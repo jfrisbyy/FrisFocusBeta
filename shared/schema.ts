@@ -1,20 +1,31 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
 // Task priority types
@@ -275,9 +286,10 @@ export type UnifiedBooster = z.infer<typeof unifiedBoosterSchema>;
 
 // ==================== FITNESS DATA TABLES (FrisFit Integration) ====================
 
-// Nutrition log
+// Nutrition log - with userId for multi-user support
 export const nutritionLogs = pgTable("nutrition_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   date: text("date").notNull(),
   calories: integer("calories"),
   protein: integer("protein"),
@@ -294,9 +306,10 @@ export const insertNutritionLogSchema = createInsertSchema(nutritionLogs).omit({
 export type InsertNutritionLog = z.infer<typeof insertNutritionLogSchema>;
 export type NutritionLog = typeof nutritionLogs.$inferSelect;
 
-// Body composition
+// Body composition - with userId for multi-user support
 export const bodyComposition = pgTable("body_composition", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   date: text("date").notNull(),
   weight: integer("weight"),
   bodyFat: integer("body_fat"),
@@ -309,9 +322,10 @@ export const insertBodyCompositionSchema = createInsertSchema(bodyComposition).o
 export type InsertBodyComposition = z.infer<typeof insertBodyCompositionSchema>;
 export type BodyComposition = typeof bodyComposition.$inferSelect;
 
-// Strength workout
+// Strength workout - with userId for multi-user support
 export const strengthWorkouts = pgTable("strength_workouts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   date: text("date").notNull(),
   type: text("type").default("Strength"),
   duration: integer("duration"),
@@ -326,9 +340,10 @@ export const insertStrengthWorkoutSchema = createInsertSchema(strengthWorkouts).
 export type InsertStrengthWorkout = z.infer<typeof insertStrengthWorkoutSchema>;
 export type StrengthWorkout = typeof strengthWorkouts.$inferSelect;
 
-// Skill workout (basketball drills)
+// Skill workout (basketball drills) - with userId for multi-user support
 export const skillWorkouts = pgTable("skill_workouts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   date: text("date").notNull(),
   type: text("type").default("Skill"),
   drillType: text("drill_type"),
@@ -343,9 +358,10 @@ export const insertSkillWorkoutSchema = createInsertSchema(skillWorkouts).omit({
 export type InsertSkillWorkout = z.infer<typeof insertSkillWorkoutSchema>;
 export type SkillWorkout = typeof skillWorkouts.$inferSelect;
 
-// Basketball runs (pickup games)
+// Basketball runs (pickup games) - with userId for multi-user support
 export const basketballRuns = pgTable("basketball_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
   date: text("date").notNull(),
   type: text("type").default("Run"),
   gameType: jsonb("game_type"),

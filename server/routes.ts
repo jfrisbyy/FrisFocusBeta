@@ -1,8 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import OpenAI from "openai";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 import {
   nutritionLogs,
   bodyComposition,
@@ -25,12 +27,28 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // ==================== FITNESS API ROUTES ====================
-  
-  // Nutrition logs
-  app.get("/api/fitness/nutrition", async (_req, res) => {
+  // Setup Replit Auth
+  await setupAuth(app);
+
+  // Auth user endpoint
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const logs = await db.select().from(nutritionLogs);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // ==================== FITNESS API ROUTES (Protected) ====================
+  
+  // Nutrition logs - filtered by user
+  app.get("/api/fitness/nutrition", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const logs = await db.select().from(nutritionLogs).where(eq(nutritionLogs.userId, userId));
       res.json(logs);
     } catch (error) {
       console.error("Error fetching nutrition logs:", error);
@@ -38,9 +56,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/fitness/nutrition", async (req, res) => {
+  app.post("/api/fitness/nutrition", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertNutritionLogSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertNutritionLogSchema.parse({ ...req.body, userId });
       const [log] = await db.insert(nutritionLogs).values(parsed).returning();
       res.json(log);
     } catch (error) {
@@ -49,10 +68,11 @@ export async function registerRoutes(
     }
   });
 
-  // Body composition (endpoint: /api/fitness/body-comp)
-  app.get("/api/fitness/body-comp", async (_req, res) => {
+  // Body composition - filtered by user
+  app.get("/api/fitness/body-comp", isAuthenticated, async (req: any, res) => {
     try {
-      const records = await db.select().from(bodyComposition);
+      const userId = req.user.claims.sub;
+      const records = await db.select().from(bodyComposition).where(eq(bodyComposition.userId, userId));
       res.json(records);
     } catch (error) {
       console.error("Error fetching body composition:", error);
@@ -60,9 +80,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/fitness/body-comp", async (req, res) => {
+  app.post("/api/fitness/body-comp", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertBodyCompositionSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertBodyCompositionSchema.parse({ ...req.body, userId });
       const [record] = await db.insert(bodyComposition).values(parsed).returning();
       res.json(record);
     } catch (error) {
@@ -71,10 +92,11 @@ export async function registerRoutes(
     }
   });
 
-  // Strength workouts
-  app.get("/api/fitness/strength", async (_req, res) => {
+  // Strength workouts - filtered by user
+  app.get("/api/fitness/strength", isAuthenticated, async (req: any, res) => {
     try {
-      const workouts = await db.select().from(strengthWorkouts);
+      const userId = req.user.claims.sub;
+      const workouts = await db.select().from(strengthWorkouts).where(eq(strengthWorkouts.userId, userId));
       res.json(workouts);
     } catch (error) {
       console.error("Error fetching strength workouts:", error);
@@ -82,9 +104,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/fitness/strength", async (req, res) => {
+  app.post("/api/fitness/strength", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertStrengthWorkoutSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertStrengthWorkoutSchema.parse({ ...req.body, userId });
       const [workout] = await db.insert(strengthWorkouts).values(parsed).returning();
       res.json(workout);
     } catch (error) {
@@ -93,10 +116,11 @@ export async function registerRoutes(
     }
   });
 
-  // Skill workouts (basketball drills)
-  app.get("/api/fitness/skill", async (_req, res) => {
+  // Skill workouts - filtered by user
+  app.get("/api/fitness/skill", isAuthenticated, async (req: any, res) => {
     try {
-      const workouts = await db.select().from(skillWorkouts);
+      const userId = req.user.claims.sub;
+      const workouts = await db.select().from(skillWorkouts).where(eq(skillWorkouts.userId, userId));
       res.json(workouts);
     } catch (error) {
       console.error("Error fetching skill workouts:", error);
@@ -104,9 +128,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/fitness/skill", async (req, res) => {
+  app.post("/api/fitness/skill", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertSkillWorkoutSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertSkillWorkoutSchema.parse({ ...req.body, userId });
       const [workout] = await db.insert(skillWorkouts).values(parsed).returning();
       res.json(workout);
     } catch (error) {
@@ -115,10 +140,11 @@ export async function registerRoutes(
     }
   });
 
-  // Basketball runs (pickup games)
-  app.get("/api/fitness/runs", async (_req, res) => {
+  // Basketball runs - filtered by user
+  app.get("/api/fitness/runs", isAuthenticated, async (req: any, res) => {
     try {
-      const runs = await db.select().from(basketballRuns);
+      const userId = req.user.claims.sub;
+      const runs = await db.select().from(basketballRuns).where(eq(basketballRuns.userId, userId));
       res.json(runs);
     } catch (error) {
       console.error("Error fetching basketball runs:", error);
@@ -126,9 +152,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/fitness/runs", async (req, res) => {
+  app.post("/api/fitness/runs", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertBasketballRunSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertBasketballRunSchema.parse({ ...req.body, userId });
       const [run] = await db.insert(basketballRuns).values(parsed).returning();
       res.json(run);
     } catch (error) {
@@ -137,9 +164,9 @@ export async function registerRoutes(
     }
   });
 
-  // ==================== AI ROUTES ====================
+  // ==================== AI ROUTES (Protected) ====================
 
-  app.post("/api/ai/insights", async (req, res) => {
+  app.post("/api/ai/insights", isAuthenticated, async (req, res) => {
     try {
       const { message, history } = req.body;
 

@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { OnboardingProvider, useOnboarding } from "@/contexts/OnboardingContext";
+import { useAuth } from "@/hooks/useAuth";
 import Navigation from "@/components/Navigation";
 import StartJourneyButton from "@/components/StartJourneyButton";
 import Dashboard from "@/pages/Dashboard";
@@ -13,10 +14,27 @@ import BadgesPage from "@/pages/BadgesPage";
 import JournalPage from "@/pages/JournalPage";
 import InsightsPage from "@/pages/InsightsPage";
 import FitnessPage from "@/pages/FitnessPage";
+import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   const { hasStartedJourney } = useOnboarding();
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+  
+  // Show landing page for unauthenticated users
+  if (!isAuthenticated) {
+    return <LandingPage />;
+  }
+
   const routerKey = hasStartedJourney ? "journey" : "onboarding";
   return (
     <div key={routerKey}>
@@ -34,18 +52,34 @@ function Router() {
   );
 }
 
+function AuthenticatedApp() {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {isAuthenticated && <Navigation />}
+      <main>
+        <Router />
+      </main>
+      {isAuthenticated && <StartJourneyButton />}
+    </div>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <OnboardingProvider>
-          <div className="min-h-screen bg-background">
-            <Navigation />
-            <main>
-              <Router />
-            </main>
-            <StartJourneyButton />
-          </div>
+          <AuthenticatedApp />
           <Toaster />
         </OnboardingProvider>
       </TooltipProvider>
