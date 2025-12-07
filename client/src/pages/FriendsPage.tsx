@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useDemo } from "@/contexts/DemoContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Users, UserPlus, Mail, Check, X, Settings, Trophy, Flame, Calendar, Loader2 } from "lucide-react";
+import { Users, UserPlus, Mail, Check, X, Settings, Trophy, Flame, Calendar, Loader2, Star } from "lucide-react";
 
 interface Friend {
   id: string;
@@ -48,8 +49,85 @@ interface SharingSettings {
   profilePublic: boolean;
 }
 
+const demoFriends: Friend[] = [
+  {
+    id: "demo-1",
+    friendId: "friend-1",
+    firstName: "Alex",
+    lastName: "Chen",
+    profileImageUrl: null,
+    weeklyPoints: 485,
+    dayStreak: 12,
+    weekStreak: 4,
+    totalBadgesEarned: 8,
+    sharePoints: true,
+    shareStreaks: true,
+    shareBadges: true,
+  },
+  {
+    id: "demo-2",
+    friendId: "friend-2",
+    firstName: "Jordan",
+    lastName: "Taylor",
+    profileImageUrl: null,
+    weeklyPoints: 320,
+    dayStreak: 7,
+    weekStreak: 2,
+    totalBadgesEarned: 5,
+    sharePoints: true,
+    shareStreaks: true,
+    shareBadges: true,
+  },
+  {
+    id: "demo-3",
+    friendId: "friend-3",
+    firstName: "Sam",
+    lastName: "Rivera",
+    profileImageUrl: null,
+    weeklyPoints: 560,
+    dayStreak: 21,
+    weekStreak: 6,
+    totalBadgesEarned: 12,
+    sharePoints: true,
+    shareStreaks: true,
+    shareBadges: true,
+  },
+];
+
+const demoIncomingRequests: FriendRequest[] = [
+  {
+    id: "req-1",
+    requesterId: "user-4",
+    firstName: "Morgan",
+    lastName: "Kim",
+    profileImageUrl: null,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
+
+const demoOutgoingRequests: FriendRequest[] = [
+  {
+    id: "req-2",
+    addresseeId: "user-5",
+    firstName: "Casey",
+    lastName: "Park",
+    profileImageUrl: null,
+    createdAt: new Date(Date.now() - 172800000).toISOString(),
+  },
+];
+
+const demoSettings: SharingSettings = {
+  id: "settings-1",
+  userId: "demo-user",
+  sharePoints: true,
+  shareStreaks: true,
+  shareBadges: true,
+  profilePublic: false,
+};
+
 export default function FriendsPage() {
   const { isAuthenticated } = useAuth();
+  const { isDemo } = useDemo();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
 
@@ -160,21 +238,10 @@ export default function FriendsPage() {
     return "Unknown User";
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="container max-w-4xl mx-auto p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="w-12 h-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Sign in to view friends</h2>
-            <p className="text-muted-foreground text-center">
-              Connect with friends and share your progress together.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const displayFriends = isDemo ? demoFriends : friends;
+  const displayIncoming = isDemo ? demoIncomingRequests : incomingRequests;
+  const displayOutgoing = isDemo ? demoOutgoingRequests : outgoingRequests;
+  const displaySettings = isDemo ? demoSettings : settings;
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
@@ -189,10 +256,10 @@ export default function FriendsPage() {
       <Tabs defaultValue="friends" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="friends" data-testid="tab-friends">
-            Friends {friends.length > 0 && <Badge variant="secondary" className="ml-2">{friends.length}</Badge>}
+            Friends {displayFriends.length > 0 && <Badge variant="secondary" className="ml-2">{displayFriends.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="requests" data-testid="tab-requests">
-            Requests {incomingRequests.length > 0 && <Badge variant="default" className="ml-2">{incomingRequests.length}</Badge>}
+            Requests {displayIncoming.length > 0 && <Badge variant="default" className="ml-2">{displayIncoming.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="settings" data-testid="tab-settings">
             <Settings className="w-4 h-4 mr-1" /> Settings
@@ -225,11 +292,11 @@ export default function FriendsPage() {
             </CardContent>
           </Card>
 
-          {loadingFriends ? (
+          {loadingFriends && !isDemo ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
-          ) : friends.length === 0 ? (
+          ) : displayFriends.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Users className="w-12 h-12 text-muted-foreground mb-4" />
@@ -240,7 +307,7 @@ export default function FriendsPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {friends.map((friend) => (
+              {displayFriends.map((friend) => (
                 <Card key={friend.id} data-testid={`card-friend-${friend.friendId}`}>
                   <CardContent className="flex items-center justify-between gap-4 p-4">
                     <div className="flex items-center gap-3">
@@ -266,18 +333,25 @@ export default function FriendsPage() {
                               <Calendar className="w-3 h-3" /> {friend.weekStreak}w
                             </span>
                           )}
+                          {friend.totalBadgesEarned !== null && (
+                            <span className="flex items-center gap-1">
+                              <Star className="w-3 h-3" /> {friend.totalBadgesEarned} badges
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeFriendMutation.mutate(friend.id)}
-                      disabled={removeFriendMutation.isPending}
-                      data-testid={`button-remove-friend-${friend.friendId}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    {!isDemo && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFriendMutation.mutate(friend.id)}
+                        disabled={removeFriendMutation.isPending}
+                        data-testid={`button-remove-friend-${friend.friendId}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -286,14 +360,14 @@ export default function FriendsPage() {
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-4 mt-4">
-          {incomingRequests.length > 0 && (
+          {displayIncoming.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Incoming Requests</CardTitle>
                 <CardDescription>People who want to be your friend</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {incomingRequests.map((request) => (
+                {displayIncoming.map((request) => (
                   <div key={request.id} className="flex items-center justify-between gap-4" data-testid={`request-incoming-${request.id}`}>
                     <div className="flex items-center gap-3">
                       <Avatar>
@@ -302,39 +376,51 @@ export default function FriendsPage() {
                       </Avatar>
                       <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => acceptRequestMutation.mutate(request.id)}
-                        disabled={acceptRequestMutation.isPending}
-                        data-testid={`button-accept-${request.id}`}
-                      >
-                        <Check className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => declineRequestMutation.mutate(request.id)}
-                        disabled={declineRequestMutation.isPending}
-                        data-testid={`button-decline-${request.id}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    {!isDemo && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => acceptRequestMutation.mutate(request.id)}
+                          disabled={acceptRequestMutation.isPending}
+                          data-testid={`button-accept-${request.id}`}
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => declineRequestMutation.mutate(request.id)}
+                          disabled={declineRequestMutation.isPending}
+                          data-testid={`button-decline-${request.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                    {isDemo && (
+                      <div className="flex gap-2">
+                        <Button size="sm" data-testid={`button-accept-${request.id}`}>
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" data-testid={`button-decline-${request.id}`}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </CardContent>
             </Card>
           )}
 
-          {outgoingRequests.length > 0 && (
+          {displayOutgoing.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Sent Requests</CardTitle>
                 <CardDescription>Waiting for their response</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {outgoingRequests.map((request) => (
+                {displayOutgoing.map((request) => (
                   <div key={request.id} className="flex items-center justify-between gap-4" data-testid={`request-outgoing-${request.id}`}>
                     <div className="flex items-center gap-3">
                       <Avatar>
@@ -352,7 +438,7 @@ export default function FriendsPage() {
             </Card>
           )}
 
-          {incomingRequests.length === 0 && outgoingRequests.length === 0 && (
+          {displayIncoming.length === 0 && displayOutgoing.length === 0 && (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Mail className="w-12 h-12 text-muted-foreground mb-4" />
@@ -376,8 +462,8 @@ export default function FriendsPage() {
                 </div>
                 <Switch
                   id="share-points"
-                  checked={settings?.sharePoints ?? true}
-                  onCheckedChange={(checked) => updateSettingsMutation.mutate({ sharePoints: checked })}
+                  checked={displaySettings?.sharePoints ?? true}
+                  onCheckedChange={(checked) => !isDemo && updateSettingsMutation.mutate({ sharePoints: checked })}
                   data-testid="switch-share-points"
                 />
               </div>
@@ -389,8 +475,8 @@ export default function FriendsPage() {
                 </div>
                 <Switch
                   id="share-streaks"
-                  checked={settings?.shareStreaks ?? true}
-                  onCheckedChange={(checked) => updateSettingsMutation.mutate({ shareStreaks: checked })}
+                  checked={displaySettings?.shareStreaks ?? true}
+                  onCheckedChange={(checked) => !isDemo && updateSettingsMutation.mutate({ shareStreaks: checked })}
                   data-testid="switch-share-streaks"
                 />
               </div>
@@ -402,8 +488,8 @@ export default function FriendsPage() {
                 </div>
                 <Switch
                   id="share-badges"
-                  checked={settings?.shareBadges ?? true}
-                  onCheckedChange={(checked) => updateSettingsMutation.mutate({ shareBadges: checked })}
+                  checked={displaySettings?.shareBadges ?? true}
+                  onCheckedChange={(checked) => !isDemo && updateSettingsMutation.mutate({ shareBadges: checked })}
                   data-testid="switch-share-badges"
                 />
               </div>

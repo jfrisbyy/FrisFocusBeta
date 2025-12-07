@@ -27,16 +27,19 @@ interface DisplayTask {
 }
 
 const sampleTasks: DisplayTask[] = [
-  { id: "demo-1", name: "Morning Prayer", value: 10, category: "Spiritual" },
-  { id: "demo-2", name: "Bible Reading", value: 15, category: "Spiritual", isBooster: true },
-  { id: "demo-3", name: "Scripture Memory", value: 10, category: "Spiritual" },
+  { id: "demo-1", name: "Morning Meditation", value: 10, category: "Mindfulness" },
+  { id: "demo-2", name: "Reading (30 min)", value: 15, category: "Personal Growth", isBooster: true },
+  { id: "demo-3", name: "Journal Entry", value: 10, category: "Mindfulness" },
   { id: "demo-4", name: "Workout", value: 20, category: "Health" },
   { id: "demo-5", name: "Meal Prep", value: 10, category: "Health" },
   { id: "demo-6", name: "8 Hours Sleep", value: 15, category: "Health" },
   { id: "demo-7", name: "Deep Work Session", value: 25, category: "Productivity" },
   { id: "demo-8", name: "Project Progress", value: 20, category: "Productivity" },
-  { id: "demo-9", name: "Skipped workout", value: -15, category: "Penalties" },
-  { id: "demo-10", name: "Missed devotions", value: -10, category: "Penalties" },
+  { id: "demo-9", name: "Learn Something New", value: 15, category: "Personal Growth" },
+  { id: "demo-10", name: "Hydration Goal", value: 10, category: "Health" },
+  { id: "demo-11", name: "Skipped workout", value: -15, category: "Penalties" },
+  { id: "demo-12", name: "Junk food", value: -10, category: "Penalties" },
+  { id: "demo-13", name: "Missed sleep goal", value: -10, category: "Penalties" },
 ];
 
 export default function DailyPage() {
@@ -52,7 +55,7 @@ export default function DailyPage() {
   useEffect(() => {
     if (isDemo) {
       setAllTasks(sampleTasks);
-      setCompletedIds(new Set(["demo-1", "demo-2", "demo-4", "demo-7"]));
+      setCompletedIds(new Set(["demo-1", "demo-2", "demo-4", "demo-6", "demo-7", "demo-9", "demo-10"]));
       return;
     }
     

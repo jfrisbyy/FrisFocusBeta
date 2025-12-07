@@ -95,20 +95,6 @@ const conditionLabels: Record<BadgeConditionType, string> = {
 const sampleBadges: BadgeDefinition[] = [
   {
     id: "demo-1",
-    name: "Scripture Scholar",
-    description: "Complete Bible reading consistently",
-    icon: "book",
-    conditionType: "taskCompletions",
-    taskName: "Bible Reading",
-    levels: [
-      { level: 1, required: 10, earned: true },
-      { level: 2, required: 25, earned: true },
-      { level: 3, required: 50, earned: false },
-    ],
-    progress: 32,
-  },
-  {
-    id: "demo-2",
     name: "Iron Will",
     description: "Complete workouts consistently",
     icon: "flame",
@@ -116,7 +102,21 @@ const sampleBadges: BadgeDefinition[] = [
     taskName: "Workout",
     levels: [
       { level: 1, required: 10, earned: true },
-      { level: 2, required: 30, earned: false },
+      { level: 2, required: 30, earned: true },
+      { level: 3, required: 60, earned: false },
+    ],
+    progress: 42,
+  },
+  {
+    id: "demo-2",
+    name: "Bookworm",
+    description: "Complete reading sessions consistently",
+    icon: "book",
+    conditionType: "taskCompletions",
+    taskName: "Reading",
+    levels: [
+      { level: 1, required: 10, earned: true },
+      { level: 2, required: 25, earned: false },
     ],
     progress: 18,
   },
@@ -127,10 +127,11 @@ const sampleBadges: BadgeDefinition[] = [
     icon: "trophy",
     conditionType: "weeklyGoalStreak",
     levels: [
-      { level: 1, required: 2, earned: false },
+      { level: 1, required: 2, earned: true },
       { level: 2, required: 4, earned: false },
+      { level: 3, required: 8, earned: false },
     ],
-    progress: 1,
+    progress: 3,
   },
   {
     id: "demo-4",
@@ -139,10 +140,63 @@ const sampleBadges: BadgeDefinition[] = [
     icon: "shield",
     conditionType: "negativeFreeStreak",
     levels: [
-      { level: 1, required: 7, earned: false },
+      { level: 1, required: 7, earned: true },
       { level: 2, required: 14, earned: false },
     ],
-    progress: 3,
+    progress: 9,
+  },
+  {
+    id: "demo-5",
+    name: "Early Bird",
+    description: "Complete morning meditation consistently",
+    icon: "star",
+    conditionType: "taskCompletions",
+    taskName: "Morning Meditation",
+    levels: [
+      { level: 1, required: 7, earned: true },
+      { level: 2, required: 21, earned: true },
+      { level: 3, required: 50, earned: false },
+    ],
+    progress: 28,
+  },
+  {
+    id: "demo-6",
+    name: "Deep Focus",
+    description: "Complete deep work sessions",
+    icon: "target",
+    conditionType: "taskCompletions",
+    taskName: "Deep Work Session",
+    levels: [
+      { level: 1, required: 10, earned: true },
+      { level: 2, required: 25, earned: false },
+    ],
+    progress: 15,
+  },
+  {
+    id: "demo-7",
+    name: "Hydration Hero",
+    description: "Hit hydration goal consistently",
+    icon: "heart",
+    conditionType: "taskCompletions",
+    taskName: "Hydration Goal",
+    levels: [
+      { level: 1, required: 7, earned: true },
+      { level: 2, required: 30, earned: false },
+    ],
+    progress: 12,
+  },
+  {
+    id: "demo-8",
+    name: "Consistency King",
+    description: "Perfect days in a row",
+    icon: "zap",
+    conditionType: "perfectDaysStreak",
+    levels: [
+      { level: 1, required: 3, earned: true },
+      { level: 2, required: 7, earned: false },
+      { level: 3, required: 14, earned: false },
+    ],
+    progress: 5,
   },
 ];
 

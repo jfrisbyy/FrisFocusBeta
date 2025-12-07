@@ -55,13 +55,16 @@ function getSampleEntries(): JournalEntry[] {
   const today = new Date();
   const yesterday = new Date(Date.now() - 86400000);
   const twoDaysAgo = new Date(Date.now() - 172800000);
+  const threeDaysAgo = new Date(Date.now() - 259200000);
+  const fourDaysAgo = new Date(Date.now() - 345600000);
+  const fiveDaysAgo = new Date(Date.now() - 432000000);
   
   return [
     {
       id: "demo-1",
       date: format(today, "yyyy-MM-dd"),
       title: "Morning Reflection",
-      content: "Great start to the day. Completed my Bible reading and had a solid workout. Feeling energized and focused for the tasks ahead.",
+      content: "Great start to the day. Completed my morning meditation and had a solid workout. Feeling energized and focused for the tasks ahead.",
       createdAt: new Date(new Date().setHours(7, 30)).toISOString(),
     },
     {
@@ -75,7 +78,7 @@ function getSampleEntries(): JournalEntry[] {
       id: "demo-3",
       date: format(yesterday, "yyyy-MM-dd"),
       title: "Weekly Planning",
-      content: "Set up goals for the week. Want to focus on maintaining my workout streak and being more intentional about scripture memory.",
+      content: "Set up goals for the week. Want to focus on maintaining my workout streak and learning something new every day.",
       createdAt: new Date(new Date(Date.now() - 86400000).setHours(9, 0)).toISOString(),
     },
     {
@@ -84,6 +87,27 @@ function getSampleEntries(): JournalEntry[] {
       title: "Gratitude Note",
       content: "Thankful for the progress I've made this month. The habit tracker has really helped me stay accountable.",
       createdAt: new Date(new Date(Date.now() - 172800000).setHours(20, 15)).toISOString(),
+    },
+    {
+      id: "demo-5",
+      date: format(threeDaysAgo, "yyyy-MM-dd"),
+      title: "Workout Progress",
+      content: "Hit a new personal record on bench press today. All those consistent sessions are paying off. Also managed to get 8 hours of sleep which really helped my recovery.",
+      createdAt: new Date(new Date(Date.now() - 259200000).setHours(18, 30)).toISOString(),
+    },
+    {
+      id: "demo-6",
+      date: format(fourDaysAgo, "yyyy-MM-dd"),
+      title: "Deep Work Session",
+      content: "Finished a major project milestone during my deep work block. No distractions, just pure focus. The meditation practice is definitely helping with concentration.",
+      createdAt: new Date(new Date(Date.now() - 345600000).setHours(14, 0)).toISOString(),
+    },
+    {
+      id: "demo-7",
+      date: format(fiveDaysAgo, "yyyy-MM-dd"),
+      title: "Basketball Run Recap",
+      content: "Great pickup games at the gym. Went 4-1 and felt really confident on the court. Need to work on my ball handling during skill sessions.",
+      createdAt: new Date(new Date(Date.now() - 432000000).setHours(19, 45)).toISOString(),
     },
   ];
 }

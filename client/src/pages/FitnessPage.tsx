@@ -9,27 +9,39 @@ const mockNutrition: NutritionLog[] = [
   { id: "demo-1", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, creatine: true, waterGallon: true },
   { id: "demo-2", date: new Date(Date.now() - 86400000).toISOString().split("T")[0], calories: 2100, protein: 165, creatine: true, waterGallon: false },
   { id: "demo-3", date: new Date(Date.now() - 172800000).toISOString().split("T")[0], calories: 2350, protein: 190, creatine: true, waterGallon: true },
+  { id: "demo-4", date: new Date(Date.now() - 259200000).toISOString().split("T")[0], calories: 2400, protein: 185, creatine: true, waterGallon: true },
+  { id: "demo-5", date: new Date(Date.now() - 345600000).toISOString().split("T")[0], calories: 2050, protein: 160, creatine: false, waterGallon: true },
+  { id: "demo-6", date: new Date(Date.now() - 432000000).toISOString().split("T")[0], calories: 2280, protein: 175, creatine: true, waterGallon: true },
 ];
 
 const mockBodyComp: BodyComposition[] = [
   { id: "demo-1", date: new Date().toISOString().split("T")[0], weight: 185, bodyFat: 15, goalWeight: 180 },
   { id: "demo-2", date: new Date(Date.now() - 604800000).toISOString().split("T")[0], weight: 187, bodyFat: 16, goalWeight: 180 },
+  { id: "demo-3", date: new Date(Date.now() - 1209600000).toISOString().split("T")[0], weight: 189, bodyFat: 17, goalWeight: 180 },
+  { id: "demo-4", date: new Date(Date.now() - 1814400000).toISOString().split("T")[0], weight: 191, bodyFat: 18, goalWeight: 180 },
 ];
 
 const mockStrength: StrengthWorkout[] = [
   { id: "demo-1", date: new Date().toISOString().split("T")[0], primaryFocus: "Push", duration: 60, volume: 15000 },
   { id: "demo-2", date: new Date(Date.now() - 172800000).toISOString().split("T")[0], primaryFocus: "Pull", duration: 55, volume: 14200 },
   { id: "demo-3", date: new Date(Date.now() - 345600000).toISOString().split("T")[0], primaryFocus: "Legs", duration: 70, volume: 18500 },
+  { id: "demo-4", date: new Date(Date.now() - 518400000).toISOString().split("T")[0], primaryFocus: "Push", duration: 65, volume: 16200 },
+  { id: "demo-5", date: new Date(Date.now() - 691200000).toISOString().split("T")[0], primaryFocus: "Pull", duration: 50, volume: 13800 },
+  { id: "demo-6", date: new Date(Date.now() - 864000000).toISOString().split("T")[0], primaryFocus: "Legs", duration: 75, volume: 19500 },
 ];
 
 const mockSkills: SkillWorkout[] = [
   { id: "demo-1", date: new Date().toISOString().split("T")[0], drillType: "Shooting", effort: 8, skillFocus: ["3-pointers", "Mid-range"], zoneFocus: ["Corner", "Wing"] },
   { id: "demo-2", date: new Date(Date.now() - 259200000).toISOString().split("T")[0], drillType: "Ball Handling", effort: 7, skillFocus: ["Crossovers", "Behind back"], zoneFocus: [] },
+  { id: "demo-3", date: new Date(Date.now() - 518400000).toISOString().split("T")[0], drillType: "Shooting", effort: 9, skillFocus: ["Free throws", "Fadeaways"], zoneFocus: ["Paint", "Elbow"] },
+  { id: "demo-4", date: new Date(Date.now() - 777600000).toISOString().split("T")[0], drillType: "Defense", effort: 8, skillFocus: ["Closeouts", "Lateral slides"], zoneFocus: [] },
 ];
 
 const mockRuns: BasketballRun[] = [
   { id: "demo-1", date: new Date().toISOString().split("T")[0], gameType: { fullCourt: true }, courtType: "Indoor", gamesPlayed: 5, wins: 3, losses: 2, performanceGrade: "B+", confidence: 7 },
   { id: "demo-2", date: new Date(Date.now() - 432000000).toISOString().split("T")[0], gameType: { halfCourt: true }, courtType: "Outdoor", gamesPlayed: 4, wins: 4, losses: 0, performanceGrade: "A", confidence: 9 },
+  { id: "demo-3", date: new Date(Date.now() - 864000000).toISOString().split("T")[0], gameType: { fullCourt: true }, courtType: "Indoor", gamesPlayed: 6, wins: 4, losses: 2, performanceGrade: "A-", confidence: 8 },
+  { id: "demo-4", date: new Date(Date.now() - 1296000000).toISOString().split("T")[0], gameType: { halfCourt: true }, courtType: "Outdoor", gamesPlayed: 3, wins: 2, losses: 1, performanceGrade: "B", confidence: 6 },
 ];
 
 export default function FitnessPage() {
