@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, CalendarCheck, ListTodo, Award, BookOpen, Sparkles } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, ListTodo, Award, BookOpen, Sparkles, Dumbbell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { path: "/badges", label: "Badges", icon: Award },
   { path: "/journal", label: "Journal", icon: BookOpen },
   { path: "/insights", label: "Insights", icon: Sparkles },
+  { path: "/fitness", label: "Fitness", icon: Dumbbell },
 ];
 
 export default function Navigation() {

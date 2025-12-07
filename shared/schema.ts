@@ -272,3 +272,71 @@ export const unifiedBoosterSchema = z.object({
   isNegative: z.boolean().default(false),
 });
 export type UnifiedBooster = z.infer<typeof unifiedBoosterSchema>;
+
+// ==================== FITNESS DATA TABLES (FrisFit Integration) ====================
+
+// Basketball workout
+export const basketballWorkouts = pgTable("basketball_workouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  duration: integer("duration").notNull(),
+  notes: text("notes"),
+  performance: jsonb("performance"),
+});
+
+export const insertBasketballWorkoutSchema = createInsertSchema(basketballWorkouts).omit({ id: true });
+export type InsertBasketballWorkout = z.infer<typeof insertBasketballWorkoutSchema>;
+export type BasketballWorkout = typeof basketballWorkouts.$inferSelect;
+
+// Run session
+export const runSessions = pgTable("run_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  distance: integer("distance").notNull(),
+  duration: integer("duration").notNull(),
+  pace: text("pace"),
+  notes: text("notes"),
+});
+
+export const insertRunSessionSchema = createInsertSchema(runSessions).omit({ id: true });
+export type InsertRunSession = z.infer<typeof insertRunSessionSchema>;
+export type RunSession = typeof runSessions.$inferSelect;
+
+// Strength workout
+export const strengthWorkouts = pgTable("strength_workouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  exercises: jsonb("exercises").notNull(),
+  notes: text("notes"),
+});
+
+export const insertStrengthWorkoutSchema = createInsertSchema(strengthWorkouts).omit({ id: true });
+export type InsertStrengthWorkout = z.infer<typeof insertStrengthWorkoutSchema>;
+export type StrengthWorkout = typeof strengthWorkouts.$inferSelect;
+
+// Nutrition log
+export const nutritionLogs = pgTable("nutrition_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  meals: jsonb("meals"),
+  macros: jsonb("macros"),
+  notes: text("notes"),
+});
+
+export const insertNutritionLogSchema = createInsertSchema(nutritionLogs).omit({ id: true });
+export type InsertNutritionLog = z.infer<typeof insertNutritionLogSchema>;
+export type NutritionLog = typeof nutritionLogs.$inferSelect;
+
+// Body composition
+export const bodyComposition = pgTable("body_composition", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  weight: integer("weight"),
+  bodyFat: integer("body_fat"),
+  measurements: jsonb("measurements"),
+  notes: text("notes"),
+});
+
+export const insertBodyCompositionSchema = createInsertSchema(bodyComposition).omit({ id: true });
+export type InsertBodyComposition = z.infer<typeof insertBodyCompositionSchema>;
+export type BodyComposition = typeof bodyComposition.$inferSelect;

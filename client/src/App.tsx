@@ -12,6 +12,7 @@ import TasksPage from "@/pages/TasksPage";
 import BadgesPage from "@/pages/BadgesPage";
 import JournalPage from "@/pages/JournalPage";
 import InsightsPage from "@/pages/InsightsPage";
+import FitnessPage from "@/pages/FitnessPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +27,7 @@ function Router() {
         <Route path="/badges" component={BadgesPage} />
         <Route path="/journal" component={JournalPage} />
         <Route path="/insights" component={InsightsPage} />
+        <Route path="/fitness" component={FitnessPage} />
         <Route component={NotFound} />
       </Switch>
     </div>
