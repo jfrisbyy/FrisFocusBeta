@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { format, startOfWeek, addDays } from "date-fns";
+import { format, startOfWeek, addDays, subWeeks } from "date-fns";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
+import RecentWeeks, { WeekData } from "@/components/RecentWeeks";
 
 // todo: remove mock functionality
 const getMockWeekData = () => {
@@ -83,11 +84,56 @@ const mockCustomBoosters = [
   },
 ];
 
+// todo: remove mock functionality
+const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
+  const today = new Date();
+  return [
+    {
+      id: "week-1",
+      weekStart: format(startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 }), "MMM d"),
+      weekEnd: format(addDays(startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 }), 6), "MMM d"),
+      points: 385,
+      defaultGoal,
+      note: undefined,
+      customGoal: undefined,
+    },
+    {
+      id: "week-2",
+      weekStart: format(startOfWeek(subWeeks(today, 2), { weekStartsOn: 1 }), "MMM d"),
+      weekEnd: format(addDays(startOfWeek(subWeeks(today, 2), { weekStartsOn: 1 }), 6), "MMM d"),
+      points: 280,
+      defaultGoal,
+      note: "Travel week",
+      customGoal: 250,
+    },
+    {
+      id: "week-3",
+      weekStart: format(startOfWeek(subWeeks(today, 3), { weekStartsOn: 1 }), "MMM d"),
+      weekEnd: format(addDays(startOfWeek(subWeeks(today, 3), { weekStartsOn: 1 }), 6), "MMM d"),
+      points: 365,
+      defaultGoal,
+      note: undefined,
+      customGoal: undefined,
+    },
+    {
+      id: "week-4",
+      weekStart: format(startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 }), "MMM d"),
+      weekEnd: format(addDays(startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 }), 6), "MMM d"),
+      points: 195,
+      defaultGoal,
+      note: "Vacation week",
+      customGoal: 200,
+    },
+  ];
+};
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const [days] = useState(getMockWeekData);
   // todo: remove mock functionality - weekly goal will come from backend
   const [weeklyGoal, setWeeklyGoal] = useState<number>(350);
+  // todo: remove mock functionality - recent weeks will come from backend
+  const [recentWeeks, setRecentWeeks] = useState<WeekData[]>(() => getMockRecentWeeks(350));
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -106,6 +152,14 @@ export default function Dashboard() {
 
   const handleGoalChange = (newGoal: number) => {
     setWeeklyGoal(newGoal);
+  };
+
+  const handleWeekUpdate = (weekId: string, note: string, customGoal?: number) => {
+    setRecentWeeks(prev => prev.map(week => 
+      week.id === weekId 
+        ? { ...week, note: note || undefined, customGoal }
+        : week
+    ));
   };
 
   return (
@@ -130,11 +184,20 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="max-w-md">
-        <BoostersPanel 
-          systemBoosters={mockSystemBoosters}
-          customBoosters={mockCustomBoosters}
-        />
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="max-w-md">
+          <BoostersPanel 
+            systemBoosters={mockSystemBoosters}
+            customBoosters={mockCustomBoosters}
+          />
+        </div>
+        <div className="max-w-lg">
+          <RecentWeeks
+            weeks={recentWeeks}
+            defaultGoal={weeklyGoal}
+            onWeekUpdate={handleWeekUpdate}
+          />
+        </div>
       </div>
     </div>
   );
