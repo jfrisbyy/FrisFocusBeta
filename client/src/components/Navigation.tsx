@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, CalendarCheck, ListTodo, Award, BookOpen, Sparkles, Dumbbell, LogOut } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, ListTodo, Award, BookOpen, Sparkles, Dumbbell, Users, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ const navItems = [
   { path: "/journal", label: "Journal", icon: BookOpen },
   { path: "/insights", label: "Insights", icon: Sparkles },
   { path: "/fitness", label: "Fitness", icon: Dumbbell },
+  { path: "/friends", label: "Friends", icon: Users },
 ];
 
 export default function Navigation() {

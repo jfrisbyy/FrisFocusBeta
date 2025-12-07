@@ -19,7 +19,14 @@ import {
   insertStrengthWorkoutSchema,
   insertSkillWorkoutSchema,
   insertBasketballRunSchema,
+  friendships,
+  userStats,
+  sharingSettings,
+  users,
+  insertFriendshipSchema,
+  insertSharingSettingsSchema,
 } from "@shared/schema";
+import { and, or } from "drizzle-orm";
 import { lt } from "drizzle-orm";
 
 const openai = new OpenAI({
@@ -246,6 +253,397 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // ==================== FRIENDS API ROUTES ====================
+
+  // Get all friends (accepted friendships)
+  app.get("/api/friends", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get all accepted friendships where user is either requester or addressee
+      const friendshipsList = await db.select().from(friendships).where(
+        and(
+          eq(friendships.status, "accepted"),
+          or(
+            eq(friendships.requesterId, userId),
+            eq(friendships.addresseeId, userId)
+          )
+        )
+      );
+
+      // Get friend IDs
+      const friendIds = friendshipsList.map(f => 
+        f.requesterId === userId ? f.addresseeId : f.requesterId
+      );
+
+      if (friendIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Get friend details with stats and sharing settings
+      const friendsWithStats = await Promise.all(
+        friendIds.map(async (friendId) => {
+          const friendship = friendshipsList.find(f => 
+            f.requesterId === friendId || f.addresseeId === friendId
+          );
+          
+          const [user] = await db.select().from(users).where(eq(users.id, friendId));
+          const [stats] = await db.select().from(userStats).where(eq(userStats.userId, friendId));
+          const [settings] = await db.select().from(sharingSettings).where(eq(sharingSettings.userId, friendId));
+
+          // Default to sharing if no settings exist (sharePoints !== false means true or undefined)
+          const sharePoints = settings?.sharePoints !== false;
+          const shareStreaks = settings?.shareStreaks !== false;
+          const shareBadges = settings?.shareBadges !== false;
+
+          return {
+            id: friendship?.id,
+            friendId,
+            firstName: user?.firstName ?? null,
+            lastName: user?.lastName ?? null,
+            profileImageUrl: user?.profileImageUrl ?? null,
+            weeklyPoints: sharePoints ? (stats?.weeklyPoints ?? 0) : null,
+            dayStreak: shareStreaks ? (stats?.dayStreak ?? 0) : null,
+            weekStreak: shareStreaks ? (stats?.weekStreak ?? 0) : null,
+            totalBadgesEarned: shareBadges ? (stats?.totalBadgesEarned ?? 0) : null,
+            sharePoints,
+            shareStreaks,
+            shareBadges,
+          };
+        })
+      );
+
+      res.json(friendsWithStats);
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+      res.status(500).json({ error: "Failed to fetch friends" });
+    }
+  });
+
+  // Get pending friend requests (incoming)
+  app.get("/api/friends/requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get pending requests where user is the addressee
+      const pendingRequests = await db.select().from(friendships).where(
+        and(
+          eq(friendships.status, "pending"),
+          eq(friendships.addresseeId, userId)
+        )
+      );
+
+      // Get requester details
+      const requestsWithDetails = await Promise.all(
+        pendingRequests.map(async (request) => {
+          const [requester] = await db.select().from(users).where(eq(users.id, request.requesterId));
+          return {
+            id: request.id,
+            requesterId: request.requesterId,
+            firstName: requester?.firstName ?? null,
+            lastName: requester?.lastName ?? null,
+            profileImageUrl: requester?.profileImageUrl ?? null,
+            createdAt: request.createdAt,
+          };
+        })
+      );
+
+      res.json(requestsWithDetails);
+    } catch (error) {
+      console.error("Error fetching friend requests:", error);
+      res.status(500).json({ error: "Failed to fetch friend requests" });
+    }
+  });
+
+  // Get outgoing friend requests
+  app.get("/api/friends/requests/outgoing", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get pending requests where user is the requester
+      const outgoingRequests = await db.select().from(friendships).where(
+        and(
+          eq(friendships.status, "pending"),
+          eq(friendships.requesterId, userId)
+        )
+      );
+
+      // Get addressee details
+      const requestsWithDetails = await Promise.all(
+        outgoingRequests.map(async (request) => {
+          const [addressee] = await db.select().from(users).where(eq(users.id, request.addresseeId));
+          return {
+            id: request.id,
+            addresseeId: request.addresseeId,
+            firstName: addressee?.firstName ?? null,
+            lastName: addressee?.lastName ?? null,
+            profileImageUrl: addressee?.profileImageUrl ?? null,
+            createdAt: request.createdAt,
+          };
+        })
+      );
+
+      res.json(requestsWithDetails);
+    } catch (error) {
+      console.error("Error fetching outgoing requests:", error);
+      res.status(500).json({ error: "Failed to fetch outgoing friend requests" });
+    }
+  });
+
+  // Send friend request (by email)
+  app.post("/api/friends/request", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      // Find user by email
+      const [targetUser] = await db.select().from(users).where(eq(users.email, email));
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (targetUser.id === userId) {
+        return res.status(400).json({ error: "Cannot send friend request to yourself" });
+      }
+
+      // Check if friendship already exists
+      const existingFriendship = await db.select().from(friendships).where(
+        or(
+          and(eq(friendships.requesterId, userId), eq(friendships.addresseeId, targetUser.id)),
+          and(eq(friendships.requesterId, targetUser.id), eq(friendships.addresseeId, userId))
+        )
+      );
+
+      if (existingFriendship.length > 0) {
+        const status = existingFriendship[0].status;
+        if (status === "accepted") {
+          return res.status(400).json({ error: "Already friends" });
+        }
+        if (status === "pending") {
+          return res.status(400).json({ error: "Friend request already pending" });
+        }
+      }
+
+      // Create friend request
+      const [friendship] = await db.insert(friendships).values({
+        requesterId: userId,
+        addresseeId: targetUser.id,
+        status: "pending",
+      }).returning();
+
+      res.json(friendship);
+    } catch (error) {
+      console.error("Error sending friend request:", error);
+      res.status(500).json({ error: "Failed to send friend request" });
+    }
+  });
+
+  // Accept friend request
+  app.post("/api/friends/accept/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Find the friendship
+      const [friendship] = await db.select().from(friendships).where(eq(friendships.id, id));
+
+      if (!friendship) {
+        return res.status(404).json({ error: "Friend request not found" });
+      }
+
+      // Only addressee can accept
+      if (friendship.addresseeId !== userId) {
+        return res.status(403).json({ error: "Not authorized to accept this request" });
+      }
+
+      if (friendship.status !== "pending") {
+        return res.status(400).json({ error: "Request already processed" });
+      }
+
+      // Update status to accepted
+      const [updated] = await db.update(friendships)
+        .set({ status: "accepted", updatedAt: new Date() })
+        .where(eq(friendships.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error accepting friend request:", error);
+      res.status(500).json({ error: "Failed to accept friend request" });
+    }
+  });
+
+  // Decline friend request
+  app.post("/api/friends/decline/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Find the friendship
+      const [friendship] = await db.select().from(friendships).where(eq(friendships.id, id));
+
+      if (!friendship) {
+        return res.status(404).json({ error: "Friend request not found" });
+      }
+
+      // Only addressee can decline
+      if (friendship.addresseeId !== userId) {
+        return res.status(403).json({ error: "Not authorized to decline this request" });
+      }
+
+      if (friendship.status !== "pending") {
+        return res.status(400).json({ error: "Request already processed" });
+      }
+
+      // Delete the request
+      await db.delete(friendships).where(eq(friendships.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error declining friend request:", error);
+      res.status(500).json({ error: "Failed to decline friend request" });
+    }
+  });
+
+  // Remove friend
+  app.delete("/api/friends/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Find the friendship
+      const [friendship] = await db.select().from(friendships).where(eq(friendships.id, id));
+
+      if (!friendship) {
+        return res.status(404).json({ error: "Friendship not found" });
+      }
+
+      // Either party can remove
+      if (friendship.requesterId !== userId && friendship.addresseeId !== userId) {
+        return res.status(403).json({ error: "Not authorized to remove this friend" });
+      }
+
+      // Delete friendship
+      await db.delete(friendships).where(eq(friendships.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing friend:", error);
+      res.status(500).json({ error: "Failed to remove friend" });
+    }
+  });
+
+  // Get sharing settings
+  app.get("/api/friends/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      let [settings] = await db.select().from(sharingSettings).where(eq(sharingSettings.userId, userId));
+
+      // Create default settings if none exist
+      if (!settings) {
+        [settings] = await db.insert(sharingSettings).values({
+          userId,
+          sharePoints: true,
+          shareStreaks: true,
+          shareBadges: true,
+          profilePublic: false,
+        }).returning();
+      }
+
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching sharing settings:", error);
+      res.status(500).json({ error: "Failed to fetch sharing settings" });
+    }
+  });
+
+  // Update sharing settings
+  app.put("/api/friends/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { sharePoints, shareStreaks, shareBadges, profilePublic } = req.body;
+
+      // Check if settings exist
+      let [settings] = await db.select().from(sharingSettings).where(eq(sharingSettings.userId, userId));
+
+      if (settings) {
+        // Update existing
+        [settings] = await db.update(sharingSettings)
+          .set({
+            sharePoints: sharePoints ?? settings.sharePoints,
+            shareStreaks: shareStreaks ?? settings.shareStreaks,
+            shareBadges: shareBadges ?? settings.shareBadges,
+            profilePublic: profilePublic ?? settings.profilePublic,
+            updatedAt: new Date(),
+          })
+          .where(eq(sharingSettings.userId, userId))
+          .returning();
+      } else {
+        // Create new
+        [settings] = await db.insert(sharingSettings).values({
+          userId,
+          sharePoints: sharePoints ?? true,
+          shareStreaks: shareStreaks ?? true,
+          shareBadges: shareBadges ?? true,
+          profilePublic: profilePublic ?? false,
+        }).returning();
+      }
+
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating sharing settings:", error);
+      res.status(500).json({ error: "Failed to update sharing settings" });
+    }
+  });
+
+  // Update user stats (called when stats change)
+  app.put("/api/friends/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weeklyPoints, dayStreak, weekStreak, longestDayStreak, longestWeekStreak, totalBadgesEarned } = req.body;
+
+      // Check if stats exist
+      let [stats] = await db.select().from(userStats).where(eq(userStats.userId, userId));
+
+      if (stats) {
+        // Update existing
+        [stats] = await db.update(userStats)
+          .set({
+            weeklyPoints: weeklyPoints ?? stats.weeklyPoints,
+            dayStreak: dayStreak ?? stats.dayStreak,
+            weekStreak: weekStreak ?? stats.weekStreak,
+            longestDayStreak: longestDayStreak ?? stats.longestDayStreak,
+            longestWeekStreak: longestWeekStreak ?? stats.longestWeekStreak,
+            totalBadgesEarned: totalBadgesEarned ?? stats.totalBadgesEarned,
+            updatedAt: new Date(),
+          })
+          .where(eq(userStats.userId, userId))
+          .returning();
+      } else {
+        // Create new
+        [stats] = await db.insert(userStats).values({
+          userId,
+          weeklyPoints: weeklyPoints ?? 0,
+          dayStreak: dayStreak ?? 0,
+          weekStreak: weekStreak ?? 0,
+          longestDayStreak: longestDayStreak ?? 0,
+          longestWeekStreak: longestWeekStreak ?? 0,
+          totalBadgesEarned: totalBadgesEarned ?? 0,
+        }).returning();
+      }
+
+      res.json(stats);
+    } catch (error) {
+      console.error("Error updating user stats:", error);
+      res.status(500).json({ error: "Failed to update user stats" });
+    }
+  });
+
   // ==================== GPT OAuth Endpoints ====================
   // These endpoints allow a ChatGPT custom GPT to access user fitness data via OAuth
 
@@ -446,6 +844,77 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error fetching GPT data:", error);
       res.status(500).json({ error: "Failed to fetch fitness data" });
+    }
+  });
+
+  // ==================== GPT HABITS DATA ENDPOINTS ====================
+  // These endpoints allow ChatGPT to access the user's habit tracking data
+
+  // Get user habit stats (points, streaks)
+  app.get("/api/gpt/habits/stats", verifyGptToken, async (req: any, res) => {
+    try {
+      const userId = req.gptUserId;
+
+      const [stats] = await db.select().from(userStats).where(eq(userStats.userId, userId));
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+
+      if (!stats) {
+        return res.json({
+          userName: user?.firstName ?? "User",
+          weeklyPoints: 0,
+          dayStreak: 0,
+          weekStreak: 0,
+          longestDayStreak: 0,
+          longestWeekStreak: 0,
+          totalBadgesEarned: 0,
+        });
+      }
+
+      res.json({
+        userName: user?.firstName ?? "User",
+        weeklyPoints: stats.weeklyPoints ?? 0,
+        dayStreak: stats.dayStreak ?? 0,
+        weekStreak: stats.weekStreak ?? 0,
+        longestDayStreak: stats.longestDayStreak ?? 0,
+        longestWeekStreak: stats.longestWeekStreak ?? 0,
+        totalBadgesEarned: stats.totalBadgesEarned ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching GPT habits stats:", error);
+      res.status(500).json({ error: "Failed to fetch habits stats" });
+    }
+  });
+
+  // Get summary of user's habits for GPT context
+  app.get("/api/gpt/habits/summary", verifyGptToken, async (req: any, res) => {
+    try {
+      const userId = req.gptUserId;
+
+      const [stats] = await db.select().from(userStats).where(eq(userStats.userId, userId));
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+
+      const summary = {
+        user: {
+          name: user?.firstName ?? "User",
+        },
+        stats: {
+          weeklyPoints: stats?.weeklyPoints ?? 0,
+          dayStreak: stats?.dayStreak ?? 0,
+          weekStreak: stats?.weekStreak ?? 0,
+          longestDayStreak: stats?.longestDayStreak ?? 0,
+          longestWeekStreak: stats?.longestWeekStreak ?? 0,
+          totalBadgesEarned: stats?.totalBadgesEarned ?? 0,
+        },
+        message: `${user?.firstName ?? "User"} has earned ${stats?.weeklyPoints ?? 0} points this week. ` +
+          `Current day streak: ${stats?.dayStreak ?? 0} days. ` +
+          `Current week streak: ${stats?.weekStreak ?? 0} weeks. ` +
+          `Total badges earned: ${stats?.totalBadgesEarned ?? 0}.`,
+      };
+
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching GPT habits summary:", error);
+      res.status(500).json({ error: "Failed to fetch habits summary" });
     }
   });
 
