@@ -1,6 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TaskList from "@/components/TaskList";
 import { useToast } from "@/hooks/use-toast";
+import { useOnboarding } from "@/contexts/OnboardingContext";
+// localStorage persistence - load and save functions
+import {
+  loadTasksFromStorage,
+  saveTasksToStorage,
+  loadCategoriesFromStorage,
+  saveCategoriesToStorage,
+  loadPenaltiesFromStorage,
+  savePenaltiesToStorage,
+  loadPenaltyBoostFromStorage,
+  savePenaltyBoostToStorage,
+  loadDailyGoalFromStorage,
+  saveDailyGoalToStorage,
+  type StoredTask,
+  type StoredCategory,
+  type StoredPenalty,
+} from "@/lib/storage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,14 +63,15 @@ interface Task {
   penaltyRule?: PenaltyRule;
 }
 
-const initialCategories: Category[] = [
+// Sample data for onboarding mode only
+const sampleCategories: Category[] = [
   { id: "c1", name: "Health" },
   { id: "c2", name: "Productivity" },
   { id: "c3", name: "Spiritual" },
   { id: "c4", name: "Social" },
 ];
 
-const initialTasks: Task[] = [
+const sampleTasks: Task[] = [
   { id: "1", name: "Morning workout", value: 15, category: "Health", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 5, period: "week", bonusPoints: 15 } },
   { id: "2", name: "Evening walk", value: 5, category: "Health", priority: "couldDo" },
   { id: "3", name: "Gym session", value: 20, category: "Health", priority: "mustDo", boosterRule: { enabled: true, timesRequired: 3, period: "week", bonusPoints: 10 }, penaltyRule: { enabled: true, timesThreshold: 1, penaltyPoints: 20, condition: "lessThan" } },
@@ -65,7 +83,7 @@ const initialTasks: Task[] = [
   { id: "9", name: "Connect with friend", value: 5, category: "Social", priority: "couldDo" },
 ];
 
-const initialPenalties: PenaltyItem[] = [
+const samplePenalties: PenaltyItem[] = [
   { id: "p1", name: "Missed workout", value: -10, category: "Penalties", negativeBoostEnabled: false },
   { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties", negativeBoostEnabled: false },
   { id: "p3", name: "Ate junk food", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 15, currentCount: 1, triggered: false },
@@ -74,12 +92,47 @@ const initialPenalties: PenaltyItem[] = [
 
 export default function TasksPage() {
   const { toast } = useToast();
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [dailyGoal, setDailyGoal] = useState(50);
+  const { isOnboarding } = useOnboarding();
+  
+  // Initialize state from localStorage or use sample data during onboarding
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    if (isOnboarding) return sampleTasks;
+    const stored = loadTasksFromStorage();
+    return stored.length > 0 ? stored.map(t => ({
+      id: t.id,
+      name: t.name,
+      value: t.value,
+      category: t.category || "General",
+      priority: (t.priority || "shouldDo") as TaskPriority,
+      boosterRule: t.boostEnabled ? {
+        enabled: true,
+        timesRequired: t.boostThreshold || 3,
+        period: t.boostPeriod || "week",
+        bonusPoints: t.boostPoints || 10,
+      } : undefined,
+    })) : [];
+  });
+  
+  const [dailyGoal, setDailyGoal] = useState(() => {
+    if (isOnboarding) return 50;
+    return loadDailyGoalFromStorage();
+  });
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   
-  const [penalties, setPenalties] = useState<PenaltyItem[]>(initialPenalties);
+  const [penalties, setPenalties] = useState<PenaltyItem[]>(() => {
+    if (isOnboarding) return samplePenalties;
+    const stored = loadPenaltiesFromStorage();
+    return stored.map(p => ({
+      id: p.id,
+      name: p.name,
+      value: p.value,
+      category: "Penalties",
+      negativeBoostEnabled: false,
+      currentCount: 0,
+      triggered: false,
+    }));
+  });
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false);
   const [editingPenalty, setEditingPenalty] = useState<PenaltyItem | null>(null);
   const [penaltyName, setPenaltyName] = useState("");
@@ -91,11 +144,59 @@ export default function TasksPage() {
   const [penaltyBoostPeriod, setPenaltyBoostPeriod] = useState<"week" | "month">("week");
   const [penaltyBoostPoints, setPenaltyBoostPoints] = useState("10");
 
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [categories, setCategories] = useState<Category[]>(() => {
+    if (isOnboarding) return sampleCategories;
+    const stored = loadCategoriesFromStorage();
+    return stored.length > 0 ? stored : [];
+  });
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
+
+  // Persist tasks to localStorage whenever they change (skip during onboarding)
+  useEffect(() => {
+    if (isOnboarding) return;
+    const storedTasks: StoredTask[] = tasks.map(t => ({
+      id: t.id,
+      name: t.name,
+      value: t.value,
+      category: t.category,
+      priority: t.priority,
+      boostEnabled: t.boosterRule?.enabled,
+      boostThreshold: t.boosterRule?.timesRequired,
+      boostPeriod: t.boosterRule?.period,
+      boostPoints: t.boosterRule?.bonusPoints,
+    }));
+    saveTasksToStorage(storedTasks);
+  }, [tasks, isOnboarding]);
+
+  // Persist categories to localStorage whenever they change
+  useEffect(() => {
+    if (isOnboarding) return;
+    const storedCategories: StoredCategory[] = categories.map(c => ({
+      id: c.id,
+      name: c.name,
+    }));
+    saveCategoriesToStorage(storedCategories);
+  }, [categories, isOnboarding]);
+
+  // Persist penalties to localStorage whenever they change
+  useEffect(() => {
+    if (isOnboarding) return;
+    const storedPenalties: StoredPenalty[] = penalties.map(p => ({
+      id: p.id,
+      name: p.name,
+      value: p.value,
+    }));
+    savePenaltiesToStorage(storedPenalties);
+  }, [penalties, isOnboarding]);
+
+  // Persist daily goal to localStorage whenever it changes
+  useEffect(() => {
+    if (isOnboarding) return;
+    saveDailyGoalToStorage(dailyGoal);
+  }, [dailyGoal, isOnboarding]);
 
   const usedCategoryNames = new Set(tasks.map(t => t.category));
   const categoryNames = categories.map(c => c.name);
