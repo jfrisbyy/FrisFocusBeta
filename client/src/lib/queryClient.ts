@@ -49,9 +49,13 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: Infinity,
       retry: false,
+      gcTime: 0,
     },
     mutations: {
       retry: false,
     },
   },
 });
+
+// Clear any stale cache on startup
+queryClient.clear();
