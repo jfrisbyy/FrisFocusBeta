@@ -410,12 +410,111 @@ export interface StoredCircleMember {
   weeklyPoints: number;
 }
 
+export type CircleTaskType = "per_person" | "circle_task";
+export type ApprovalStatus = "approved" | "pending" | "rejected";
+
 export interface StoredCircleTask {
   id: string;
   circleId: string;
   name: string;
   value: number;
   category?: string;
+  taskType: CircleTaskType;
+  createdById: string;
+  requiresApproval: boolean;
+  approvalStatus: ApprovalStatus;
+}
+
+export interface StoredCircleDailySubmission {
+  id: string;
+  circleId: string;
+  userId: string;
+  firstName: string;
+  date: string;
+  completedTaskIds: string[];
+  points: number;
+}
+
+export interface StoredCircleTaskCompletion {
+  id: string;
+  circleId: string;
+  taskId: string;
+  completedById: string;
+  completedByName: string;
+  completedAt: string;
+}
+
+export interface StoredCircleTaskAdjustmentRequest {
+  id: string;
+  circleId: string;
+  requesterId: string;
+  requesterName: string;
+  type: "add" | "edit" | "delete";
+  taskData: Partial<StoredCircleTask>;
+  existingTaskId?: string;
+  status: ApprovalStatus;
+  createdAt: string;
+  reviewedById?: string;
+  reviewedAt?: string;
+}
+
+export interface StoredCircleMessage {
+  id: string;
+  circleId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface StoredCirclePost {
+  id: string;
+  circleId: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+  likes: string[];
+}
+
+export interface StoredDirectMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientId: string;
+  recipientName: string;
+  content: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export type PostVisibility = "public" | "friends";
+
+export interface StoredCommunityPost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  visibility: PostVisibility;
+  createdAt: string;
+  likes: string[];
+  comments: StoredPostComment[];
+}
+
+export interface StoredPostComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface StoredFriendActivity {
+  friendId: string;
+  recentTasks: { taskName: string; completedAt: string }[];
+  todayPoints: number;
+  weeklyBreakdown: { date: string; points: number }[];
+  recentBadges: { name: string; earnedAt: string }[];
 }
 
 export interface StoredCircleBadge {
@@ -447,6 +546,14 @@ const COMMUNITY_STORAGE_KEYS = {
   CIRCLE_TASKS: "frisfocus_circle_tasks",
   CIRCLE_BADGES: "frisfocus_circle_badges",
   CIRCLE_LOGS: "frisfocus_circle_logs",
+  CIRCLE_DAILY_SUBMISSIONS: "frisfocus_circle_daily_submissions",
+  CIRCLE_TASK_COMPLETIONS: "frisfocus_circle_task_completions",
+  CIRCLE_TASK_REQUESTS: "frisfocus_circle_task_requests",
+  CIRCLE_MESSAGES: "frisfocus_circle_messages",
+  CIRCLE_POSTS: "frisfocus_circle_posts",
+  DIRECT_MESSAGES: "frisfocus_direct_messages",
+  COMMUNITY_POSTS: "frisfocus_community_posts",
+  FRIEND_ACTIVITIES: "frisfocus_friend_activities",
 } as const;
 
 // Friends storage functions
@@ -505,6 +612,78 @@ export function loadCircleLogsFromStorage(): StoredCircleLog[] {
 
 export function saveCircleLogsToStorage(logs: StoredCircleLog[]): void {
   saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_LOGS, logs);
+}
+
+// Circle daily submissions
+export function loadCircleDailySubmissionsFromStorage(): StoredCircleDailySubmission[] {
+  return loadFromStorage<StoredCircleDailySubmission[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_DAILY_SUBMISSIONS, []);
+}
+
+export function saveCircleDailySubmissionsToStorage(submissions: StoredCircleDailySubmission[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_DAILY_SUBMISSIONS, submissions);
+}
+
+// Circle task completions (for circle tasks completed once by anyone)
+export function loadCircleTaskCompletionsFromStorage(): StoredCircleTaskCompletion[] {
+  return loadFromStorage<StoredCircleTaskCompletion[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_TASK_COMPLETIONS, []);
+}
+
+export function saveCircleTaskCompletionsToStorage(completions: StoredCircleTaskCompletion[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_TASK_COMPLETIONS, completions);
+}
+
+// Circle task adjustment requests
+export function loadCircleTaskRequestsFromStorage(): StoredCircleTaskAdjustmentRequest[] {
+  return loadFromStorage<StoredCircleTaskAdjustmentRequest[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_TASK_REQUESTS, []);
+}
+
+export function saveCircleTaskRequestsToStorage(requests: StoredCircleTaskAdjustmentRequest[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_TASK_REQUESTS, requests);
+}
+
+// Circle messages
+export function loadCircleMessagesFromStorage(): StoredCircleMessage[] {
+  return loadFromStorage<StoredCircleMessage[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_MESSAGES, []);
+}
+
+export function saveCircleMessagesToStorage(messages: StoredCircleMessage[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_MESSAGES, messages);
+}
+
+// Circle posts
+export function loadCirclePostsFromStorage(): StoredCirclePost[] {
+  return loadFromStorage<StoredCirclePost[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_POSTS, []);
+}
+
+export function saveCirclePostsToStorage(posts: StoredCirclePost[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_POSTS, posts);
+}
+
+// Direct messages
+export function loadDirectMessagesFromStorage(): StoredDirectMessage[] {
+  return loadFromStorage<StoredDirectMessage[]>(COMMUNITY_STORAGE_KEYS.DIRECT_MESSAGES, []);
+}
+
+export function saveDirectMessagesToStorage(messages: StoredDirectMessage[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.DIRECT_MESSAGES, messages);
+}
+
+// Community posts (feed)
+export function loadCommunityPostsFromStorage(): StoredCommunityPost[] {
+  return loadFromStorage<StoredCommunityPost[]>(COMMUNITY_STORAGE_KEYS.COMMUNITY_POSTS, []);
+}
+
+export function saveCommunityPostsToStorage(posts: StoredCommunityPost[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.COMMUNITY_POSTS, posts);
+}
+
+// Friend activities (for friend profile view)
+export function loadFriendActivitiesFromStorage(): Record<string, StoredFriendActivity> {
+  return loadFromStorage<Record<string, StoredFriendActivity>>(COMMUNITY_STORAGE_KEYS.FRIEND_ACTIVITIES, {});
+}
+
+export function saveFriendActivitiesToStorage(activities: Record<string, StoredFriendActivity>): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.FRIEND_ACTIVITIES, activities);
 }
 
 // Export storage keys for reference

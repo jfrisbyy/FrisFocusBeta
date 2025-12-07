@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,8 +35,32 @@ import {
   Target,
   ChevronRight,
   Award,
+  MessageCircle,
+  Send,
+  Heart,
+  Globe,
+  Lock,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  ArrowLeft,
+  Pencil,
+  Trash2,
 } from "lucide-react";
-import type { StoredFriend, StoredCircle, StoredCircleMember, StoredCircleTask, VisibilityLevel } from "@/lib/storage";
+import type { 
+  StoredFriend, 
+  StoredCircle, 
+  StoredCircleMember, 
+  StoredCircleTask, 
+  VisibilityLevel,
+  StoredCircleMessage,
+  StoredCirclePost,
+  StoredDirectMessage,
+  StoredCommunityPost,
+  StoredCircleTaskAdjustmentRequest,
+  StoredFriendActivity,
+  CircleTaskType,
+} from "@/lib/storage";
 
 interface FriendRequest {
   id: string;
@@ -111,6 +136,91 @@ const demoFriends: StoredFriend[] = [
   },
 ];
 
+const demoFriendActivities: Record<string, StoredFriendActivity> = {
+  "friend-1": {
+    friendId: "friend-1",
+    recentTasks: [
+      { taskName: "Morning workout", completedAt: new Date().toISOString() },
+      { taskName: "Read 30 minutes", completedAt: new Date(Date.now() - 3600000).toISOString() },
+      { taskName: "Meditate", completedAt: new Date(Date.now() - 7200000).toISOString() },
+    ],
+    todayPoints: 45,
+    weeklyBreakdown: [
+      { date: "Mon", points: 65 },
+      { date: "Tue", points: 80 },
+      { date: "Wed", points: 75 },
+      { date: "Thu", points: 90 },
+      { date: "Fri", points: 85 },
+      { date: "Sat", points: 45 },
+      { date: "Sun", points: 45 },
+    ],
+    recentBadges: [
+      { name: "Early Bird", earnedAt: new Date(Date.now() - 86400000 * 2).toISOString() },
+      { name: "Week Warrior", earnedAt: new Date(Date.now() - 86400000 * 7).toISOString() },
+    ],
+  },
+  "friend-2": {
+    friendId: "friend-2",
+    recentTasks: [
+      { taskName: "Bible study", completedAt: new Date().toISOString() },
+      { taskName: "Walk 10k steps", completedAt: new Date(Date.now() - 3600000).toISOString() },
+    ],
+    todayPoints: 30,
+    weeklyBreakdown: [
+      { date: "Mon", points: 50 },
+      { date: "Tue", points: 45 },
+      { date: "Wed", points: 55 },
+      { date: "Thu", points: 60 },
+      { date: "Fri", points: 50 },
+      { date: "Sat", points: 30 },
+      { date: "Sun", points: 30 },
+    ],
+    recentBadges: [
+      { name: "Consistency King", earnedAt: new Date(Date.now() - 86400000 * 5).toISOString() },
+    ],
+  },
+  "friend-3": {
+    friendId: "friend-3",
+    recentTasks: [
+      { taskName: "Morning run", completedAt: new Date().toISOString() },
+      { taskName: "Meal prep", completedAt: new Date(Date.now() - 7200000).toISOString() },
+      { taskName: "Journaling", completedAt: new Date(Date.now() - 10800000).toISOString() },
+    ],
+    todayPoints: 55,
+    weeklyBreakdown: [
+      { date: "Mon", points: 85 },
+      { date: "Tue", points: 90 },
+      { date: "Wed", points: 80 },
+      { date: "Thu", points: 95 },
+      { date: "Fri", points: 75 },
+      { date: "Sat", points: 80 },
+      { date: "Sun", points: 55 },
+    ],
+    recentBadges: [
+      { name: "Marathon Runner", earnedAt: new Date(Date.now() - 86400000).toISOString() },
+      { name: "Focus Master", earnedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
+      { name: "Perfect Week", earnedAt: new Date(Date.now() - 86400000 * 7).toISOString() },
+    ],
+  },
+  "friend-4": {
+    friendId: "friend-4",
+    recentTasks: [
+      { taskName: "Study session", completedAt: new Date().toISOString() },
+    ],
+    todayPoints: 20,
+    weeklyBreakdown: [
+      { date: "Mon", points: 40 },
+      { date: "Tue", points: 50 },
+      { date: "Wed", points: 45 },
+      { date: "Thu", points: 55 },
+      { date: "Fri", points: 40 },
+      { date: "Sat", points: 30 },
+      { date: "Sun", points: 20 },
+    ],
+    recentBadges: [],
+  },
+};
+
 const demoRequests: FriendRequest[] = [
   {
     id: "req-1",
@@ -180,27 +290,51 @@ const demoCircleMembers: Record<string, StoredCircleMember[]> = {
 
 const demoCircleTasks: Record<string, StoredCircleTask[]> = {
   "circle-1": [
-    { id: "ct1", circleId: "circle-1", name: "5K Training Run", value: 20, category: "Cardio" },
-    { id: "ct2", circleId: "circle-1", name: "Strength Training", value: 15, category: "Strength" },
-    { id: "ct3", circleId: "circle-1", name: "Stretching Session", value: 10, category: "Recovery" },
-    { id: "ct4", circleId: "circle-1", name: "Long Run (10K+)", value: 30, category: "Cardio" },
-    { id: "ct5", circleId: "circle-1", name: "Rest Day (Active Recovery)", value: 5, category: "Recovery" },
+    { id: "ct1", circleId: "circle-1", name: "5K Training Run", value: 20, category: "Cardio", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct2", circleId: "circle-1", name: "Strength Training", value: 15, category: "Strength", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct3", circleId: "circle-1", name: "Stretching Session", value: 10, category: "Recovery", taskType: "per_person", createdById: "u3", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct4", circleId: "circle-1", name: "Long Run (10K+)", value: 30, category: "Cardio", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct5", circleId: "circle-1", name: "Rest Day (Active Recovery)", value: 5, category: "Recovery", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
   ],
   "circle-2": [
-    { id: "ct6", circleId: "circle-2", name: "Clean Room", value: 10, category: "Cleaning" },
-    { id: "ct7", circleId: "circle-2", name: "Do Dishes", value: 5, category: "Kitchen" },
-    { id: "ct8", circleId: "circle-2", name: "Take Out Trash", value: 5, category: "Cleaning" },
-    { id: "ct9", circleId: "circle-2", name: "Mow Lawn", value: 20, category: "Yard" },
-    { id: "ct10", circleId: "circle-2", name: "Homework Done", value: 15, category: "School" },
-    { id: "ct11", circleId: "circle-2", name: "Walk the Dog", value: 10, category: "Pets" },
+    { id: "ct6", circleId: "circle-2", name: "Clean Room", value: 10, category: "Cleaning", taskType: "per_person", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct7", circleId: "circle-2", name: "Do Dishes", value: 5, category: "Kitchen", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct8", circleId: "circle-2", name: "Take Out Trash", value: 5, category: "Cleaning", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct9", circleId: "circle-2", name: "Mow Lawn", value: 20, category: "Yard", taskType: "circle_task", createdById: "u4", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct10", circleId: "circle-2", name: "Homework Done", value: 15, category: "School", taskType: "per_person", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct11", circleId: "circle-2", name: "Walk the Dog", value: 10, category: "Pets", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
   ],
   "circle-3": [
-    { id: "ct12", circleId: "circle-3", name: "Read 30 minutes", value: 10, category: "Reading" },
-    { id: "ct13", circleId: "circle-3", name: "Write Book Review", value: 25, category: "Writing" },
-    { id: "ct14", circleId: "circle-3", name: "Attend Discussion", value: 15, category: "Social" },
-    { id: "ct15", circleId: "circle-3", name: "Finish Book Chapter", value: 20, category: "Reading" },
+    { id: "ct12", circleId: "circle-3", name: "Read 30 minutes", value: 10, category: "Reading", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct13", circleId: "circle-3", name: "Write Book Review", value: 25, category: "Writing", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct14", circleId: "circle-3", name: "Attend Discussion", value: 15, category: "Social", taskType: "circle_task", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct15", circleId: "circle-3", name: "Finish Book Chapter", value: 20, category: "Reading", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
   ],
 };
+
+const demoTaskRequests: StoredCircleTaskAdjustmentRequest[] = [
+  {
+    id: "req-1",
+    circleId: "circle-2",
+    requesterId: "u5",
+    requesterName: "Tommy",
+    type: "add",
+    taskData: { name: "Video Game Time", value: 5, category: "Fun", taskType: "per_person" },
+    status: "pending",
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: "req-2",
+    circleId: "circle-2",
+    requesterId: "u6",
+    requesterName: "Sarah",
+    type: "edit",
+    taskData: { name: "Clean Room (Quick)", value: 5 },
+    existingTaskId: "ct6",
+    status: "pending",
+    createdAt: new Date(Date.now() - 7200000).toISOString(),
+  },
+];
 
 const demoCircleBadges: Record<string, CircleBadge[]> = {
   "circle-1": [
@@ -218,13 +352,49 @@ const demoCircleBadges: Record<string, CircleBadge[]> = {
   ],
 };
 
-const demoTasks = [
-  { id: "task-1", name: "Morning workout" },
-  { id: "task-2", name: "Bible study" },
-  { id: "task-3", name: "Read 30 minutes" },
-  { id: "task-4", name: "Drink 8 glasses of water" },
-  { id: "task-5", name: "Meditate" },
+const demoCircleMessages: Record<string, StoredCircleMessage[]> = {
+  "circle-1": [
+    { id: "cm1", circleId: "circle-1", senderId: "u1", senderName: "Sarah M", content: "Great job on the 10K today everyone!", createdAt: new Date(Date.now() - 3600000).toISOString() },
+    { id: "cm2", circleId: "circle-1", senderId: "u2", senderName: "Lisa K", content: "Thanks! Feeling stronger every week.", createdAt: new Date(Date.now() - 1800000).toISOString() },
+    { id: "cm3", circleId: "circle-1", senderId: "you", senderName: "You", content: "Can't wait for the actual marathon!", createdAt: new Date(Date.now() - 600000).toISOString() },
+  ],
+  "circle-2": [
+    { id: "cm4", circleId: "circle-2", senderId: "u4", senderName: "Dad", content: "Who's doing the dishes tonight?", createdAt: new Date(Date.now() - 7200000).toISOString() },
+    { id: "cm5", circleId: "circle-2", senderId: "u5", senderName: "Tommy", content: "I'll do it!", createdAt: new Date(Date.now() - 5400000).toISOString() },
+    { id: "cm6", circleId: "circle-2", senderId: "you", senderName: "You", content: "Great job Tommy! 5 points for you.", createdAt: new Date(Date.now() - 3600000).toISOString() },
+  ],
+  "circle-3": [
+    { id: "cm7", circleId: "circle-3", senderId: "u8", senderName: "Marcus B", content: "This month's book is 'Atomic Habits'!", createdAt: new Date(Date.now() - 86400000).toISOString() },
+  ],
+};
+
+const demoCirclePosts: Record<string, StoredCirclePost[]> = {
+  "circle-1": [
+    { id: "cp1", circleId: "circle-1", authorId: "u1", authorName: "Sarah M", content: "Just finished my first half marathon! 13.1 miles in 2:15. Couldn't have done it without this group!", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), likes: ["u2", "u3", "you"] },
+    { id: "cp2", circleId: "circle-1", authorId: "u3", authorName: "Emma T", content: "New week, new goals! Let's crush it everyone.", createdAt: new Date(Date.now() - 86400000).toISOString(), likes: ["u1"] },
+  ],
+  "circle-2": [
+    { id: "cp3", circleId: "circle-2", authorId: "you", authorName: "You", content: "Family meeting this Sunday! Let's review our weekly points and plan the next week's chores.", createdAt: new Date(Date.now() - 172800000).toISOString(), likes: ["u4", "u5"] },
+  ],
+  "circle-3": [],
+};
+
+const demoCommunityPosts: StoredCommunityPost[] = [
+  { id: "feed-1", authorId: "friend-3", authorName: "Sam Rivera", content: "Just hit a 21-day streak! Consistency is key. Keep pushing everyone!", visibility: "public", createdAt: new Date(Date.now() - 3600000).toISOString(), likes: ["friend-1", "you"], comments: [] },
+  { id: "feed-2", authorId: "friend-1", authorName: "Alex Chen", content: "New personal best today - 50 points in one day! Time to celebrate.", visibility: "friends", createdAt: new Date(Date.now() - 7200000).toISOString(), likes: ["friend-2"], comments: [{ id: "c1", authorId: "friend-2", authorName: "Jordan Taylor", content: "Amazing work!", createdAt: new Date(Date.now() - 5400000).toISOString() }] },
+  { id: "feed-3", authorId: "you", authorName: "You", content: "Starting my marathon training journey with the Marathon Mommy's circle. Here we go!", visibility: "public", createdAt: new Date(Date.now() - 86400000).toISOString(), likes: ["friend-1", "friend-3"], comments: [] },
 ];
+
+const demoDirectMessages: Record<string, StoredDirectMessage[]> = {
+  "friend-1": [
+    { id: "dm1", senderId: "friend-1", senderName: "Alex Chen", recipientId: "you", recipientName: "You", content: "Hey! Want to do a workout challenge this week?", createdAt: new Date(Date.now() - 86400000).toISOString(), read: true },
+    { id: "dm2", senderId: "you", senderName: "You", recipientId: "friend-1", recipientName: "Alex Chen", content: "Sure! What did you have in mind?", createdAt: new Date(Date.now() - 82800000).toISOString(), read: true },
+    { id: "dm3", senderId: "friend-1", senderName: "Alex Chen", recipientId: "you", recipientName: "You", content: "Let's see who can get the most points by Friday!", createdAt: new Date(Date.now() - 79200000).toISOString(), read: true },
+  ],
+  "friend-2": [
+    { id: "dm4", senderId: "friend-2", senderName: "Jordan Taylor", recipientId: "you", recipientName: "You", content: "Thanks for the motivation yesterday!", createdAt: new Date(Date.now() - 172800000).toISOString(), read: true },
+  ],
+};
 
 export default function CommunityPage() {
   const { isDemo } = useDemo();
@@ -239,6 +409,24 @@ export default function CommunityPage() {
   const [showCreateCircle, setShowCreateCircle] = useState(false);
   const [newCircleName, setNewCircleName] = useState("");
   const [newCircleDescription, setNewCircleDescription] = useState("");
+  const [selectedFriend, setSelectedFriend] = useState<StoredFriend | null>(null);
+  const [dmFriend, setDmFriend] = useState<StoredFriend | null>(null);
+  const [dmMessage, setDmMessage] = useState("");
+  const [directMessages, setDirectMessages] = useState<Record<string, StoredDirectMessage[]>>(demoDirectMessages);
+  const [communityPosts, setCommunityPosts] = useState<StoredCommunityPost[]>(demoCommunityPosts);
+  const [newPostContent, setNewPostContent] = useState("");
+  const [newPostVisibility, setNewPostVisibility] = useState<"public" | "friends">("friends");
+  const [circleMessages, setCircleMessages] = useState<Record<string, StoredCircleMessage[]>>(demoCircleMessages);
+  const [circlePosts, setCirclePosts] = useState<Record<string, StoredCirclePost[]>>(demoCirclePosts);
+  const [newCircleMessage, setNewCircleMessage] = useState("");
+  const [newCirclePost, setNewCirclePost] = useState("");
+  const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>(demoTaskRequests);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskValue, setNewTaskValue] = useState("10");
+  const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
+  const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>(demoCircleTasks);
+  const [circleDetailTab, setCircleDetailTab] = useState("tasks");
 
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
@@ -251,6 +439,33 @@ export default function CommunityPage() {
     if (firstName) return firstName;
     if (lastName) return lastName;
     return "Unknown User";
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const isOwnerOrAdmin = (circleId: string) => {
+    const members = demoCircleMembers[circleId] || [];
+    const me = members.find(m => m.userId === "you");
+    return me?.role === "owner" || me?.role === "admin";
+  };
+
+  const getUserRole = (circleId: string) => {
+    const members = demoCircleMembers[circleId] || [];
+    const me = members.find(m => m.userId === "you");
+    return me?.role || "member";
   };
 
   const sortedLeaderboard = useMemo(() => {
@@ -266,6 +481,11 @@ export default function CommunityPage() {
         f.lastName.toLowerCase().includes(query)
     );
   }, [friends, searchQuery]);
+
+  const pendingRequestsForCircle = useMemo(() => {
+    if (!selectedCircle) return [];
+    return taskRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
+  }, [selectedCircle, taskRequests]);
 
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,18 +536,6 @@ export default function CommunityPage() {
     toast({ title: "Visibility updated" });
   };
 
-  const handleToggleTaskVisibility = (friendId: string, taskId: string) => {
-    setFriends(
-      friends.map((f) => {
-        if (f.id !== friendId) return f;
-        const hiddenTaskIds = f.hiddenTaskIds.includes(taskId)
-          ? f.hiddenTaskIds.filter((id) => id !== taskId)
-          : [...f.hiddenTaskIds, taskId];
-        return { ...f, hiddenTaskIds };
-      })
-    );
-  };
-
   const handleCreateCircle = () => {
     if (newCircleName.trim()) {
       const newCircle: StoredCircle = {
@@ -340,6 +548,12 @@ export default function CommunityPage() {
         memberCount: 1,
       };
       setCircles([...circles, newCircle]);
+      demoCircleMembers[newCircle.id] = [
+        { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
+      ];
+      setCircleTasks({ ...circleTasks, [newCircle.id]: [] });
+      setCircleMessages({ ...circleMessages, [newCircle.id]: [] });
+      setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
       toast({
         title: "Circle created",
         description: `"${newCircleName}" has been created. Invite members to get started!`,
@@ -348,6 +562,155 @@ export default function CommunityPage() {
       setNewCircleName("");
       setNewCircleDescription("");
     }
+  };
+
+  const handleSendDM = () => {
+    if (!dmFriend || !dmMessage.trim()) return;
+    const newDM: StoredDirectMessage = {
+      id: `dm-${Date.now()}`,
+      senderId: "you",
+      senderName: "You",
+      recipientId: dmFriend.friendId,
+      recipientName: getName(dmFriend.firstName, dmFriend.lastName),
+      content: dmMessage.trim(),
+      createdAt: new Date().toISOString(),
+      read: true,
+    };
+    const currentDMs = directMessages[dmFriend.friendId] || [];
+    setDirectMessages({ ...directMessages, [dmFriend.friendId]: [...currentDMs, newDM] });
+    setDmMessage("");
+    toast({ title: "Message sent" });
+  };
+
+  const handleCreateFeedPost = () => {
+    if (!newPostContent.trim()) return;
+    const newPost: StoredCommunityPost = {
+      id: `feed-${Date.now()}`,
+      authorId: "you",
+      authorName: "You",
+      content: newPostContent.trim(),
+      visibility: newPostVisibility,
+      createdAt: new Date().toISOString(),
+      likes: [],
+      comments: [],
+    };
+    setCommunityPosts([newPost, ...communityPosts]);
+    setNewPostContent("");
+    toast({ title: "Post shared" });
+  };
+
+  const handleLikeFeedPost = (postId: string) => {
+    setCommunityPosts(communityPosts.map(post => {
+      if (post.id !== postId) return post;
+      const liked = post.likes.includes("you");
+      return {
+        ...post,
+        likes: liked ? post.likes.filter(id => id !== "you") : [...post.likes, "you"]
+      };
+    }));
+  };
+
+  const handleSendCircleMessage = () => {
+    if (!selectedCircle || !newCircleMessage.trim()) return;
+    const newMsg: StoredCircleMessage = {
+      id: `cm-${Date.now()}`,
+      circleId: selectedCircle.id,
+      senderId: "you",
+      senderName: "You",
+      content: newCircleMessage.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const current = circleMessages[selectedCircle.id] || [];
+    setCircleMessages({ ...circleMessages, [selectedCircle.id]: [...current, newMsg] });
+    setNewCircleMessage("");
+  };
+
+  const handleCreateCirclePost = () => {
+    if (!selectedCircle || !newCirclePost.trim()) return;
+    const newPost: StoredCirclePost = {
+      id: `cp-${Date.now()}`,
+      circleId: selectedCircle.id,
+      authorId: "you",
+      authorName: "You",
+      content: newCirclePost.trim(),
+      createdAt: new Date().toISOString(),
+      likes: [],
+    };
+    const current = circlePosts[selectedCircle.id] || [];
+    setCirclePosts({ ...circlePosts, [selectedCircle.id]: [newPost, ...current] });
+    setNewCirclePost("");
+    toast({ title: "Post added to board" });
+  };
+
+  const handleAddTask = () => {
+    if (!selectedCircle || !newTaskName.trim()) return;
+    const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
+    
+    if (canApproveInstantly) {
+      const newTask: StoredCircleTask = {
+        id: `ct-${Date.now()}`,
+        circleId: selectedCircle.id,
+        name: newTaskName.trim(),
+        value: parseInt(newTaskValue) || 10,
+        taskType: newTaskType,
+        createdById: "you",
+        requiresApproval: false,
+        approvalStatus: "approved",
+      };
+      const current = circleTasks[selectedCircle.id] || [];
+      setCircleTasks({ ...circleTasks, [selectedCircle.id]: [...current, newTask] });
+      toast({ title: "Task added" });
+    } else {
+      const request: StoredCircleTaskAdjustmentRequest = {
+        id: `req-${Date.now()}`,
+        circleId: selectedCircle.id,
+        requesterId: "you",
+        requesterName: "You",
+        type: "add",
+        taskData: { name: newTaskName.trim(), value: parseInt(newTaskValue) || 10, taskType: newTaskType },
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      };
+      setTaskRequests([...taskRequests, request]);
+      toast({ title: "Task request submitted", description: "Waiting for owner/admin approval" });
+    }
+    
+    setShowAddTask(false);
+    setNewTaskName("");
+    setNewTaskValue("10");
+    setNewTaskType("per_person");
+  };
+
+  const handleApproveRequest = (requestId: string) => {
+    const request = taskRequests.find(r => r.id === requestId);
+    if (!request || !selectedCircle) return;
+    
+    if (request.type === "add") {
+      const newTask: StoredCircleTask = {
+        id: `ct-${Date.now()}`,
+        circleId: selectedCircle.id,
+        name: request.taskData.name || "New Task",
+        value: request.taskData.value || 10,
+        taskType: request.taskData.taskType || "per_person",
+        createdById: request.requesterId,
+        requiresApproval: false,
+        approvalStatus: "approved",
+      };
+      const current = circleTasks[selectedCircle.id] || [];
+      setCircleTasks({ ...circleTasks, [selectedCircle.id]: [...current, newTask] });
+    }
+    
+    setTaskRequests(taskRequests.map(r => 
+      r.id === requestId ? { ...r, status: "approved", reviewedById: "you", reviewedAt: new Date().toISOString() } : r
+    ));
+    toast({ title: "Request approved" });
+  };
+
+  const handleRejectRequest = (requestId: string) => {
+    setTaskRequests(taskRequests.map(r => 
+      r.id === requestId ? { ...r, status: "rejected", reviewedById: "you", reviewedAt: new Date().toISOString() } : r
+    ));
+    toast({ title: "Request rejected" });
   };
 
   const incomingRequests = requests.filter((r) => r.direction === "incoming");
@@ -371,6 +734,169 @@ export default function CommunityPage() {
     }
   };
 
+  const renderFriendProfile = () => {
+    if (!selectedFriend) return null;
+    const activity = demoFriendActivities[selectedFriend.friendId];
+    const visibility = selectedFriend.visibilityLevel;
+    
+    return (
+      <Dialog open={!!selectedFriend} onOpenChange={() => setSelectedFriend(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarFallback className="text-xl">
+                  {getInitials(selectedFriend.firstName, selectedFriend.lastName)}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <DialogTitle data-testid="text-friend-profile-name">
+                  {getName(selectedFriend.firstName, selectedFriend.lastName)}
+                </DialogTitle>
+                <DialogDescription className="flex items-center gap-2 mt-1">
+                  <Flame className="w-4 h-4 text-orange-500" />
+                  {selectedFriend.dayStreak} day streak
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            {visibility !== "hidden" && (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 rounded-md bg-muted">
+                  <p className="text-2xl font-bold">{selectedFriend.weeklyPoints}</p>
+                  <p className="text-sm text-muted-foreground">Weekly pts</p>
+                </div>
+                <div className="text-center p-3 rounded-md bg-muted">
+                  <p className="text-2xl font-bold">{selectedFriend.weekStreak}</p>
+                  <p className="text-sm text-muted-foreground">Week streak</p>
+                </div>
+                <div className="text-center p-3 rounded-md bg-muted">
+                  <p className="text-2xl font-bold">{selectedFriend.totalBadgesEarned}</p>
+                  <p className="text-sm text-muted-foreground">Badges</p>
+                </div>
+              </div>
+            )}
+            
+            {(visibility === "full" || visibility === "tasks_only") && activity && (
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" />
+                  Recent Tasks
+                </h4>
+                <div className="space-y-2">
+                  {activity.recentTasks.map((task, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2 rounded bg-muted">
+                      <span>{task.taskName}</span>
+                      <span className="text-muted-foreground">{formatTime(task.completedAt)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {visibility === "full" && activity && activity.recentBadges.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <Award className="w-4 h-4" />
+                  Recent Badges
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {activity.recentBadges.map((badge, i) => (
+                    <Badge key={i} variant="secondary">{badge.name}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {visibility === "hidden" && (
+              <div className="text-center py-8 text-muted-foreground">
+                <EyeOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>This friend's activity is hidden</p>
+              </div>
+            )}
+            
+            {visibility === "points_only" && (
+              <div className="text-center py-4 text-muted-foreground">
+                <p className="text-sm">Only points data is visible for this friend</p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setSelectedFriend(null)}>
+              Close
+            </Button>
+            <Button onClick={() => { setDmFriend(selectedFriend); setSelectedFriend(null); }} data-testid="button-dm-from-profile">
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Message
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const renderDMDialog = () => {
+    if (!dmFriend) return null;
+    const messages = directMessages[dmFriend.friendId] || [];
+    
+    return (
+      <Dialog open={!!dmFriend} onOpenChange={() => setDmFriend(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback>
+                  {getInitials(dmFriend.firstName, dmFriend.lastName)}
+                </AvatarFallback>
+              </Avatar>
+              {getName(dmFriend.firstName, dmFriend.lastName)}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <ScrollArea className="h-64 pr-4">
+            <div className="space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.senderId === "you" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[80%] p-3 rounded-lg ${
+                      msg.senderId === "you"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                  >
+                    <p className="text-sm">{msg.content}</p>
+                    <p className={`text-xs mt-1 ${msg.senderId === "you" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                      {formatTime(msg.createdAt)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          
+          <div className="flex gap-2 mt-4">
+            <Input
+              placeholder="Type a message..."
+              value={dmMessage}
+              onChange={(e) => setDmMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSendDM()}
+              data-testid="input-dm-message"
+            />
+            <Button size="icon" onClick={handleSendDM} data-testid="button-send-dm">
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   return (
     <div className="container max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -386,7 +912,7 @@ export default function CommunityPage() {
       </div>
 
       <Tabs defaultValue="friends" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="friends" data-testid="tab-friends">
             <Users className="w-4 h-4 mr-2" />
             Friends
@@ -404,6 +930,10 @@ export default function CommunityPage() {
                 {circles.length}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="feed" data-testid="tab-feed">
+            <Globe className="w-4 h-4 mr-2" />
+            Feed
           </TabsTrigger>
         </TabsList>
 
@@ -553,7 +1083,7 @@ export default function CommunityPage() {
                 <div>
                   <CardTitle>Your Friends</CardTitle>
                   <CardDescription>
-                    Manage visibility and see their progress
+                    Click on a friend to view their profile and stats
                   </CardDescription>
                 </div>
                 <Input
@@ -580,7 +1110,8 @@ export default function CommunityPage() {
                   {filteredFriends.map((friend) => (
                     <div
                       key={friend.id}
-                      className="flex items-center justify-between gap-4 p-3 rounded-md border"
+                      className="flex items-center justify-between gap-4 p-3 rounded-md border hover-elevate cursor-pointer"
+                      onClick={() => setSelectedFriend(friend)}
                       data-testid={`card-friend-${friend.friendId}`}
                     >
                       <div className="flex items-center gap-3">
@@ -598,44 +1129,36 @@ export default function CommunityPage() {
                               <Trophy className="w-3 h-3" /> {friend.weeklyPoints} pts
                             </span>
                             <span className="flex items-center gap-1">
-                              <Flame className="w-3 h-3" /> {friend.dayStreak}d
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> {friend.weekStreak}w
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" /> {friend.totalBadgesEarned} badges
+                              <Flame className="w-3 h-3" /> {friend.dayStreak} days
                             </span>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="gap-1">
-                          {friend.visibilityLevel === "hidden" ? (
-                            <EyeOff className="w-3 h-3" />
-                          ) : (
-                            <Eye className="w-3 h-3" />
-                          )}
-                          {visibilityLabels[friend.visibilityLevel]}
-                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); setDmFriend(friend); }}
+                          data-testid={`button-dm-${friend.friendId}`}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </Button>
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
-                              variant="ghost"
                               size="icon"
-                              onClick={() => setEditingFriend(friend)}
-                              data-testid={`button-edit-visibility-${friend.id}`}
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); setEditingFriend(friend); }}
+                              data-testid={`button-settings-${friend.friendId}`}
                             >
                               <Settings className="w-4 h-4" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>
-                                Visibility for {getName(friend.firstName, friend.lastName)}
-                              </DialogTitle>
+                              <DialogTitle>Visibility Settings</DialogTitle>
                               <DialogDescription>
-                                Control what this friend can see about your progress
+                                Control what {friend.firstName} can see about your activity
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
@@ -643,74 +1166,28 @@ export default function CommunityPage() {
                                 <Label>Visibility Level</Label>
                                 <Select
                                   value={friend.visibilityLevel}
-                                  onValueChange={(value: VisibilityLevel) =>
-                                    handleUpdateVisibility(friend.id, value)
-                                  }
+                                  onValueChange={(v) => handleUpdateVisibility(friend.id, v as VisibilityLevel)}
                                 >
-                                  <SelectTrigger data-testid="select-visibility">
+                                  <SelectTrigger>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="full">
-                                      Full Access - See all tasks and points
-                                    </SelectItem>
-                                    <SelectItem value="tasks_only">
-                                      Tasks Only - See task list but not points
-                                    </SelectItem>
-                                    <SelectItem value="points_only">
-                                      Points Only - See points but not tasks
-                                    </SelectItem>
-                                    <SelectItem value="hidden">
-                                      Hidden - Cannot see your profile
-                                    </SelectItem>
+                                    <SelectItem value="full">Full Access - See all activity</SelectItem>
+                                    <SelectItem value="tasks_only">Tasks Only - See tasks but not badges</SelectItem>
+                                    <SelectItem value="points_only">Points Only - Only weekly points</SelectItem>
+                                    <SelectItem value="hidden">Hidden - No visibility</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
-
-                              {(friend.visibilityLevel === "full" ||
-                                friend.visibilityLevel === "tasks_only") && (
-                                <div className="space-y-2">
-                                  <Label>Hide Specific Tasks</Label>
-                                  <p className="text-sm text-muted-foreground">
-                                    Select tasks you don't want this friend to see
-                                  </p>
-                                  <div className="space-y-2 mt-2">
-                                    {demoTasks.map((task) => (
-                                      <div
-                                        key={task.id}
-                                        className="flex items-center gap-2"
-                                      >
-                                        <Checkbox
-                                          id={`hide-${task.id}`}
-                                          checked={friend.hiddenTaskIds.includes(task.id)}
-                                          onCheckedChange={() =>
-                                            handleToggleTaskVisibility(friend.id, task.id)
-                                          }
-                                          data-testid={`checkbox-hide-${task.id}`}
-                                        />
-                                        <label
-                                          htmlFor={`hide-${task.id}`}
-                                          className="text-sm"
-                                        >
-                                          {task.name}
-                                        </label>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
                             </div>
                             <DialogFooter>
-                              <Button
-                                variant="destructive"
-                                onClick={() => handleRemoveFriend(friend.id)}
-                                data-testid="button-remove-friend"
-                              >
+                              <Button variant="destructive" onClick={() => handleRemoveFriend(friend.id)}>
                                 Remove Friend
                               </Button>
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </div>
                   ))}
@@ -724,12 +1201,7 @@ export default function CommunityPage() {
           {!selectedCircle ? (
             <>
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold">Your Circles</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Join circles to share goals and compete with groups
-                  </p>
-                </div>
+                <h2 className="text-lg font-semibold">Your Circles</h2>
                 <Dialog open={showCreateCircle} onOpenChange={setShowCreateCircle}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-create-circle">
@@ -739,9 +1211,9 @@ export default function CommunityPage() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Create a New Circle</DialogTitle>
+                      <DialogTitle>Create New Circle</DialogTitle>
                       <DialogDescription>
-                        Start a group with shared tasks and goals
+                        Start a group to share goals and track progress together
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -749,16 +1221,16 @@ export default function CommunityPage() {
                         <Label htmlFor="circle-name">Circle Name</Label>
                         <Input
                           id="circle-name"
-                          placeholder="e.g., Marathon Runners, Book Club"
+                          placeholder="e.g., Fitness Buddies"
                           value={newCircleName}
                           onChange={(e) => setNewCircleName(e.target.value)}
                           data-testid="input-circle-name"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="circle-desc">Description</Label>
-                        <Input
-                          id="circle-desc"
+                        <Label htmlFor="circle-description">Description</Label>
+                        <Textarea
+                          id="circle-description"
                           placeholder="What is this circle about?"
                           value={newCircleDescription}
                           onChange={(e) => setNewCircleDescription(e.target.value)}
@@ -767,17 +1239,10 @@ export default function CommunityPage() {
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowCreateCircle(false)}
-                        data-testid="button-cancel-create-circle"
-                      >
+                      <Button variant="outline" onClick={() => setShowCreateCircle(false)} data-testid="button-create-circle-cancel">
                         Cancel
                       </Button>
-                      <Button
-                        onClick={handleCreateCircle}
-                        data-testid="button-confirm-create-circle"
-                      >
+                      <Button onClick={handleCreateCircle} data-testid="button-create-circle-submit">
                         Create Circle
                       </Button>
                     </DialogFooter>
@@ -785,116 +1250,208 @@ export default function CommunityPage() {
                 </Dialog>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {circles.map((circle) => (
-                  <Card
-                    key={circle.id}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => setSelectedCircle(circle)}
-                    data-testid={`card-circle-${circle.id}`}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div
-                          className="w-10 h-10 rounded-md flex items-center justify-center"
-                          style={{ backgroundColor: circle.iconColor }}
-                        >
-                          <CircleDot className="w-5 h-5 text-white" />
+              {circles.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <CircleDot className="w-12 h-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground text-center">
+                      No circles yet. Create one to start collaborating!
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {circles.map((circle) => (
+                    <Card
+                      key={circle.id}
+                      className="hover-elevate cursor-pointer"
+                      onClick={() => { setSelectedCircle(circle); setCircleDetailTab("tasks"); }}
+                      data-testid={`card-circle-${circle.id}`}
+                    >
+                      <CardHeader>
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: circle.iconColor }}
+                          >
+                            <CircleDot className="w-6 h-6 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <CardTitle className="text-lg">{circle.name}</CardTitle>
+                              {circle.createdBy === "you" && (
+                                <Crown className="w-4 h-4 text-yellow-500" />
+                              )}
+                            </div>
+                            <CardDescription className="line-clamp-2">
+                              {circle.description}
+                            </CardDescription>
+                          </div>
                         </div>
-                        <Badge variant="outline">{circle.memberCount} members</Badge>
-                      </div>
-                      <CardTitle className="mt-2">{circle.name}</CardTitle>
-                      <CardDescription className="line-clamp-2">
-                        {circle.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                          {circle.createdBy === "you" ? "You created this" : "Member"}
-                        </span>
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Users className="w-4 h-4" />
+                            {circle.memberCount} members
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedCircle(null)}
-                  data-testid="button-back-to-circles"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Back
+                <Button variant="ghost" size="icon" onClick={() => setSelectedCircle(null)} data-testid="button-back-to-circles">
+                  <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div
-                  className="w-10 h-10 rounded-md flex items-center justify-center"
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: selectedCircle.iconColor }}
                 >
-                  <CircleDot className="w-5 h-5 text-white" />
+                  <CircleDot className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold">{selectedCircle.name}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedCircle.description}
-                  </p>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold flex items-center gap-2" data-testid="text-circle-name">
+                    {selectedCircle.name}
+                    {selectedCircle.createdBy === "you" && <Crown className="w-5 h-5 text-yellow-500" />}
+                  </h2>
+                  <p className="text-muted-foreground">{selectedCircle.description}</p>
                 </div>
+                {isOwnerOrAdmin(selectedCircle.id) && pendingRequestsForCircle.length > 0 && (
+                  <Badge variant="destructive">
+                    {pendingRequestsForCircle.length} pending
+                  </Badge>
+                )}
               </div>
 
-              <Tabs defaultValue="tasks" className="w-full">
-                <TabsList>
-                  <TabsTrigger value="tasks" data-testid="tab-circle-tasks">
-                    <Target className="w-4 h-4 mr-2" />
-                    Tasks
-                  </TabsTrigger>
-                  <TabsTrigger value="leaderboard" data-testid="tab-circle-leaderboard">
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Leaderboard
-                  </TabsTrigger>
-                  <TabsTrigger value="badges" data-testid="tab-circle-badges">
-                    <Award className="w-4 h-4 mr-2" />
-                    Badges
-                  </TabsTrigger>
-                  <TabsTrigger value="members" data-testid="tab-circle-members">
-                    <Users className="w-4 h-4 mr-2" />
-                    Members
-                  </TabsTrigger>
+              <Tabs value={circleDetailTab} onValueChange={setCircleDetailTab}>
+                <TabsList className="grid w-full grid-cols-6">
+                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                  <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+                  <TabsTrigger value="messages">Chat</TabsTrigger>
+                  <TabsTrigger value="posts">Board</TabsTrigger>
+                  <TabsTrigger value="members">Members</TabsTrigger>
+                  {isOwnerOrAdmin(selectedCircle.id) && (
+                    <TabsTrigger value="approvals">
+                      Approvals
+                      {pendingRequestsForCircle.length > 0 && (
+                        <Badge variant="destructive" className="ml-1">{pendingRequestsForCircle.length}</Badge>
+                      )}
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="tasks" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Circle Tasks</CardTitle>
-                      <CardDescription>
-                        Shared tasks for all circle members to complete
-                      </CardDescription>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <CardTitle>Circle Tasks</CardTitle>
+                          <CardDescription>
+                            Daily tasks for members and shared circle tasks
+                          </CardDescription>
+                        </div>
+                        <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
+                          <DialogTrigger asChild>
+                            <Button data-testid="button-add-task">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Task
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add New Task</DialogTitle>
+                              <DialogDescription>
+                                {isOwnerOrAdmin(selectedCircle.id)
+                                  ? "Create a new task for this circle"
+                                  : "Submit a task request for approval"}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label>Task Name</Label>
+                                <Input
+                                  placeholder="e.g., Morning workout"
+                                  value={newTaskName}
+                                  onChange={(e) => setNewTaskName(e.target.value)}
+                                  data-testid="input-new-task-name"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Point Value</Label>
+                                <Input
+                                  type="number"
+                                  value={newTaskValue}
+                                  onChange={(e) => setNewTaskValue(e.target.value)}
+                                  data-testid="input-new-task-value"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Task Type</Label>
+                                <Select value={newTaskType} onValueChange={(v) => setNewTaskType(v as CircleTaskType)}>
+                                  <SelectTrigger data-testid="select-task-type">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="per_person">Per-Person Daily - Each member logs individually</SelectItem>
+                                    <SelectItem value="circle_task">Circle Task - Only needs to be done once</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setShowAddTask(false)}>Cancel</Button>
+                              <Button onClick={handleAddTask} data-testid="button-submit-task">
+                                {isOwnerOrAdmin(selectedCircle.id) ? "Add Task" : "Submit Request"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {(demoCircleTasks[selectedCircle.id] || []).map((task) => (
-                          <div
-                            key={task.id}
-                            className="flex items-center justify-between p-3 rounded-md border"
-                            data-testid={`circle-task-${task.id}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Checkbox data-testid={`checkbox-task-${task.id}`} />
-                              <div>
-                                <p className="font-medium">{task.name}</p>
-                                {task.category && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {task.category}
-                                  </Badge>
-                                )}
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Per-Person Daily Tasks</h4>
+                        {(circleTasks[selectedCircle.id] || [])
+                          .filter(t => t.taskType === "per_person" && t.approvalStatus === "approved")
+                          .map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center justify-between p-3 rounded-md border"
+                              data-testid={`task-${task.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Target className="w-5 h-5 text-muted-foreground" />
+                                <span>{task.name}</span>
                               </div>
+                              <Badge variant="outline">{task.value} pts</Badge>
                             </div>
-                            <Badge>{task.value} pts</Badge>
-                          </div>
-                        ))}
+                          ))}
+                        
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2 mt-6">Circle Tasks (Anyone Can Complete)</h4>
+                        {(circleTasks[selectedCircle.id] || [])
+                          .filter(t => t.taskType === "circle_task" && t.approvalStatus === "approved")
+                          .map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center justify-between p-3 rounded-md border bg-muted/50"
+                              data-testid={`task-${task.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <CheckCircle className="w-5 h-5 text-muted-foreground" />
+                                <div>
+                                  <span>{task.name}</span>
+                                  <p className="text-xs text-muted-foreground">Shared task - one completion per day</p>
+                                </div>
+                              </div>
+                              <Badge variant="outline">{task.value} pts</Badge>
+                            </div>
+                          ))}
                       </div>
                     </CardContent>
                   </Card>
@@ -903,10 +1460,11 @@ export default function CommunityPage() {
                 <TabsContent value="leaderboard" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>This Week's Leaderboard</CardTitle>
-                      <CardDescription>
-                        See who's leading in {selectedCircle.name}
-                      </CardDescription>
+                      <CardTitle className="flex items-center gap-2">
+                        <Trophy className="w-5 h-5" />
+                        Circle Leaderboard
+                      </CardTitle>
+                      <CardDescription>This week's top performers in the circle</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
@@ -916,20 +1474,14 @@ export default function CommunityPage() {
                             <div
                               key={member.id}
                               className="flex items-center justify-between gap-4 p-3 rounded-md border"
-                              data-testid={`leaderboard-member-${member.id}`}
+                              data-testid={`leaderboard-member-${index}`}
                             >
                               <div className="flex items-center gap-3">
-                                <span
-                                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                    index === 0
-                                      ? "bg-yellow-500/20 text-yellow-600"
-                                      : index === 1
-                                      ? "bg-gray-400/20 text-gray-600"
-                                      : index === 2
-                                      ? "bg-orange-500/20 text-orange-600"
-                                      : "bg-muted text-muted-foreground"
-                                  }`}
-                                >
+                                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                  index === 0 ? "bg-yellow-500 text-white" :
+                                  index === 1 ? "bg-gray-400 text-white" :
+                                  index === 2 ? "bg-amber-600 text-white" : "bg-muted"
+                                }`}>
                                   {index + 1}
                                 </span>
                                 <Avatar>
@@ -937,16 +1489,14 @@ export default function CommunityPage() {
                                     {getInitials(member.firstName, member.lastName)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">
-                                    {member.firstName} {member.lastName}
-                                  </span>
-                                  {getRoleIcon(member.role)}
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{member.firstName} {member.lastName}</span>
+                                    {getRoleIcon(member.role)}
+                                  </div>
                                 </div>
                               </div>
-                              <Badge variant="secondary">
-                                {member.weeklyPoints} pts
-                              </Badge>
+                              <Badge variant="secondary">{member.weeklyPoints} pts</Badge>
                             </div>
                           ))}
                       </div>
@@ -954,61 +1504,97 @@ export default function CommunityPage() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="badges" className="space-y-4 mt-4">
+                <TabsContent value="messages" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Circle Badges</CardTitle>
-                      <CardDescription>
-                        Earn badges by completing circle challenges
-                      </CardDescription>
+                      <CardTitle className="flex items-center gap-2">
+                        <MessageCircle className="w-5 h-5" />
+                        Circle Chat
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {(demoCircleBadges[selectedCircle.id] || []).map((badge) => (
-                          <div
-                            key={badge.id}
-                            className={`p-4 rounded-md border ${
-                              badge.earned ? "bg-primary/10 border-primary/30" : ""
-                            }`}
-                            data-testid={`circle-badge-${badge.id}`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                    badge.earned
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted"
-                                  }`}
-                                >
-                                  <Award className="w-5 h-5" />
+                      <ScrollArea className="h-64 mb-4 pr-4">
+                        <div className="space-y-3">
+                          {(circleMessages[selectedCircle.id] || []).map((msg) => (
+                            <div key={msg.id} className="flex gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-baseline gap-2">
+                                  <span className="font-medium text-sm">{msg.senderName}</span>
+                                  <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
                                 </div>
-                                <div>
-                                  <p className="font-medium">{badge.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {badge.description}
-                                  </p>
-                                </div>
+                                <p className="text-sm">{msg.content}</p>
                               </div>
-                              {badge.earned && (
-                                <Badge variant="default">Earned</Badge>
-                              )}
                             </div>
-                            {!badge.earned && (
-                              <div className="mt-3">
-                                <div className="flex justify-between text-sm mb-1">
-                                  <span>Progress</span>
-                                  <span>
-                                    {badge.progress}/{badge.required}
-                                  </span>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Type a message..."
+                          value={newCircleMessage}
+                          onChange={(e) => setNewCircleMessage(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleSendCircleMessage()}
+                          data-testid="input-circle-message"
+                        />
+                        <Button size="icon" onClick={handleSendCircleMessage} data-testid="button-send-circle-message">
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="posts" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Circle Post Board</CardTitle>
+                      <CardDescription>Share updates and announcements with the circle</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex gap-2">
+                        <Textarea
+                          placeholder="Share something with the circle..."
+                          value={newCirclePost}
+                          onChange={(e) => setNewCirclePost(e.target.value)}
+                          className="min-h-[80px]"
+                          data-testid="input-circle-post"
+                        />
+                      </div>
+                      <Button onClick={handleCreateCirclePost} className="w-full" data-testid="button-create-circle-post">
+                        Post to Board
+                      </Button>
+                      
+                      <Separator />
+                      
+                      <div className="space-y-4">
+                        {(circlePosts[selectedCircle.id] || []).map((post) => (
+                          <div key={post.id} className="p-4 rounded-md border">
+                            <div className="flex items-start gap-3">
+                              <Avatar>
+                                <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1">
+                                <div className="flex items-baseline gap-2">
+                                  <span className="font-medium">{post.authorName}</span>
+                                  <span className="text-sm text-muted-foreground">{formatTime(post.createdAt)}</span>
                                 </div>
-                                <Progress
-                                  value={(badge.progress / badge.required) * 100}
-                                />
+                                <p className="mt-2">{post.content}</p>
+                                <div className="flex items-center gap-4 mt-3">
+                                  <Button variant="ghost" size="sm">
+                                    <Heart className={`w-4 h-4 mr-1 ${post.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
+                                    {post.likes.length}
+                                  </Button>
+                                </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         ))}
+                        {(circlePosts[selectedCircle.id] || []).length === 0 && (
+                          <p className="text-center text-muted-foreground py-8">No posts yet. Be the first to share!</p>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -1052,8 +1638,7 @@ export default function CommunityPage() {
                                   {getRoleIcon(member.role)}
                                 </div>
                                 <p className="text-sm text-muted-foreground">
-                                  Joined{" "}
-                                  {new Date(member.joinedAt).toLocaleDateString()}
+                                  Joined {new Date(member.joinedAt).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
@@ -1066,11 +1651,173 @@ export default function CommunityPage() {
                     </CardContent>
                   </Card>
                 </TabsContent>
+
+                {isOwnerOrAdmin(selectedCircle.id) && (
+                  <TabsContent value="approvals" className="space-y-4 mt-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5" />
+                          Task Adjustment Requests
+                        </CardTitle>
+                        <CardDescription>
+                          Review and approve task changes from members
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {pendingRequestsForCircle.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Check className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p>No pending requests</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {pendingRequestsForCircle.map((request) => (
+                              <div key={request.id} className="p-4 rounded-md border">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Badge variant={request.type === "add" ? "default" : request.type === "edit" ? "secondary" : "destructive"}>
+                                        {request.type.toUpperCase()}
+                                      </Badge>
+                                      <span className="text-sm text-muted-foreground">
+                                        from {request.requesterName} - {formatTime(request.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="font-medium">{request.taskData.name}</p>
+                                    {request.taskData.value && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {request.taskData.value} points - {request.taskData.taskType === "circle_task" ? "Circle Task" : "Per-Person"}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => handleApproveRequest(request.id)} data-testid={`button-approve-${request.id}`}>
+                                      <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleRejectRequest(request.id)} data-testid={`button-reject-${request.id}`}>
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                )}
               </Tabs>
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="feed" className="space-y-6 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Share an Update</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="What's on your mind? Share your progress..."
+                value={newPostContent}
+                onChange={(e) => setNewPostContent(e.target.value)}
+                className="min-h-[100px]"
+                data-testid="input-feed-post"
+              />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Visibility:</Label>
+                  <Select value={newPostVisibility} onValueChange={(v) => setNewPostVisibility(v as "public" | "friends")}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-post-visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="friends">
+                        <span className="flex items-center gap-2">
+                          <Lock className="w-4 h-4" /> Friends Only
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="public">
+                        <span className="flex items-center gap-2">
+                          <Globe className="w-4 h-4" /> Public
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleCreateFeedPost} data-testid="button-post-feed">
+                  Post
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            {communityPosts.map((post) => (
+              <Card key={post.id} data-testid={`feed-post-${post.id}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <Avatar>
+                      <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className="font-medium">{post.authorName}</span>
+                        <span className="text-sm text-muted-foreground">{formatTime(post.createdAt)}</span>
+                        {post.visibility === "friends" ? (
+                          <Badge variant="outline" className="text-xs"><Lock className="w-3 h-3 mr-1" />Friends</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs"><Globe className="w-3 h-3 mr-1" />Public</Badge>
+                        )}
+                      </div>
+                      <p className="mt-2">{post.content}</p>
+                      <div className="flex items-center gap-4 mt-4">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleLikeFeedPost(post.id)}
+                          data-testid={`button-like-${post.id}`}
+                        >
+                          <Heart className={`w-4 h-4 mr-1 ${post.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
+                          {post.likes.length}
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <MessageCircle className="w-4 h-4 mr-1" />
+                          {post.comments.length}
+                        </Button>
+                      </div>
+                      
+                      {post.comments.length > 0 && (
+                        <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
+                          {post.comments.map((comment) => (
+                            <div key={comment.id} className="flex gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="font-medium text-sm">{comment.authorName}</span>
+                                  <span className="text-xs text-muted-foreground">{formatTime(comment.createdAt)}</span>
+                                </div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
       </Tabs>
+
+      {renderFriendProfile()}
+      {renderDMDialog()}
     </div>
   );
 }
