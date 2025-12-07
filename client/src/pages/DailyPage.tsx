@@ -10,8 +10,11 @@ import {
   loadCategoriesFromStorage,
   loadDailyLogFromStorage,
   saveDailyLogToStorage,
+  loadJournalFromStorage,
+  saveJournalToStorage,
   type StoredTask,
   type StoredPenalty,
+  type StoredJournalEntry,
 } from "@/lib/storage";
 
 interface DisplayTask {
@@ -111,19 +114,41 @@ export default function DailyPage() {
   const handleSave = () => {
     setIsSaving(true);
     const dateStr = format(date, "yyyy-MM-dd");
+    const now = new Date();
     
-    // Save to localStorage
+    // If there are notes, create a journal entry with time-based title
+    if (notes.trim()) {
+      const timeTitle = format(now, "h:mm a") + " Note";
+      const newJournalEntry: StoredJournalEntry = {
+        id: `entry-${Date.now()}`,
+        date: format(now, "yyyy-MM-dd"),
+        title: timeTitle,
+        content: notes.trim(),
+        createdAt: now.toISOString(),
+      };
+      
+      const existingEntries = loadJournalFromStorage();
+      saveJournalToStorage([newJournalEntry, ...existingEntries]);
+    }
+    
+    // Save the daily log (without notes since it's now in journal)
     saveDailyLogToStorage({
       date: dateStr,
       completedTaskIds: Array.from(completedIds),
-      notes,
+      notes: "", // Clear notes from daily log since it's saved to journal
     });
+
+    // Reset the notes field for next entry
+    setNotes("");
 
     setTimeout(() => {
       setIsSaving(false);
+      const hasNotes = notes.trim().length > 0;
       toast({
         title: "Day saved",
-        description: `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
+        description: hasNotes 
+          ? `Logged ${completedIds.size} tasks and added journal entry`
+          : `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
       });
     }, 300);
   };
