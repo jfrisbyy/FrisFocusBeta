@@ -86,6 +86,8 @@ const mockCustomBoosters = [
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const [days] = useState(getMockWeekData);
+  // todo: remove mock functionality - weekly goal will come from backend
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(350);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -102,6 +104,10 @@ export default function Dashboard() {
     console.log("Navigate to day:", date);
   };
 
+  const handleGoalChange = (newGoal: number) => {
+    setWeeklyGoal(newGoal);
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div>
@@ -115,6 +121,8 @@ export default function Dashboard() {
             weekTotal={finalTotal}
             weekRange={weekRange}
             boosterPoints={boosterPoints}
+            weeklyGoal={weeklyGoal}
+            onGoalChange={handleGoalChange}
           />
         </div>
         <div className="lg:col-span-2">
