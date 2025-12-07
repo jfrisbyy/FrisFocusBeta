@@ -499,6 +499,10 @@ export default function CommunityPage() {
   const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>(demoCircleTasks);
   const [circleDetailTab, setCircleDetailTab] = useState("tasks");
   
+  // Circle badges and awards state (mutable versions of demo data)
+  const [circleBadges, setCircleBadges] = useState<Record<string, CircleBadge[]>>(demoCircleBadges);
+  const [circleAwards, setCircleAwards] = useState<Record<string, CircleAward[]>>(demoCircleAwards);
+  
   // Task completion tracking - who completed what tasks today
   const [myCompletedTasks, setMyCompletedTasks] = useState<Record<string, string[]>>({
     "circle-1": ["ct1", "ct3"],
@@ -1042,6 +1046,126 @@ export default function CommunityPage() {
     ));
     toast({ title: "Request rejected" });
   };
+
+  const handleAddBadge = () => {
+    if (!selectedCircle || !newBadgeName.trim()) return;
+    const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
+    
+    if (canApproveInstantly) {
+      const newBadge: CircleBadge = {
+        id: `cb-${Date.now()}`,
+        name: newBadgeName.trim(),
+        description: newBadgeDescription.trim() || "Complete this challenge",
+        icon: "target",
+        progress: 0,
+        required: parseInt(newBadgeRequired) || 10,
+        earned: false,
+      };
+      const current = circleBadges[selectedCircle.id] || [];
+      setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
+      toast({ title: "Badge created" });
+    } else {
+      const request = {
+        id: `br-${Date.now()}`,
+        circleId: selectedCircle.id,
+        requesterId: "you",
+        requesterName: "You",
+        type: "badge" as const,
+        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10 },
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      };
+      setBadgeRequests([...badgeRequests, request]);
+      toast({ title: "Badge request submitted", description: "Waiting for owner/admin approval" });
+    }
+    
+    setShowAddBadge(false);
+    setNewBadgeName("");
+    setNewBadgeDescription("");
+    setNewBadgeRequired("10");
+  };
+
+  const handleAddAward = () => {
+    if (!selectedCircle || !newAwardName.trim()) return;
+    const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
+    
+    if (canApproveInstantly) {
+      const newAward: CircleAward = {
+        id: `ca-${Date.now()}`,
+        name: newAwardName.trim(),
+        description: newAwardDescription.trim() || "Win this challenge",
+        type: newAwardType,
+        target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
+        category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
+      };
+      const current = circleAwards[selectedCircle.id] || [];
+      setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
+      toast({ title: "Award created" });
+    } else {
+      const request = {
+        id: `ar-${Date.now()}`,
+        circleId: selectedCircle.id,
+        requesterId: "you",
+        requesterName: "You",
+        type: "award" as const,
+        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory },
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      };
+      setBadgeRequests([...badgeRequests, request]);
+      toast({ title: "Award request submitted", description: "Waiting for owner/admin approval" });
+    }
+    
+    setShowAddAward(false);
+    setNewAwardName("");
+    setNewAwardDescription("");
+    setNewAwardType("first_to");
+    setNewAwardTarget("100");
+    setNewAwardCategory("");
+  };
+
+  const handleApproveBadgeRequest = (requestId: string) => {
+    const request = badgeRequests.find(r => r.id === requestId);
+    if (!request || !selectedCircle) return;
+    
+    if (request.type === "badge") {
+      const newBadge: CircleBadge = {
+        id: `cb-${Date.now()}`,
+        name: request.data.name || "New Badge",
+        description: request.data.description || "Complete this challenge",
+        icon: "target",
+        progress: 0,
+        required: request.data.required || 10,
+        earned: false,
+      };
+      const current = circleBadges[selectedCircle.id] || [];
+      setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
+    } else if (request.type === "award") {
+      const newAward: CircleAward = {
+        id: `ca-${Date.now()}`,
+        name: request.data.name || "New Award",
+        description: request.data.description || "Win this challenge",
+        type: request.data.awardType || "first_to",
+        target: request.data.target,
+        category: request.data.category,
+      };
+      const current = circleAwards[selectedCircle.id] || [];
+      setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
+    }
+    
+    setBadgeRequests(badgeRequests.filter(r => r.id !== requestId));
+    toast({ title: "Request approved" });
+  };
+
+  const handleRejectBadgeRequest = (requestId: string) => {
+    setBadgeRequests(badgeRequests.filter(r => r.id !== requestId));
+    toast({ title: "Request rejected" });
+  };
+
+  const pendingBadgeRequestsForCircle = useMemo(() => {
+    if (!selectedCircle) return [];
+    return badgeRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
+  }, [selectedCircle, badgeRequests]);
 
   const handleToggleTaskComplete = (circleId: string, taskId: string, task: StoredCircleTask) => {
     const myCompleted = myCompletedTasks[circleId] || [];
@@ -2158,15 +2282,101 @@ export default function CommunityPage() {
                 <TabsContent value="badges" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Star className="w-5 h-5" />
-                        Circle Badges
-                      </CardTitle>
-                      <CardDescription>Shared goals everyone works towards together</CardDescription>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Star className="w-5 h-5" />
+                            Circle Badges
+                          </CardTitle>
+                          <CardDescription>Shared goals everyone works towards together</CardDescription>
+                        </div>
+                        <Dialog open={showAddBadge} onOpenChange={setShowAddBadge}>
+                          <DialogTrigger asChild>
+                            <Button data-testid="button-add-badge">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Badge
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add New Badge</DialogTitle>
+                              <DialogDescription>
+                                {isOwnerOrAdmin(selectedCircle.id)
+                                  ? "Create a new badge for this circle"
+                                  : "Submit a badge request for approval"}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label>Badge Name</Label>
+                                <Input
+                                  placeholder="e.g., Marathon Ready"
+                                  value={newBadgeName}
+                                  onChange={(e) => setNewBadgeName(e.target.value)}
+                                  data-testid="input-new-badge-name"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Description</Label>
+                                <Textarea
+                                  placeholder="What do members need to do to earn this badge?"
+                                  value={newBadgeDescription}
+                                  onChange={(e) => setNewBadgeDescription(e.target.value)}
+                                  data-testid="input-new-badge-description"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Required Count</Label>
+                                <Input
+                                  type="number"
+                                  value={newBadgeRequired}
+                                  onChange={(e) => setNewBadgeRequired(e.target.value)}
+                                  data-testid="input-new-badge-required"
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setShowAddBadge(false)}>Cancel</Button>
+                              <Button onClick={handleAddBadge} data-testid="button-submit-badge">
+                                {isOwnerOrAdmin(selectedCircle.id) ? "Add Badge" : "Submit Request"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </CardHeader>
                     <CardContent>
+                      {isOwnerOrAdmin(selectedCircle.id) && pendingBadgeRequestsForCircle.filter(r => r.type === "badge").length > 0 && (
+                        <div className="mb-6 p-4 rounded-md border border-yellow-500/30 bg-yellow-500/10">
+                          <h4 className="font-medium flex items-center gap-2 mb-3">
+                            <AlertCircle className="w-4 h-4 text-yellow-500" />
+                            Pending Badge Requests
+                          </h4>
+                          <div className="space-y-3">
+                            {pendingBadgeRequestsForCircle.filter(r => r.type === "badge").map((request) => (
+                              <div key={request.id} className="flex items-center justify-between gap-4 p-3 rounded-md bg-background border">
+                                <div>
+                                  <p className="font-medium">{request.data.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Requested by {request.requesterName} - {request.data.description || "No description"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Required: {request.data.required}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => handleApproveBadgeRequest(request.id)} data-testid={`button-approve-badge-${request.id}`}>
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleRejectBadgeRequest(request.id)} data-testid={`button-reject-badge-${request.id}`}>
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="space-y-4">
-                        {(demoCircleBadges[selectedCircle.id] || []).map((badge) => (
+                        {(circleBadges[selectedCircle.id] || []).map((badge) => (
                           <div 
                             key={badge.id} 
                             className={`p-4 rounded-md border ${badge.earned ? "bg-yellow-500/10 border-yellow-500/30" : ""}`}
@@ -2188,7 +2398,7 @@ export default function CommunityPage() {
                             <Progress value={(badge.progress / badge.required) * 100} className="h-2" />
                           </div>
                         ))}
-                        {(!demoCircleBadges[selectedCircle.id] || demoCircleBadges[selectedCircle.id].length === 0) && (
+                        {(!circleBadges[selectedCircle.id] || circleBadges[selectedCircle.id].length === 0) && (
                           <div className="text-center py-8 text-muted-foreground">
                             <Star className="w-12 h-12 mx-auto mb-2 opacity-50" />
                             <p>No badges set up for this circle yet</p>
@@ -2202,15 +2412,131 @@ export default function CommunityPage() {
                 <TabsContent value="awards" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Award className="w-5 h-5" />
-                        Circle Awards
-                      </CardTitle>
-                      <CardDescription>Competitive challenges and races</CardDescription>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Award className="w-5 h-5" />
+                            Circle Awards
+                          </CardTitle>
+                          <CardDescription>Competitive challenges and races</CardDescription>
+                        </div>
+                        <Dialog open={showAddAward} onOpenChange={setShowAddAward}>
+                          <DialogTrigger asChild>
+                            <Button data-testid="button-add-award">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Award
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add New Award</DialogTitle>
+                              <DialogDescription>
+                                {isOwnerOrAdmin(selectedCircle.id)
+                                  ? "Create a new award for this circle"
+                                  : "Submit an award request for approval"}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label>Award Name</Label>
+                                <Input
+                                  placeholder="e.g., Speed Demon"
+                                  value={newAwardName}
+                                  onChange={(e) => setNewAwardName(e.target.value)}
+                                  data-testid="input-new-award-name"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Description</Label>
+                                <Textarea
+                                  placeholder="What's the challenge about?"
+                                  value={newAwardDescription}
+                                  onChange={(e) => setNewAwardDescription(e.target.value)}
+                                  data-testid="input-new-award-description"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Award Type</Label>
+                                <Select value={newAwardType} onValueChange={(v) => setNewAwardType(v as "first_to" | "most_in_category" | "weekly_champion")}>
+                                  <SelectTrigger data-testid="select-award-type">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="first_to">First To - First to reach a target</SelectItem>
+                                    <SelectItem value="most_in_category">Most In Category - Highest in a category</SelectItem>
+                                    <SelectItem value="weekly_champion">Weekly Champion - Best performer each week</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {newAwardType === "first_to" && (
+                                <div className="space-y-2">
+                                  <Label>Target Points</Label>
+                                  <Input
+                                    type="number"
+                                    value={newAwardTarget}
+                                    onChange={(e) => setNewAwardTarget(e.target.value)}
+                                    data-testid="input-new-award-target"
+                                  />
+                                </div>
+                              )}
+                              {newAwardType === "most_in_category" && (
+                                <div className="space-y-2">
+                                  <Label>Category</Label>
+                                  <Input
+                                    placeholder="e.g., Cardio, Reading"
+                                    value={newAwardCategory}
+                                    onChange={(e) => setNewAwardCategory(e.target.value)}
+                                    data-testid="input-new-award-category"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setShowAddAward(false)}>Cancel</Button>
+                              <Button onClick={handleAddAward} data-testid="button-submit-award">
+                                {isOwnerOrAdmin(selectedCircle.id) ? "Add Award" : "Submit Request"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </CardHeader>
                     <CardContent>
+                      {isOwnerOrAdmin(selectedCircle.id) && pendingBadgeRequestsForCircle.filter(r => r.type === "award").length > 0 && (
+                        <div className="mb-6 p-4 rounded-md border border-yellow-500/30 bg-yellow-500/10">
+                          <h4 className="font-medium flex items-center gap-2 mb-3">
+                            <AlertCircle className="w-4 h-4 text-yellow-500" />
+                            Pending Award Requests
+                          </h4>
+                          <div className="space-y-3">
+                            {pendingBadgeRequestsForCircle.filter(r => r.type === "award").map((request) => (
+                              <div key={request.id} className="flex items-center justify-between gap-4 p-3 rounded-md bg-background border">
+                                <div>
+                                  <p className="font-medium">{request.data.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Requested by {request.requesterName} - {request.data.description || "No description"}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Type: {request.data.awardType}
+                                    {request.data.target && ` - Target: ${request.data.target}`}
+                                    {request.data.category && ` - Category: ${request.data.category}`}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button size="sm" onClick={() => handleApproveBadgeRequest(request.id)} data-testid={`button-approve-award-${request.id}`}>
+                                    <Check className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleRejectBadgeRequest(request.id)} data-testid={`button-reject-award-${request.id}`}>
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="space-y-4">
-                        {(demoCircleAwards[selectedCircle.id] || []).map((award) => (
+                        {(circleAwards[selectedCircle.id] || []).map((award) => (
                           <div 
                             key={award.id} 
                             className={`p-4 rounded-md border ${award.winner ? "bg-green-500/10 border-green-500/30" : "bg-muted/50"}`}
@@ -2244,7 +2570,7 @@ export default function CommunityPage() {
                             )}
                           </div>
                         ))}
-                        {(!demoCircleAwards[selectedCircle.id] || demoCircleAwards[selectedCircle.id].length === 0) && (
+                        {(!circleAwards[selectedCircle.id] || circleAwards[selectedCircle.id].length === 0) && (
                           <div className="text-center py-8 text-muted-foreground">
                             <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
                             <p>No awards or challenges set up yet</p>
