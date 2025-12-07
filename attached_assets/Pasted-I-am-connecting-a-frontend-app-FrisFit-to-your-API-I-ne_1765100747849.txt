@@ -1,0 +1,91 @@
+I am connecting a frontend app (FrisFit) to your API. I need you to update your backend to support the following endpoints and data schemas at /api/fitness/*. Please ensure your server handles these POST/PUT/GET/DELETE requests and stores the JSON data structure exactly as defined below.
+
+1. Nutrition Logs (/api/fitness/nutrition)
+schema:
+
+{
+  "id": "string (generated)",
+  "date": "ISO string",
+  "calories": number,
+  "protein": number,
+  "carbs": number,
+  "fats": number,
+  "creatine": boolean,
+  "waterGallon": boolean,
+  "deficit": number,
+  "caloriesBurned": number,
+  "meals": [
+    { "name": "string", "calories": number, "protein": number, "time": "string" }
+  ]
+}
+
+2. Body Composition (/api/fitness/body-comp)
+schema:
+
+{
+  "id": "string",
+  "date": "ISO string",
+  "weight": number,
+  "bodyFat": number (optional),
+  "goalWeight": number,
+  "nextMilestone": number,
+  "photoUrl": "string (base64 or url)"
+}
+
+3. Strength Workouts (/api/fitness/strength)
+schema:
+
+{
+  "id": "string",
+  "date": "ISO string",
+  "type": "Strength",
+  "duration": number,
+  "volume": number,
+  "primaryFocus": "string",
+  "notes": "string",
+  "effort": number,
+  "exercises": [
+    { "name": "string", "sets": number, "reps": number, "weight": number }
+  ]
+}
+
+4. Skill Workouts (/api/fitness/skill)
+schema:
+
+{
+  "id": "string",
+  "date": "ISO string",
+  "type": "Skill",
+  "drillType": "string",
+  "skillFocus": ["string"],
+  "zoneFocus": { "paint": number, "midRange": number, "threePoint": number },
+  "effort": number,
+  "notes": "string",
+  "drillStats": [
+     { "name": "string", "reps": number, "made": number, "trend": "up|down|stable" }
+  ]
+}
+
+5. Basketball Runs (/api/fitness/runs)
+Note: This endpoint is for pickup games, not cardio runs.
+schema:
+
+{
+  "id": "string",
+  "date": "ISO string",
+  "type": "Run",
+  "gameType": ["5v5", "3v3", "etc"],
+  "courtType": "Full Court" | "Half Court",
+  "competitionLevel": "string",
+  "gamesPlayed": number,
+  "wins": number,
+  "losses": number,
+  "performanceGrade": "string (A, B, C...)",
+  "confidence": number,
+  "positivePoints": "string",
+  "weakPoints": "string",
+  "matchupNotes": "string",
+  "challenges": [
+     { "description": "string", "category": "string", "target": number, "achieved": number, "completed": boolean }
+  ]
+}
