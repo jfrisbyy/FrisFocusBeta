@@ -1,15 +1,15 @@
-# Trust The Process - Habit Tracker
+# FrisFocus - Habit Tracker
 
 ## Overview
 
-Trust The Process is a full-stack habit tracking application that helps users build consistent routines through a point-based system. Users create tasks with point values, log daily completions, and earn bonus points through "boosters" - achievement-based rewards for hitting specific milestones (e.g., logging 5 of 7 days, completing a Bible book, lifting 3 times weekly).
+FrisFocus is a full-stack habit tracking application that helps users build consistent routines through a point-based system. Users create tasks with point values, log daily completions, and earn bonus points through "boosters" - achievement-based rewards for hitting specific milestones (e.g., logging 5 of 7 days, completing a Bible book, lifting 3 times weekly).
 
 The application provides three main views:
 - **Dashboard**: Weekly overview showing total points, daily breakdown, and active boosters
 - **Daily**: Date-based task completion with real-time point calculations
 - **Tasks**: CRUD interface for managing tasks and configuring custom booster rules
 
-The system emphasizes visual feedback through color-coded point thresholds and progress indicators, motivating users to maintain momentum and "trust the process" of incremental improvement.
+The system emphasizes visual feedback through color-coded point thresholds and progress indicators, motivating users to maintain focus and build lasting habits.
 
 ## User Preferences
 

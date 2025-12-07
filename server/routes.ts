@@ -20,7 +20,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Message is required" });
       }
 
-      const systemPrompt = `You are a helpful and encouraging habit tracking assistant for an app called "Trust The Process". 
+      const systemPrompt = `You are a helpful and encouraging habit tracking assistant for an app called "FrisFocus". 
 Your role is to:
 - Provide insights about the user's habits and progress
 - Offer encouragement and motivation

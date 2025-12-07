@@ -1,4 +1,4 @@
-# Trust The Process - Design Guidelines
+# FrisFocus - Design Guidelines
 
 ## Design Approach
 
@@ -13,7 +13,7 @@
 - Secondary: JetBrains Mono or similar (point values, dates, numerical data)
 
 **Hierarchy:**
-- Hero/Page Titles: 2xl to 3xl, font-semibold (e.g., "Trust The Process")
+- Hero/Page Titles: 2xl to 3xl, font-semibold (e.g., "FrisFocus")
 - Section Headers: xl, font-semibold
 - Card Titles: lg, font-medium
 - Body Text: base, font-normal

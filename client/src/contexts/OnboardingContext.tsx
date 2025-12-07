@@ -8,7 +8,7 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-const STORAGE_KEY = "trust_the_process_started";
+const STORAGE_KEY = "frisfocus_started";
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [hasStartedJourney, setHasStartedJourney] = useState<boolean>(() => {

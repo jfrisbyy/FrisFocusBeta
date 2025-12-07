@@ -22,7 +22,7 @@ interface WelcomeMessageProps {
 const defaultMessages = [
   "Let's start this week off right, you can do it I believe in you!",
   "Every day is a new opportunity to be better than yesterday!",
-  "Trust the process and keep pushing forward!",
+  "Stay focused and keep pushing forward!",
   "Small daily improvements lead to stunning results!",
   "You've got this! Stay focused and stay consistent!",
 ];
