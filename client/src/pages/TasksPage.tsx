@@ -5,9 +5,34 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Target, Pencil, Check, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown } from "lucide-react";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
-import type { TaskPriority, PenaltyRule } from "@shared/schema";
+import type { TaskPriority, PenaltyRule, PenaltyItem, NegativeBooster } from "@shared/schema";
 
 interface Task {
   id: string;
@@ -33,6 +58,19 @@ const initialTasks: Task[] = [
   { id: "9", name: "Connect with friend", value: 5, category: "Social", priority: "couldDo" },
 ];
 
+// Mock penalties
+const initialPenalties: PenaltyItem[] = [
+  { id: "p1", name: "Missed workout", value: -10, category: "Penalties" },
+  { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties" },
+  { id: "p3", name: "Ate junk food", value: -8, category: "Penalties" },
+];
+
+// Mock negative boosters
+const initialNegativeBoosters: NegativeBooster[] = [
+  { id: "nb1", name: "Too much screen time", description: "If done 3+ times per week", timesThreshold: 3, period: "week", penaltyPoints: 15, currentCount: 1, triggered: false },
+  { id: "nb2", name: "Skipped gym", description: "If skipped 2+ times per week", timesThreshold: 2, period: "week", penaltyPoints: 20, currentCount: 0, triggered: false },
+];
+
 export default function TasksPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -40,6 +78,25 @@ export default function TasksPage() {
   const [dailyGoal, setDailyGoal] = useState(50);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
+  
+  // Penalties state
+  const [penalties, setPenalties] = useState<PenaltyItem[]>(initialPenalties);
+  const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false);
+  const [editingPenalty, setEditingPenalty] = useState<PenaltyItem | null>(null);
+  const [penaltyName, setPenaltyName] = useState("");
+  const [penaltyValue, setPenaltyValue] = useState("-5");
+  const [deletePenaltyId, setDeletePenaltyId] = useState<string | null>(null);
+
+  // Negative boosters state
+  const [negativeBoosters, setNegativeBoosters] = useState<NegativeBooster[]>(initialNegativeBoosters);
+  const [boosterDialogOpen, setBoosterDialogOpen] = useState(false);
+  const [editingBooster, setEditingBooster] = useState<NegativeBooster | null>(null);
+  const [boosterName, setBoosterName] = useState("");
+  const [boosterDescription, setBoosterDescription] = useState("");
+  const [boosterThreshold, setBoosterThreshold] = useState("3");
+  const [boosterPeriod, setBoosterPeriod] = useState<"week" | "month">("week");
+  const [boosterPoints, setBoosterPoints] = useState("10");
+  const [deleteBoosterId, setDeleteBoosterId] = useState<string | null>(null);
 
   const handleAdd = (task: Omit<Task, "id">) => {
     const id = String(Date.now());
@@ -87,6 +144,126 @@ export default function TasksPage() {
   const handleCancelGoal = () => {
     setEditingGoal(false);
     setGoalInput("");
+  };
+
+  // Penalty handlers
+  const resetPenaltyForm = () => {
+    setPenaltyName("");
+    setPenaltyValue("-5");
+  };
+
+  const handleOpenCreatePenalty = () => {
+    resetPenaltyForm();
+    setEditingPenalty(null);
+    setPenaltyDialogOpen(true);
+  };
+
+  const handleOpenEditPenalty = (penalty: PenaltyItem) => {
+    setEditingPenalty(penalty);
+    setPenaltyName(penalty.name);
+    setPenaltyValue(penalty.value.toString());
+    setPenaltyDialogOpen(true);
+  };
+
+  const handleSavePenalty = () => {
+    const value = parseInt(penaltyValue, 10);
+    const finalValue = value > 0 ? -value : value;
+
+    if (editingPenalty) {
+      setPenalties(penalties.map(p =>
+        p.id === editingPenalty.id
+          ? { ...p, name: penaltyName, value: finalValue }
+          : p
+      ));
+      toast({ title: "Penalty updated", description: `"${penaltyName}" has been updated` });
+    } else {
+      const newPenalty: PenaltyItem = {
+        id: `p${Date.now()}`,
+        name: penaltyName,
+        value: finalValue,
+        category: "Penalties",
+      };
+      setPenalties([...penalties, newPenalty]);
+      toast({ title: "Penalty added", description: `"${penaltyName}" has been added` });
+    }
+
+    setPenaltyDialogOpen(false);
+    resetPenaltyForm();
+    setEditingPenalty(null);
+  };
+
+  const handleDeletePenalty = () => {
+    if (deletePenaltyId) {
+      const penalty = penalties.find(p => p.id === deletePenaltyId);
+      setPenalties(penalties.filter(p => p.id !== deletePenaltyId));
+      toast({ title: "Penalty deleted", description: penalty ? `"${penalty.name}" has been removed` : "Penalty removed" });
+      setDeletePenaltyId(null);
+    }
+  };
+
+  // Negative booster handlers
+  const resetBoosterForm = () => {
+    setBoosterName("");
+    setBoosterDescription("");
+    setBoosterThreshold("3");
+    setBoosterPeriod("week");
+    setBoosterPoints("10");
+  };
+
+  const handleOpenCreateBooster = () => {
+    resetBoosterForm();
+    setEditingBooster(null);
+    setBoosterDialogOpen(true);
+  };
+
+  const handleOpenEditBooster = (booster: NegativeBooster) => {
+    setEditingBooster(booster);
+    setBoosterName(booster.name);
+    setBoosterDescription(booster.description);
+    setBoosterThreshold(booster.timesThreshold.toString());
+    setBoosterPeriod(booster.period);
+    setBoosterPoints(booster.penaltyPoints.toString());
+    setBoosterDialogOpen(true);
+  };
+
+  const handleSaveBooster = () => {
+    const threshold = parseInt(boosterThreshold, 10) || 3;
+    const points = parseInt(boosterPoints, 10) || 10;
+
+    if (editingBooster) {
+      setNegativeBoosters(negativeBoosters.map(b =>
+        b.id === editingBooster.id
+          ? { ...b, name: boosterName, description: boosterDescription, timesThreshold: threshold, period: boosterPeriod, penaltyPoints: points }
+          : b
+      ));
+      toast({ title: "Negative booster updated", description: `"${boosterName}" has been updated` });
+    } else {
+      const newBooster: NegativeBooster = {
+        id: `nb${Date.now()}`,
+        name: boosterName,
+        description: boosterDescription,
+        timesThreshold: threshold,
+        period: boosterPeriod,
+        penaltyPoints: points,
+        currentCount: 0,
+        triggered: false,
+      };
+      setNegativeBoosters([...negativeBoosters, newBooster]);
+      toast({ title: "Negative booster added", description: `"${boosterName}" has been added` });
+    }
+
+    setBoosterDialogOpen(false);
+    resetBoosterForm();
+    setEditingBooster(null);
+  };
+
+  const handleDeleteBooster = () => {
+    if (deleteBoosterId) {
+      const booster = negativeBoosters.find(b => b.id === deleteBoosterId);
+      setNegativeBoosters(negativeBoosters.filter(b => b.id !== deleteBoosterId));
+      toast({ title: "Negative booster deleted", description: booster ? `"${booster.name}" has been removed` : "Negative booster removed" });
+      setDeleteBoosterId(null);
+    }
   };
 
   return (
@@ -144,6 +321,277 @@ export default function TasksPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
+
+      {/* Penalties Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-chart-3" />
+            <h3 className="text-lg font-medium">Penalties</h3>
+            <span className="text-sm text-muted-foreground">({penalties.length})</span>
+          </div>
+          <Button onClick={handleOpenCreatePenalty} data-testid="button-add-penalty">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Penalty
+          </Button>
+        </div>
+
+        {penalties.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              No penalties configured. Add one to track negative behaviors.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {penalties.map((penalty) => (
+              <Card key={penalty.id} data-testid={`penalty-${penalty.id}`}>
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-sm">{penalty.name}</span>
+                      <p className="font-mono text-chart-3 text-sm">{penalty.value} pts</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleOpenEditPenalty(penalty)}
+                        data-testid={`button-edit-penalty-${penalty.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeletePenaltyId(penalty.id)}
+                        data-testid={`button-delete-penalty-${penalty.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-chart-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Negative Boosters Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5 text-chart-3" />
+            <h3 className="text-lg font-medium">Negative Boosters</h3>
+            <span className="text-sm text-muted-foreground">({negativeBoosters.length})</span>
+          </div>
+          <Button onClick={handleOpenCreateBooster} data-testid="button-add-negative-booster">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Negative Booster
+          </Button>
+        </div>
+
+        {negativeBoosters.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              No negative boosters configured. Add one to penalize repeated bad behaviors.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {negativeBoosters.map((booster) => (
+              <Card key={booster.id} data-testid={`negative-booster-${booster.id}`}>
+                <CardContent className="pt-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-sm">{booster.name}</span>
+                      <p className="text-xs text-muted-foreground">{booster.description}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleOpenEditBooster(booster)}
+                        data-testid={`button-edit-booster-${booster.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeleteBoosterId(booster.id)}
+                        data-testid={`button-delete-booster-${booster.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-chart-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      {booster.timesThreshold}+ times per {booster.period}
+                    </span>
+                    <span className="font-mono text-chart-3">-{booster.penaltyPoints} pts</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Penalty Dialog */}
+      <Dialog open={penaltyDialogOpen} onOpenChange={setPenaltyDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingPenalty ? "Edit Penalty" : "Add Penalty"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="penalty-name">Name</Label>
+              <Input
+                id="penalty-name"
+                value={penaltyName}
+                onChange={(e) => setPenaltyName(e.target.value)}
+                placeholder="e.g., Missed workout"
+                data-testid="input-penalty-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="penalty-value">Point Value (negative)</Label>
+              <Input
+                id="penalty-value"
+                type="number"
+                value={penaltyValue}
+                onChange={(e) => setPenaltyValue(e.target.value)}
+                max={-1}
+                data-testid="input-penalty-value"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPenaltyDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePenalty} disabled={!penaltyName.trim()} data-testid="button-save-penalty">
+              {editingPenalty ? "Update" : "Add"} Penalty
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Negative Booster Dialog */}
+      <Dialog open={boosterDialogOpen} onOpenChange={setBoosterDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingBooster ? "Edit Negative Booster" : "Add Negative Booster"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="booster-name">Name</Label>
+              <Input
+                id="booster-name"
+                value={boosterName}
+                onChange={(e) => setBoosterName(e.target.value)}
+                placeholder="e.g., Too much screen time"
+                data-testid="input-booster-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="booster-description">Description</Label>
+              <Textarea
+                id="booster-description"
+                value={boosterDescription}
+                onChange={(e) => setBoosterDescription(e.target.value)}
+                placeholder="e.g., If done 3+ times per week"
+                rows={2}
+                className="resize-none"
+                data-testid="input-booster-description"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="booster-threshold">Times Threshold</Label>
+                <Input
+                  id="booster-threshold"
+                  type="number"
+                  value={boosterThreshold}
+                  onChange={(e) => setBoosterThreshold(e.target.value)}
+                  min={1}
+                  data-testid="input-booster-threshold"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="booster-period">Period</Label>
+                <Select value={boosterPeriod} onValueChange={(v) => setBoosterPeriod(v as "week" | "month")}>
+                  <SelectTrigger data-testid="select-booster-period">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">Week</SelectItem>
+                    <SelectItem value="month">Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="booster-points">Penalty Points</Label>
+              <Input
+                id="booster-points"
+                type="number"
+                value={boosterPoints}
+                onChange={(e) => setBoosterPoints(e.target.value)}
+                min={1}
+                data-testid="input-booster-points"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBoosterDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveBooster} disabled={!boosterName.trim()} data-testid="button-save-booster">
+              {editingBooster ? "Update" : "Add"} Negative Booster
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Penalty Confirmation */}
+      <AlertDialog open={!!deletePenaltyId} onOpenChange={(open) => !open && setDeletePenaltyId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Penalty</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this penalty? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePenalty} className="bg-destructive text-destructive-foreground">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Negative Booster Confirmation */}
+      <AlertDialog open={!!deleteBoosterId} onOpenChange={(open) => !open && setDeleteBoosterId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Negative Booster</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this negative booster? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBooster} className="bg-destructive text-destructive-foreground">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

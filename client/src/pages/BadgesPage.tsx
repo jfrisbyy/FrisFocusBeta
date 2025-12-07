@@ -50,6 +50,12 @@ import {
 
 type BadgeConditionType = "taskCompletions" | "perfectDaysStreak" | "negativeFreeStreak" | "weeklyGoalStreak";
 
+interface BadgeLevel {
+  level: number;
+  required: number;
+  earned: boolean;
+}
+
 interface BadgeDefinition {
   id: string;
   name: string;
@@ -57,8 +63,7 @@ interface BadgeDefinition {
   icon: string;
   conditionType: BadgeConditionType;
   taskName?: string;
-  required: number;
-  earned: boolean;
+  levels: BadgeLevel[];
   progress: number;
 }
 
@@ -90,54 +95,69 @@ const conditionLabels: Record<BadgeConditionType, string> = {
 const initialBadges: BadgeDefinition[] = [
   {
     id: "1",
-    name: "Scripture Scholar I",
-    description: "Read 30 Bible chapters",
+    name: "Scripture Scholar",
+    description: "Read Bible chapters",
     icon: "book",
     conditionType: "taskCompletions",
     taskName: "Bible study",
-    required: 30,
-    earned: false,
-    progress: 18,
+    levels: [
+      { level: 1, required: 30, earned: true },
+      { level: 2, required: 100, earned: false },
+      { level: 3, required: 300, earned: false },
+    ],
+    progress: 45,
   },
   {
     id: "2",
     name: "Beast Mode",
-    description: "3 perfect days in a row",
+    description: "Perfect days in a row",
     icon: "flame",
     conditionType: "perfectDaysStreak",
-    required: 3,
-    earned: true,
-    progress: 3,
+    levels: [
+      { level: 1, required: 3, earned: true },
+      { level: 2, required: 7, earned: false },
+      { level: 3, required: 14, earned: false },
+    ],
+    progress: 5,
   },
   {
     id: "3",
     name: "Purified",
-    description: "10 negative-free days in a row",
+    description: "Negative-free days in a row",
     icon: "shield",
     conditionType: "negativeFreeStreak",
-    required: 10,
-    earned: false,
+    levels: [
+      { level: 1, required: 7, earned: false },
+      { level: 2, required: 14, earned: false },
+      { level: 3, required: 30, earned: false },
+    ],
     progress: 6,
   },
   {
     id: "4",
     name: "Consistent Champion",
-    description: "Hit weekly goal 4 weeks in a row",
+    description: "Hit weekly goal in a row",
     icon: "trophy",
     conditionType: "weeklyGoalStreak",
-    required: 4,
-    earned: false,
+    levels: [
+      { level: 1, required: 4, earned: false },
+      { level: 2, required: 8, earned: false },
+      { level: 3, required: 12, earned: false },
+    ],
     progress: 3,
   },
   {
     id: "5",
     name: "Gym Warrior",
-    description: "Complete 50 gym sessions",
+    description: "Complete gym sessions",
     icon: "zap",
     conditionType: "taskCompletions",
     taskName: "Gym session",
-    required: 50,
-    earned: false,
+    levels: [
+      { level: 1, required: 25, earned: false },
+      { level: 2, required: 50, earned: false },
+      { level: 3, required: 100, earned: false },
+    ],
     progress: 23,
   },
 ];
@@ -154,10 +174,21 @@ export default function BadgesPage() {
   const [formIcon, setFormIcon] = useState("award");
   const [formConditionType, setFormConditionType] = useState<BadgeConditionType>("taskCompletions");
   const [formTaskName, setFormTaskName] = useState("");
-  const [formRequired, setFormRequired] = useState("10");
+  const [formLevel1, setFormLevel1] = useState("10");
+  const [formLevel2, setFormLevel2] = useState("25");
+  const [formLevel3, setFormLevel3] = useState("50");
 
-  const earnedBadges = badges.filter(b => b.earned);
-  const inProgressBadges = badges.filter(b => !b.earned);
+  const getHighestEarnedLevel = (badge: BadgeDefinition) => {
+    const earnedLevels = badge.levels.filter(l => l.earned);
+    return earnedLevels.length > 0 ? Math.max(...earnedLevels.map(l => l.level)) : 0;
+  };
+
+  const getNextLevel = (badge: BadgeDefinition) => {
+    return badge.levels.find(l => !l.earned);
+  };
+
+  const earnedBadges = badges.filter(b => b.levels.some(l => l.earned));
+  const inProgressBadges = badges.filter(b => !b.levels.some(l => l.earned));
 
   const resetForm = () => {
     setFormName("");
@@ -165,7 +196,9 @@ export default function BadgesPage() {
     setFormIcon("award");
     setFormConditionType("taskCompletions");
     setFormTaskName("");
-    setFormRequired("10");
+    setFormLevel1("10");
+    setFormLevel2("25");
+    setFormLevel3("50");
   };
 
   const handleOpenCreate = () => {
@@ -181,12 +214,16 @@ export default function BadgesPage() {
     setFormIcon(badge.icon);
     setFormConditionType(badge.conditionType);
     setFormTaskName(badge.taskName || "");
-    setFormRequired(badge.required.toString());
+    setFormLevel1(badge.levels[0]?.required.toString() || "10");
+    setFormLevel2(badge.levels[1]?.required.toString() || "25");
+    setFormLevel3(badge.levels[2]?.required.toString() || "50");
     setDialogOpen(true);
   };
 
   const handleSave = () => {
-    const required = parseInt(formRequired, 10) || 10;
+    const level1 = parseInt(formLevel1, 10) || 10;
+    const level2 = parseInt(formLevel2, 10) || 25;
+    const level3 = parseInt(formLevel3, 10) || 50;
 
     if (editingBadge) {
       setBadges(badges.map(b =>
@@ -198,7 +235,11 @@ export default function BadgesPage() {
               icon: formIcon,
               conditionType: formConditionType,
               taskName: formConditionType === "taskCompletions" ? formTaskName : undefined,
-              required,
+              levels: [
+                { level: 1, required: level1, earned: b.levels[0]?.earned || false },
+                { level: 2, required: level2, earned: b.levels[1]?.earned || false },
+                { level: 3, required: level3, earned: b.levels[2]?.earned || false },
+              ],
             }
           : b
       ));
@@ -211,8 +252,11 @@ export default function BadgesPage() {
         icon: formIcon,
         conditionType: formConditionType,
         taskName: formConditionType === "taskCompletions" ? formTaskName : undefined,
-        required,
-        earned: false,
+        levels: [
+          { level: 1, required: level1, earned: false },
+          { level: 2, required: level2, earned: false },
+          { level: 3, required: level3, earned: false },
+        ],
         progress: 0,
       };
       setBadges([...badges, newBadge]);
@@ -255,9 +299,14 @@ export default function BadgesPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {earnedBadges.map((badge) => {
               const Icon = getIcon(badge.icon);
+              const highestLevel = getHighestEarnedLevel(badge);
+              const nextLevel = getNextLevel(badge);
+              const percentage = nextLevel 
+                ? Math.min((badge.progress / nextLevel.required) * 100, 100)
+                : 100;
               return (
                 <Card key={badge.id} className="border-chart-1/30" data-testid={`badge-${badge.id}`}>
-                  <CardContent className="pt-4">
+                  <CardContent className="pt-4 space-y-3">
                     <div className="flex items-start gap-3">
                       <div className="rounded-full p-2 bg-chart-1/10">
                         <Icon className="h-5 w-5 text-chart-1" />
@@ -266,7 +315,7 @@ export default function BadgesPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm">{badge.name}</span>
                           <Badge variant="outline" className="text-xs text-chart-1 border-chart-1/30">
-                            Earned
+                            Level {highestLevel}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
@@ -280,6 +329,17 @@ export default function BadgesPage() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </div>
+                    {nextLevel && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Next: Level {nextLevel.level}</span>
+                          <span className="font-mono">
+                            {badge.progress}/{nextLevel.required}
+                          </span>
+                        </div>
+                        <Progress value={percentage} className="h-1.5" />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -303,7 +363,10 @@ export default function BadgesPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {inProgressBadges.map((badge) => {
               const Icon = getIcon(badge.icon);
-              const percentage = Math.min((badge.progress / badge.required) * 100, 100);
+              const nextLevel = getNextLevel(badge);
+              const percentage = nextLevel 
+                ? Math.min((badge.progress / nextLevel.required) * 100, 100)
+                : 0;
               return (
                 <Card key={badge.id} data-testid={`badge-${badge.id}`}>
                   <CardContent className="pt-4 space-y-3">
@@ -334,15 +397,17 @@ export default function BadgesPage() {
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-mono">
-                          {badge.progress}/{badge.required}
-                        </span>
+                    {nextLevel && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Level {nextLevel.level}</span>
+                          <span className="font-mono">
+                            {badge.progress}/{nextLevel.required}
+                          </span>
+                        </div>
+                        <Progress value={percentage} className="h-1.5" />
                       </div>
-                      <Progress value={percentage} className="h-1.5" />
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -436,21 +501,39 @@ export default function BadgesPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="required">
-                  {formConditionType === "taskCompletions"
-                    ? "Times Required"
-                    : formConditionType.includes("Streak")
-                    ? "Days/Weeks Required"
-                    : "Count Required"}
-                </Label>
-                <Input
-                  id="required"
-                  type="number"
-                  value={formRequired}
-                  onChange={(e) => setFormRequired(e.target.value)}
-                  min={1}
-                  data-testid="input-required"
-                />
+                <Label>Level Requirements</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Level 1</span>
+                    <Input
+                      type="number"
+                      value={formLevel1}
+                      onChange={(e) => setFormLevel1(e.target.value)}
+                      min={1}
+                      data-testid="input-level-1"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Level 2</span>
+                    <Input
+                      type="number"
+                      value={formLevel2}
+                      onChange={(e) => setFormLevel2(e.target.value)}
+                      min={1}
+                      data-testid="input-level-2"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Level 3</span>
+                    <Input
+                      type="number"
+                      value={formLevel3}
+                      onChange={(e) => setFormLevel3(e.target.value)}
+                      min={1}
+                      data-testid="input-level-3"
+                    />
+                  </div>
+                </div>
               </div>
 
               <DialogFooter className="pt-2">

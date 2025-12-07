@@ -52,7 +52,7 @@ export default function DailySummary({
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm text-muted-foreground">Notes</label>
+          <label className="text-sm text-muted-foreground">Journal</label>
           <Textarea
             placeholder="How was your day?"
             value={notes}
