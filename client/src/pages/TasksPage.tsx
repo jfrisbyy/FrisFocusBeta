@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -30,9 +31,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag } from "lucide-react";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
-import type { TaskPriority, PenaltyRule, PenaltyItem, NegativeBooster } from "@shared/schema";
+import type { TaskPriority, PenaltyRule, PenaltyItem, Category } from "@shared/schema";
 
 interface Task {
   id: string;
@@ -45,7 +46,13 @@ interface Task {
   penaltyRule?: PenaltyRule;
 }
 
-// todo: remove mock functionality
+const initialCategories: Category[] = [
+  { id: "c1", name: "Health" },
+  { id: "c2", name: "Productivity" },
+  { id: "c3", name: "Spiritual" },
+  { id: "c4", name: "Social" },
+];
+
 const initialTasks: Task[] = [
   { id: "1", name: "Morning workout", value: 15, category: "Health", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 5, period: "week", bonusPoints: 15 } },
   { id: "2", name: "Evening walk", value: 5, category: "Health", priority: "couldDo" },
@@ -58,45 +65,40 @@ const initialTasks: Task[] = [
   { id: "9", name: "Connect with friend", value: 5, category: "Social", priority: "couldDo" },
 ];
 
-// Mock penalties
 const initialPenalties: PenaltyItem[] = [
-  { id: "p1", name: "Missed workout", value: -10, category: "Penalties" },
-  { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties" },
-  { id: "p3", name: "Ate junk food", value: -8, category: "Penalties" },
-];
-
-// Mock negative boosters
-const initialNegativeBoosters: NegativeBooster[] = [
-  { id: "nb1", name: "Too much screen time", description: "If done 3+ times per week", timesThreshold: 3, period: "week", penaltyPoints: 15, currentCount: 1, triggered: false },
-  { id: "nb2", name: "Skipped gym", description: "If skipped 2+ times per week", timesThreshold: 2, period: "week", penaltyPoints: 20, currentCount: 0, triggered: false },
+  { id: "p1", name: "Missed workout", value: -10, category: "Penalties", negativeBoostEnabled: false },
+  { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties", negativeBoostEnabled: false },
+  { id: "p3", name: "Ate junk food", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 15, currentCount: 1, triggered: false },
+  { id: "p4", name: "Too much screen time", value: -5, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 4, period: "week", boostPenaltyPoints: 20, currentCount: 2, triggered: false },
 ];
 
 export default function TasksPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  // todo: remove mock functionality - daily goal will come from backend
   const [dailyGoal, setDailyGoal] = useState(50);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   
-  // Penalties state
   const [penalties, setPenalties] = useState<PenaltyItem[]>(initialPenalties);
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false);
   const [editingPenalty, setEditingPenalty] = useState<PenaltyItem | null>(null);
   const [penaltyName, setPenaltyName] = useState("");
   const [penaltyValue, setPenaltyValue] = useState("-5");
   const [deletePenaltyId, setDeletePenaltyId] = useState<string | null>(null);
+  
+  const [penaltyBoostEnabled, setPenaltyBoostEnabled] = useState(false);
+  const [penaltyBoostThreshold, setPenaltyBoostThreshold] = useState("3");
+  const [penaltyBoostPeriod, setPenaltyBoostPeriod] = useState<"week" | "month">("week");
+  const [penaltyBoostPoints, setPenaltyBoostPoints] = useState("10");
 
-  // Negative boosters state
-  const [negativeBoosters, setNegativeBoosters] = useState<NegativeBooster[]>(initialNegativeBoosters);
-  const [boosterDialogOpen, setBoosterDialogOpen] = useState(false);
-  const [editingBooster, setEditingBooster] = useState<NegativeBooster | null>(null);
-  const [boosterName, setBoosterName] = useState("");
-  const [boosterDescription, setBoosterDescription] = useState("");
-  const [boosterThreshold, setBoosterThreshold] = useState("3");
-  const [boosterPeriod, setBoosterPeriod] = useState<"week" | "month">("week");
-  const [boosterPoints, setBoosterPoints] = useState("10");
-  const [deleteBoosterId, setDeleteBoosterId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
+
+  const usedCategoryNames = new Set(tasks.map(t => t.category));
+  const categoryNames = categories.map(c => c.name);
 
   const handleAdd = (task: Omit<Task, "id">) => {
     const id = String(Date.now());
@@ -146,10 +148,13 @@ export default function TasksPage() {
     setGoalInput("");
   };
 
-  // Penalty handlers
   const resetPenaltyForm = () => {
     setPenaltyName("");
     setPenaltyValue("-5");
+    setPenaltyBoostEnabled(false);
+    setPenaltyBoostThreshold("3");
+    setPenaltyBoostPeriod("week");
+    setPenaltyBoostPoints("10");
   };
 
   const handleOpenCreatePenalty = () => {
@@ -162,17 +167,31 @@ export default function TasksPage() {
     setEditingPenalty(penalty);
     setPenaltyName(penalty.name);
     setPenaltyValue(penalty.value.toString());
+    setPenaltyBoostEnabled(penalty.negativeBoostEnabled || false);
+    setPenaltyBoostThreshold(penalty.timesThreshold?.toString() || "3");
+    setPenaltyBoostPeriod(penalty.period || "week");
+    setPenaltyBoostPoints(penalty.boostPenaltyPoints?.toString() || "10");
     setPenaltyDialogOpen(true);
   };
 
   const handleSavePenalty = () => {
     const value = parseInt(penaltyValue, 10);
     const finalValue = value > 0 ? -value : value;
+    const threshold = parseInt(penaltyBoostThreshold, 10) || 3;
+    const boostPoints = parseInt(penaltyBoostPoints, 10) || 10;
 
     if (editingPenalty) {
       setPenalties(penalties.map(p =>
         p.id === editingPenalty.id
-          ? { ...p, name: penaltyName, value: finalValue }
+          ? {
+              ...p,
+              name: penaltyName,
+              value: finalValue,
+              negativeBoostEnabled: penaltyBoostEnabled,
+              timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+              period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+              boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+            }
           : p
       ));
       toast({ title: "Penalty updated", description: `"${penaltyName}" has been updated` });
@@ -182,6 +201,12 @@ export default function TasksPage() {
         name: penaltyName,
         value: finalValue,
         category: "Penalties",
+        negativeBoostEnabled: penaltyBoostEnabled,
+        timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+        period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+        boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+        currentCount: 0,
+        triggered: false,
       };
       setPenalties([...penalties, newPenalty]);
       toast({ title: "Penalty added", description: `"${penaltyName}" has been added` });
@@ -201,70 +226,58 @@ export default function TasksPage() {
     }
   };
 
-  // Negative booster handlers
-  const resetBoosterForm = () => {
-    setBoosterName("");
-    setBoosterDescription("");
-    setBoosterThreshold("3");
-    setBoosterPeriod("week");
-    setBoosterPoints("10");
+  const resetCategoryForm = () => {
+    setCategoryName("");
   };
 
-  const handleOpenCreateBooster = () => {
-    resetBoosterForm();
-    setEditingBooster(null);
-    setBoosterDialogOpen(true);
+  const handleOpenCreateCategory = () => {
+    resetCategoryForm();
+    setEditingCategory(null);
+    setCategoryDialogOpen(true);
   };
 
-  const handleOpenEditBooster = (booster: NegativeBooster) => {
-    setEditingBooster(booster);
-    setBoosterName(booster.name);
-    setBoosterDescription(booster.description);
-    setBoosterThreshold(booster.timesThreshold.toString());
-    setBoosterPeriod(booster.period);
-    setBoosterPoints(booster.penaltyPoints.toString());
-    setBoosterDialogOpen(true);
+  const handleOpenEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setCategoryName(category.name);
+    setCategoryDialogOpen(true);
   };
 
-  const handleSaveBooster = () => {
-    const threshold = parseInt(boosterThreshold, 10) || 3;
-    const points = parseInt(boosterPoints, 10) || 10;
-
-    if (editingBooster) {
-      setNegativeBoosters(negativeBoosters.map(b =>
-        b.id === editingBooster.id
-          ? { ...b, name: boosterName, description: boosterDescription, timesThreshold: threshold, period: boosterPeriod, penaltyPoints: points }
-          : b
+  const handleSaveCategory = () => {
+    if (editingCategory) {
+      const oldName = editingCategory.name;
+      setCategories(categories.map(c =>
+        c.id === editingCategory.id ? { ...c, name: categoryName } : c
       ));
-      toast({ title: "Negative booster updated", description: `"${boosterName}" has been updated` });
+      if (oldName !== categoryName) {
+        setTasks(tasks.map(t =>
+          t.category === oldName ? { ...t, category: categoryName } : t
+        ));
+      }
+      toast({ title: "Category updated", description: `"${categoryName}" has been updated` });
     } else {
-      const newBooster: NegativeBooster = {
-        id: `nb${Date.now()}`,
-        name: boosterName,
-        description: boosterDescription,
-        timesThreshold: threshold,
-        period: boosterPeriod,
-        penaltyPoints: points,
-        currentCount: 0,
-        triggered: false,
+      const newCategory: Category = {
+        id: `c${Date.now()}`,
+        name: categoryName,
       };
-      setNegativeBoosters([...negativeBoosters, newBooster]);
-      toast({ title: "Negative booster added", description: `"${boosterName}" has been added` });
+      setCategories([...categories, newCategory]);
+      toast({ title: "Category added", description: `"${categoryName}" has been added` });
     }
 
-    setBoosterDialogOpen(false);
-    resetBoosterForm();
-    setEditingBooster(null);
+    setCategoryDialogOpen(false);
+    resetCategoryForm();
+    setEditingCategory(null);
   };
 
-  const handleDeleteBooster = () => {
-    if (deleteBoosterId) {
-      const booster = negativeBoosters.find(b => b.id === deleteBoosterId);
-      setNegativeBoosters(negativeBoosters.filter(b => b.id !== deleteBoosterId));
-      toast({ title: "Negative booster deleted", description: booster ? `"${booster.name}" has been removed` : "Negative booster removed" });
-      setDeleteBoosterId(null);
+  const handleDeleteCategory = () => {
+    if (deleteCategoryId) {
+      const category = categories.find(c => c.id === deleteCategoryId);
+      setCategories(categories.filter(c => c.id !== deleteCategoryId));
+      toast({ title: "Category deleted", description: category ? `"${category.name}" has been removed` : "Category removed" });
+      setDeleteCategoryId(null);
     }
   };
+
+  const isCategoryInUse = (categoryName: string) => usedCategoryNames.has(categoryName);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -273,56 +286,106 @@ export default function TasksPage() {
         <p className="text-muted-foreground text-sm">Manage your tasks and point values</p>
       </div>
 
-      <Card className="max-w-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Target className="h-4 w-4 text-muted-foreground" />
-            Daily Point Goal
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {editingGoal ? (
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                value={goalInput}
-                onChange={(e) => setGoalInput(e.target.value)}
-                className="w-24 font-mono"
-                min={1}
-                autoFocus
-                data-testid="input-daily-goal"
-              />
-              <span className="text-sm text-muted-foreground">points</span>
-              <Button size="icon" variant="ghost" onClick={handleSaveGoal} data-testid="button-save-daily-goal">
-                <Check className="h-4 w-4 text-chart-1" />
+      <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              Daily Point Goal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {editingGoal ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  className="w-24 font-mono"
+                  min={1}
+                  autoFocus
+                  data-testid="input-daily-goal"
+                />
+                <span className="text-sm text-muted-foreground">points</span>
+                <Button size="icon" variant="ghost" onClick={handleSaveGoal} data-testid="button-save-daily-goal">
+                  <Check className="h-4 w-4 text-chart-1" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={handleCancelGoal} data-testid="button-cancel-daily-goal">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-mono font-bold">{dailyGoal}</span>
+                <span className="text-sm text-muted-foreground">points per day</span>
+                <Button size="icon" variant="ghost" onClick={handleEditGoal} data-testid="button-edit-daily-goal">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Hit this goal each day to build your day streak
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                Categories
+              </div>
+              <Button size="sm" variant="ghost" onClick={handleOpenCreateCategory} data-testid="button-add-category">
+                <Plus className="h-4 w-4" />
               </Button>
-              <Button size="icon" variant="ghost" onClick={handleCancelGoal} data-testid="button-cancel-daily-goal">
-                <X className="h-4 w-4" />
-              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((category) => (
+                <div
+                  key={category.id}
+                  className="flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 rounded-md text-xs"
+                  data-testid={`category-${category.id}`}
+                >
+                  <span>{category.name}</span>
+                  <button
+                    type="button"
+                    className="hover:text-foreground"
+                    onClick={() => handleOpenEditCategory(category)}
+                    data-testid={`button-edit-category-${category.id}`}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  {!isCategoryInUse(category.name) && (
+                    <button
+                      type="button"
+                      className="hover:text-foreground"
+                      onClick={() => setDeleteCategoryId(category.id)}
+                      data-testid={`button-delete-category-${category.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {categories.length === 0 && (
+                <span className="text-sm text-muted-foreground">No categories yet</span>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-mono font-bold">{dailyGoal}</span>
-              <span className="text-sm text-muted-foreground">points per day</span>
-              <Button size="icon" variant="ghost" onClick={handleEditGoal} data-testid="button-edit-daily-goal">
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground mt-2">
-            Hit this goal each day to build your day streak
-          </p>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       <TaskList
         tasks={tasks}
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        categories={categoryNames}
       />
 
-      {/* Penalties Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
@@ -346,8 +409,8 @@ export default function TasksPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {penalties.map((penalty) => (
               <Card key={penalty.id} data-testid={`penalty-${penalty.id}`}>
-                <CardContent className="pt-4">
-                  <div className="flex items-center justify-between gap-2">
+                <CardContent className="pt-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-sm">{penalty.name}</span>
                       <p className="font-mono text-chart-3 text-sm">{penalty.value} pts</p>
@@ -371,6 +434,15 @@ export default function TasksPage() {
                       </Button>
                     </div>
                   </div>
+                  {penalty.negativeBoostEnabled && penalty.timesThreshold && penalty.period && penalty.boostPenaltyPoints && (
+                    <div className="flex items-center gap-2 text-xs border-t pt-2">
+                      <TrendingDown className="h-3 w-3 text-chart-3" />
+                      <span className="text-muted-foreground">
+                        {penalty.timesThreshold}+ times/{penalty.period}:
+                      </span>
+                      <span className="font-mono text-chart-3">-{penalty.boostPenaltyPoints} pts</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -378,69 +450,6 @@ export default function TasksPage() {
         )}
       </div>
 
-      {/* Negative Boosters Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5 text-chart-3" />
-            <h3 className="text-lg font-medium">Negative Boosters</h3>
-            <span className="text-sm text-muted-foreground">({negativeBoosters.length})</span>
-          </div>
-          <Button onClick={handleOpenCreateBooster} data-testid="button-add-negative-booster">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Negative Booster
-          </Button>
-        </div>
-
-        {negativeBoosters.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No negative boosters configured. Add one to penalize repeated bad behaviors.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {negativeBoosters.map((booster) => (
-              <Card key={booster.id} data-testid={`negative-booster-${booster.id}`}>
-                <CardContent className="pt-4 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm">{booster.name}</span>
-                      <p className="text-xs text-muted-foreground">{booster.description}</p>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleOpenEditBooster(booster)}
-                        data-testid={`button-edit-booster-${booster.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setDeleteBoosterId(booster.id)}
-                        data-testid={`button-delete-booster-${booster.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-chart-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">
-                      {booster.timesThreshold}+ times per {booster.period}
-                    </span>
-                    <span className="font-mono text-chart-3">-{booster.penaltyPoints} pts</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Penalty Dialog */}
       <Dialog open={penaltyDialogOpen} onOpenChange={setPenaltyDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -468,6 +477,65 @@ export default function TasksPage() {
                 data-testid="input-penalty-value"
               />
             </div>
+            
+            <div className="border-t pt-4 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label htmlFor="boost-enabled" className="text-sm font-medium">Negative Boost</Label>
+                  <p className="text-xs text-muted-foreground">Extra penalty for repeated offenses</p>
+                </div>
+                <Switch
+                  id="boost-enabled"
+                  checked={penaltyBoostEnabled}
+                  onCheckedChange={setPenaltyBoostEnabled}
+                  data-testid="switch-penalty-boost"
+                />
+              </div>
+              
+              {penaltyBoostEnabled && (
+                <div className="space-y-4 pl-4 border-l-2 border-muted">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="boost-threshold">Times Threshold</Label>
+                      <Input
+                        id="boost-threshold"
+                        type="number"
+                        value={penaltyBoostThreshold}
+                        onChange={(e) => setPenaltyBoostThreshold(e.target.value)}
+                        min={1}
+                        data-testid="input-penalty-boost-threshold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="boost-period">Period</Label>
+                      <Select value={penaltyBoostPeriod} onValueChange={(v) => setPenaltyBoostPeriod(v as "week" | "month")}>
+                        <SelectTrigger data-testid="select-penalty-boost-period">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="week">Week</SelectItem>
+                          <SelectItem value="month">Month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="boost-points">Extra Penalty Points</Label>
+                    <Input
+                      id="boost-points"
+                      type="number"
+                      value={penaltyBoostPoints}
+                      onChange={(e) => setPenaltyBoostPoints(e.target.value)}
+                      min={1}
+                      data-testid="input-penalty-boost-points"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      If this penalty is logged {penaltyBoostThreshold}+ times per {penaltyBoostPeriod}, you lose an extra {penaltyBoostPoints} points
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPenaltyDialogOpen(false)}>
@@ -480,84 +548,34 @@ export default function TasksPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Negative Booster Dialog */}
-      <Dialog open={boosterDialogOpen} onOpenChange={setBoosterDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editingBooster ? "Edit Negative Booster" : "Add Negative Booster"}</DialogTitle>
+            <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="booster-name">Name</Label>
+              <Label htmlFor="category-name">Name</Label>
               <Input
-                id="booster-name"
-                value={boosterName}
-                onChange={(e) => setBoosterName(e.target.value)}
-                placeholder="e.g., Too much screen time"
-                data-testid="input-booster-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="booster-description">Description</Label>
-              <Textarea
-                id="booster-description"
-                value={boosterDescription}
-                onChange={(e) => setBoosterDescription(e.target.value)}
-                placeholder="e.g., If done 3+ times per week"
-                rows={2}
-                className="resize-none"
-                data-testid="input-booster-description"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="booster-threshold">Times Threshold</Label>
-                <Input
-                  id="booster-threshold"
-                  type="number"
-                  value={boosterThreshold}
-                  onChange={(e) => setBoosterThreshold(e.target.value)}
-                  min={1}
-                  data-testid="input-booster-threshold"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="booster-period">Period</Label>
-                <Select value={boosterPeriod} onValueChange={(v) => setBoosterPeriod(v as "week" | "month")}>
-                  <SelectTrigger data-testid="select-booster-period">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="booster-points">Penalty Points</Label>
-              <Input
-                id="booster-points"
-                type="number"
-                value={boosterPoints}
-                onChange={(e) => setBoosterPoints(e.target.value)}
-                min={1}
-                data-testid="input-booster-points"
+                id="category-name"
+                value={categoryName}
+                onChange={(e) => setCategoryName(e.target.value)}
+                placeholder="e.g., Fitness"
+                data-testid="input-category-name"
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setBoosterDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveBooster} disabled={!boosterName.trim()} data-testid="button-save-booster">
-              {editingBooster ? "Update" : "Add"} Negative Booster
+            <Button onClick={handleSaveCategory} disabled={!categoryName.trim()} data-testid="button-save-category">
+              {editingCategory ? "Update" : "Add"} Category
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Penalty Confirmation */}
       <AlertDialog open={!!deletePenaltyId} onOpenChange={(open) => !open && setDeletePenaltyId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -575,18 +593,17 @@ export default function TasksPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Negative Booster Confirmation */}
-      <AlertDialog open={!!deleteBoosterId} onOpenChange={(open) => !open && setDeleteBoosterId(null)}>
+      <AlertDialog open={!!deleteCategoryId} onOpenChange={(open) => !open && setDeleteCategoryId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Negative Booster</AlertDialogTitle>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this negative booster? This action cannot be undone.
+              Are you sure you want to delete this category? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteBooster} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction onClick={handleDeleteCategory} className="bg-destructive text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

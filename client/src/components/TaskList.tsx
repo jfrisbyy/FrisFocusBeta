@@ -39,6 +39,7 @@ interface TaskListProps {
   onAdd: (task: Omit<Task, "id">) => void;
   onEdit: (id: string, task: Omit<Task, "id">) => void;
   onDelete: (id: string) => void;
+  categories?: string[];
 }
 
 const priorityConfig: Record<TaskPriority, { label: string; variant: "default" | "secondary" | "outline"; icon: typeof AlertTriangle }> = {
@@ -49,7 +50,7 @@ const priorityConfig: Record<TaskPriority, { label: string; variant: "default" |
 
 const priorityOrder: TaskPriority[] = ["mustDo", "shouldDo", "couldDo"];
 
-export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListProps) {
+export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: propCategories }: TaskListProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -72,7 +73,8 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
     }
   };
 
-  const categories = Array.from(new Set(tasks.map(t => t.category)));
+  const derivedCategories = Array.from(new Set(tasks.map(t => t.category)));
+  const categories = propCategories && propCategories.length > 0 ? propCategories : derivedCategories;
 
   return (
     <>

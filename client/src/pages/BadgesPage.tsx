@@ -174,9 +174,7 @@ export default function BadgesPage() {
   const [formIcon, setFormIcon] = useState("award");
   const [formConditionType, setFormConditionType] = useState<BadgeConditionType>("taskCompletions");
   const [formTaskName, setFormTaskName] = useState("");
-  const [formLevel1, setFormLevel1] = useState("10");
-  const [formLevel2, setFormLevel2] = useState("25");
-  const [formLevel3, setFormLevel3] = useState("50");
+  const [formLevels, setFormLevels] = useState<string[]>(["10", "25", "50"]);
 
   const getHighestEarnedLevel = (badge: BadgeDefinition) => {
     const earnedLevels = badge.levels.filter(l => l.earned);
@@ -196,9 +194,25 @@ export default function BadgesPage() {
     setFormIcon("award");
     setFormConditionType("taskCompletions");
     setFormTaskName("");
-    setFormLevel1("10");
-    setFormLevel2("25");
-    setFormLevel3("50");
+    setFormLevels(["10", "25", "50"]);
+  };
+
+  const handleAddLevel = () => {
+    const lastValue = parseInt(formLevels[formLevels.length - 1] || "0", 10);
+    const newValue = lastValue > 0 ? Math.round(lastValue * 2).toString() : "100";
+    setFormLevels([...formLevels, newValue]);
+  };
+
+  const handleRemoveLevel = (index: number) => {
+    if (formLevels.length > 1) {
+      setFormLevels(formLevels.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleLevelChange = (index: number, value: string) => {
+    const newLevels = [...formLevels];
+    newLevels[index] = value;
+    setFormLevels(newLevels);
   };
 
   const handleOpenCreate = () => {
@@ -214,16 +228,16 @@ export default function BadgesPage() {
     setFormIcon(badge.icon);
     setFormConditionType(badge.conditionType);
     setFormTaskName(badge.taskName || "");
-    setFormLevel1(badge.levels[0]?.required.toString() || "10");
-    setFormLevel2(badge.levels[1]?.required.toString() || "25");
-    setFormLevel3(badge.levels[2]?.required.toString() || "50");
+    setFormLevels(badge.levels.map(l => l.required.toString()));
     setDialogOpen(true);
   };
 
   const handleSave = () => {
-    const level1 = parseInt(formLevel1, 10) || 10;
-    const level2 = parseInt(formLevel2, 10) || 25;
-    const level3 = parseInt(formLevel3, 10) || 50;
+    const parsedLevels = formLevels.map((val, idx) => ({
+      level: idx + 1,
+      required: parseInt(val, 10) || (idx + 1) * 10,
+      earned: false,
+    }));
 
     if (editingBadge) {
       setBadges(badges.map(b =>
@@ -235,11 +249,10 @@ export default function BadgesPage() {
               icon: formIcon,
               conditionType: formConditionType,
               taskName: formConditionType === "taskCompletions" ? formTaskName : undefined,
-              levels: [
-                { level: 1, required: level1, earned: b.levels[0]?.earned || false },
-                { level: 2, required: level2, earned: b.levels[1]?.earned || false },
-                { level: 3, required: level3, earned: b.levels[2]?.earned || false },
-              ],
+              levels: parsedLevels.map((pl, idx) => ({
+                ...pl,
+                earned: b.levels[idx]?.earned || false,
+              })),
             }
           : b
       ));
@@ -252,11 +265,7 @@ export default function BadgesPage() {
         icon: formIcon,
         conditionType: formConditionType,
         taskName: formConditionType === "taskCompletions" ? formTaskName : undefined,
-        levels: [
-          { level: 1, required: level1, earned: false },
-          { level: 2, required: level2, earned: false },
-          { level: 3, required: level3, earned: false },
-        ],
+        levels: parsedLevels,
         progress: 0,
       };
       setBadges([...badges, newBadge]);
@@ -501,38 +510,44 @@ export default function BadgesPage() {
               )}
 
               <div className="space-y-2">
-                <Label>Level Requirements</Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Level 1</span>
-                    <Input
-                      type="number"
-                      value={formLevel1}
-                      onChange={(e) => setFormLevel1(e.target.value)}
-                      min={1}
-                      data-testid="input-level-1"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Level 2</span>
-                    <Input
-                      type="number"
-                      value={formLevel2}
-                      onChange={(e) => setFormLevel2(e.target.value)}
-                      min={1}
-                      data-testid="input-level-2"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground">Level 3</span>
-                    <Input
-                      type="number"
-                      value={formLevel3}
-                      onChange={(e) => setFormLevel3(e.target.value)}
-                      min={1}
-                      data-testid="input-level-3"
-                    />
-                  </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Level Requirements</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAddLevel}
+                    data-testid="button-add-level"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Level
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {formLevels.map((levelValue, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-16">Level {index + 1}</span>
+                      <Input
+                        type="number"
+                        value={levelValue}
+                        onChange={(e) => handleLevelChange(index, e.target.value)}
+                        min={1}
+                        className="flex-1"
+                        data-testid={`input-level-${index + 1}`}
+                      />
+                      {formLevels.length > 1 && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemoveLevel(index)}
+                          data-testid={`button-remove-level-${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-chart-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
