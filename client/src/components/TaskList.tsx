@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import TaskForm from "./TaskForm";
+import TaskForm, { TaskWithBooster } from "./TaskForm";
+import { BoosterRule } from "./BoosterRuleConfig";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Task {
   id: string;
@@ -22,7 +28,7 @@ interface Task {
   value: number;
   category: string;
   group?: string;
-  isBooster?: boolean;
+  boosterRule?: BoosterRule;
 }
 
 interface TaskListProps {
@@ -43,7 +49,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
     setEditingTask(task);
   };
 
-  const handleEditSubmit = (values: Omit<Task, "id">) => {
+  const handleEditSubmit = (values: TaskWithBooster) => {
     if (editingTask) {
       onEdit(editingTask.id, values);
       setEditingTask(null);
@@ -87,12 +93,22 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
                         className="flex items-center justify-between gap-4 px-6 py-3 hover-elevate"
                         data-testid={`task-row-${task.id}`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-wrap">
                           <span className="text-sm font-medium truncate">{task.name}</span>
-                          {task.isBooster && (
-                            <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30 shrink-0">
-                              Booster
-                            </Badge>
+                          {task.boosterRule?.enabled && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30 shrink-0 gap-1">
+                                  <Zap className="h-3 w-3" />
+                                  {task.boosterRule.timesRequired}x/{task.boosterRule.period === "week" ? "wk" : "mo"}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  Complete {task.boosterRule.timesRequired} times per {task.boosterRule.period} for +{task.boosterRule.bonusPoints} bonus
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                           {task.group && (
                             <Badge variant="secondary" className="text-xs shrink-0">

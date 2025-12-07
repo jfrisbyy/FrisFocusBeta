@@ -20,7 +20,7 @@ const getMockWeekData = () => {
   return days;
 };
 
-const mockBoosters = [
+const mockSystemBoosters = [
   {
     id: "booster_5of7_tracking",
     name: "5 of 7 Tracking",
@@ -28,6 +28,7 @@ const mockBoosters = [
     points: 10,
     achieved: true,
     icon: "tracking" as const,
+    type: "system" as const,
   },
   {
     id: "booster_finish_bible_book",
@@ -36,6 +37,7 @@ const mockBoosters = [
     points: 10,
     achieved: false,
     icon: "bible" as const,
+    type: "system" as const,
   },
   {
     id: "booster_3days_lifting",
@@ -44,6 +46,40 @@ const mockBoosters = [
     points: 10,
     achieved: true,
     icon: "lifting" as const,
+    type: "system" as const,
+  },
+];
+
+const mockCustomBoosters = [
+  {
+    id: "custom-1",
+    taskName: "Read 30 minutes",
+    timesRequired: 4,
+    timesCompleted: 3,
+    period: "week" as const,
+    bonusPoints: 20,
+    achieved: false,
+    type: "custom" as const,
+  },
+  {
+    id: "custom-2",
+    taskName: "Morning workout",
+    timesRequired: 5,
+    timesCompleted: 5,
+    period: "week" as const,
+    bonusPoints: 15,
+    achieved: true,
+    type: "custom" as const,
+  },
+  {
+    id: "custom-3",
+    taskName: "Bible study",
+    timesRequired: 7,
+    timesCompleted: 4,
+    period: "week" as const,
+    bonusPoints: 25,
+    achieved: false,
+    type: "custom" as const,
   },
 ];
 
@@ -56,7 +92,9 @@ export default function Dashboard() {
   const weekRange = `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d")}`;
 
   const weekTotal = days.reduce((sum, d) => sum + (d.points || 0), 0);
-  const boosterPoints = mockBoosters.filter(b => b.achieved).reduce((sum, b) => sum + b.points, 0);
+  const systemBoosterPoints = mockSystemBoosters.filter(b => b.achieved).reduce((sum, b) => sum + b.points, 0);
+  const customBoosterPoints = mockCustomBoosters.filter(b => b.achieved).reduce((sum, b) => sum + b.bonusPoints, 0);
+  const boosterPoints = systemBoosterPoints + customBoosterPoints;
   const finalTotal = weekTotal + boosterPoints;
 
   const handleDayClick = (date: string) => {
@@ -85,7 +123,10 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-md">
-        <BoostersPanel boosters={mockBoosters} />
+        <BoostersPanel 
+          systemBoosters={mockSystemBoosters}
+          customBoosters={mockCustomBoosters}
+        />
       </div>
     </div>
   );
