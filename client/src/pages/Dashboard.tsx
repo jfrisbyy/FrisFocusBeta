@@ -12,6 +12,8 @@ import AlertsPanel from "@/components/AlertsPanel";
 import WelcomeMessage from "@/components/WelcomeMessage";
 import MilestonesPanel from "@/components/MilestonesPanel";
 import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
+import TodoListPanel from "@/components/TodoListPanel";
+import DueDatesPanel from "@/components/DueDatesPanel";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels } from "@shared/schema";
 import {
   loadMilestonesFromStorage,
@@ -26,7 +28,14 @@ import {
   loadTasksFromStorage,
   loadPenaltiesFromStorage,
   loadBadgesFromStorage,
+  loadWeeklyTodoListFromStorage,
+  saveWeeklyTodoListToStorage,
+  loadDueDatesFromStorage,
+  saveDueDatesToStorage,
+  getWeekId,
   StoredMilestone,
+  StoredTodoItem,
+  StoredDueDateItem,
 } from "@/lib/storage";
 
 const getMockWeekData = () => {
@@ -282,6 +291,18 @@ const getMockBadges = (): BadgeWithLevels[] => [
   },
 ];
 
+const getMockWeeklyTodos = (): StoredTodoItem[] => [
+  { id: "wt1", title: "Meal prep for the week", pointValue: 15, completed: true, order: 0 },
+  { id: "wt2", title: "Review weekly goals", pointValue: 10, completed: false, order: 1 },
+  { id: "wt3", title: "Clean the garage", pointValue: 20, completed: false, order: 2 },
+];
+
+const getMockDueDates = (): StoredDueDateItem[] => [
+  { id: "dd1", title: "Submit tax documents", dueDate: "2025-01-15", pointValue: 50, penaltyValue: 25, status: "pending" },
+  { id: "dd2", title: "Renew gym membership", dueDate: "2024-12-31", pointValue: 20, penaltyValue: 10, status: "pending" },
+  { id: "dd3", title: "Pay credit card bill", dueDate: "2024-12-10", pointValue: 30, penaltyValue: 15, status: "completed", completedAt: "2024-12-08" },
+];
+
 const getEmptyWeekData = () => {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -315,6 +336,11 @@ export default function Dashboard() {
   const [boosters, setBoosters] = useState<UnifiedBooster[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [badges, setBadges] = useState<BadgeWithLevels[]>([]);
+  const [weeklyTodos, setWeeklyTodos] = useState<StoredTodoItem[]>([]);
+  const [weeklyTodoBonusEnabled, setWeeklyTodoBonusEnabled] = useState(false);
+  const [weeklyTodoBonusPoints, setWeeklyTodoBonusPoints] = useState(25);
+  const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
+  const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -332,6 +358,10 @@ export default function Dashboard() {
       setWeekStreak(3);
       setLongestDayStreak(14);
       setLongestWeekStreak(8);
+      setWeeklyTodos(getMockWeeklyTodos());
+      setWeeklyTodoBonusEnabled(true);
+      setWeeklyTodoBonusPoints(25);
+      setDueDates(getMockDueDates());
       return;
     }
 
@@ -367,6 +397,20 @@ export default function Dashboard() {
       levels: b.levels,
       currentProgress: b.currentProgress || 0,
     })));
+
+    // Load weekly todos
+    const currentWeekId = getWeekId(new Date());
+    const storedWeeklyTodoList = loadWeeklyTodoListFromStorage(currentWeekId);
+    if (storedWeeklyTodoList) {
+      setWeeklyTodos(storedWeeklyTodoList.items);
+      setWeeklyTodoBonusEnabled(storedWeeklyTodoList.bonusEnabled);
+      setWeeklyTodoBonusPoints(storedWeeklyTodoList.bonusPoints);
+      setWeeklyTodoBonusAwarded(storedWeeklyTodoList.bonusAwarded);
+    }
+
+    // Load due dates
+    const storedDueDates = loadDueDatesFromStorage();
+    setDueDates(storedDueDates);
 
     // Load tasks and penalties for point calculations
     const tasks = loadTasksFromStorage();
@@ -694,6 +738,77 @@ export default function Dashboard() {
     }
   };
 
+  // Weekly todos handlers
+  const handleWeeklyTodosChange = (items: StoredTodoItem[]) => {
+    setWeeklyTodos(items);
+    if (!useMockData) {
+      const weekId = getWeekId(new Date());
+      saveWeeklyTodoListToStorage({
+        weekId,
+        items,
+        bonusEnabled: weeklyTodoBonusEnabled,
+        bonusPoints: weeklyTodoBonusPoints,
+        bonusAwarded: weeklyTodoBonusAwarded,
+      });
+    }
+  };
+
+  const handleWeeklyTodoBonusEnabledChange = (enabled: boolean) => {
+    setWeeklyTodoBonusEnabled(enabled);
+    if (!useMockData) {
+      const weekId = getWeekId(new Date());
+      saveWeeklyTodoListToStorage({
+        weekId,
+        items: weeklyTodos,
+        bonusEnabled: enabled,
+        bonusPoints: weeklyTodoBonusPoints,
+        bonusAwarded: weeklyTodoBonusAwarded,
+      });
+    }
+  };
+
+  const handleWeeklyTodoBonusPointsChange = (points: number) => {
+    setWeeklyTodoBonusPoints(points);
+    if (!useMockData) {
+      const weekId = getWeekId(new Date());
+      saveWeeklyTodoListToStorage({
+        weekId,
+        items: weeklyTodos,
+        bonusEnabled: weeklyTodoBonusEnabled,
+        bonusPoints: points,
+        bonusAwarded: weeklyTodoBonusAwarded,
+      });
+    }
+  };
+
+  // Due dates handlers
+  const handleDueDatesChange = (items: StoredDueDateItem[]) => {
+    setDueDates(items);
+    if (!useMockData) {
+      saveDueDatesToStorage(items);
+    }
+  };
+
+  // Calculate weekly todo points for point summary
+  const weeklyTodoPoints = useMemo(() => {
+    const completedPoints = weeklyTodos
+      .filter(t => t.completed)
+      .reduce((sum, t) => sum + t.pointValue, 0);
+    const bonusPoints = weeklyTodoBonusAwarded ? weeklyTodoBonusPoints : 0;
+    return completedPoints + bonusPoints;
+  }, [weeklyTodos, weeklyTodoBonusAwarded, weeklyTodoBonusPoints]);
+
+  // Calculate due date points for point summary
+  const dueDatePoints = useMemo(() => {
+    const earnedPoints = dueDates
+      .filter(d => d.status === "completed")
+      .reduce((sum, d) => sum + d.pointValue, 0);
+    const lostPoints = dueDates
+      .filter(d => d.status === "missed")
+      .reduce((sum, d) => sum + d.penaltyValue, 0);
+    return earnedPoints - lostPoints;
+  }, [dueDates]);
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <WelcomeMessage
@@ -727,8 +842,31 @@ export default function Dashboard() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="max-w-md">
+          <TodoListPanel
+            title="Weekly To-Do List"
+            prompt="Add a weekly task..."
+            items={weeklyTodos}
+            onItemsChange={handleWeeklyTodosChange}
+            bonusEnabled={weeklyTodoBonusEnabled}
+            bonusPoints={weeklyTodoBonusPoints}
+            bonusAwarded={weeklyTodoBonusAwarded}
+            onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
+            onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
+            isDemo={useMockData}
+          />
+        </div>
+        <div className="max-w-md">
+          <DueDatesPanel
+            items={dueDates}
+            onItemsChange={handleDueDatesChange}
+          />
+        </div>
+        <div className="max-w-md">
           <BoostersPanel boosters={boosters} />
         </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="max-w-md">
           <MilestonesPanel
             milestones={milestones}
@@ -738,7 +876,7 @@ export default function Dashboard() {
             onToggleAchieved={handleMilestoneToggle}
           />
         </div>
-        <div className="max-w-lg">
+        <div className="max-w-lg lg:col-span-2">
           <RecentWeeks
             weeks={recentWeeks}
             defaultGoal={weeklyGoal}

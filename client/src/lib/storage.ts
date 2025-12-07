@@ -20,6 +20,9 @@ const STORAGE_KEYS = {
   USER_PROFILE: "frisfocus_user_profile",
   INSIGHTS_MESSAGES: "frisfocus_insights_messages",
   ONBOARDING: "frisfocus_started",
+  DAILY_TODOS: "frisfocus_daily_todos",
+  WEEKLY_TODOS: "frisfocus_weekly_todos",
+  DUE_DATES: "frisfocus_due_dates",
 } as const;
 
 // Generic helper to safely parse JSON from localStorage
@@ -262,6 +265,98 @@ export function clearAllFrisFocusData(): void {
   Object.values(STORAGE_KEYS).forEach((key) => {
     localStorage.removeItem(key);
   });
+}
+
+// ============ DAILY TO-DO ITEMS ============
+export interface StoredTodoItem {
+  id: string;
+  title: string;
+  pointValue: number;
+  completed: boolean;
+  order: number;
+}
+
+export interface StoredDailyTodoList {
+  date: string; // YYYY-MM-DD format
+  items: StoredTodoItem[];
+  bonusEnabled: boolean;
+  bonusPoints: number;
+  bonusAwarded: boolean;
+}
+
+export function loadDailyTodosFromStorage(): Record<string, StoredDailyTodoList> {
+  return loadFromStorage<Record<string, StoredDailyTodoList>>(STORAGE_KEYS.DAILY_TODOS, {});
+}
+
+export function saveDailyTodosToStorage(todos: Record<string, StoredDailyTodoList>): void {
+  saveToStorage(STORAGE_KEYS.DAILY_TODOS, todos);
+}
+
+export function loadDailyTodoListFromStorage(date: string): StoredDailyTodoList | null {
+  const todos = loadDailyTodosFromStorage();
+  return todos[date] || null;
+}
+
+export function saveDailyTodoListToStorage(list: StoredDailyTodoList): void {
+  const todos = loadDailyTodosFromStorage();
+  todos[list.date] = list;
+  saveDailyTodosToStorage(todos);
+}
+
+// ============ WEEKLY TO-DO ITEMS ============
+export interface StoredWeeklyTodoList {
+  weekId: string; // YYYY-WNN format (year-week number)
+  items: StoredTodoItem[];
+  bonusEnabled: boolean;
+  bonusPoints: number;
+  bonusAwarded: boolean;
+}
+
+export function loadWeeklyTodosFromStorage(): Record<string, StoredWeeklyTodoList> {
+  return loadFromStorage<Record<string, StoredWeeklyTodoList>>(STORAGE_KEYS.WEEKLY_TODOS, {});
+}
+
+export function saveWeeklyTodosToStorage(todos: Record<string, StoredWeeklyTodoList>): void {
+  saveToStorage(STORAGE_KEYS.WEEKLY_TODOS, todos);
+}
+
+export function loadWeeklyTodoListFromStorage(weekId: string): StoredWeeklyTodoList | null {
+  const todos = loadWeeklyTodosFromStorage();
+  return todos[weekId] || null;
+}
+
+export function saveWeeklyTodoListToStorage(list: StoredWeeklyTodoList): void {
+  const todos = loadWeeklyTodosFromStorage();
+  todos[list.weekId] = list;
+  saveWeeklyTodosToStorage(todos);
+}
+
+// ============ DUE DATE ITEMS ============
+export interface StoredDueDateItem {
+  id: string;
+  title: string;
+  dueDate: string; // YYYY-MM-DD format
+  pointValue: number;
+  penaltyValue: number;
+  status: "pending" | "completed" | "missed";
+  completedAt?: string;
+}
+
+export function loadDueDatesFromStorage(): StoredDueDateItem[] {
+  return loadFromStorage<StoredDueDateItem[]>(STORAGE_KEYS.DUE_DATES, []);
+}
+
+export function saveDueDatesToStorage(dueDates: StoredDueDateItem[]): void {
+  saveToStorage(STORAGE_KEYS.DUE_DATES, dueDates);
+}
+
+// Helper to get week ID from date (YYYY-WNN format)
+export function getWeekId(date: Date): string {
+  const year = date.getFullYear();
+  const oneJan = new Date(year, 0, 1);
+  const dayOfYear = Math.floor((date.getTime() - oneJan.getTime()) / 86400000) + 1;
+  const weekNum = Math.ceil((dayOfYear + oneJan.getDay()) / 7);
+  return `${year}-W${weekNum.toString().padStart(2, '0')}`;
 }
 
 // Export storage keys for reference

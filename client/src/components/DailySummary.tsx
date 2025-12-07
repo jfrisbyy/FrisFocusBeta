@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 interface DailySummaryProps {
   positivePoints: number;
   negativePoints: number;
+  todoPoints?: number;
   notes: string;
   onNotesChange: (notes: string) => void;
   onSave: () => void;
@@ -16,12 +17,13 @@ interface DailySummaryProps {
 export default function DailySummary({
   positivePoints,
   negativePoints,
+  todoPoints = 0,
   notes,
   onNotesChange,
   onSave,
   isSaving,
 }: DailySummaryProps) {
-  const netTotal = positivePoints + negativePoints;
+  const netTotal = positivePoints + negativePoints + todoPoints;
 
   return (
     <Card className="sticky top-20">
@@ -31,11 +33,17 @@ export default function DailySummary({
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Positive</span>
+            <span className="text-muted-foreground">Tasks</span>
             <span className="font-mono font-semibold text-chart-1">+{positivePoints}</span>
           </div>
+          {todoPoints > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">To-Do List</span>
+              <span className="font-mono font-semibold text-chart-1">+{todoPoints}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Negative</span>
+            <span className="text-muted-foreground">Penalties</span>
             <span className="font-mono font-semibold text-chart-3">{negativePoints}</span>
           </div>
           <div className="border-t pt-2 flex items-center justify-between">

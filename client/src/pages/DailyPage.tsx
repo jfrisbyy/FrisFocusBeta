@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import DatePicker from "@/components/DatePicker";
 import TaskGroup from "@/components/TaskGroup";
 import DailySummary from "@/components/DailySummary";
+import TodoListPanel from "@/components/TodoListPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
 import {
@@ -13,9 +14,13 @@ import {
   saveDailyLogToStorage,
   loadJournalFromStorage,
   saveJournalToStorage,
+  loadDailyTodoListFromStorage,
+  saveDailyTodoListToStorage,
   type StoredTask,
   type StoredPenalty,
   type StoredJournalEntry,
+  type StoredTodoItem,
+  type StoredDailyTodoList,
 } from "@/lib/storage";
 
 interface DisplayTask {
@@ -42,6 +47,13 @@ const sampleTasks: DisplayTask[] = [
   { id: "demo-13", name: "Missed sleep goal", value: -10, category: "Penalties" },
 ];
 
+const sampleDailyTodos: StoredTodoItem[] = [
+  { id: "demo-todo-1", title: "Pick up medicine from pharmacy", pointValue: 5, completed: true, order: 0 },
+  { id: "demo-todo-2", title: "Call Grandma", pointValue: 5, completed: false, order: 1 },
+  { id: "demo-todo-3", title: "Grocery shopping", pointValue: 10, completed: true, order: 2 },
+  { id: "demo-todo-4", title: "Take out trash", pointValue: 3, completed: false, order: 3 },
+];
+
 export default function DailyPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
@@ -50,12 +62,19 @@ export default function DailyPage() {
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [allTasks, setAllTasks] = useState<DisplayTask[]>([]);
+  const [todoItems, setTodoItems] = useState<StoredTodoItem[]>([]);
+  const [todoBonusEnabled, setTodoBonusEnabled] = useState(false);
+  const [todoBonusPoints, setTodoBonusPoints] = useState(10);
+  const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
 
   // Load tasks and penalties from localStorage on mount
   useEffect(() => {
     if (isDemo) {
       setAllTasks(sampleTasks);
       setCompletedIds(new Set(["demo-1", "demo-2", "demo-4", "demo-6", "demo-7", "demo-9", "demo-10"]));
+      setTodoItems(sampleDailyTodos);
+      setTodoBonusEnabled(true);
+      setTodoBonusPoints(15);
       return;
     }
     
@@ -86,7 +105,7 @@ export default function DailyPage() {
     setAllTasks([...taskItems, ...penaltyItems]);
   }, [isDemo]);
 
-  // Load daily log when date changes
+  // Load daily log and todos when date changes
   useEffect(() => {
     if (isDemo) return;
     
@@ -98,6 +117,19 @@ export default function DailyPage() {
     } else {
       setCompletedIds(new Set());
       setNotes("");
+    }
+
+    const todoList = loadDailyTodoListFromStorage(dateStr);
+    if (todoList) {
+      setTodoItems(todoList.items);
+      setTodoBonusEnabled(todoList.bonusEnabled);
+      setTodoBonusPoints(todoList.bonusPoints);
+      setTodoBonusAwarded(todoList.bonusAwarded);
+    } else {
+      setTodoItems([]);
+      setTodoBonusEnabled(false);
+      setTodoBonusPoints(10);
+      setTodoBonusAwarded(false);
     }
   }, [date, isDemo]);
 
@@ -136,6 +168,58 @@ export default function DailyPage() {
   const negativePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value < 0)
     .reduce((sum, t) => sum + t.value, 0);
+
+  const todoCompletedPoints = todoItems
+    .filter(item => item.completed)
+    .reduce((sum, item) => sum + item.pointValue, 0);
+
+  const allTodosCompleted = todoItems.length > 0 && todoItems.every(item => item.completed);
+  const todoBonus = allTodosCompleted && todoBonusEnabled ? todoBonusPoints : 0;
+  const totalTodoPoints = todoCompletedPoints + todoBonus;
+
+  const handleTodoItemsChange = (items: StoredTodoItem[]) => {
+    setTodoItems(items);
+    if (!isDemo) {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const allCompleted = items.length > 0 && items.every(item => item.completed);
+      const bonusAwarded = allCompleted && todoBonusEnabled;
+      saveDailyTodoListToStorage({
+        date: dateStr,
+        items,
+        bonusEnabled: todoBonusEnabled,
+        bonusPoints: todoBonusPoints,
+        bonusAwarded,
+      });
+    }
+  };
+
+  const handleTodoBonusEnabledChange = (enabled: boolean) => {
+    setTodoBonusEnabled(enabled);
+    if (!isDemo) {
+      const dateStr = format(date, "yyyy-MM-dd");
+      saveDailyTodoListToStorage({
+        date: dateStr,
+        items: todoItems,
+        bonusEnabled: enabled,
+        bonusPoints: todoBonusPoints,
+        bonusAwarded: todoBonusAwarded,
+      });
+    }
+  };
+
+  const handleTodoBonusPointsChange = (points: number) => {
+    setTodoBonusPoints(points);
+    if (!isDemo) {
+      const dateStr = format(date, "yyyy-MM-dd");
+      saveDailyTodoListToStorage({
+        date: dateStr,
+        items: todoItems,
+        bonusEnabled: todoBonusEnabled,
+        bonusPoints: points,
+        bonusAwarded: todoBonusAwarded,
+      });
+    }
+  };
 
   const handleSave = () => {
     if (isDemo) {
@@ -220,6 +304,16 @@ export default function DailyPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
+          <TodoListPanel
+            title="Today's To-Do List"
+            items={todoItems}
+            onItemsChange={handleTodoItemsChange}
+            bonusEnabled={todoBonusEnabled}
+            onBonusEnabledChange={handleTodoBonusEnabledChange}
+            bonusPoints={todoBonusPoints}
+            onBonusPointsChange={handleTodoBonusPointsChange}
+            data-testid="panel-daily-todos"
+          />
           {categories.map((category) => (
             <TaskGroup
               key={category}
@@ -236,6 +330,7 @@ export default function DailyPage() {
           <DailySummary
             positivePoints={positivePoints}
             negativePoints={negativePoints}
+            todoPoints={totalTodoPoints}
             notes={notes}
             onNotesChange={setNotes}
             onSave={handleSave}
