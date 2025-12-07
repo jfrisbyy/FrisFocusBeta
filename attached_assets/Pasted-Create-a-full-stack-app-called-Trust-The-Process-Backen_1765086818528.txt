@@ -1,0 +1,74 @@
+Create a full-stack app called Trust The Process.
+
+Backend: Node + Express. Use a simple JSON file or Replit DB for storage.
+
+Implement these models:
+
+Task: { id, name, value, category, group, isBooster }
+
+DayLog: { date, completedTaskIds, notes, dailyPoints }
+
+WeekSummary (computed only): { weekStart, dailyTotals, weekTotal, boostersApplied, finalWeekPoints }.
+
+Implement these endpoints:
+
+GET /v1/tasks – return all tasks.
+
+POST /v1/tasks – create a new task.
+
+PUT /v1/tasks/:id – update a task.
+
+DELETE /v1/tasks/:id – delete a task.
+
+GET /v1/days?from&to – get a list of DayLogs within the date range.
+
+GET /v1/days/:date – get a single DayLog.
+
+POST /v1/days – upsert a DayLog. Body: { date, completedTaskIds, notes }. Server should:
+
+look up each task’s value,
+
+sum positive values,
+
+sum negative values,
+
+store dailyPoints = total.
+
+GET /v1/weeks/:weekStart – compute the WeekSummary from 7 DayLogs starting at weekStart.
+
+weekTotal = sum of dailyPoints.
+
+boostersApplied is an array of booster task IDs that qualify. For now, implement 3 boosters:
+
+booster_5of7_tracking (+10 pts) if at least 5 of the 7 days have a DayLog.
+
+booster_finish_bible_book (+10 pts) – triggered when a DayLog includes a special task ID.
+
+booster_3days_lifting (+10 pts) – triggered when at least 3 DayLogs contain a ‘lifting’ task.
+
+finalWeekPoints = weekTotal + sum of booster values.
+
+Frontend:
+
+Dashboard page:
+
+Show this week’s total points and color based on thresholds (green > 400, yellow 250–400, red < 250).
+
+Show a small table of dates vs dailyPoints.
+
+Daily page:
+
+Date picker (default today).
+
+Checklist of all tasks grouped by category.
+
+When the user checks/unchecks tasks, it calls POST /v1/days and shows the updated dailyPoints.
+
+Tasks management page:
+
+List of tasks with value and category.
+
+Simple form to add/edit tasks.
+
+Make the UI clean and dark-theme styled, with the title ‘Trust The Process’ and use the same color idea as the sheet: green for positives/strong weeks, red for penalties, yellow for mid.
+Also generate a minimal OpenAPI 3.1 spec (openapi.yaml) for these endpoints so I can plug this into a Custom GPT later.”
