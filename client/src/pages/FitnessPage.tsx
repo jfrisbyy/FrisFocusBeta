@@ -2,30 +2,71 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dumbbell, Utensils, Scale, Target, Trophy } from "lucide-react";
+import { useDemo } from "@/contexts/DemoContext";
 import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun } from "@shared/schema";
 
+const mockNutrition: NutritionLog[] = [
+  { id: "demo-1", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, creatine: true, waterGallon: true },
+  { id: "demo-2", date: new Date(Date.now() - 86400000).toISOString().split("T")[0], calories: 2100, protein: 165, creatine: true, waterGallon: false },
+  { id: "demo-3", date: new Date(Date.now() - 172800000).toISOString().split("T")[0], calories: 2350, protein: 190, creatine: true, waterGallon: true },
+];
+
+const mockBodyComp: BodyComposition[] = [
+  { id: "demo-1", date: new Date().toISOString().split("T")[0], weight: 185, bodyFat: 15, goalWeight: 180 },
+  { id: "demo-2", date: new Date(Date.now() - 604800000).toISOString().split("T")[0], weight: 187, bodyFat: 16, goalWeight: 180 },
+];
+
+const mockStrength: StrengthWorkout[] = [
+  { id: "demo-1", date: new Date().toISOString().split("T")[0], primaryFocus: "Push", duration: 60, volume: 15000 },
+  { id: "demo-2", date: new Date(Date.now() - 172800000).toISOString().split("T")[0], primaryFocus: "Pull", duration: 55, volume: 14200 },
+  { id: "demo-3", date: new Date(Date.now() - 345600000).toISOString().split("T")[0], primaryFocus: "Legs", duration: 70, volume: 18500 },
+];
+
+const mockSkills: SkillWorkout[] = [
+  { id: "demo-1", date: new Date().toISOString().split("T")[0], drillType: "Shooting", effort: 8, skillFocus: ["3-pointers", "Mid-range"], zoneFocus: ["Corner", "Wing"] },
+  { id: "demo-2", date: new Date(Date.now() - 259200000).toISOString().split("T")[0], drillType: "Ball Handling", effort: 7, skillFocus: ["Crossovers", "Behind back"], zoneFocus: [] },
+];
+
+const mockRuns: BasketballRun[] = [
+  { id: "demo-1", date: new Date().toISOString().split("T")[0], gameType: { fullCourt: true }, courtType: "Indoor", gamesPlayed: 5, wins: 3, losses: 2, performanceGrade: "B+", confidence: 7 },
+  { id: "demo-2", date: new Date(Date.now() - 432000000).toISOString().split("T")[0], gameType: { halfCourt: true }, courtType: "Outdoor", gamesPlayed: 4, wins: 4, losses: 0, performanceGrade: "A", confidence: 9 },
+];
+
 export default function FitnessPage() {
-  const { data: nutrition = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
+  const { isDemo } = useDemo();
+  
+  const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
+    enabled: !isDemo,
   });
 
-  const { data: bodyComp = [], isLoading: loadingBody } = useQuery<BodyComposition[]>({
+  const { data: bodyCompData = [], isLoading: loadingBody } = useQuery<BodyComposition[]>({
     queryKey: ["/api/fitness/body-comp"],
+    enabled: !isDemo,
   });
 
-  const { data: strength = [], isLoading: loadingStrength } = useQuery<StrengthWorkout[]>({
+  const { data: strengthData = [], isLoading: loadingStrength } = useQuery<StrengthWorkout[]>({
     queryKey: ["/api/fitness/strength"],
+    enabled: !isDemo,
   });
 
-  const { data: skills = [], isLoading: loadingSkills } = useQuery<SkillWorkout[]>({
+  const { data: skillsData = [], isLoading: loadingSkills } = useQuery<SkillWorkout[]>({
     queryKey: ["/api/fitness/skill"],
+    enabled: !isDemo,
   });
 
-  const { data: runs = [], isLoading: loadingRuns } = useQuery<BasketballRun[]>({
+  const { data: runsData = [], isLoading: loadingRuns } = useQuery<BasketballRun[]>({
     queryKey: ["/api/fitness/runs"],
+    enabled: !isDemo,
   });
 
-  const isLoading = loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns;
+  const nutrition = isDemo ? mockNutrition : nutritionData;
+  const bodyComp = isDemo ? mockBodyComp : bodyCompData;
+  const strength = isDemo ? mockStrength : strengthData;
+  const skills = isDemo ? mockSkills : skillsData;
+  const runs = isDemo ? mockRuns : runsData;
+
+  const isLoading = !isDemo && (loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns);
 
   if (isLoading) {
     return (

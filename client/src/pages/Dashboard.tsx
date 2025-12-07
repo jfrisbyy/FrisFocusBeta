@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { format, startOfWeek, addDays, subWeeks } from "date-fns";
 import { useOnboarding } from "@/contexts/OnboardingContext";
+import { useDemo } from "@/contexts/DemoContext";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
@@ -297,6 +298,8 @@ const getEmptyWeekData = () => {
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const { isOnboarding } = useOnboarding();
+  const { isDemo } = useDemo();
+  const useMockData = isDemo || isOnboarding;
   
   // State initialization
   const [days, setDays] = useState<{ date: string; dayName: string; points: number | null }[]>([]);
@@ -315,8 +318,8 @@ export default function Dashboard() {
 
   // Load data from localStorage on mount
   useEffect(() => {
-    // Use mock data during onboarding, otherwise load from storage
-    if (isOnboarding) {
+    // Use mock data during demo/onboarding, otherwise load from storage
+    if (useMockData) {
       setDays(getMockWeekData());
       setRecentWeeks(getMockRecentWeeks(350));
       setMilestones(getMockMilestones());
@@ -591,7 +594,9 @@ export default function Dashboard() {
 
   const handleGoalChange = (newGoal: number) => {
     setWeeklyGoal(newGoal);
-    saveWeeklyGoalToStorage(newGoal);
+    if (!useMockData) {
+      saveWeeklyGoalToStorage(newGoal);
+    }
   };
 
   const handleWeekUpdate = (weekId: string, note: string, customGoal?: number) => {
@@ -605,7 +610,9 @@ export default function Dashboard() {
   const handleWelcomeUpdate = (newName: string, newMessage: string) => {
     setUserName(newName);
     setEncouragementMessage(newMessage);
-    saveUserProfileToStorage({ userName: newName, encouragementMessage: newMessage });
+    if (!useMockData) {
+      saveUserProfileToStorage({ userName: newName, encouragementMessage: newMessage });
+    }
   };
 
   const handleMilestoneAdd = (milestone: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
@@ -616,15 +623,17 @@ export default function Dashboard() {
     };
     const updated = [...milestones, newMilestone];
     setMilestones(updated);
-    saveMilestonesToStorage(updated.map(m => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      points: m.points,
-      deadline: m.deadline,
-      achieved: m.achieved,
-      achievedAt: m.achievedAt,
-    })));
+    if (!useMockData) {
+      saveMilestonesToStorage(updated.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        points: m.points,
+        deadline: m.deadline,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })));
+    }
   };
 
   const handleMilestoneEdit = (id: string, updates: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
@@ -632,29 +641,33 @@ export default function Dashboard() {
       m.id === id ? { ...m, ...updates } : m
     );
     setMilestones(updated);
-    saveMilestonesToStorage(updated.map(m => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      points: m.points,
-      deadline: m.deadline,
-      achieved: m.achieved,
-      achievedAt: m.achievedAt,
-    })));
+    if (!useMockData) {
+      saveMilestonesToStorage(updated.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        points: m.points,
+        deadline: m.deadline,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })));
+    }
   };
 
   const handleMilestoneDelete = (id: string) => {
     const updated = milestones.filter(m => m.id !== id);
     setMilestones(updated);
-    saveMilestonesToStorage(updated.map(m => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      points: m.points,
-      deadline: m.deadline,
-      achieved: m.achieved,
-      achievedAt: m.achievedAt,
-    })));
+    if (!useMockData) {
+      saveMilestonesToStorage(updated.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        points: m.points,
+        deadline: m.deadline,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })));
+    }
   };
 
   const handleMilestoneToggle = (id: string) => {
@@ -668,15 +681,17 @@ export default function Dashboard() {
         : m
     );
     setMilestones(updated);
-    saveMilestonesToStorage(updated.map(m => ({
-      id: m.id,
-      name: m.name,
-      description: m.description,
-      points: m.points,
-      deadline: m.deadline,
-      achieved: m.achieved,
-      achievedAt: m.achievedAt,
-    })));
+    if (!useMockData) {
+      saveMilestonesToStorage(updated.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        points: m.points,
+        deadline: m.deadline,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })));
+    }
   };
 
   return (

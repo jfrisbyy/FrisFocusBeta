@@ -3,13 +3,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Sparkles } from "lucide-react";
+import { Send, Bot, User, Sparkles, Lock } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useDemo } from "@/contexts/DemoContext";
 import type { AIMessage } from "@shared/schema";
 
+const sampleMessages: AIMessage[] = [
+  {
+    id: "demo-1",
+    role: "user",
+    content: "How am I doing this week?",
+    timestamp: new Date().toISOString(),
+  },
+  {
+    id: "demo-2",
+    role: "assistant",
+    content: "Based on your habit data, you're having a strong week! You've completed 85% of your tasks, which is above your monthly average of 72%.\n\nHighlights:\n- Your spiritual habits are consistent - 6/7 days of Bible reading\n- Workout streak is at 4 days\n- You hit your daily goal 5 times this week\n\nAreas to focus on:\n- Meal prep was only done twice - consider batch cooking on Sundays\n- Sleep schedule has been inconsistent\n\nKeep up the momentum! You're building great habits.",
+    timestamp: new Date().toISOString(),
+  },
+];
+
 export default function InsightsPage() {
-  const [messages, setMessages] = useState<AIMessage[]>([]);
+  const { isDemo } = useDemo();
+  const [messages, setMessages] = useState<AIMessage[]>(isDemo ? sampleMessages : []);
   const [input, setInput] = useState("");
 
   const sendMutation = useMutation({
@@ -33,6 +50,24 @@ export default function InsightsPage() {
 
   const handleSend = () => {
     if (!input.trim() || sendMutation.isPending) return;
+    
+    if (isDemo) {
+      const userMessage: AIMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: input.trim(),
+        timestamp: new Date().toISOString(),
+      };
+      const demoResponse: AIMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "Sign in to get personalized AI insights based on your habit data. In the full version, I can analyze your progress, identify patterns, and give you actionable suggestions.",
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMessage, demoResponse]);
+      setInput("");
+      return;
+    }
 
     const userMessage: AIMessage = {
       id: crypto.randomUUID(),

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import TaskList from "@/components/TaskList";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
+import { useDemo } from "@/contexts/DemoContext";
 // localStorage persistence - load and save functions
 import {
   loadTasksFromStorage,
@@ -84,8 +85,8 @@ const sampleTasks: Task[] = [
 ];
 
 const samplePenalties: PenaltyItem[] = [
-  { id: "p1", name: "Missed workout", value: -10, category: "Penalties", negativeBoostEnabled: false },
-  { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties", negativeBoostEnabled: false },
+  { id: "p1", name: "Missed workout", value: -10, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
+  { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
   { id: "p3", name: "Ate junk food", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 15, currentCount: 1, triggered: false },
   { id: "p4", name: "Too much screen time", value: -5, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 4, period: "week", boostPenaltyPoints: 20, currentCount: 2, triggered: false },
 ];
@@ -93,10 +94,12 @@ const samplePenalties: PenaltyItem[] = [
 export default function TasksPage() {
   const { toast } = useToast();
   const { isOnboarding } = useOnboarding();
+  const { isDemo } = useDemo();
+  const useMockData = isDemo || isOnboarding;
   
-  // Initialize state from localStorage or use sample data during onboarding
+  // Initialize state from localStorage or use sample data during demo/onboarding
   const [tasks, setTasks] = useState<Task[]>(() => {
-    if (isOnboarding) return sampleTasks;
+    if (useMockData) return sampleTasks;
     const stored = loadTasksFromStorage();
     return stored.length > 0 ? stored.map(t => ({
       id: t.id,
@@ -114,14 +117,14 @@ export default function TasksPage() {
   });
   
   const [dailyGoal, setDailyGoal] = useState(() => {
-    if (isOnboarding) return 50;
+    if (useMockData) return 50;
     return loadDailyGoalFromStorage();
   });
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   
   const [penalties, setPenalties] = useState<PenaltyItem[]>(() => {
-    if (isOnboarding) return samplePenalties;
+    if (useMockData) return samplePenalties;
     const stored = loadPenaltiesFromStorage();
     return stored.map(p => ({
       id: p.id,
@@ -145,7 +148,7 @@ export default function TasksPage() {
   const [penaltyBoostPoints, setPenaltyBoostPoints] = useState("10");
 
   const [categories, setCategories] = useState<Category[]>(() => {
-    if (isOnboarding) return sampleCategories;
+    if (useMockData) return sampleCategories;
     const stored = loadCategoriesFromStorage();
     return stored.length > 0 ? stored : [];
   });
@@ -154,9 +157,9 @@ export default function TasksPage() {
   const [categoryName, setCategoryName] = useState("");
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
 
-  // Persist tasks to localStorage whenever they change (skip during onboarding)
+  // Persist tasks to localStorage whenever they change (skip during demo/onboarding)
   useEffect(() => {
-    if (isOnboarding) return;
+    if (useMockData) return;
     const storedTasks: StoredTask[] = tasks.map(t => ({
       id: t.id,
       name: t.name,
@@ -169,34 +172,34 @@ export default function TasksPage() {
       boostPoints: t.boosterRule?.bonusPoints,
     }));
     saveTasksToStorage(storedTasks);
-  }, [tasks, isOnboarding]);
+  }, [tasks, useMockData]);
 
-  // Persist categories to localStorage whenever they change
+  // Persist categories to localStorage whenever they change (skip during demo/onboarding)
   useEffect(() => {
-    if (isOnboarding) return;
+    if (useMockData) return;
     const storedCategories: StoredCategory[] = categories.map(c => ({
       id: c.id,
       name: c.name,
     }));
     saveCategoriesToStorage(storedCategories);
-  }, [categories, isOnboarding]);
+  }, [categories, useMockData]);
 
-  // Persist penalties to localStorage whenever they change
+  // Persist penalties to localStorage whenever they change (skip during demo/onboarding)
   useEffect(() => {
-    if (isOnboarding) return;
+    if (useMockData) return;
     const storedPenalties: StoredPenalty[] = penalties.map(p => ({
       id: p.id,
       name: p.name,
       value: p.value,
     }));
     savePenaltiesToStorage(storedPenalties);
-  }, [penalties, isOnboarding]);
+  }, [penalties, useMockData]);
 
-  // Persist daily goal to localStorage whenever it changes
+  // Persist daily goal to localStorage whenever it changes (skip during demo/onboarding)
   useEffect(() => {
-    if (isOnboarding) return;
+    if (useMockData) return;
     saveDailyGoalToStorage(dailyGoal);
-  }, [dailyGoal, isOnboarding]);
+  }, [dailyGoal, useMockData]);
 
   const usedCategoryNames = new Set(tasks.map(t => t.category));
   const categoryNames = categories.map(c => c.name);

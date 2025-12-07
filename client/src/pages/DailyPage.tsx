@@ -4,6 +4,7 @@ import DatePicker from "@/components/DatePicker";
 import TaskGroup from "@/components/TaskGroup";
 import DailySummary from "@/components/DailySummary";
 import { useToast } from "@/hooks/use-toast";
+import { useDemo } from "@/contexts/DemoContext";
 import {
   loadTasksFromStorage,
   loadPenaltiesFromStorage,
@@ -25,8 +26,22 @@ interface DisplayTask {
   isBooster?: boolean;
 }
 
+const sampleTasks: DisplayTask[] = [
+  { id: "demo-1", name: "Morning Prayer", value: 10, category: "Spiritual" },
+  { id: "demo-2", name: "Bible Reading", value: 15, category: "Spiritual", isBooster: true },
+  { id: "demo-3", name: "Scripture Memory", value: 10, category: "Spiritual" },
+  { id: "demo-4", name: "Workout", value: 20, category: "Health" },
+  { id: "demo-5", name: "Meal Prep", value: 10, category: "Health" },
+  { id: "demo-6", name: "8 Hours Sleep", value: 15, category: "Health" },
+  { id: "demo-7", name: "Deep Work Session", value: 25, category: "Productivity" },
+  { id: "demo-8", name: "Project Progress", value: 20, category: "Productivity" },
+  { id: "demo-9", name: "Skipped workout", value: -15, category: "Penalties" },
+  { id: "demo-10", name: "Missed devotions", value: -10, category: "Penalties" },
+];
+
 export default function DailyPage() {
   const { toast } = useToast();
+  const { isDemo } = useDemo();
   const [date, setDate] = useState(new Date());
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
@@ -35,6 +50,12 @@ export default function DailyPage() {
 
   // Load tasks and penalties from localStorage on mount
   useEffect(() => {
+    if (isDemo) {
+      setAllTasks(sampleTasks);
+      setCompletedIds(new Set(["demo-1", "demo-2", "demo-4", "demo-7"]));
+      return;
+    }
+    
     const storedTasks = loadTasksFromStorage();
     const storedPenalties = loadPenaltiesFromStorage();
     const storedCategories = loadCategoriesFromStorage();
@@ -60,10 +81,12 @@ export default function DailyPage() {
     }));
 
     setAllTasks([...taskItems, ...penaltyItems]);
-  }, []);
+  }, [isDemo]);
 
   // Load daily log when date changes
   useEffect(() => {
+    if (isDemo) return;
+    
     const dateStr = format(date, "yyyy-MM-dd");
     const log = loadDailyLogFromStorage(dateStr);
     if (log) {
@@ -73,7 +96,7 @@ export default function DailyPage() {
       setCompletedIds(new Set());
       setNotes("");
     }
-  }, [date]);
+  }, [date, isDemo]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allTasks.map(t => t.category)));
@@ -112,6 +135,14 @@ export default function DailyPage() {
     .reduce((sum, t) => sum + t.value, 0);
 
   const handleSave = () => {
+    if (isDemo) {
+      toast({
+        title: "Demo Mode",
+        description: "Sign in to save your progress",
+      });
+      return;
+    }
+    
     setIsSaving(true);
     const dateStr = format(date, "yyyy-MM-dd");
     const now = new Date();

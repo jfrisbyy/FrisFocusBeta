@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useDemo } from "@/contexts/DemoContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,8 +92,63 @@ const conditionLabels: Record<BadgeConditionType, string> = {
   weeklyGoalStreak: "Weekly goals hit in a row",
 };
 
+const sampleBadges: BadgeDefinition[] = [
+  {
+    id: "demo-1",
+    name: "Scripture Scholar",
+    description: "Complete Bible reading consistently",
+    icon: "book",
+    conditionType: "taskCompletions",
+    taskName: "Bible Reading",
+    levels: [
+      { level: 1, required: 10, earned: true },
+      { level: 2, required: 25, earned: true },
+      { level: 3, required: 50, earned: false },
+    ],
+    progress: 32,
+  },
+  {
+    id: "demo-2",
+    name: "Iron Will",
+    description: "Complete workouts consistently",
+    icon: "flame",
+    conditionType: "taskCompletions",
+    taskName: "Workout",
+    levels: [
+      { level: 1, required: 10, earned: true },
+      { level: 2, required: 30, earned: false },
+    ],
+    progress: 18,
+  },
+  {
+    id: "demo-3",
+    name: "Perfect Week",
+    description: "Hit weekly goal multiple weeks in a row",
+    icon: "trophy",
+    conditionType: "weeklyGoalStreak",
+    levels: [
+      { level: 1, required: 2, earned: false },
+      { level: 2, required: 4, earned: false },
+    ],
+    progress: 1,
+  },
+  {
+    id: "demo-4",
+    name: "Clean Streak",
+    description: "Days without penalties",
+    icon: "shield",
+    conditionType: "negativeFreeStreak",
+    levels: [
+      { level: 1, required: 7, earned: false },
+      { level: 2, required: 14, earned: false },
+    ],
+    progress: 3,
+  },
+];
+
 export default function BadgesPage() {
   const { toast } = useToast();
+  const { isDemo } = useDemo();
   const [badges, setBadges] = useState<BadgeDefinition[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBadge, setEditingBadge] = useState<BadgeDefinition | null>(null);
@@ -107,6 +163,11 @@ export default function BadgesPage() {
 
   // Load badges from localStorage on mount
   useEffect(() => {
+    if (isDemo) {
+      setBadges(sampleBadges);
+      return;
+    }
+    
     const storedBadges = loadBadgesFromStorage();
     const converted: BadgeDefinition[] = storedBadges.map((b: StoredBadge) => ({
       id: b.id,
@@ -119,11 +180,13 @@ export default function BadgesPage() {
       progress: b.currentProgress || 0,
     }));
     setBadges(converted);
-  }, []);
+  }, [isDemo]);
 
   // Save badges to localStorage whenever they change
   const saveBadges = (newBadges: BadgeDefinition[]) => {
     setBadges(newBadges);
+    if (isDemo) return;
+    
     const toStore: StoredBadge[] = newBadges.map(b => ({
       id: b.id,
       name: b.name,

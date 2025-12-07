@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useDemo } from "@/contexts/DemoContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,8 +51,46 @@ interface JournalEntry {
   createdAt: string;
 }
 
+function getSampleEntries(): JournalEntry[] {
+  const today = new Date();
+  const yesterday = new Date(Date.now() - 86400000);
+  const twoDaysAgo = new Date(Date.now() - 172800000);
+  
+  return [
+    {
+      id: "demo-1",
+      date: format(today, "yyyy-MM-dd"),
+      title: "Morning Reflection",
+      content: "Great start to the day. Completed my Bible reading and had a solid workout. Feeling energized and focused for the tasks ahead.",
+      createdAt: new Date(new Date().setHours(7, 30)).toISOString(),
+    },
+    {
+      id: "demo-2",
+      date: format(today, "yyyy-MM-dd"),
+      title: "Evening Review",
+      content: "Productive day overall. Hit 85% of my daily goal. Need to work on consistency with meal prep - skipped it again today.",
+      createdAt: new Date(new Date().setHours(21, 0)).toISOString(),
+    },
+    {
+      id: "demo-3",
+      date: format(yesterday, "yyyy-MM-dd"),
+      title: "Weekly Planning",
+      content: "Set up goals for the week. Want to focus on maintaining my workout streak and being more intentional about scripture memory.",
+      createdAt: new Date(new Date(Date.now() - 86400000).setHours(9, 0)).toISOString(),
+    },
+    {
+      id: "demo-4",
+      date: format(twoDaysAgo, "yyyy-MM-dd"),
+      title: "Gratitude Note",
+      content: "Thankful for the progress I've made this month. The habit tracker has really helped me stay accountable.",
+      createdAt: new Date(new Date(Date.now() - 172800000).setHours(20, 15)).toISOString(),
+    },
+  ];
+}
+
 export default function JournalPage() {
   const { toast } = useToast();
+  const { isDemo } = useDemo();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
@@ -63,14 +102,21 @@ export default function JournalPage() {
 
   // Load entries from localStorage on mount
   useEffect(() => {
+    if (isDemo) {
+      setEntries(getSampleEntries());
+      return;
+    }
+    
     const storedEntries = loadJournalFromStorage();
     setEntries(storedEntries);
-  }, []);
+  }, [isDemo]);
 
   // Save entries to localStorage
   const saveEntries = (newEntries: JournalEntry[]) => {
     setEntries(newEntries);
-    saveJournalToStorage(newEntries);
+    if (!isDemo) {
+      saveJournalToStorage(newEntries);
+    }
   };
 
   const entriesPerPage = 10;
