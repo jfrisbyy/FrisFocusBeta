@@ -352,6 +352,67 @@ const demoCircleBadges: Record<string, CircleBadge[]> = {
   ],
 };
 
+interface CircleAward {
+  id: string;
+  name: string;
+  description: string;
+  type: "first_to" | "most_in_category" | "weekly_champion";
+  target?: number;
+  category?: string;
+  winner?: { userId: string; userName: string; achievedAt: string };
+  endDate?: string;
+}
+
+const demoCircleAwards: Record<string, CircleAward[]> = {
+  "circle-1": [
+    { id: "ca1", name: "Speed Demon", description: "First to 500 points this month", type: "first_to", target: 500, winner: { userId: "u1", userName: "Sarah M", achievedAt: new Date(Date.now() - 172800000).toISOString() } },
+    { id: "ca2", name: "Cardio King/Queen", description: "Most points in Cardio category", type: "most_in_category", category: "Cardio" },
+    { id: "ca3", name: "Weekly Champion", description: "Highest points this week", type: "weekly_champion" },
+  ],
+  "circle-2": [
+    { id: "ca4", name: "First to 100", description: "First to reach 100 points", type: "first_to", target: 100 },
+    { id: "ca5", name: "Cleaning Star", description: "Most points in Cleaning tasks", type: "most_in_category", category: "Cleaning", winner: { userId: "u5", userName: "Tommy", achievedAt: new Date(Date.now() - 86400000).toISOString() } },
+  ],
+  "circle-3": [
+    { id: "ca6", name: "Reading Race", description: "First to finish 3 books", type: "first_to", target: 3 },
+  ],
+};
+
+// Full task list for friend dashboard view
+const demoFriendFullTasks: Record<string, { id: string; name: string; value: number; completed: boolean; category: string }[]> = {
+  "friend-1": [
+    { id: "ft1", name: "Morning workout", value: 15, completed: true, category: "Fitness" },
+    { id: "ft2", name: "Read 30 minutes", value: 10, completed: true, category: "Personal" },
+    { id: "ft3", name: "Meditate", value: 10, completed: true, category: "Wellness" },
+    { id: "ft4", name: "Evening walk", value: 10, completed: false, category: "Fitness" },
+    { id: "ft5", name: "Journal", value: 5, completed: false, category: "Personal" },
+  ],
+  "friend-3": [
+    { id: "ft6", name: "Morning run", value: 20, completed: true, category: "Fitness" },
+    { id: "ft7", name: "Meal prep", value: 15, completed: true, category: "Health" },
+    { id: "ft8", name: "Journaling", value: 10, completed: true, category: "Personal" },
+    { id: "ft9", name: "Stretching", value: 10, completed: true, category: "Fitness" },
+    { id: "ft10", name: "Read book", value: 10, completed: false, category: "Personal" },
+    { id: "ft11", name: "Evening workout", value: 15, completed: false, category: "Fitness" },
+  ],
+};
+
+const demoFriendBadges: Record<string, { id: string; name: string; description: string; earned: boolean }[]> = {
+  "friend-1": [
+    { id: "b1", name: "Early Bird", description: "Complete tasks before 8am", earned: true },
+    { id: "b2", name: "Week Warrior", description: "7-day streak", earned: true },
+    { id: "b3", name: "Focus Master", description: "Complete all tasks 3 days", earned: true },
+    { id: "b4", name: "Century Club", description: "Earn 100 points in a day", earned: false },
+  ],
+  "friend-3": [
+    { id: "b5", name: "Marathon Runner", description: "Run 50 miles total", earned: true },
+    { id: "b6", name: "Focus Master", description: "Complete all tasks 3 days", earned: true },
+    { id: "b7", name: "Perfect Week", description: "Complete every task for a week", earned: true },
+    { id: "b8", name: "Iron Will", description: "30-day streak", earned: true },
+    { id: "b9", name: "Elite Status", description: "Earn 1000 points in a week", earned: false },
+  ],
+};
+
 const demoCircleMessages: Record<string, StoredCircleMessage[]> = {
   "circle-1": [
     { id: "cm1", circleId: "circle-1", senderId: "u1", senderName: "Sarah M", content: "Great job on the 10K today everyone!", createdAt: new Date(Date.now() - 3600000).toISOString() },
@@ -427,6 +488,44 @@ export default function CommunityPage() {
   const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
   const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>(demoCircleTasks);
   const [circleDetailTab, setCircleDetailTab] = useState("tasks");
+  
+  // Task completion tracking - who completed what tasks today
+  const [myCompletedTasks, setMyCompletedTasks] = useState<Record<string, string[]>>({
+    "circle-1": ["ct1", "ct3"],
+    "circle-2": ["ct6", "ct7"],
+  });
+  
+  // Demo data: who completed which tasks today
+  const [circleTaskCompletions, setCircleTaskCompletions] = useState<Record<string, Record<string, { userId: string; userName: string; completedAt: string }[]>>>({
+    "circle-1": {
+      "ct1": [
+        { userId: "u1", userName: "Sarah M", completedAt: new Date(Date.now() - 7200000).toISOString() },
+        { userId: "u2", userName: "Lisa K", completedAt: new Date(Date.now() - 3600000).toISOString() },
+        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 1800000).toISOString() },
+      ],
+      "ct2": [
+        { userId: "u3", userName: "Emma T", completedAt: new Date(Date.now() - 5400000).toISOString() },
+      ],
+      "ct3": [
+        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 900000).toISOString() },
+        { userId: "u1", userName: "Sarah M", completedAt: new Date(Date.now() - 600000).toISOString() },
+      ],
+    },
+    "circle-2": {
+      "ct6": [
+        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 3600000).toISOString() },
+        { userId: "u5", userName: "Tommy", completedAt: new Date(Date.now() - 1800000).toISOString() },
+      ],
+      "ct7": [
+        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 7200000).toISOString() },
+      ],
+      "ct9": [
+        { userId: "u4", userName: "Dad", completedAt: new Date(Date.now() - 86400000).toISOString() },
+      ],
+    },
+  });
+  
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
@@ -610,6 +709,27 @@ export default function CommunityPage() {
     }));
   };
 
+  const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
+  const [newComment, setNewComment] = useState("");
+
+  const handleAddComment = (postId: string) => {
+    if (!newComment.trim()) return;
+    setCommunityPosts(communityPosts.map(post => {
+      if (post.id !== postId) return post;
+      const comment = {
+        id: `c-${Date.now()}`,
+        authorId: "you",
+        authorName: "You",
+        content: newComment.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      return { ...post, comments: [...post.comments, comment] };
+    }));
+    setNewComment("");
+    setCommentingPostId(null);
+    toast({ title: "Comment added" });
+  };
+
   const handleSendCircleMessage = () => {
     if (!selectedCircle || !newCircleMessage.trim()) return;
     const newMsg: StoredCircleMessage = {
@@ -713,6 +833,49 @@ export default function CommunityPage() {
     toast({ title: "Request rejected" });
   };
 
+  const handleToggleTaskComplete = (circleId: string, taskId: string, task: StoredCircleTask) => {
+    const myCompleted = myCompletedTasks[circleId] || [];
+    const isCompleted = myCompleted.includes(taskId);
+    
+    // For circle tasks, only one person can complete per day
+    if (task.taskType === "circle_task" && !isCompleted) {
+      const completions = circleTaskCompletions[circleId]?.[taskId] || [];
+      if (completions.length > 0) {
+        toast({ title: "Already completed", description: "This circle task was already done today" });
+        return;
+      }
+    }
+    
+    if (isCompleted) {
+      // Remove completion
+      setMyCompletedTasks({ ...myCompletedTasks, [circleId]: myCompleted.filter(id => id !== taskId) });
+      const circleCompletions = circleTaskCompletions[circleId] || {};
+      const taskCompletions = (circleCompletions[taskId] || []).filter(c => c.userId !== "you");
+      setCircleTaskCompletions({ ...circleTaskCompletions, [circleId]: { ...circleCompletions, [taskId]: taskCompletions } });
+    } else {
+      // Add completion
+      setMyCompletedTasks({ ...myCompletedTasks, [circleId]: [...myCompleted, taskId] });
+      const circleCompletions = circleTaskCompletions[circleId] || {};
+      const taskCompletions = circleCompletions[taskId] || [];
+      setCircleTaskCompletions({
+        ...circleTaskCompletions,
+        [circleId]: {
+          ...circleCompletions,
+          [taskId]: [...taskCompletions, { userId: "you", userName: "You", completedAt: new Date().toISOString() }]
+        }
+      });
+      toast({ title: "Task completed!", description: `+${task.value} points` });
+    }
+  };
+
+  const getTaskCompletions = (circleId: string, taskId: string) => {
+    return circleTaskCompletions[circleId]?.[taskId] || [];
+  };
+
+  const isTaskCompletedByMe = (circleId: string, taskId: string) => {
+    return (myCompletedTasks[circleId] || []).includes(taskId);
+  };
+
   const incomingRequests = requests.filter((r) => r.direction === "incoming");
   const outgoingRequests = requests.filter((r) => r.direction === "outgoing");
 
@@ -779,7 +942,102 @@ export default function CommunityPage() {
               </div>
             )}
             
-            {(visibility === "full" || visibility === "tasks_only") && activity && (
+            {visibility === "full" && (
+              <>
+                {/* Full Task List */}
+                {demoFriendFullTasks[selectedFriend.friendId] && (
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Target className="w-4 h-4" />
+                      Today's Tasks
+                    </h4>
+                    <div className="space-y-2">
+                      {demoFriendFullTasks[selectedFriend.friendId].map((task) => (
+                        <div 
+                          key={task.id} 
+                          className={`flex items-center justify-between text-sm p-2 rounded ${task.completed ? "bg-green-500/10" : "bg-muted"}`}
+                          data-testid={`friend-task-${task.id}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {task.completed ? (
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Clock className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <span className={task.completed ? "text-muted-foreground" : ""}>{task.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">{task.category}</Badge>
+                            <span className="text-muted-foreground">{task.value} pts</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Weekly Breakdown Chart */}
+                {activity && (
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      This Week
+                    </h4>
+                    <div className="flex items-end gap-1 h-20">
+                      {activity.weeklyBreakdown.map((day, i) => {
+                        const maxPoints = Math.max(...activity.weeklyBreakdown.map(d => d.points));
+                        const height = maxPoints > 0 ? (day.points / maxPoints) * 100 : 0;
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <div 
+                              className="w-full bg-primary/20 rounded-t-sm relative"
+                              style={{ height: `${height}%`, minHeight: '4px' }}
+                            >
+                              <div 
+                                className="absolute bottom-0 left-0 right-0 bg-primary rounded-t-sm"
+                                style={{ height: '100%' }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground">{day.date}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* All Badges */}
+                {demoFriendBadges[selectedFriend.friendId] && (
+                  <div>
+                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                      <Award className="w-4 h-4" />
+                      Badges ({demoFriendBadges[selectedFriend.friendId].filter(b => b.earned).length}/{demoFriendBadges[selectedFriend.friendId].length})
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {demoFriendBadges[selectedFriend.friendId].map((badge) => (
+                        <div 
+                          key={badge.id} 
+                          className={`flex items-center gap-2 p-2 rounded ${badge.earned ? "bg-yellow-500/10" : "bg-muted opacity-50"}`}
+                          data-testid={`friend-badge-${badge.id}`}
+                        >
+                          {badge.earned ? (
+                            <Trophy className="w-4 h-4 text-yellow-500" />
+                          ) : (
+                            <Trophy className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{badge.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{badge.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            
+            {visibility === "tasks_only" && activity && (
               <div>
                 <h4 className="font-medium mb-2 flex items-center gap-2">
                   <CheckCircle className="w-4 h-4" />
@@ -791,20 +1049,6 @@ export default function CommunityPage() {
                       <span>{task.taskName}</span>
                       <span className="text-muted-foreground">{formatTime(task.completedAt)}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {visibility === "full" && activity && activity.recentBadges.length > 0 && (
-              <div>
-                <h4 className="font-medium mb-2 flex items-center gap-2">
-                  <Award className="w-4 h-4" />
-                  Recent Badges
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {activity.recentBadges.map((badge, i) => (
-                    <Badge key={i} variant="secondary">{badge.name}</Badge>
                   ))}
                 </div>
               </div>
@@ -1330,9 +1574,11 @@ export default function CommunityPage() {
               </div>
 
               <Tabs value={circleDetailTab} onValueChange={setCircleDetailTab}>
-                <TabsList className="grid w-full grid-cols-6">
+                <TabsList className="flex w-full overflow-x-auto">
                   <TabsTrigger value="tasks">Tasks</TabsTrigger>
                   <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+                  <TabsTrigger value="badges">Badges</TabsTrigger>
+                  <TabsTrigger value="awards">Awards</TabsTrigger>
                   <TabsTrigger value="messages">Chat</TabsTrigger>
                   <TabsTrigger value="posts">Board</TabsTrigger>
                   <TabsTrigger value="members">Members</TabsTrigger>
@@ -1419,39 +1665,112 @@ export default function CommunityPage() {
                         <h4 className="text-sm font-medium text-muted-foreground mb-2">Per-Person Daily Tasks</h4>
                         {(circleTasks[selectedCircle.id] || [])
                           .filter(t => t.taskType === "per_person" && t.approvalStatus === "approved")
-                          .map((task) => (
-                            <div
-                              key={task.id}
-                              className="flex items-center justify-between p-3 rounded-md border"
-                              data-testid={`task-${task.id}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <Target className="w-5 h-5 text-muted-foreground" />
-                                <span>{task.name}</span>
+                          .map((task) => {
+                            const completions = getTaskCompletions(selectedCircle.id, task.id);
+                            const isCompleted = isTaskCompletedByMe(selectedCircle.id, task.id);
+                            const isExpanded = expandedTaskId === task.id;
+                            return (
+                              <div key={task.id} className="space-y-1">
+                                <div
+                                  className={`flex items-center justify-between p-3 rounded-md border cursor-pointer hover-elevate ${isCompleted ? "bg-green-500/10 border-green-500/30" : ""}`}
+                                  onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                                  data-testid={`task-${task.id}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Checkbox
+                                      checked={isCompleted}
+                                      onClick={(e) => { e.stopPropagation(); handleToggleTaskComplete(selectedCircle.id, task.id, task); }}
+                                      data-testid={`checkbox-${task.id}`}
+                                    />
+                                    <span className={isCompleted ? "line-through text-muted-foreground" : ""}>{task.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {completions.length > 0 && (
+                                      <div className="flex -space-x-2">
+                                        {completions.slice(0, 3).map((c, i) => (
+                                          <Avatar key={i} className="h-6 w-6 border-2 border-background">
+                                            <AvatarFallback className="text-xs">{c.userName.charAt(0)}</AvatarFallback>
+                                          </Avatar>
+                                        ))}
+                                        {completions.length > 3 && (
+                                          <span className="text-xs text-muted-foreground ml-2">+{completions.length - 3}</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    <Badge variant="outline">{task.value} pts</Badge>
+                                  </div>
+                                </div>
+                                {isExpanded && completions.length > 0 && (
+                                  <div className="ml-8 p-2 rounded bg-muted/50 space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Completed by:</p>
+                                    {completions.map((c, i) => (
+                                      <div key={i} className="flex items-center gap-2 text-sm">
+                                        <Avatar className="h-5 w-5">
+                                          <AvatarFallback className="text-xs">{c.userName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <span>{c.userName}</span>
+                                        <span className="text-muted-foreground text-xs">{formatTime(c.completedAt)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                              <Badge variant="outline">{task.value} pts</Badge>
-                            </div>
-                          ))}
+                            );
+                          })}
                         
-                        <h4 className="text-sm font-medium text-muted-foreground mb-2 mt-6">Circle Tasks (Anyone Can Complete)</h4>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2 mt-6">Circle Tasks (One Person Completes for All)</h4>
                         {(circleTasks[selectedCircle.id] || [])
                           .filter(t => t.taskType === "circle_task" && t.approvalStatus === "approved")
-                          .map((task) => (
-                            <div
-                              key={task.id}
-                              className="flex items-center justify-between p-3 rounded-md border bg-muted/50"
-                              data-testid={`task-${task.id}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <CheckCircle className="w-5 h-5 text-muted-foreground" />
-                                <div>
-                                  <span>{task.name}</span>
-                                  <p className="text-xs text-muted-foreground">Shared task - one completion per day</p>
+                          .map((task) => {
+                            const completions = getTaskCompletions(selectedCircle.id, task.id);
+                            const isCompletedByAnyone = completions.length > 0;
+                            const isCompletedByMe = (myCompletedTasks[selectedCircle.id] || []).includes(task.id);
+                            const isExpanded = expandedTaskId === task.id;
+                            return (
+                              <div key={task.id} className="space-y-1">
+                                <div
+                                  className={`flex items-center justify-between p-3 rounded-md border cursor-pointer hover-elevate ${isCompletedByAnyone ? "bg-green-500/10 border-green-500/30" : "bg-muted/50"}`}
+                                  onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                                  data-testid={`task-${task.id}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Checkbox
+                                      checked={isCompletedByMe}
+                                      disabled={isCompletedByAnyone && !isCompletedByMe}
+                                      onClick={(e) => { e.stopPropagation(); handleToggleTaskComplete(selectedCircle.id, task.id, task); }}
+                                      data-testid={`checkbox-${task.id}`}
+                                    />
+                                    <div>
+                                      <span className={isCompletedByAnyone ? "line-through text-muted-foreground" : ""}>{task.name}</span>
+                                      <p className="text-xs text-muted-foreground">
+                                        {isCompletedByAnyone ? `Done by ${completions[0].userName}` : "One completion per day"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {isCompletedByAnyone && (
+                                      <Avatar className="h-6 w-6 border-2 border-background">
+                                        <AvatarFallback className="text-xs">{completions[0].userName.charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                    )}
+                                    <Badge variant="outline">{task.value} pts</Badge>
+                                  </div>
                                 </div>
+                                {isExpanded && isCompletedByAnyone && (
+                                  <div className="ml-8 p-2 rounded bg-muted/50">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Completed by:</p>
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <Avatar className="h-5 w-5">
+                                        <AvatarFallback className="text-xs">{completions[0].userName.charAt(0)}</AvatarFallback>
+                                      </Avatar>
+                                      <span>{completions[0].userName}</span>
+                                      <span className="text-muted-foreground text-xs">{formatTime(completions[0].completedAt)}</span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <Badge variant="outline">{task.value} pts</Badge>
-                            </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     </CardContent>
                   </Card>
@@ -1499,6 +1818,106 @@ export default function CommunityPage() {
                               <Badge variant="secondary">{member.weeklyPoints} pts</Badge>
                             </div>
                           ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="badges" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Star className="w-5 h-5" />
+                        Circle Badges
+                      </CardTitle>
+                      <CardDescription>Shared goals everyone works towards together</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {(demoCircleBadges[selectedCircle.id] || []).map((badge) => (
+                          <div 
+                            key={badge.id} 
+                            className={`p-4 rounded-md border ${badge.earned ? "bg-yellow-500/10 border-yellow-500/30" : ""}`}
+                            data-testid={`circle-badge-${badge.id}`}
+                          >
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                              <div className="flex items-center gap-2">
+                                {badge.earned ? (
+                                  <Trophy className="w-5 h-5 text-yellow-500" />
+                                ) : (
+                                  <Target className="w-5 h-5 text-muted-foreground" />
+                                )}
+                                <span className="font-medium">{badge.name}</span>
+                                {badge.earned && <Badge variant="secondary">Earned</Badge>}
+                              </div>
+                              <span className="text-sm text-muted-foreground">{badge.progress}/{badge.required}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{badge.description}</p>
+                            <Progress value={(badge.progress / badge.required) * 100} className="h-2" />
+                          </div>
+                        ))}
+                        {(!demoCircleBadges[selectedCircle.id] || demoCircleBadges[selectedCircle.id].length === 0) && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Star className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p>No badges set up for this circle yet</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="awards" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Award className="w-5 h-5" />
+                        Circle Awards
+                      </CardTitle>
+                      <CardDescription>Competitive challenges and races</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {(demoCircleAwards[selectedCircle.id] || []).map((award) => (
+                          <div 
+                            key={award.id} 
+                            className={`p-4 rounded-md border ${award.winner ? "bg-green-500/10 border-green-500/30" : "bg-muted/50"}`}
+                            data-testid={`circle-award-${award.id}`}
+                          >
+                            <div className="flex items-center justify-between gap-4 mb-2">
+                              <div className="flex items-center gap-2">
+                                {award.type === "first_to" && <Flame className="w-5 h-5 text-orange-500" />}
+                                {award.type === "most_in_category" && <Trophy className="w-5 h-5 text-purple-500" />}
+                                {award.type === "weekly_champion" && <Crown className="w-5 h-5 text-yellow-500" />}
+                                <span className="font-medium">{award.name}</span>
+                              </div>
+                              <Badge variant={award.winner ? "default" : "outline"}>
+                                {award.type === "first_to" && `First to ${award.target}`}
+                                {award.type === "most_in_category" && award.category}
+                                {award.type === "weekly_champion" && "Weekly"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{award.description}</p>
+                            {award.winner ? (
+                              <div className="flex items-center gap-2 p-2 rounded bg-green-500/20">
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                <span className="text-sm font-medium">{award.winner.userName} won!</span>
+                                <span className="text-xs text-muted-foreground">{formatTime(award.winner.achievedAt)}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Clock className="w-4 h-4" />
+                                <span>Challenge in progress</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {(!demoCircleAwards[selectedCircle.id] || demoCircleAwards[selectedCircle.id].length === 0) && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p>No awards or challenges set up yet</p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -1730,20 +2149,12 @@ export default function CommunityPage() {
                 <div className="flex items-center gap-2">
                   <Label className="text-sm">Visibility:</Label>
                   <Select value={newPostVisibility} onValueChange={(v) => setNewPostVisibility(v as "public" | "friends")}>
-                    <SelectTrigger className="w-[140px]" data-testid="select-post-visibility">
-                      <SelectValue />
+                    <SelectTrigger className="w-[160px]" data-testid="select-post-visibility">
+                      <SelectValue placeholder="Visibility" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="friends">
-                        <span className="flex items-center gap-2">
-                          <Lock className="w-4 h-4" /> Friends Only
-                        </span>
-                      </SelectItem>
-                      <SelectItem value="public">
-                        <span className="flex items-center gap-2">
-                          <Globe className="w-4 h-4" /> Public
-                        </span>
-                      </SelectItem>
+                      <SelectItem value="friends">Friends Only</SelectItem>
+                      <SelectItem value="public">Public</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1783,11 +2194,31 @@ export default function CommunityPage() {
                           <Heart className={`w-4 h-4 mr-1 ${post.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
                           {post.likes.length}
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setCommentingPostId(commentingPostId === post.id ? null : post.id)}
+                          data-testid={`button-comment-${post.id}`}
+                        >
                           <MessageCircle className="w-4 h-4 mr-1" />
                           {post.comments.length}
                         </Button>
                       </div>
+                      
+                      {commentingPostId === post.id && (
+                        <div className="mt-4 flex gap-2">
+                          <Input
+                            placeholder="Write a comment..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleAddComment(post.id)}
+                            data-testid={`input-comment-${post.id}`}
+                          />
+                          <Button size="icon" onClick={() => handleAddComment(post.id)} data-testid={`button-submit-comment-${post.id}`}>
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
                       
                       {post.comments.length > 0 && (
                         <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
