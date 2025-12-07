@@ -730,6 +730,19 @@ export default function CommunityPage() {
     toast({ title: "Comment added" });
   };
 
+  const handleDeletePost = (postId: string) => {
+    setCommunityPosts(communityPosts.filter(post => post.id !== postId));
+    toast({ title: "Post deleted" });
+  };
+
+  const handleDeleteComment = (postId: string, commentId: string) => {
+    setCommunityPosts(communityPosts.map(post => {
+      if (post.id !== postId) return post;
+      return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
+    }));
+    toast({ title: "Comment deleted" });
+  };
+
   const handleSendCircleMessage = () => {
     if (!selectedCircle || !newCircleMessage.trim()) return;
     const newMsg: StoredCircleMessage = {
@@ -2182,6 +2195,17 @@ export default function CommunityPage() {
                         ) : (
                           <Badge variant="outline" className="text-xs"><Globe className="w-3 h-3 mr-1" />Public</Badge>
                         )}
+                        {post.authorId === "you" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 ml-auto"
+                            onClick={() => handleDeletePost(post.id)}
+                            data-testid={`button-delete-post-${post.id}`}
+                          >
+                            <Trash2 className="w-3 h-3 text-muted-foreground" />
+                          </Button>
+                        )}
                       </div>
                       <p className="mt-2">{post.content}</p>
                       <div className="flex items-center gap-4 mt-4">
@@ -2227,10 +2251,21 @@ export default function CommunityPage() {
                               <Avatar className="h-6 w-6">
                                 <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
                               </Avatar>
-                              <div>
+                              <div className="flex-1">
                                 <div className="flex items-baseline gap-2">
                                   <span className="font-medium text-sm">{comment.authorName}</span>
                                   <span className="text-xs text-muted-foreground">{formatTime(comment.createdAt)}</span>
+                                  {comment.authorId === "you" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-5 w-5"
+                                      onClick={() => handleDeleteComment(post.id, comment.id)}
+                                      data-testid={`button-delete-comment-${comment.id}`}
+                                    >
+                                      <Trash2 className="w-3 h-3 text-muted-foreground" />
+                                    </Button>
+                                  )}
                                 </div>
                                 <p className="text-sm">{comment.content}</p>
                               </div>
