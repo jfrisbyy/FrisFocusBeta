@@ -10,7 +10,6 @@ import AlertsPanel from "@/components/AlertsPanel";
 import WelcomeMessage from "@/components/WelcomeMessage";
 import MilestonesPanel from "@/components/MilestonesPanel";
 import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
-import CurrentWeekSettings from "@/components/CurrentWeekSettings";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels } from "@shared/schema";
 
 const getMockWeekData = () => {
@@ -146,6 +145,7 @@ const getMockMilestones = (): Milestone[] => [
     name: "Buy a car",
     description: "Save up and purchase first vehicle",
     points: 100,
+    deadline: "2025-03-01",
     achieved: false,
   },
   {
@@ -153,6 +153,7 @@ const getMockMilestones = (): Milestone[] => [
     name: "Run a 5K",
     description: "Complete first 5K race",
     points: 50,
+    deadline: "2024-11-20",
     achieved: true,
     achievedAt: "2024-11-15",
   },
@@ -217,9 +218,6 @@ export default function Dashboard() {
   const [boosters] = useState<UnifiedBooster[]>(getMockBoosters);
   const [milestones, setMilestones] = useState<Milestone[]>(getMockMilestones);
   const [badges] = useState<BadgeWithLevels[]>(getMockBadges);
-  const [weekNote, setWeekNote] = useState("");
-  const [isCustomGoalWeek, setIsCustomGoalWeek] = useState(false);
-  const [customWeekGoal, setCustomWeekGoal] = useState<number | undefined>();
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -284,14 +282,6 @@ export default function Dashboard() {
     ));
   };
 
-  const handleCurrentWeekUpdate = (note: string, isCustom: boolean, customGoal?: number) => {
-    setWeekNote(note);
-    setIsCustomGoalWeek(isCustom);
-    setCustomWeekGoal(customGoal);
-  };
-
-  const effectiveGoal = isCustomGoalWeek && customWeekGoal ? customWeekGoal : weeklyGoal;
-
   return (
     <div className="p-4 md:p-6 space-y-6">
       <WelcomeMessage
@@ -306,7 +296,7 @@ export default function Dashboard() {
             weekTotal={finalTotal}
             weekRange={weekRange}
             boosterPoints={boosterPoints}
-            weeklyGoal={effectiveGoal}
+            weeklyGoal={weeklyGoal}
             onGoalChange={handleGoalChange}
           />
           <StreaksCard
@@ -320,14 +310,6 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           <WeeklyTable days={days} onDayClick={handleDayClick} />
           <AlertsPanel alerts={alerts} />
-          <CurrentWeekSettings
-            weekRange={weekRange}
-            note={weekNote}
-            isCustomGoalWeek={isCustomGoalWeek}
-            customGoal={customWeekGoal}
-            defaultGoal={weeklyGoal}
-            onUpdate={handleCurrentWeekUpdate}
-          />
         </div>
       </div>
 

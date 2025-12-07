@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format, parseISO, isPast, isToday } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Flag, Plus, Check, Pencil, Trash2, Trophy } from "lucide-react";
+import { Flag, Plus, Check, Pencil, Trash2, Trophy, Calendar, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Milestone } from "@shared/schema";
@@ -50,6 +51,7 @@ export default function MilestonesPanel({
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formPoints, setFormPoints] = useState("50");
+  const [formDeadline, setFormDeadline] = useState("");
 
   const achievedMilestones = milestones.filter(m => m.achieved);
   const pendingMilestones = milestones.filter(m => !m.achieved);
@@ -59,6 +61,21 @@ export default function MilestonesPanel({
     setFormName("");
     setFormDescription("");
     setFormPoints("50");
+    setFormDeadline("");
+  };
+
+  const isOverdue = (deadline?: string) => {
+    if (!deadline) return false;
+    const deadlineDate = parseISO(deadline);
+    return isPast(deadlineDate) && !isToday(deadlineDate);
+  };
+
+  const formatDeadline = (deadline: string) => {
+    try {
+      return format(parseISO(deadline), "MMM d, yyyy");
+    } catch {
+      return deadline;
+    }
   };
 
   const handleOpenCreate = () => {
@@ -72,6 +89,7 @@ export default function MilestonesPanel({
     setFormName(milestone.name);
     setFormDescription(milestone.description);
     setFormPoints(milestone.points.toString());
+    setFormDeadline(milestone.deadline || "");
     setDialogOpen(true);
   };
 
@@ -83,6 +101,7 @@ export default function MilestonesPanel({
         name: formName,
         description: formDescription,
         points,
+        deadline: formDeadline || undefined,
       });
       toast({ title: "Milestone updated", description: `"${formName}" has been updated` });
     } else {
@@ -90,6 +109,7 @@ export default function MilestonesPanel({
         name: formName,
         description: formDescription,
         points,
+        deadline: formDeadline || undefined,
       });
       toast({ title: "Milestone added", description: `"${formName}" has been added` });
     }
@@ -160,6 +180,22 @@ export default function MilestonesPanel({
               </div>
               {milestone.description && (
                 <p className="text-xs text-muted-foreground mt-0.5">{milestone.description}</p>
+              )}
+              {milestone.deadline && (
+                <div className={cn(
+                  "flex items-center gap-1 mt-1 text-xs",
+                  isOverdue(milestone.deadline) ? "text-chart-3" : "text-muted-foreground"
+                )}>
+                  {isOverdue(milestone.deadline) ? (
+                    <AlertCircle className="h-3 w-3" />
+                  ) : (
+                    <Calendar className="h-3 w-3" />
+                  )}
+                  <span>
+                    {isOverdue(milestone.deadline) ? "Overdue: " : "Due: "}
+                    {formatDeadline(milestone.deadline)}
+                  </span>
+                </div>
               )}
             </div>
             <div className="flex gap-1 shrink-0">
@@ -261,6 +297,16 @@ export default function MilestonesPanel({
                 onChange={(e) => setFormPoints(e.target.value)}
                 min={1}
                 data-testid="input-milestone-points"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="milestone-deadline">Deadline (optional)</Label>
+              <Input
+                id="milestone-deadline"
+                type="date"
+                value={formDeadline}
+                onChange={(e) => setFormDeadline(e.target.value)}
+                data-testid="input-milestone-deadline"
               />
             </div>
           </div>

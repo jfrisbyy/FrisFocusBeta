@@ -177,6 +177,7 @@ export const milestoneSchema = z.object({
   name: z.string().min(1),
   description: z.string(),
   points: z.number().int().min(1),
+  deadline: z.string().optional(),
   achieved: z.boolean(),
   achievedAt: z.string().optional(),
 });
@@ -185,17 +186,30 @@ export type Milestone = z.infer<typeof milestoneSchema>;
 export const insertMilestoneSchema = milestoneSchema.omit({ id: true, achieved: true, achievedAt: true });
 export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
 
-// Penalty item (editable negative tasks)
+// Penalty item with optional negative boost rule
 export const penaltyItemSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   value: z.number().int().max(-1),
   category: z.string().default("Penalties"),
+  negativeBoostEnabled: z.boolean().default(false),
+  timesThreshold: z.number().int().min(1).optional(),
+  period: z.enum(["week", "month"]).optional(),
+  boostPenaltyPoints: z.number().int().min(1).optional(),
+  currentCount: z.number().int().min(0).default(0),
+  triggered: z.boolean().default(false),
 });
 export type PenaltyItem = z.infer<typeof penaltyItemSchema>;
 
-export const insertPenaltyItemSchema = penaltyItemSchema.omit({ id: true });
+export const insertPenaltyItemSchema = penaltyItemSchema.omit({ id: true, currentCount: true, triggered: true });
 export type InsertPenaltyItem = z.infer<typeof insertPenaltyItemSchema>;
+
+// Category for tasks
+export const categorySchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+});
+export type Category = z.infer<typeof categorySchema>;
 
 // Badge level definition
 export const badgeLevelSchema = z.object({
