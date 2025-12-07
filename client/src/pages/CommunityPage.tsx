@@ -285,6 +285,16 @@ const demoCircleMembers: Record<string, StoredCircleMember[]> = {
   "circle-3": [
     { id: "m10", circleId: "circle-3", userId: "you", firstName: "You", lastName: "", role: "member", joinedAt: "2024-09-15", weeklyPoints: 40 },
     { id: "m11", circleId: "circle-3", userId: "u8", firstName: "Marcus", lastName: "B", role: "owner", joinedAt: "2024-09-01", weeklyPoints: 75 },
+    { id: "m12", circleId: "circle-3", userId: "u9", firstName: "Emily", lastName: "R", role: "admin", joinedAt: "2024-09-05", weeklyPoints: 60 },
+    { id: "m13", circleId: "circle-3", userId: "u10", firstName: "David", lastName: "L", role: "member", joinedAt: "2024-09-10", weeklyPoints: 55 },
+    { id: "m14", circleId: "circle-3", userId: "u11", firstName: "Sarah", lastName: "W", role: "member", joinedAt: "2024-09-12", weeklyPoints: 45 },
+    { id: "m15", circleId: "circle-3", userId: "u12", firstName: "James", lastName: "H", role: "member", joinedAt: "2024-09-15", weeklyPoints: 50 },
+    { id: "m16", circleId: "circle-3", userId: "u13", firstName: "Lisa", lastName: "C", role: "member", joinedAt: "2024-09-18", weeklyPoints: 35 },
+    { id: "m17", circleId: "circle-3", userId: "u14", firstName: "Mike", lastName: "T", role: "member", joinedAt: "2024-09-20", weeklyPoints: 30 },
+    { id: "m18", circleId: "circle-3", userId: "u15", firstName: "Anna", lastName: "K", role: "member", joinedAt: "2024-09-22", weeklyPoints: 25 },
+    { id: "m19", circleId: "circle-3", userId: "u16", firstName: "Tom", lastName: "D", role: "member", joinedAt: "2024-09-25", weeklyPoints: 20 },
+    { id: "m20", circleId: "circle-3", userId: "u17", firstName: "Kate", lastName: "M", role: "member", joinedAt: "2024-09-28", weeklyPoints: 15 },
+    { id: "m21", circleId: "circle-3", userId: "u18", firstName: "Chris", lastName: "P", role: "member", joinedAt: "2024-10-01", weeklyPoints: 10 },
   ],
 };
 
@@ -526,6 +536,193 @@ export default function CommunityPage() {
   });
   
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  
+  // Leaderboard view mode (day/week/all time)
+  const [leaderboardViewMode, setLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  
+  // Demo data for member daily completions (today)
+  const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
+    "circle-1": {
+      "you": [
+        { taskId: "ct1", taskName: "5K Training Run", completedAt: new Date(Date.now() - 3600000).toISOString() },
+        { taskId: "ct3", taskName: "Stretching Session", completedAt: new Date(Date.now() - 7200000).toISOString() },
+      ],
+      "u1": [
+        { taskId: "ct1", taskName: "5K Training Run", completedAt: new Date(Date.now() - 5400000).toISOString() },
+        { taskId: "ct2", taskName: "Strength Training", completedAt: new Date(Date.now() - 3600000).toISOString() },
+        { taskId: "ct4", taskName: "Long Run (10K+)", completedAt: new Date(Date.now() - 1800000).toISOString() },
+      ],
+      "u2": [
+        { taskId: "ct1", taskName: "5K Training Run", completedAt: new Date(Date.now() - 7200000).toISOString() },
+        { taskId: "ct2", taskName: "Strength Training", completedAt: new Date(Date.now() - 5400000).toISOString() },
+      ],
+      "u3": [
+        { taskId: "ct3", taskName: "Stretching Session", completedAt: new Date(Date.now() - 3600000).toISOString() },
+        { taskId: "ct5", taskName: "Rest Day (Active Recovery)", completedAt: new Date(Date.now() - 1800000).toISOString() },
+      ],
+    },
+    "circle-2": {
+      "you": [
+        { taskId: "ct6", taskName: "Clean Room", completedAt: new Date(Date.now() - 3600000).toISOString() },
+        { taskId: "ct7", taskName: "Do Dishes", completedAt: new Date(Date.now() - 7200000).toISOString() },
+      ],
+      "u4": [
+        { taskId: "ct9", taskName: "Mow Lawn", completedAt: new Date(Date.now() - 5400000).toISOString() },
+      ],
+      "u5": [
+        { taskId: "ct6", taskName: "Clean Room", completedAt: new Date(Date.now() - 1800000).toISOString() },
+        { taskId: "ct10", taskName: "Homework Done", completedAt: new Date(Date.now() - 3600000).toISOString() },
+      ],
+      "u6": [
+        { taskId: "ct6", taskName: "Clean Room", completedAt: new Date(Date.now() - 5400000).toISOString() },
+      ],
+      "u7": [],
+    },
+    "circle-3": {
+      "you": [
+        { taskId: "ct12", taskName: "Read 30 minutes", completedAt: new Date(Date.now() - 3600000).toISOString() },
+      ],
+      "u8": [
+        { taskId: "ct12", taskName: "Read 30 minutes", completedAt: new Date(Date.now() - 1800000).toISOString() },
+        { taskId: "ct15", taskName: "Finish Book Chapter", completedAt: new Date(Date.now() - 5400000).toISOString() },
+      ],
+    },
+  };
+  
+  // Demo data for weekly task counts
+  const demoMemberWeeklyCompletions: Record<string, Record<string, { taskName: string; count: number }[]>> = {
+    "circle-1": {
+      "you": [
+        { taskName: "5K Training Run", count: 3 },
+        { taskName: "Stretching Session", count: 5 },
+        { taskName: "Strength Training", count: 2 },
+      ],
+      "u1": [
+        { taskName: "5K Training Run", count: 5 },
+        { taskName: "Strength Training", count: 4 },
+        { taskName: "Long Run (10K+)", count: 2 },
+      ],
+      "u2": [
+        { taskName: "5K Training Run", count: 4 },
+        { taskName: "Strength Training", count: 3 },
+        { taskName: "Stretching Session", count: 2 },
+      ],
+      "u3": [
+        { taskName: "Stretching Session", count: 6 },
+        { taskName: "Rest Day (Active Recovery)", count: 2 },
+        { taskName: "Strength Training", count: 1 },
+      ],
+    },
+    "circle-2": {
+      "you": [
+        { taskName: "Clean Room", count: 3 },
+        { taskName: "Do Dishes", count: 5 },
+        { taskName: "Take Out Trash", count: 2 },
+      ],
+      "u4": [
+        { taskName: "Mow Lawn", count: 1 },
+        { taskName: "Take Out Trash", count: 3 },
+      ],
+      "u5": [
+        { taskName: "Clean Room", count: 4 },
+        { taskName: "Homework Done", count: 5 },
+        { taskName: "Walk the Dog", count: 3 },
+      ],
+      "u6": [
+        { taskName: "Clean Room", count: 3 },
+        { taskName: "Homework Done", count: 4 },
+      ],
+      "u7": [
+        { taskName: "Walk the Dog", count: 2 },
+      ],
+    },
+    "circle-3": {
+      "you": [
+        { taskName: "Read 30 minutes", count: 4 },
+        { taskName: "Finish Book Chapter", count: 1 },
+      ],
+      "u8": [
+        { taskName: "Read 30 minutes", count: 6 },
+        { taskName: "Finish Book Chapter", count: 3 },
+        { taskName: "Write Book Review", count: 1 },
+      ],
+    },
+  };
+  
+  // Demo data for all-time stats
+  const demoMemberAllTimeStats: Record<string, Record<string, { weeklyHistory: { week: string; points: number }[]; taskTotals: { taskName: string; count: number }[] }>> = {
+    "circle-1": {
+      "you": {
+        weeklyHistory: [
+          { week: "Nov 25", points: 145 },
+          { week: "Nov 18", points: 120 },
+          { week: "Nov 11", points: 95 },
+          { week: "Nov 4", points: 110 },
+        ],
+        taskTotals: [
+          { taskName: "5K Training Run", count: 15 },
+          { taskName: "Stretching Session", count: 22 },
+          { taskName: "Strength Training", count: 8 },
+        ],
+      },
+      "u1": {
+        weeklyHistory: [
+          { week: "Nov 25", points: 210 },
+          { week: "Nov 18", points: 195 },
+          { week: "Nov 11", points: 180 },
+          { week: "Nov 4", points: 175 },
+        ],
+        taskTotals: [
+          { taskName: "5K Training Run", count: 28 },
+          { taskName: "Strength Training", count: 20 },
+          { taskName: "Long Run (10K+)", count: 12 },
+        ],
+      },
+    },
+    "circle-2": {
+      "you": {
+        weeklyHistory: [
+          { week: "Nov 25", points: 85 },
+          { week: "Nov 18", points: 90 },
+          { week: "Nov 11", points: 75 },
+        ],
+        taskTotals: [
+          { taskName: "Clean Room", count: 12 },
+          { taskName: "Do Dishes", count: 18 },
+          { taskName: "Take Out Trash", count: 8 },
+        ],
+      },
+      "u5": {
+        weeklyHistory: [
+          { week: "Nov 25", points: 55 },
+          { week: "Nov 18", points: 60 },
+          { week: "Nov 11", points: 45 },
+        ],
+        taskTotals: [
+          { taskName: "Clean Room", count: 15 },
+          { taskName: "Homework Done", count: 20 },
+          { taskName: "Walk the Dog", count: 10 },
+        ],
+      },
+    },
+  };
+  
+  // Badge/Award creation state
+  const [showAddBadge, setShowAddBadge] = useState(false);
+  const [newBadgeName, setNewBadgeName] = useState("");
+  const [newBadgeDescription, setNewBadgeDescription] = useState("");
+  const [newBadgeRequired, setNewBadgeRequired] = useState("10");
+  
+  const [showAddAward, setShowAddAward] = useState(false);
+  const [newAwardName, setNewAwardName] = useState("");
+  const [newAwardDescription, setNewAwardDescription] = useState("");
+  const [newAwardType, setNewAwardType] = useState<"first_to" | "most_in_category" | "weekly_champion">("first_to");
+  const [newAwardTarget, setNewAwardTarget] = useState("100");
+  const [newAwardCategory, setNewAwardCategory] = useState("");
+  
+  // Badge/Award requests for approval
+  const [badgeRequests, setBadgeRequests] = useState<{ id: string; circleId: string; requesterId: string; requesterName: string; type: "badge" | "award"; data: any; status: string; createdAt: string }[]>([]);
 
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
@@ -996,25 +1193,23 @@ export default function CommunityPage() {
                       <Calendar className="w-4 h-4" />
                       This Week
                     </h4>
-                    <div className="flex items-end gap-1 h-20">
-                      {activity.weeklyBreakdown.map((day, i) => {
+                    <div className="flex items-end gap-1" style={{ height: '80px' }}>
+                      {(() => {
                         const maxPoints = Math.max(...activity.weeklyBreakdown.map(d => d.points));
-                        const height = maxPoints > 0 ? (day.points / maxPoints) * 100 : 0;
-                        return (
-                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                            <div 
-                              className="w-full bg-primary/20 rounded-t-sm relative"
-                              style={{ height: `${height}%`, minHeight: '4px' }}
-                            >
+                        return activity.weeklyBreakdown.map((day, i) => {
+                          const heightPx = maxPoints > 0 ? Math.max(4, (day.points / maxPoints) * 60) : 4;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+                              <span className="text-xs font-medium">{day.points}</span>
                               <div 
-                                className="absolute bottom-0 left-0 right-0 bg-primary rounded-t-sm"
-                                style={{ height: '100%' }}
+                                className="w-full bg-primary rounded-t-sm"
+                                style={{ height: `${heightPx}px` }}
                               />
+                              <span className="text-xs text-muted-foreground">{day.date}</span>
                             </div>
-                            <span className="text-xs text-muted-foreground">{day.date}</span>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 )}
@@ -1792,45 +1987,169 @@ export default function CommunityPage() {
                 <TabsContent value="leaderboard" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Trophy className="w-5 h-5" />
-                        Circle Leaderboard
-                      </CardTitle>
-                      <CardDescription>This week's top performers in the circle</CardDescription>
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Trophy className="w-5 h-5" />
+                            Circle Leaderboard
+                          </CardTitle>
+                          <CardDescription>
+                            {leaderboardViewMode === "day" && "Today's activity"}
+                            {leaderboardViewMode === "week" && "This week's top performers"}
+                            {leaderboardViewMode === "alltime" && "All-time statistics"}
+                          </CardDescription>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant={leaderboardViewMode === "day" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => { setLeaderboardViewMode("day"); setExpandedMemberId(null); }}
+                            data-testid="button-leaderboard-day"
+                          >
+                            Day
+                          </Button>
+                          <Button
+                            variant={leaderboardViewMode === "week" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => { setLeaderboardViewMode("week"); setExpandedMemberId(null); }}
+                            data-testid="button-leaderboard-week"
+                          >
+                            Week
+                          </Button>
+                          <Button
+                            variant={leaderboardViewMode === "alltime" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => { setLeaderboardViewMode("alltime"); setExpandedMemberId(null); }}
+                            data-testid="button-leaderboard-alltime"
+                          >
+                            All Time
+                          </Button>
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
+                      <div className="space-y-2">
                         {(demoCircleMembers[selectedCircle.id] || [])
                           .sort((a, b) => b.weeklyPoints - a.weeklyPoints)
-                          .map((member, index) => (
-                            <div
-                              key={member.id}
-                              className="flex items-center justify-between gap-4 p-3 rounded-md border"
-                              data-testid={`leaderboard-member-${index}`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                                  index === 0 ? "bg-yellow-500 text-white" :
-                                  index === 1 ? "bg-gray-400 text-white" :
-                                  index === 2 ? "bg-amber-600 text-white" : "bg-muted"
-                                }`}>
-                                  {index + 1}
-                                </span>
-                                <Avatar>
-                                  <AvatarFallback>
-                                    {getInitials(member.firstName, member.lastName)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
+                          .map((member, index) => {
+                            const isExpanded = expandedMemberId === member.userId;
+                            const dailyTasks = demoMemberDailyCompletions[selectedCircle.id]?.[member.userId] || [];
+                            const weeklyTasks = demoMemberWeeklyCompletions[selectedCircle.id]?.[member.userId] || [];
+                            const allTimeStats = demoMemberAllTimeStats[selectedCircle.id]?.[member.userId];
+                            const todayPoints = dailyTasks.reduce((sum, t) => {
+                              const task = (circleTasks[selectedCircle.id] || []).find(ct => ct.id === t.taskId);
+                              return sum + (task?.value || 0);
+                            }, 0);
+                            
+                            return (
+                              <div key={member.id}>
+                                <div
+                                  className="flex items-center justify-between gap-4 p-3 rounded-md border hover-elevate cursor-pointer"
+                                  onClick={() => setExpandedMemberId(isExpanded ? null : member.userId)}
+                                  data-testid={`leaderboard-member-${index}`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                      index === 0 ? "bg-yellow-500 text-white" :
+                                      index === 1 ? "bg-gray-400 text-white" :
+                                      index === 2 ? "bg-amber-600 text-white" : "bg-muted"
+                                    }`}>
+                                      {index + 1}
+                                    </span>
+                                    <Avatar>
+                                      <AvatarFallback>
+                                        {getInitials(member.firstName, member.lastName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium">{member.firstName} {member.lastName}</span>
+                                        {getRoleIcon(member.role)}
+                                      </div>
+                                    </div>
+                                  </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium">{member.firstName} {member.lastName}</span>
-                                    {getRoleIcon(member.role)}
+                                    <Badge variant="secondary">
+                                      {leaderboardViewMode === "day" && `${todayPoints} pts today`}
+                                      {leaderboardViewMode === "week" && `${member.weeklyPoints} pts`}
+                                      {leaderboardViewMode === "alltime" && `${member.weeklyPoints} pts/wk`}
+                                    </Badge>
+                                    <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                                   </div>
                                 </div>
+                                
+                                {isExpanded && (
+                                  <div className="ml-11 mt-2 p-3 rounded-md bg-muted/50 space-y-2">
+                                    {leaderboardViewMode === "day" && (
+                                      <>
+                                        <p className="text-xs font-medium text-muted-foreground mb-2">Tasks completed today:</p>
+                                        {dailyTasks.length > 0 ? (
+                                          dailyTasks.map((task, i) => (
+                                            <div key={i} className="flex items-center justify-between text-sm py-1">
+                                              <div className="flex items-center gap-2">
+                                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                                <span>{task.taskName}</span>
+                                              </div>
+                                              <span className="text-xs text-muted-foreground">{formatTime(task.completedAt)}</span>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <p className="text-sm text-muted-foreground">No tasks completed today</p>
+                                        )}
+                                      </>
+                                    )}
+                                    
+                                    {leaderboardViewMode === "week" && (
+                                      <>
+                                        <p className="text-xs font-medium text-muted-foreground mb-2">Tasks this week:</p>
+                                        {weeklyTasks.length > 0 ? (
+                                          weeklyTasks.map((task, i) => (
+                                            <div key={i} className="flex items-center justify-between text-sm py-1">
+                                              <div className="flex items-center gap-2">
+                                                <Target className="w-4 h-4 text-primary" />
+                                                <span>{task.taskName}</span>
+                                              </div>
+                                              <Badge variant="outline" className="text-xs">x{task.count}</Badge>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <p className="text-sm text-muted-foreground">No tasks completed this week</p>
+                                        )}
+                                      </>
+                                    )}
+                                    
+                                    {leaderboardViewMode === "alltime" && (
+                                      <>
+                                        {allTimeStats ? (
+                                          <>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">Weekly history:</p>
+                                            <div className="space-y-1 mb-4">
+                                              {allTimeStats.weeklyHistory.map((week, i) => (
+                                                <div key={i} className="flex items-center justify-between text-sm py-1">
+                                                  <span className="text-muted-foreground">{week.week}</span>
+                                                  <Badge variant="outline">{week.points} pts</Badge>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <Separator className="my-2" />
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">All-time task totals:</p>
+                                            {allTimeStats.taskTotals.map((task, i) => (
+                                              <div key={i} className="flex items-center justify-between text-sm py-1">
+                                                <span>{task.taskName}</span>
+                                                <Badge variant="secondary">x{task.count}</Badge>
+                                              </div>
+                                            ))}
+                                          </>
+                                        ) : (
+                                          <p className="text-sm text-muted-foreground">No historical data available</p>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              <Badge variant="secondary">{member.weeklyPoints} pts</Badge>
-                            </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     </CardContent>
                   </Card>
