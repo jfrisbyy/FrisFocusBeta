@@ -630,7 +630,29 @@ export default function Dashboard() {
   const negativeBoosterPoints = boosters.filter(b => b.achieved && b.isNegative).reduce((sum, b) => sum + Math.abs(b.points), 0);
   const milestonePoints = milestones.filter(m => m.achieved).reduce((sum, m) => sum + m.points, 0);
   const boosterPoints = positiveBoosterPoints - negativeBoosterPoints + milestonePoints;
-  const finalTotal = weekTotal + boosterPoints;
+  
+  // Calculate weekly todo points
+  const weeklyTodoPoints = useMemo(() => {
+    const completedPoints = weeklyTodos
+      .filter(t => t.completed)
+      .reduce((sum, t) => sum + t.pointValue, 0);
+    const bonusPoints = weeklyTodoBonusAwarded ? weeklyTodoBonusPoints : 0;
+    return completedPoints + bonusPoints;
+  }, [weeklyTodos, weeklyTodoBonusAwarded, weeklyTodoBonusPoints]);
+
+  // Calculate due date points
+  const dueDatePoints = useMemo(() => {
+    const earnedPoints = dueDates
+      .filter(d => d.status === "completed")
+      .reduce((sum, d) => sum + d.pointValue, 0);
+    const lostPoints = dueDates
+      .filter(d => d.status === "missed")
+      .reduce((sum, d) => sum + d.penaltyValue, 0);
+    return earnedPoints - lostPoints;
+  }, [dueDates]);
+
+  // Final total includes all point sources
+  const finalTotal = weekTotal + boosterPoints + weeklyTodoPoints + dueDatePoints;
 
   const handleDayClick = () => {
     navigate("/daily");
@@ -788,26 +810,6 @@ export default function Dashboard() {
       saveDueDatesToStorage(items);
     }
   };
-
-  // Calculate weekly todo points for point summary
-  const weeklyTodoPoints = useMemo(() => {
-    const completedPoints = weeklyTodos
-      .filter(t => t.completed)
-      .reduce((sum, t) => sum + t.pointValue, 0);
-    const bonusPoints = weeklyTodoBonusAwarded ? weeklyTodoBonusPoints : 0;
-    return completedPoints + bonusPoints;
-  }, [weeklyTodos, weeklyTodoBonusAwarded, weeklyTodoBonusPoints]);
-
-  // Calculate due date points for point summary
-  const dueDatePoints = useMemo(() => {
-    const earnedPoints = dueDates
-      .filter(d => d.status === "completed")
-      .reduce((sum, d) => sum + d.pointValue, 0);
-    const lostPoints = dueDates
-      .filter(d => d.status === "missed")
-      .reduce((sum, d) => sum + d.penaltyValue, 0);
-    return earnedPoints - lostPoints;
-  }, [dueDates]);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
