@@ -275,52 +275,19 @@ export type UnifiedBooster = z.infer<typeof unifiedBoosterSchema>;
 
 // ==================== FITNESS DATA TABLES (FrisFit Integration) ====================
 
-// Basketball workout
-export const basketballWorkouts = pgTable("basketball_workouts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  date: text("date").notNull(),
-  duration: integer("duration").notNull(),
-  notes: text("notes"),
-  performance: jsonb("performance"),
-});
-
-export const insertBasketballWorkoutSchema = createInsertSchema(basketballWorkouts).omit({ id: true });
-export type InsertBasketballWorkout = z.infer<typeof insertBasketballWorkoutSchema>;
-export type BasketballWorkout = typeof basketballWorkouts.$inferSelect;
-
-// Run session
-export const runSessions = pgTable("run_sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  date: text("date").notNull(),
-  distance: integer("distance").notNull(),
-  duration: integer("duration").notNull(),
-  pace: text("pace"),
-  notes: text("notes"),
-});
-
-export const insertRunSessionSchema = createInsertSchema(runSessions).omit({ id: true });
-export type InsertRunSession = z.infer<typeof insertRunSessionSchema>;
-export type RunSession = typeof runSessions.$inferSelect;
-
-// Strength workout
-export const strengthWorkouts = pgTable("strength_workouts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  date: text("date").notNull(),
-  exercises: jsonb("exercises").notNull(),
-  notes: text("notes"),
-});
-
-export const insertStrengthWorkoutSchema = createInsertSchema(strengthWorkouts).omit({ id: true });
-export type InsertStrengthWorkout = z.infer<typeof insertStrengthWorkoutSchema>;
-export type StrengthWorkout = typeof strengthWorkouts.$inferSelect;
-
 // Nutrition log
 export const nutritionLogs = pgTable("nutrition_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   date: text("date").notNull(),
+  calories: integer("calories"),
+  protein: integer("protein"),
+  carbs: integer("carbs"),
+  fats: integer("fats"),
+  creatine: boolean("creatine"),
+  waterGallon: boolean("water_gallon"),
+  deficit: integer("deficit"),
+  caloriesBurned: integer("calories_burned"),
   meals: jsonb("meals"),
-  macros: jsonb("macros"),
-  notes: text("notes"),
 });
 
 export const insertNutritionLogSchema = createInsertSchema(nutritionLogs).omit({ id: true });
@@ -333,10 +300,68 @@ export const bodyComposition = pgTable("body_composition", {
   date: text("date").notNull(),
   weight: integer("weight"),
   bodyFat: integer("body_fat"),
-  measurements: jsonb("measurements"),
-  notes: text("notes"),
+  goalWeight: integer("goal_weight"),
+  nextMilestone: integer("next_milestone"),
+  photoUrl: text("photo_url"),
 });
 
 export const insertBodyCompositionSchema = createInsertSchema(bodyComposition).omit({ id: true });
 export type InsertBodyComposition = z.infer<typeof insertBodyCompositionSchema>;
 export type BodyComposition = typeof bodyComposition.$inferSelect;
+
+// Strength workout
+export const strengthWorkouts = pgTable("strength_workouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  type: text("type").default("Strength"),
+  duration: integer("duration"),
+  volume: integer("volume"),
+  primaryFocus: text("primary_focus"),
+  notes: text("notes"),
+  effort: integer("effort"),
+  exercises: jsonb("exercises"),
+});
+
+export const insertStrengthWorkoutSchema = createInsertSchema(strengthWorkouts).omit({ id: true });
+export type InsertStrengthWorkout = z.infer<typeof insertStrengthWorkoutSchema>;
+export type StrengthWorkout = typeof strengthWorkouts.$inferSelect;
+
+// Skill workout (basketball drills)
+export const skillWorkouts = pgTable("skill_workouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  type: text("type").default("Skill"),
+  drillType: text("drill_type"),
+  skillFocus: jsonb("skill_focus"),
+  zoneFocus: jsonb("zone_focus"),
+  effort: integer("effort"),
+  notes: text("notes"),
+  drillStats: jsonb("drill_stats"),
+});
+
+export const insertSkillWorkoutSchema = createInsertSchema(skillWorkouts).omit({ id: true });
+export type InsertSkillWorkout = z.infer<typeof insertSkillWorkoutSchema>;
+export type SkillWorkout = typeof skillWorkouts.$inferSelect;
+
+// Basketball runs (pickup games)
+export const basketballRuns = pgTable("basketball_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull(),
+  type: text("type").default("Run"),
+  gameType: jsonb("game_type"),
+  courtType: text("court_type"),
+  competitionLevel: text("competition_level"),
+  gamesPlayed: integer("games_played"),
+  wins: integer("wins"),
+  losses: integer("losses"),
+  performanceGrade: text("performance_grade"),
+  confidence: integer("confidence"),
+  positivePoints: text("positive_points"),
+  weakPoints: text("weak_points"),
+  matchupNotes: text("matchup_notes"),
+  challenges: jsonb("challenges"),
+});
+
+export const insertBasketballRunSchema = createInsertSchema(basketballRuns).omit({ id: true });
+export type InsertBasketballRun = z.infer<typeof insertBasketballRunSchema>;
+export type BasketballRun = typeof basketballRuns.$inferSelect;

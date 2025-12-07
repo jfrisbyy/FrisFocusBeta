@@ -4,16 +4,16 @@ import { storage } from "./storage";
 import OpenAI from "openai";
 import { db } from "./db";
 import {
-  basketballWorkouts,
-  runSessions,
-  strengthWorkouts,
   nutritionLogs,
   bodyComposition,
-  insertBasketballWorkoutSchema,
-  insertRunSessionSchema,
-  insertStrengthWorkoutSchema,
+  strengthWorkouts,
+  skillWorkouts,
+  basketballRuns,
   insertNutritionLogSchema,
   insertBodyCompositionSchema,
+  insertStrengthWorkoutSchema,
+  insertSkillWorkoutSchema,
+  insertBasketballRunSchema,
 } from "@shared/schema";
 
 const openai = new OpenAI({
@@ -27,47 +27,47 @@ export async function registerRoutes(
 ): Promise<Server> {
   // ==================== FITNESS API ROUTES ====================
   
-  // Basketball workouts
-  app.get("/api/fitness/basketball", async (_req, res) => {
+  // Nutrition logs
+  app.get("/api/fitness/nutrition", async (_req, res) => {
     try {
-      const workouts = await db.select().from(basketballWorkouts);
-      res.json(workouts);
+      const logs = await db.select().from(nutritionLogs);
+      res.json(logs);
     } catch (error) {
-      console.error("Error fetching basketball workouts:", error);
-      res.status(500).json({ error: "Failed to fetch basketball workouts" });
+      console.error("Error fetching nutrition logs:", error);
+      res.status(500).json({ error: "Failed to fetch nutrition logs" });
     }
   });
 
-  app.post("/api/fitness/basketball", async (req, res) => {
+  app.post("/api/fitness/nutrition", async (req, res) => {
     try {
-      const parsed = insertBasketballWorkoutSchema.parse(req.body);
-      const [workout] = await db.insert(basketballWorkouts).values(parsed).returning();
-      res.json(workout);
+      const parsed = insertNutritionLogSchema.parse(req.body);
+      const [log] = await db.insert(nutritionLogs).values(parsed).returning();
+      res.json(log);
     } catch (error) {
-      console.error("Error creating basketball workout:", error);
-      res.status(400).json({ error: "Failed to create basketball workout" });
+      console.error("Error creating nutrition log:", error);
+      res.status(400).json({ error: "Failed to create nutrition log" });
     }
   });
 
-  // Run sessions
-  app.get("/api/fitness/runs", async (_req, res) => {
+  // Body composition (endpoint: /api/fitness/body-comp)
+  app.get("/api/fitness/body-comp", async (_req, res) => {
     try {
-      const runs = await db.select().from(runSessions);
-      res.json(runs);
+      const records = await db.select().from(bodyComposition);
+      res.json(records);
     } catch (error) {
-      console.error("Error fetching run sessions:", error);
-      res.status(500).json({ error: "Failed to fetch run sessions" });
+      console.error("Error fetching body composition:", error);
+      res.status(500).json({ error: "Failed to fetch body composition" });
     }
   });
 
-  app.post("/api/fitness/runs", async (req, res) => {
+  app.post("/api/fitness/body-comp", async (req, res) => {
     try {
-      const parsed = insertRunSessionSchema.parse(req.body);
-      const [run] = await db.insert(runSessions).values(parsed).returning();
-      res.json(run);
+      const parsed = insertBodyCompositionSchema.parse(req.body);
+      const [record] = await db.insert(bodyComposition).values(parsed).returning();
+      res.json(record);
     } catch (error) {
-      console.error("Error creating run session:", error);
-      res.status(400).json({ error: "Failed to create run session" });
+      console.error("Error creating body composition:", error);
+      res.status(400).json({ error: "Failed to create body composition" });
     }
   });
 
@@ -93,47 +93,47 @@ export async function registerRoutes(
     }
   });
 
-  // Nutrition logs
-  app.get("/api/fitness/nutrition", async (_req, res) => {
+  // Skill workouts (basketball drills)
+  app.get("/api/fitness/skill", async (_req, res) => {
     try {
-      const logs = await db.select().from(nutritionLogs);
-      res.json(logs);
+      const workouts = await db.select().from(skillWorkouts);
+      res.json(workouts);
     } catch (error) {
-      console.error("Error fetching nutrition logs:", error);
-      res.status(500).json({ error: "Failed to fetch nutrition logs" });
+      console.error("Error fetching skill workouts:", error);
+      res.status(500).json({ error: "Failed to fetch skill workouts" });
     }
   });
 
-  app.post("/api/fitness/nutrition", async (req, res) => {
+  app.post("/api/fitness/skill", async (req, res) => {
     try {
-      const parsed = insertNutritionLogSchema.parse(req.body);
-      const [log] = await db.insert(nutritionLogs).values(parsed).returning();
-      res.json(log);
+      const parsed = insertSkillWorkoutSchema.parse(req.body);
+      const [workout] = await db.insert(skillWorkouts).values(parsed).returning();
+      res.json(workout);
     } catch (error) {
-      console.error("Error creating nutrition log:", error);
-      res.status(400).json({ error: "Failed to create nutrition log" });
+      console.error("Error creating skill workout:", error);
+      res.status(400).json({ error: "Failed to create skill workout" });
     }
   });
 
-  // Body composition
-  app.get("/api/fitness/body", async (_req, res) => {
+  // Basketball runs (pickup games)
+  app.get("/api/fitness/runs", async (_req, res) => {
     try {
-      const records = await db.select().from(bodyComposition);
-      res.json(records);
+      const runs = await db.select().from(basketballRuns);
+      res.json(runs);
     } catch (error) {
-      console.error("Error fetching body composition:", error);
-      res.status(500).json({ error: "Failed to fetch body composition" });
+      console.error("Error fetching basketball runs:", error);
+      res.status(500).json({ error: "Failed to fetch basketball runs" });
     }
   });
 
-  app.post("/api/fitness/body", async (req, res) => {
+  app.post("/api/fitness/runs", async (req, res) => {
     try {
-      const parsed = insertBodyCompositionSchema.parse(req.body);
-      const [record] = await db.insert(bodyComposition).values(parsed).returning();
-      res.json(record);
+      const parsed = insertBasketballRunSchema.parse(req.body);
+      const [run] = await db.insert(basketballRuns).values(parsed).returning();
+      res.json(run);
     } catch (error) {
-      console.error("Error creating body composition:", error);
-      res.status(400).json({ error: "Failed to create body composition" });
+      console.error("Error creating basketball run:", error);
+      res.status(400).json({ error: "Failed to create basketball run" });
     }
   });
 
