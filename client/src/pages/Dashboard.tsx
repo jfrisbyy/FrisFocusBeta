@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { format, startOfWeek, addDays, subWeeks } from "date-fns";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
-import RecentWeeks, { WeekData } from "@/components/RecentWeeks";
+import RecentWeeks, { WeekData, DayData, WeekBooster, WeekBadge, WeekMilestone } from "@/components/RecentWeeks";
 import StreaksCard from "@/components/StreaksCard";
 import AlertsPanel from "@/components/AlertsPanel";
 import WelcomeMessage from "@/components/WelcomeMessage";
@@ -91,6 +92,16 @@ const getMockBoosters = (): UnifiedBooster[] => [
 
 const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
   const today = new Date();
+  
+  const generateDays = (weekOffset: number, points: number[]): DayData[] => {
+    const weekStart = startOfWeek(subWeeks(today, weekOffset), { weekStartsOn: 1 });
+    return points.map((p, i) => ({
+      date: format(addDays(weekStart, i), "MMM d"),
+      dayName: format(addDays(weekStart, i), "EEE"),
+      points: p,
+    }));
+  };
+
   return [
     {
       id: "week-1",
@@ -100,6 +111,15 @@ const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
       defaultGoal,
       note: undefined,
       customGoal: undefined,
+      days: generateDays(1, [55, 60, 45, 70, 65, 50, 40]),
+      boosters: [
+        { id: "b1", name: "5 of 7 Tracking", points: 10, isNegative: false },
+        { id: "b2", name: "Morning Workout", points: 15, isNegative: false },
+      ],
+      badges: [
+        { id: "badge1", name: "Beast Mode", level: 2, earnedAt: "2024-12-01" },
+      ],
+      milestones: [],
     },
     {
       id: "week-2",
@@ -109,6 +129,12 @@ const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
       defaultGoal,
       note: "Travel week",
       customGoal: 250,
+      days: generateDays(2, [40, 35, 30, 45, 50, 40, 40]),
+      boosters: [
+        { id: "b3", name: "Junk Food", points: -15, isNegative: true },
+      ],
+      badges: [],
+      milestones: [],
     },
     {
       id: "week-3",
@@ -118,6 +144,45 @@ const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
       defaultGoal,
       note: undefined,
       customGoal: undefined,
+      days: generateDays(3, [50, 55, 48, 60, 52, 55, 45]),
+      boosters: [
+        { id: "b4", name: "3 Days Lifting", points: 10, isNegative: false },
+        { id: "b5", name: "Read 30 minutes", points: 20, isNegative: false },
+      ],
+      badges: [],
+      milestones: [
+        { id: "m1", name: "Run a 5K", points: 50, achievedAt: "2024-11-15" },
+      ],
+    },
+    {
+      id: "week-4",
+      weekStart: format(startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 }), "MMM d"),
+      weekEnd: format(addDays(startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 }), 6), "MMM d"),
+      points: 320,
+      defaultGoal,
+      note: undefined,
+      customGoal: undefined,
+      days: generateDays(4, [45, 50, 40, 55, 48, 42, 40]),
+      boosters: [],
+      badges: [
+        { id: "badge2", name: "Purified", level: 1, earnedAt: "2024-11-01" },
+      ],
+      milestones: [],
+    },
+    {
+      id: "week-5",
+      weekStart: format(startOfWeek(subWeeks(today, 5), { weekStartsOn: 1 }), "MMM d"),
+      weekEnd: format(addDays(startOfWeek(subWeeks(today, 5), { weekStartsOn: 1 }), 6), "MMM d"),
+      points: 290,
+      defaultGoal,
+      note: "Busy week at work",
+      customGoal: undefined,
+      days: generateDays(5, [35, 40, 45, 50, 45, 40, 35]),
+      boosters: [
+        { id: "b6", name: "Social Media Binge", points: -20, isNegative: true },
+      ],
+      badges: [],
+      milestones: [],
     },
   ];
 };
@@ -201,23 +266,47 @@ const getMockBadges = (): BadgeWithLevels[] => [
   },
 ];
 
+const getEmptyWeekData = () => {
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(weekStart, i);
+    return {
+      date: format(date, "MMM d"),
+      dayName: format(date, "EEE"),
+      points: null,
+    };
+  });
+  return days;
+};
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const [days] = useState(getMockWeekData);
+  const { isOnboarding } = useOnboarding();
+  
+  const initialDays = useMemo(() => isOnboarding ? getMockWeekData() : getEmptyWeekData(), [isOnboarding]);
+  const initialWeeks = useMemo(() => isOnboarding ? getMockRecentWeeks(350) : [], [isOnboarding]);
+  const initialMilestones = useMemo(() => isOnboarding ? getMockMilestones() : [], [isOnboarding]);
+  const initialBoosters = useMemo(() => isOnboarding ? getMockBoosters() : [], [isOnboarding]);
+  const initialBadges = useMemo(() => isOnboarding ? getMockBadges() : [], [isOnboarding]);
+  const initialAlerts = useMemo(() => isOnboarding ? getMockAlerts() : [], [isOnboarding]);
+  
+  const [days] = useState(initialDays);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(350);
-  const [recentWeeks, setRecentWeeks] = useState<WeekData[]>(() => getMockRecentWeeks(350));
-  const [dayStreak] = useState(5);
-  const [weekStreak] = useState(3);
-  const [longestDayStreak] = useState(14);
-  const [longestWeekStreak] = useState(8);
-  const [alerts] = useState<TaskAlert[]>(getMockAlerts);
-  const [userName, setUserName] = useState("Jordan");
+  const [recentWeeks, setRecentWeeks] = useState<WeekData[]>(initialWeeks);
+  const [dayStreak] = useState(isOnboarding ? 5 : 0);
+  const [weekStreak] = useState(isOnboarding ? 3 : 0);
+  const [longestDayStreak] = useState(isOnboarding ? 14 : 0);
+  const [longestWeekStreak] = useState(isOnboarding ? 8 : 0);
+  const [alerts] = useState<TaskAlert[]>(initialAlerts);
+  const [userName, setUserName] = useState(isOnboarding ? "Jordan" : "You");
   const [encouragementMessage, setEncouragementMessage] = useState(
-    "Let's start this week off right, you can do it I believe in you!"
+    isOnboarding 
+      ? "Let's start this week off right, you can do it I believe in you!"
+      : "Welcome! Set up your tasks and start logging your progress."
   );
-  const [boosters] = useState<UnifiedBooster[]>(getMockBoosters);
-  const [milestones, setMilestones] = useState<Milestone[]>(getMockMilestones);
-  const [badges] = useState<BadgeWithLevels[]>(getMockBadges);
+  const [boosters] = useState<UnifiedBooster[]>(initialBoosters);
+  const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
+  const [badges] = useState<BadgeWithLevels[]>(initialBadges);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);

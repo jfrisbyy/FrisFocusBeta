@@ -253,6 +253,12 @@ export default function MilestonesPanel({
                   {milestone.description && (
                     <p className="text-xs text-muted-foreground mt-0.5">{milestone.description}</p>
                   )}
+                  {milestone.achievedAt && (
+                    <div className="flex items-center gap-1 mt-1 text-xs text-chart-1/70">
+                      <Trophy className="h-3 w-3" />
+                      <span>Achieved: {format(parseISO(milestone.achievedAt), "MMM d, yyyy")}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
