@@ -231,6 +231,7 @@ export interface StoredFriendWelcomeMessage {
   friendName: string;
   message: string;
   createdAt: string;
+  expiresAt?: string; // For Cheerlines - expires after 3 days
 }
 
 export interface StoredUserProfile {
@@ -238,6 +239,8 @@ export interface StoredUserProfile {
   encouragementMessage: string;
   useCustomMessage?: boolean;
   friendWelcomeMessages?: StoredFriendWelcomeMessage[];
+  savedCustomMessages?: string[]; // User's saved custom messages list
+  selectedMessageIndex?: number; // -1 for random, or index of selected message
 }
 
 export function loadUserProfileFromStorage(): StoredUserProfile {

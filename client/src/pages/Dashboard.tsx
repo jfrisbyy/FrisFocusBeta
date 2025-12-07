@@ -376,6 +376,8 @@ export default function Dashboard() {
   const [encouragementMessage, setEncouragementMessage] = useState("Welcome! Set up your tasks and start logging your progress.");
   const [useCustomMessage, setUseCustomMessage] = useState(false);
   const [friendWelcomeMessages, setFriendWelcomeMessages] = useState<StoredFriendWelcomeMessage[]>([]);
+  const [savedCustomMessages, setSavedCustomMessages] = useState<string[]>([]);
+  const [selectedMessageIndex, setSelectedMessageIndex] = useState<number>(-1);
   const [boosters, setBoosters] = useState<UnifiedBooster[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [badges, setBadges] = useState<BadgeWithLevels[]>([]);
@@ -399,9 +401,15 @@ export default function Dashboard() {
       setEncouragementMessage("Let's start this week off right, you can do it I believe in you!");
       setUseCustomMessage(true);
       setFriendWelcomeMessages([
-        { friendId: "friend-1", friendName: "Alex Chen", message: "You've got this! Crush it this week!", createdAt: new Date(Date.now() - 3600000).toISOString() },
-        { friendId: "friend-3", friendName: "Sam Rivera", message: "Keep up the amazing streak!", createdAt: new Date(Date.now() - 7200000).toISOString() },
+        { friendId: "friend-1", friendName: "Alex Chen", message: "You've got this! Crush it this week!", createdAt: new Date(Date.now() - 3600000).toISOString(), expiresAt: new Date(Date.now() + 86400000 * 2).toISOString() },
+        { friendId: "friend-3", friendName: "Sam Rivera", message: "Keep up the amazing streak!", createdAt: new Date(Date.now() - 7200000).toISOString(), expiresAt: new Date(Date.now() + 86400000 * 3).toISOString() },
       ]);
+      setSavedCustomMessages([
+        "Let's start this week off right, you can do it I believe in you!",
+        "You are stronger than you think!",
+        "One step at a time leads to great things!",
+      ]);
+      setSelectedMessageIndex(-1);
       setDayStreak(5);
       setWeekStreak(3);
       setLongestDayStreak(14);
@@ -419,6 +427,8 @@ export default function Dashboard() {
     setEncouragementMessage(profile.encouragementMessage);
     setUseCustomMessage(profile.useCustomMessage ?? false);
     setFriendWelcomeMessages(profile.friendWelcomeMessages ?? []);
+    setSavedCustomMessages(profile.savedCustomMessages ?? []);
+    setSelectedMessageIndex(profile.selectedMessageIndex ?? -1);
 
     // Load goals
     setWeeklyGoal(loadWeeklyGoalFromStorage());
@@ -723,16 +733,24 @@ export default function Dashboard() {
     ));
   };
 
-  const handleWelcomeUpdate = (newName: string, newMessage: string, customMode: boolean) => {
+  const handleWelcomeUpdate = (newName: string, newMessage: string, customMode: boolean, savedMessages?: string[], selectedIndex?: number) => {
     setUserName(newName);
     setEncouragementMessage(newMessage);
     setUseCustomMessage(customMode);
+    if (savedMessages !== undefined) {
+      setSavedCustomMessages(savedMessages);
+    }
+    if (selectedIndex !== undefined) {
+      setSelectedMessageIndex(selectedIndex);
+    }
     if (!useMockData) {
       saveUserProfileToStorage({ 
         userName: newName, 
         encouragementMessage: newMessage,
         useCustomMessage: customMode,
         friendWelcomeMessages,
+        savedCustomMessages: savedMessages ?? savedCustomMessages,
+        selectedMessageIndex: selectedIndex ?? selectedMessageIndex,
       });
     }
   };
@@ -886,6 +904,8 @@ export default function Dashboard() {
         message={encouragementMessage}
         useCustomMessage={useCustomMessage}
         friendMessages={friendWelcomeMessages}
+        savedCustomMessages={savedCustomMessages}
+        selectedMessageIndex={selectedMessageIndex}
         onUpdate={handleWelcomeUpdate}
         onDismissFriendMessage={handleDismissFriendMessage}
       />

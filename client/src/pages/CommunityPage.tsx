@@ -508,6 +508,8 @@ export default function CommunityPage() {
   const [selectedFriend, setSelectedFriend] = useState<StoredFriend | null>(null);
   const [dmFriend, setDmFriend] = useState<StoredFriend | null>(null);
   const [dmMessage, setDmMessage] = useState("");
+  const [cheerlineFriend, setCheerlineFriend] = useState<StoredFriend | null>(null);
+  const [cheerlineMessage, setCheerlineMessage] = useState("");
   const [directMessages, setDirectMessages] = useState<Record<string, StoredDirectMessage[]>>(demoDirectMessages);
   const [communityPosts, setCommunityPosts] = useState<StoredCommunityPost[]>(demoCommunityPosts);
   const [newPostContent, setNewPostContent] = useState("");
@@ -746,6 +748,9 @@ export default function CommunityPage() {
   const [newBadgeName, setNewBadgeName] = useState("");
   const [newBadgeDescription, setNewBadgeDescription] = useState("");
   const [newBadgeRequired, setNewBadgeRequired] = useState("10");
+  const [newBadgeRewardType, setNewBadgeRewardType] = useState<"none" | "points" | "gift" | "both">("none");
+  const [newBadgeRewardPoints, setNewBadgeRewardPoints] = useState("50");
+  const [newBadgeRewardGift, setNewBadgeRewardGift] = useState("");
   
   const [showAddAward, setShowAddAward] = useState(false);
   const [newAwardName, setNewAwardName] = useState("");
@@ -753,9 +758,36 @@ export default function CommunityPage() {
   const [newAwardType, setNewAwardType] = useState<"first_to" | "most_in_category" | "weekly_champion">("first_to");
   const [newAwardTarget, setNewAwardTarget] = useState("100");
   const [newAwardCategory, setNewAwardCategory] = useState("");
+  const [newAwardRewardType, setNewAwardRewardType] = useState<"none" | "points" | "gift" | "both">("none");
+  const [newAwardRewardPoints, setNewAwardRewardPoints] = useState("50");
+  const [newAwardRewardGift, setNewAwardRewardGift] = useState("");
   
   // Badge/Award requests for approval
   const [badgeRequests, setBadgeRequests] = useState<{ id: string; circleId: string; requesterId: string; requesterName: string; type: "badge" | "award"; data: any; status: string; createdAt: string }[]>([]);
+
+  // Edit state for tasks, badges, awards
+  const [editingTask, setEditingTask] = useState<StoredCircleTask | null>(null);
+  const [editTaskName, setEditTaskName] = useState("");
+  const [editTaskValue, setEditTaskValue] = useState("10");
+  const [editTaskType, setEditTaskType] = useState<CircleTaskType>("per_person");
+
+  const [editingBadge, setEditingBadge] = useState<CircleBadge | null>(null);
+  const [editBadgeName, setEditBadgeName] = useState("");
+  const [editBadgeDescription, setEditBadgeDescription] = useState("");
+  const [editBadgeRequired, setEditBadgeRequired] = useState("10");
+  const [editBadgeRewardType, setEditBadgeRewardType] = useState<"none" | "points" | "gift" | "both">("none");
+  const [editBadgeRewardPoints, setEditBadgeRewardPoints] = useState("50");
+  const [editBadgeRewardGift, setEditBadgeRewardGift] = useState("");
+
+  const [editingAward, setEditingAward] = useState<CircleAward | null>(null);
+  const [editAwardName, setEditAwardName] = useState("");
+  const [editAwardDescription, setEditAwardDescription] = useState("");
+  const [editAwardType, setEditAwardType] = useState<"first_to" | "most_in_category" | "weekly_champion">("first_to");
+  const [editAwardTarget, setEditAwardTarget] = useState("100");
+  const [editAwardCategory, setEditAwardCategory] = useState("");
+  const [editAwardRewardType, setEditAwardRewardType] = useState<"none" | "points" | "gift" | "both">("none");
+  const [editAwardRewardPoints, setEditAwardRewardPoints] = useState("50");
+  const [editAwardRewardGift, setEditAwardRewardGift] = useState("");
 
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
@@ -1129,6 +1161,15 @@ export default function CommunityPage() {
     toast({ title: "Comment deleted" });
   };
 
+  const handleDeleteCirclePost = (postId: string) => {
+    if (!selectedCircle) return;
+    setCirclePosts({
+      ...circlePosts,
+      [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).filter(p => p.id !== postId)
+    });
+    toast({ title: "Post deleted" });
+  };
+
   const handleAddTask = () => {
     if (!selectedCircle || !newTaskName.trim()) return;
     const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
@@ -1204,6 +1245,18 @@ export default function CommunityPage() {
     if (!selectedCircle || !newBadgeName.trim()) return;
     const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
     
+    // Build reward if applicable
+    let reward: CircleBadgeReward | undefined;
+    if (newBadgeRewardType !== "none") {
+      reward = { type: newBadgeRewardType };
+      if (newBadgeRewardType === "points" || newBadgeRewardType === "both") {
+        reward.points = parseInt(newBadgeRewardPoints) || 50;
+      }
+      if (newBadgeRewardType === "gift" || newBadgeRewardType === "both") {
+        reward.gift = newBadgeRewardGift.trim() || undefined;
+      }
+    }
+
     if (canApproveInstantly) {
       const newBadge: CircleBadge = {
         id: `cb-${Date.now()}`,
@@ -1213,6 +1266,7 @@ export default function CommunityPage() {
         progress: 0,
         required: parseInt(newBadgeRequired) || 10,
         earned: false,
+        reward,
       };
       const current = circleBadges[selectedCircle.id] || [];
       setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
@@ -1224,7 +1278,7 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "badge" as const,
-        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10 },
+        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10, reward },
         status: "pending",
         createdAt: new Date().toISOString(),
       };
@@ -1236,12 +1290,27 @@ export default function CommunityPage() {
     setNewBadgeName("");
     setNewBadgeDescription("");
     setNewBadgeRequired("10");
+    setNewBadgeRewardType("none");
+    setNewBadgeRewardPoints("50");
+    setNewBadgeRewardGift("");
   };
 
   const handleAddAward = () => {
     if (!selectedCircle || !newAwardName.trim()) return;
     const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
     
+    // Build reward if applicable
+    let awardReward: CircleBadgeReward | undefined;
+    if (newAwardRewardType !== "none") {
+      awardReward = { type: newAwardRewardType };
+      if (newAwardRewardType === "points" || newAwardRewardType === "both") {
+        awardReward.points = parseInt(newAwardRewardPoints) || 50;
+      }
+      if (newAwardRewardType === "gift" || newAwardRewardType === "both") {
+        awardReward.gift = newAwardRewardGift.trim() || undefined;
+      }
+    }
+
     if (canApproveInstantly) {
       const newAward: CircleAward = {
         id: `ca-${Date.now()}`,
@@ -1250,6 +1319,7 @@ export default function CommunityPage() {
         type: newAwardType,
         target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
         category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
+        reward: awardReward,
       };
       const current = circleAwards[selectedCircle.id] || [];
       setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
@@ -1261,7 +1331,7 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "award" as const,
-        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory },
+        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory, reward: awardReward },
         status: "pending",
         createdAt: new Date().toISOString(),
       };
@@ -1275,6 +1345,9 @@ export default function CommunityPage() {
     setNewAwardType("first_to");
     setNewAwardTarget("100");
     setNewAwardCategory("");
+    setNewAwardRewardType("none");
+    setNewAwardRewardPoints("50");
+    setNewAwardRewardGift("");
   };
 
   const handleApproveBadgeRequest = (requestId: string) => {
@@ -1290,6 +1363,7 @@ export default function CommunityPage() {
         progress: 0,
         required: request.data.required || 10,
         earned: false,
+        reward: request.data.reward,
       };
       const current = circleBadges[selectedCircle.id] || [];
       setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
@@ -1301,6 +1375,7 @@ export default function CommunityPage() {
         type: request.data.awardType || "first_to",
         target: request.data.target,
         category: request.data.category,
+        reward: request.data.reward,
       };
       const current = circleAwards[selectedCircle.id] || [];
       setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
@@ -1313,6 +1388,124 @@ export default function CommunityPage() {
   const handleRejectBadgeRequest = (requestId: string) => {
     setBadgeRequests(badgeRequests.filter(r => r.id !== requestId));
     toast({ title: "Request rejected" });
+  };
+
+  const startEditTask = (task: StoredCircleTask) => {
+    setEditingTask(task);
+    setEditTaskName(task.name);
+    setEditTaskValue(task.value.toString());
+    setEditTaskType(task.taskType);
+  };
+
+  const handleEditTask = () => {
+    if (!selectedCircle || !editingTask || !editTaskName.trim()) return;
+    const updatedTasks = (circleTasks[selectedCircle.id] || []).map(t =>
+      t.id === editingTask.id
+        ? { ...t, name: editTaskName.trim(), value: parseInt(editTaskValue) || 10, taskType: editTaskType }
+        : t
+    );
+    setCircleTasks({ ...circleTasks, [selectedCircle.id]: updatedTasks });
+    setEditingTask(null);
+    toast({ title: "Task updated" });
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    if (!selectedCircle) return;
+    const updatedTasks = (circleTasks[selectedCircle.id] || []).filter(t => t.id !== taskId);
+    setCircleTasks({ ...circleTasks, [selectedCircle.id]: updatedTasks });
+    toast({ title: "Task deleted" });
+  };
+
+  const startEditBadge = (badge: CircleBadge) => {
+    setEditingBadge(badge);
+    setEditBadgeName(badge.name);
+    setEditBadgeDescription(badge.description);
+    setEditBadgeRequired(badge.required.toString());
+    if (badge.reward) {
+      setEditBadgeRewardType(badge.reward.type);
+      setEditBadgeRewardPoints(badge.reward.points?.toString() || "50");
+      setEditBadgeRewardGift(badge.reward.gift || "");
+    } else {
+      setEditBadgeRewardType("none");
+      setEditBadgeRewardPoints("50");
+      setEditBadgeRewardGift("");
+    }
+  };
+
+  const handleEditBadge = () => {
+    if (!selectedCircle || !editingBadge || !editBadgeName.trim()) return;
+    let reward: CircleBadgeReward | undefined;
+    if (editBadgeRewardType !== "none") {
+      reward = { type: editBadgeRewardType };
+      if (editBadgeRewardType === "points" || editBadgeRewardType === "both") {
+        reward.points = parseInt(editBadgeRewardPoints) || 50;
+      }
+      if (editBadgeRewardType === "gift" || editBadgeRewardType === "both") {
+        reward.gift = editBadgeRewardGift.trim() || undefined;
+      }
+    }
+    const updatedBadges = (circleBadges[selectedCircle.id] || []).map(b =>
+      b.id === editingBadge.id
+        ? { ...b, name: editBadgeName.trim(), description: editBadgeDescription.trim(), required: parseInt(editBadgeRequired) || 10, reward }
+        : b
+    );
+    setCircleBadges({ ...circleBadges, [selectedCircle.id]: updatedBadges });
+    setEditingBadge(null);
+    toast({ title: "Badge updated" });
+  };
+
+  const handleDeleteBadge = (badgeId: string) => {
+    if (!selectedCircle) return;
+    const updatedBadges = (circleBadges[selectedCircle.id] || []).filter(b => b.id !== badgeId);
+    setCircleBadges({ ...circleBadges, [selectedCircle.id]: updatedBadges });
+    toast({ title: "Badge deleted" });
+  };
+
+  const startEditAward = (award: CircleAward) => {
+    setEditingAward(award);
+    setEditAwardName(award.name);
+    setEditAwardDescription(award.description);
+    setEditAwardType(award.type);
+    setEditAwardTarget(award.target?.toString() || "100");
+    setEditAwardCategory(award.category || "");
+    if (award.reward) {
+      setEditAwardRewardType(award.reward.type);
+      setEditAwardRewardPoints(award.reward.points?.toString() || "50");
+      setEditAwardRewardGift(award.reward.gift || "");
+    } else {
+      setEditAwardRewardType("none");
+      setEditAwardRewardPoints("50");
+      setEditAwardRewardGift("");
+    }
+  };
+
+  const handleEditAward = () => {
+    if (!selectedCircle || !editingAward || !editAwardName.trim()) return;
+    let reward: CircleBadgeReward | undefined;
+    if (editAwardRewardType !== "none") {
+      reward = { type: editAwardRewardType };
+      if (editAwardRewardType === "points" || editAwardRewardType === "both") {
+        reward.points = parseInt(editAwardRewardPoints) || 50;
+      }
+      if (editAwardRewardType === "gift" || editAwardRewardType === "both") {
+        reward.gift = editAwardRewardGift.trim() || undefined;
+      }
+    }
+    const updatedAwards = (circleAwards[selectedCircle.id] || []).map(a =>
+      a.id === editingAward.id
+        ? { ...a, name: editAwardName.trim(), description: editAwardDescription.trim(), type: editAwardType, target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined, category: editAwardType === "most_in_category" ? editAwardCategory : undefined, reward }
+        : a
+    );
+    setCircleAwards({ ...circleAwards, [selectedCircle.id]: updatedAwards });
+    setEditingAward(null);
+    toast({ title: "Award updated" });
+  };
+
+  const handleDeleteAward = (awardId: string) => {
+    if (!selectedCircle) return;
+    const updatedAwards = (circleAwards[selectedCircle.id] || []).filter(a => a.id !== awardId);
+    setCircleAwards({ ...circleAwards, [selectedCircle.id]: updatedAwards });
+    toast({ title: "Award deleted" });
   };
 
   const pendingBadgeRequestsForCircle = useMemo(() => {
@@ -1566,13 +1759,74 @@ export default function CommunityPage() {
             )}
           </div>
           
-          <DialogFooter className="mt-4">
+          <DialogFooter className="mt-4 flex-wrap gap-2">
             <Button variant="outline" onClick={() => setSelectedFriend(null)}>
               Close
+            </Button>
+            <Button variant="secondary" onClick={() => { setCheerlineFriend(selectedFriend); setSelectedFriend(null); }} data-testid="button-send-cheerline">
+              <Heart className="w-4 h-4 mr-2" />
+              Send Cheerline
             </Button>
             <Button onClick={() => { setDmFriend(selectedFriend); setSelectedFriend(null); }} data-testid="button-dm-from-profile">
               <MessageCircle className="w-4 h-4 mr-2" />
               Message
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const renderCheerlineDialog = () => {
+    if (!cheerlineFriend) return null;
+    
+    const handleSendCheerline = () => {
+      if (!cheerlineMessage.trim()) {
+        toast({ title: "Message required", description: "Please enter a cheerline message", variant: "destructive" });
+        return;
+      }
+      
+      toast({ 
+        title: "Cheerline sent!", 
+        description: `Your encouraging message was sent to ${cheerlineFriend.firstName}. It will appear on their dashboard for 3 days.` 
+      });
+      setCheerlineMessage("");
+      setCheerlineFriend(null);
+    };
+    
+    return (
+      <Dialog open={!!cheerlineFriend} onOpenChange={() => { setCheerlineFriend(null); setCheerlineMessage(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Heart className="w-5 h-5 text-pink-500" />
+              Send Cheerline to {cheerlineFriend.firstName}
+            </DialogTitle>
+            <DialogDescription>
+              Send an encouraging message that will appear on their dashboard for 3 days.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Textarea
+              placeholder="You're doing amazing! Keep up the great work..."
+              value={cheerlineMessage}
+              onChange={(e) => setCheerlineMessage(e.target.value)}
+              className="min-h-[100px]"
+              data-testid="input-cheerline-message"
+            />
+            <p className="text-sm text-muted-foreground">
+              Cheerlines are short, encouraging messages to motivate your friends. They expire after 3 days.
+            </p>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setCheerlineFriend(null); setCheerlineMessage(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendCheerline} data-testid="button-confirm-cheerline">
+              <Send className="w-4 h-4 mr-2" />
+              Send Cheerline
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2262,6 +2516,40 @@ export default function CommunityPage() {
                         </Dialog>
                       </div>
                     </CardHeader>
+
+                    {/* Edit Task Dialog */}
+                    <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Task</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Task Name</Label>
+                            <Input value={editTaskName} onChange={(e) => setEditTaskName(e.target.value)} data-testid="input-edit-task-name" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Point Value</Label>
+                            <Input type="number" value={editTaskValue} onChange={(e) => setEditTaskValue(e.target.value)} data-testid="input-edit-task-value" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Task Type</Label>
+                            <Select value={editTaskType} onValueChange={(v) => setEditTaskType(v as CircleTaskType)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="per_person">Per-Person Daily</SelectItem>
+                                <SelectItem value="circle_task">Circle Task</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setEditingTask(null)}>Cancel</Button>
+                          <Button onClick={handleEditTask} data-testid="button-save-edit-task">Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <CardContent>
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium text-muted-foreground mb-2">Per-Person Daily Tasks</h4>
@@ -2300,6 +2588,16 @@ export default function CommunityPage() {
                                       </div>
                                     )}
                                     <Badge variant="outline">{task.value} pts</Badge>
+                                    {isOwnerOrAdmin(selectedCircle.id) && (
+                                      <div className="flex gap-1">
+                                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); startEditTask(task); }} data-testid={`button-edit-task-${task.id}`}>
+                                          <Pencil className="w-4 h-4" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} data-testid={`button-delete-task-${task.id}`}>
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 {isExpanded && completions.length > 0 && (
@@ -2356,6 +2654,16 @@ export default function CommunityPage() {
                                       </Avatar>
                                     )}
                                     <Badge variant="outline">{task.value} pts</Badge>
+                                    {isOwnerOrAdmin(selectedCircle.id) && (
+                                      <div className="flex gap-1">
+                                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); startEditTask(task); }} data-testid={`button-edit-task-${task.id}`}>
+                                          <Pencil className="w-4 h-4" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} data-testid={`button-delete-task-${task.id}`}>
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 {isExpanded && isCompletedByAnyone && (
@@ -2424,7 +2732,27 @@ export default function CommunityPage() {
                     <CardContent>
                       <div className="space-y-2">
                         {(circleMembers[selectedCircle.id] || [])
-                          .sort((a, b) => b.weeklyPoints - a.weeklyPoints)
+                          .sort((a, b) => {
+                            const getTodayPoints = (m: StoredCircleMember) => {
+                              const dailyTasks = demoMemberDailyCompletions[selectedCircle.id]?.[m.userId] || [];
+                              return dailyTasks.reduce((sum, t) => {
+                                const task = (circleTasks[selectedCircle.id] || []).find(ct => ct.id === t.taskId);
+                                return sum + (task?.value || 0);
+                              }, 0);
+                            };
+                            const getAllTimePoints = (m: StoredCircleMember) => {
+                              return demoMemberAllTimeStats[selectedCircle.id]?.[m.userId]?.totalPoints || m.weeklyPoints;
+                            };
+                            switch (leaderboardViewMode) {
+                              case "day":
+                                return getTodayPoints(b) - getTodayPoints(a);
+                              case "alltime":
+                                return getAllTimePoints(b) - getAllTimePoints(a);
+                              case "week":
+                              default:
+                                return b.weeklyPoints - a.weeklyPoints;
+                            }
+                          })
                           .map((member, index) => {
                             const isExpanded = expandedMemberId === member.userId;
                             const dailyTasks = demoMemberDailyCompletions[selectedCircle.id]?.[member.userId] || [];
@@ -2604,6 +2932,43 @@ export default function CommunityPage() {
                                   data-testid="input-new-badge-required"
                                 />
                               </div>
+                              <div className="space-y-2">
+                                <Label>Reward (Optional)</Label>
+                                <Select value={newBadgeRewardType} onValueChange={(v) => setNewBadgeRewardType(v as "none" | "points" | "gift" | "both")}>
+                                  <SelectTrigger data-testid="select-badge-reward-type">
+                                    <SelectValue placeholder="Select reward type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No Reward</SelectItem>
+                                    <SelectItem value="points">Bonus Points</SelectItem>
+                                    <SelectItem value="gift">Gift/Prize</SelectItem>
+                                    <SelectItem value="both">Points + Gift</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {(newBadgeRewardType === "points" || newBadgeRewardType === "both") && (
+                                <div className="space-y-2">
+                                  <Label>Bonus Points</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="e.g., 50"
+                                    value={newBadgeRewardPoints}
+                                    onChange={(e) => setNewBadgeRewardPoints(e.target.value)}
+                                    data-testid="input-badge-reward-points"
+                                  />
+                                </div>
+                              )}
+                              {(newBadgeRewardType === "gift" || newBadgeRewardType === "both") && (
+                                <div className="space-y-2">
+                                  <Label>Gift/Prize</Label>
+                                  <Input
+                                    placeholder="e.g., Pizza night, Free movie"
+                                    value={newBadgeRewardGift}
+                                    onChange={(e) => setNewBadgeRewardGift(e.target.value)}
+                                    data-testid="input-badge-reward-gift"
+                                  />
+                                </div>
+                              )}
                             </div>
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setShowAddBadge(false)}>Cancel</Button>
@@ -2615,6 +2980,58 @@ export default function CommunityPage() {
                         </Dialog>
                       </div>
                     </CardHeader>
+
+                    {/* Edit Badge Dialog */}
+                    <Dialog open={!!editingBadge} onOpenChange={(open) => !open && setEditingBadge(null)}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Badge</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Badge Name</Label>
+                            <Input value={editBadgeName} onChange={(e) => setEditBadgeName(e.target.value)} data-testid="input-edit-badge-name" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea value={editBadgeDescription} onChange={(e) => setEditBadgeDescription(e.target.value)} data-testid="input-edit-badge-description" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Required Count</Label>
+                            <Input type="number" value={editBadgeRequired} onChange={(e) => setEditBadgeRequired(e.target.value)} data-testid="input-edit-badge-required" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Reward Type</Label>
+                            <Select value={editBadgeRewardType} onValueChange={(v) => setEditBadgeRewardType(v as "none" | "points" | "gift" | "both")}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No Reward</SelectItem>
+                                <SelectItem value="points">Bonus Points</SelectItem>
+                                <SelectItem value="gift">Gift/Prize</SelectItem>
+                                <SelectItem value="both">Points + Gift</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {(editBadgeRewardType === "points" || editBadgeRewardType === "both") && (
+                            <div className="space-y-2">
+                              <Label>Bonus Points</Label>
+                              <Input type="number" value={editBadgeRewardPoints} onChange={(e) => setEditBadgeRewardPoints(e.target.value)} data-testid="input-edit-badge-reward-points" />
+                            </div>
+                          )}
+                          {(editBadgeRewardType === "gift" || editBadgeRewardType === "both") && (
+                            <div className="space-y-2">
+                              <Label>Gift/Prize</Label>
+                              <Input value={editBadgeRewardGift} onChange={(e) => setEditBadgeRewardGift(e.target.value)} data-testid="input-edit-badge-reward-gift" />
+                            </div>
+                          )}
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setEditingBadge(null)}>Cancel</Button>
+                          <Button onClick={handleEditBadge} data-testid="button-save-edit-badge">Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <CardContent>
                       {isOwnerOrAdmin(selectedCircle.id) && pendingBadgeRequestsForCircle.filter(r => r.type === "badge").length > 0 && (
                         <div className="mb-6 p-4 rounded-md border border-yellow-500/30 bg-yellow-500/10">
@@ -2662,7 +3079,19 @@ export default function CommunityPage() {
                                 <span className="font-medium">{badge.name}</span>
                                 {badge.earned && <Badge variant="secondary">Earned</Badge>}
                               </div>
-                              <span className="text-sm text-muted-foreground">{badge.progress}/{badge.required}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">{badge.progress}/{badge.required}</span>
+                                {isOwnerOrAdmin(selectedCircle.id) && (
+                                  <div className="flex gap-1">
+                                    <Button size="icon" variant="ghost" onClick={() => startEditBadge(badge)} data-testid={`button-edit-badge-${badge.id}`}>
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" onClick={() => handleDeleteBadge(badge.id)} data-testid={`button-delete-badge-${badge.id}`}>
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <p className="text-sm text-muted-foreground mb-2">{badge.description}</p>
                             {badge.reward && (
@@ -2772,6 +3201,43 @@ export default function CommunityPage() {
                                   />
                                 </div>
                               )}
+                              <div className="space-y-2">
+                                <Label>Reward (Optional)</Label>
+                                <Select value={newAwardRewardType} onValueChange={(v) => setNewAwardRewardType(v as "none" | "points" | "gift" | "both")}>
+                                  <SelectTrigger data-testid="select-award-reward-type">
+                                    <SelectValue placeholder="Select reward type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No Reward</SelectItem>
+                                    <SelectItem value="points">Bonus Points</SelectItem>
+                                    <SelectItem value="gift">Gift/Prize</SelectItem>
+                                    <SelectItem value="both">Points + Gift</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {(newAwardRewardType === "points" || newAwardRewardType === "both") && (
+                                <div className="space-y-2">
+                                  <Label>Bonus Points</Label>
+                                  <Input
+                                    type="number"
+                                    placeholder="e.g., 50"
+                                    value={newAwardRewardPoints}
+                                    onChange={(e) => setNewAwardRewardPoints(e.target.value)}
+                                    data-testid="input-award-reward-points"
+                                  />
+                                </div>
+                              )}
+                              {(newAwardRewardType === "gift" || newAwardRewardType === "both") && (
+                                <div className="space-y-2">
+                                  <Label>Gift/Prize</Label>
+                                  <Input
+                                    placeholder="e.g., Extra screen time, Gift card"
+                                    value={newAwardRewardGift}
+                                    onChange={(e) => setNewAwardRewardGift(e.target.value)}
+                                    data-testid="input-award-reward-gift"
+                                  />
+                                </div>
+                              )}
                             </div>
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setShowAddAward(false)}>Cancel</Button>
@@ -2783,6 +3249,77 @@ export default function CommunityPage() {
                         </Dialog>
                       </div>
                     </CardHeader>
+
+                    {/* Edit Award Dialog */}
+                    <Dialog open={!!editingAward} onOpenChange={(open) => !open && setEditingAward(null)}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Award</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Award Name</Label>
+                            <Input value={editAwardName} onChange={(e) => setEditAwardName(e.target.value)} data-testid="input-edit-award-name" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea value={editAwardDescription} onChange={(e) => setEditAwardDescription(e.target.value)} data-testid="input-edit-award-description" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Award Type</Label>
+                            <Select value={editAwardType} onValueChange={(v) => setEditAwardType(v as "first_to" | "most_in_category" | "weekly_champion")}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="first_to">First To</SelectItem>
+                                <SelectItem value="most_in_category">Most In Category</SelectItem>
+                                <SelectItem value="weekly_champion">Weekly Champion</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {editAwardType === "first_to" && (
+                            <div className="space-y-2">
+                              <Label>Target Points</Label>
+                              <Input type="number" value={editAwardTarget} onChange={(e) => setEditAwardTarget(e.target.value)} data-testid="input-edit-award-target" />
+                            </div>
+                          )}
+                          {editAwardType === "most_in_category" && (
+                            <div className="space-y-2">
+                              <Label>Category</Label>
+                              <Input value={editAwardCategory} onChange={(e) => setEditAwardCategory(e.target.value)} data-testid="input-edit-award-category" />
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label>Reward Type</Label>
+                            <Select value={editAwardRewardType} onValueChange={(v) => setEditAwardRewardType(v as "none" | "points" | "gift" | "both")}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No Reward</SelectItem>
+                                <SelectItem value="points">Bonus Points</SelectItem>
+                                <SelectItem value="gift">Gift/Prize</SelectItem>
+                                <SelectItem value="both">Points + Gift</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {(editAwardRewardType === "points" || editAwardRewardType === "both") && (
+                            <div className="space-y-2">
+                              <Label>Bonus Points</Label>
+                              <Input type="number" value={editAwardRewardPoints} onChange={(e) => setEditAwardRewardPoints(e.target.value)} data-testid="input-edit-award-reward-points" />
+                            </div>
+                          )}
+                          {(editAwardRewardType === "gift" || editAwardRewardType === "both") && (
+                            <div className="space-y-2">
+                              <Label>Gift/Prize</Label>
+                              <Input value={editAwardRewardGift} onChange={(e) => setEditAwardRewardGift(e.target.value)} data-testid="input-edit-award-reward-gift" />
+                            </div>
+                          )}
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setEditingAward(null)}>Cancel</Button>
+                          <Button onClick={handleEditAward} data-testid="button-save-edit-award">Save Changes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <CardContent>
                       {isOwnerOrAdmin(selectedCircle.id) && pendingBadgeRequestsForCircle.filter(r => r.type === "award").length > 0 && (
                         <div className="mb-6 p-4 rounded-md border border-yellow-500/30 bg-yellow-500/10">
@@ -2831,11 +3368,23 @@ export default function CommunityPage() {
                                 {award.type === "weekly_champion" && <Crown className="w-5 h-5 text-yellow-500" />}
                                 <span className="font-medium">{award.name}</span>
                               </div>
-                              <Badge variant={award.winner ? "default" : "outline"}>
-                                {award.type === "first_to" && `First to ${award.target}`}
-                                {award.type === "most_in_category" && award.category}
-                                {award.type === "weekly_champion" && "Weekly"}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={award.winner ? "default" : "outline"}>
+                                  {award.type === "first_to" && `First to ${award.target}`}
+                                  {award.type === "most_in_category" && award.category}
+                                  {award.type === "weekly_champion" && "Weekly"}
+                                </Badge>
+                                {isOwnerOrAdmin(selectedCircle.id) && (
+                                  <div className="flex gap-1">
+                                    <Button size="icon" variant="ghost" onClick={() => startEditAward(award)} data-testid={`button-edit-award-${award.id}`}>
+                                      <Pencil className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" onClick={() => handleDeleteAward(award.id)} data-testid={`button-delete-award-${award.id}`}>
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             <p className="text-sm text-muted-foreground mb-2">{award.description}</p>
                             {award.reward && (
@@ -2972,6 +3521,16 @@ export default function CommunityPage() {
                                     <MessageCircle className="w-4 h-4 mr-1" />
                                     {post.comments.length}
                                   </Button>
+                                  {(post.authorId === "you" || isOwnerOrAdmin(selectedCircle.id)) && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => handleDeleteCirclePost(post.id)}
+                                      data-testid={`button-delete-circle-post-${post.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </div>
                                 
                                 {circlePostCommentingId === post.id && (
@@ -3302,6 +3861,7 @@ export default function CommunityPage() {
 
       {renderFriendProfile()}
       {renderDMDialog()}
+      {renderCheerlineDialog()}
     </div>
   );
 }

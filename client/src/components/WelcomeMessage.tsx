@@ -12,7 +12,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Settings, Sparkles, MessageCircle, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Settings, Sparkles, Heart, X, ChevronDown, ChevronUp, Plus, Trash2, Shuffle } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { StoredFriendWelcomeMessage } from "@/lib/storage";
@@ -22,7 +23,9 @@ interface WelcomeMessageProps {
   message: string;
   useCustomMessage?: boolean;
   friendMessages?: StoredFriendWelcomeMessage[];
-  onUpdate?: (userName: string, message: string, useCustomMessage: boolean) => void;
+  savedCustomMessages?: string[];
+  selectedMessageIndex?: number;
+  onUpdate?: (userName: string, message: string, useCustomMessage: boolean, savedMessages?: string[], selectedIndex?: number) => void;
   onDismissFriendMessage?: (friendId: string) => void;
 }
 
@@ -42,6 +45,8 @@ export default function WelcomeMessage({
   message,
   useCustomMessage = false,
   friendMessages = [],
+  savedCustomMessages = [],
+  selectedMessageIndex = -1,
   onUpdate,
   onDismissFriendMessage,
 }: WelcomeMessageProps) {
@@ -49,30 +54,81 @@ export default function WelcomeMessage({
   const [nameInput, setNameInput] = useState(userName);
   const [messageInput, setMessageInput] = useState(message);
   const [useCustom, setUseCustom] = useState(useCustomMessage);
-  const [showFriendMessages, setShowFriendMessages] = useState(true);
+  const [showCheerlines, setShowCheerlines] = useState(true);
+  const [savedMessages, setSavedMessages] = useState<string[]>(savedCustomMessages);
+  const [newMessageInput, setNewMessageInput] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState<number>(selectedMessageIndex);
 
   const handleOpen = () => {
     setNameInput(userName);
     setMessageInput(message);
     setUseCustom(useCustomMessage);
+    setSavedMessages(savedCustomMessages);
+    setSelectedIndex(selectedMessageIndex);
+    setNewMessageInput("");
     setDialogOpen(true);
   };
 
   const handleSave = () => {
-    onUpdate?.(nameInput.trim() || userName, messageInput.trim() || message, useCustom);
+    onUpdate?.(
+      nameInput.trim() || userName, 
+      messageInput.trim() || message, 
+      useCustom,
+      savedMessages,
+      selectedIndex
+    );
     setDialogOpen(false);
   };
 
-  const handleRandomMessage = () => {
-    const randomIndex = Math.floor(Math.random() * defaultMessages.length);
-    setMessageInput(defaultMessages[randomIndex]);
+  const handleAddMessage = () => {
+    if (newMessageInput.trim()) {
+      setSavedMessages([...savedMessages, newMessageInput.trim()]);
+      setNewMessageInput("");
+    }
   };
 
-  const displayMessage = useCustomMessage ? message : (
-    defaultMessages[Math.floor(Math.random() * defaultMessages.length)]
-  );
+  const handleRemoveMessage = (index: number) => {
+    const newMessages = savedMessages.filter((_, i) => i !== index);
+    setSavedMessages(newMessages);
+    if (selectedIndex === index) {
+      setSelectedIndex(-1);
+    } else if (selectedIndex > index) {
+      setSelectedIndex(selectedIndex - 1);
+    }
+  };
 
-  const unreadFriendMessages = friendMessages.filter(m => m.message.trim() !== "");
+  const handleSelectMessage = (value: string) => {
+    const idx = parseInt(value);
+    setSelectedIndex(idx);
+    if (idx >= 0 && savedMessages[idx]) {
+      setMessageInput(savedMessages[idx]);
+    }
+  };
+
+  const getDisplayMessage = () => {
+    if (!useCustomMessage) {
+      return defaultMessages[Math.floor(Math.random() * defaultMessages.length)];
+    }
+    if (savedCustomMessages.length > 0) {
+      if (selectedMessageIndex === -1) {
+        const randomIdx = Math.floor(Math.random() * savedCustomMessages.length);
+        return savedCustomMessages[randomIdx];
+      }
+      if (selectedMessageIndex >= 0 && savedCustomMessages[selectedMessageIndex]) {
+        return savedCustomMessages[selectedMessageIndex];
+      }
+    }
+    return message;
+  };
+
+  const now = new Date();
+  const validCheerlines = friendMessages.filter(m => {
+    if (!m.message.trim()) return false;
+    if (m.expiresAt) {
+      return new Date(m.expiresAt) > now;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -84,7 +140,7 @@ export default function WelcomeMessage({
                 Welcome, {userName}!
               </h1>
               <p className="text-sm text-muted-foreground" data-testid="text-welcome-message">
-                {useCustomMessage ? message : displayMessage}
+                {getDisplayMessage()}
               </p>
             </div>
             <Button
@@ -97,30 +153,30 @@ export default function WelcomeMessage({
             </Button>
           </div>
 
-          {unreadFriendMessages.length > 0 && (
+          {validCheerlines.length > 0 && (
             <div className="mt-4 pt-3 border-t border-primary/10">
               <button
-                onClick={() => setShowFriendMessages(!showFriendMessages)}
+                onClick={() => setShowCheerlines(!showCheerlines)}
                 className="flex items-center gap-2 text-sm text-muted-foreground mb-2 hover:text-foreground transition-colors"
-                data-testid="button-toggle-friend-messages"
+                data-testid="button-toggle-cheerlines"
               >
-                <MessageCircle className="h-4 w-4" />
-                <span>Friend Messages ({unreadFriendMessages.length})</span>
-                {showFriendMessages ? (
+                <Heart className="h-4 w-4" />
+                <span>Cheerlines ({validCheerlines.length})</span>
+                {showCheerlines ? (
                   <ChevronUp className="h-3 w-3" />
                 ) : (
                   <ChevronDown className="h-3 w-3" />
                 )}
               </button>
 
-              {showFriendMessages && (
+              {showCheerlines && (
                 <ScrollArea className="max-h-32">
                   <div className="space-y-2">
-                    {unreadFriendMessages.map((fm) => (
+                    {validCheerlines.map((fm) => (
                       <div
                         key={fm.friendId}
                         className="flex items-start gap-2 p-2 rounded-md bg-background/50"
-                        data-testid={`friend-message-${fm.friendId}`}
+                        data-testid={`cheerline-${fm.friendId}`}
                       >
                         <Avatar className="h-6 w-6">
                           <AvatarFallback className="text-xs">
@@ -138,7 +194,7 @@ export default function WelcomeMessage({
                           variant="ghost"
                           className="h-5 w-5"
                           onClick={() => onDismissFriendMessage?.(fm.friendId)}
-                          data-testid={`button-dismiss-message-${fm.friendId}`}
+                          data-testid={`button-dismiss-cheerline-${fm.friendId}`}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -172,10 +228,10 @@ export default function WelcomeMessage({
             <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50">
               <div className="space-y-0.5">
                 <Label htmlFor="custom-toggle" className="text-sm font-medium">
-                  Use Custom Message
+                  Use Custom Messages
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  {useCustom ? "Your custom message will show" : "A random motivational message will show each visit"}
+                  {useCustom ? "Select from your saved messages" : "A random motivational message will show each visit"}
                 </p>
               </div>
               <Switch
@@ -186,41 +242,130 @@ export default function WelcomeMessage({
               />
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="encouragement">
-                  {useCustom ? "Your Custom Message" : "Message Template"}
-                </Label>
-                {!useCustom && (
+            {useCustom && (
+              <>
+                <div className="space-y-2">
+                  <Label>Your Saved Messages</Label>
+                  {savedMessages.length > 0 ? (
+                    <ScrollArea className="max-h-32 border rounded-md p-2">
+                      <div className="space-y-1">
+                        {savedMessages.map((msg, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 p-2 rounded bg-muted/30"
+                            data-testid={`saved-message-${idx}`}
+                          >
+                            <p className="text-xs flex-1 truncate">{msg}</p>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-5 w-5"
+                              onClick={() => handleRemoveMessage(idx)}
+                              data-testid={`button-remove-message-${idx}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-xs text-muted-foreground p-2 border rounded-md">
+                      No saved messages yet. Add your first one below!
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="new-message">Add New Message</Label>
+                  <div className="flex gap-2">
+                    <Textarea
+                      id="new-message"
+                      value={newMessageInput}
+                      onChange={(e) => setNewMessageInput(e.target.value)}
+                      placeholder="Write a motivational message..."
+                      rows={2}
+                      className="resize-none flex-1"
+                      data-testid="input-new-message"
+                    />
+                    <Button
+                      size="icon"
+                      onClick={handleAddMessage}
+                      disabled={!newMessageInput.trim()}
+                      data-testid="button-add-message"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {savedMessages.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Message Selection</Label>
+                    <Select
+                      value={selectedIndex.toString()}
+                      onValueChange={handleSelectMessage}
+                    >
+                      <SelectTrigger data-testid="select-message-mode">
+                        <SelectValue placeholder="Choose how to display" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="-1">
+                          <div className="flex items-center gap-2">
+                            <Shuffle className="h-3 w-3" />
+                            <span>Random from saved</span>
+                          </div>
+                        </SelectItem>
+                        {savedMessages.map((msg, idx) => (
+                          <SelectItem key={idx} value={idx.toString()}>
+                            <span className="truncate max-w-[200px]">{msg.substring(0, 40)}...</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedIndex === -1 
+                        ? "A random message from your saved list will show each visit"
+                        : "This specific message will always show"}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!useCustom && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="encouragement">Preview Default Messages</Label>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={handleRandomMessage}
+                    onClick={() => {
+                      const randomIndex = Math.floor(Math.random() * defaultMessages.length);
+                      setMessageInput(defaultMessages[randomIndex]);
+                    }}
                     className="text-xs gap-1"
                     data-testid="button-random-message"
                   >
                     <Sparkles className="h-3 w-3" />
                     Preview Random
                   </Button>
-                )}
-              </div>
-              <Textarea
-                id="encouragement"
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                placeholder={useCustom ? "Write your custom message..." : "Preview a random message..."}
-                rows={3}
-                className="resize-none"
-                data-testid="input-encouragement"
-                disabled={!useCustom}
-              />
-              {!useCustom && (
+                </div>
+                <Textarea
+                  id="encouragement"
+                  value={messageInput}
+                  readOnly
+                  placeholder="Click Preview Random to see a message..."
+                  rows={3}
+                  className="resize-none"
+                  data-testid="input-encouragement"
+                />
                 <p className="text-xs text-muted-foreground">
-                  When disabled, a random motivational message will be shown each time you visit.
+                  A random motivational message will be shown each time you visit.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
