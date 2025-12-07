@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,14 +47,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  loadBadgesFromStorage,
+  saveBadgesToStorage,
+  type StoredBadge,
+  type StoredBadgeLevel,
+} from "@/lib/storage";
 
 type BadgeConditionType = "taskCompletions" | "perfectDaysStreak" | "negativeFreeStreak" | "weeklyGoalStreak";
-
-interface BadgeLevel {
-  level: number;
-  required: number;
-  earned: boolean;
-}
 
 interface BadgeDefinition {
   id: string;
@@ -63,7 +63,7 @@ interface BadgeDefinition {
   icon: string;
   conditionType: BadgeConditionType;
   taskName?: string;
-  levels: BadgeLevel[];
+  levels: StoredBadgeLevel[];
   progress: number;
 }
 
@@ -91,80 +91,9 @@ const conditionLabels: Record<BadgeConditionType, string> = {
   weeklyGoalStreak: "Weekly goals hit in a row",
 };
 
-// todo: remove mock functionality
-const initialBadges: BadgeDefinition[] = [
-  {
-    id: "1",
-    name: "Scripture Scholar",
-    description: "Read Bible chapters",
-    icon: "book",
-    conditionType: "taskCompletions",
-    taskName: "Bible study",
-    levels: [
-      { level: 1, required: 30, earned: true },
-      { level: 2, required: 100, earned: false },
-      { level: 3, required: 300, earned: false },
-    ],
-    progress: 45,
-  },
-  {
-    id: "2",
-    name: "Beast Mode",
-    description: "Perfect days in a row",
-    icon: "flame",
-    conditionType: "perfectDaysStreak",
-    levels: [
-      { level: 1, required: 3, earned: true },
-      { level: 2, required: 7, earned: false },
-      { level: 3, required: 14, earned: false },
-    ],
-    progress: 5,
-  },
-  {
-    id: "3",
-    name: "Purified",
-    description: "Negative-free days in a row",
-    icon: "shield",
-    conditionType: "negativeFreeStreak",
-    levels: [
-      { level: 1, required: 7, earned: false },
-      { level: 2, required: 14, earned: false },
-      { level: 3, required: 30, earned: false },
-    ],
-    progress: 6,
-  },
-  {
-    id: "4",
-    name: "Consistent Champion",
-    description: "Hit weekly goal in a row",
-    icon: "trophy",
-    conditionType: "weeklyGoalStreak",
-    levels: [
-      { level: 1, required: 4, earned: false },
-      { level: 2, required: 8, earned: false },
-      { level: 3, required: 12, earned: false },
-    ],
-    progress: 3,
-  },
-  {
-    id: "5",
-    name: "Gym Warrior",
-    description: "Complete gym sessions",
-    icon: "zap",
-    conditionType: "taskCompletions",
-    taskName: "Gym session",
-    levels: [
-      { level: 1, required: 25, earned: false },
-      { level: 2, required: 50, earned: false },
-      { level: 3, required: 100, earned: false },
-    ],
-    progress: 23,
-  },
-];
-
 export default function BadgesPage() {
   const { toast } = useToast();
-  const [badges, setBadges] = useState<BadgeDefinition[]>(initialBadges);
+  const [badges, setBadges] = useState<BadgeDefinition[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBadge, setEditingBadge] = useState<BadgeDefinition | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -175,6 +104,38 @@ export default function BadgesPage() {
   const [formConditionType, setFormConditionType] = useState<BadgeConditionType>("taskCompletions");
   const [formTaskName, setFormTaskName] = useState("");
   const [formLevels, setFormLevels] = useState<string[]>(["10", "25", "50"]);
+
+  // Load badges from localStorage on mount
+  useEffect(() => {
+    const storedBadges = loadBadgesFromStorage();
+    const converted: BadgeDefinition[] = storedBadges.map((b: StoredBadge) => ({
+      id: b.id,
+      name: b.name,
+      description: b.description,
+      icon: b.icon,
+      conditionType: b.conditionType as BadgeConditionType,
+      taskName: b.taskName,
+      levels: b.levels,
+      progress: b.currentProgress || 0,
+    }));
+    setBadges(converted);
+  }, []);
+
+  // Save badges to localStorage whenever they change
+  const saveBadges = (newBadges: BadgeDefinition[]) => {
+    setBadges(newBadges);
+    const toStore: StoredBadge[] = newBadges.map(b => ({
+      id: b.id,
+      name: b.name,
+      description: b.description,
+      icon: b.icon,
+      conditionType: b.conditionType,
+      taskName: b.taskName,
+      levels: b.levels,
+      currentProgress: b.progress,
+    }));
+    saveBadgesToStorage(toStore);
+  };
 
   const getHighestEarnedLevel = (badge: BadgeDefinition) => {
     const earnedLevels = badge.levels.filter(l => l.earned);
@@ -233,14 +194,14 @@ export default function BadgesPage() {
   };
 
   const handleSave = () => {
-    const parsedLevels = formLevels.map((val, idx) => ({
+    const parsedLevels: StoredBadgeLevel[] = formLevels.map((val, idx) => ({
       level: idx + 1,
       required: parseInt(val, 10) || (idx + 1) * 10,
       earned: false,
     }));
 
     if (editingBadge) {
-      setBadges(badges.map(b =>
+      const updated = badges.map(b =>
         b.id === editingBadge.id
           ? {
               ...b,
@@ -255,7 +216,8 @@ export default function BadgesPage() {
               })),
             }
           : b
-      ));
+      );
+      saveBadges(updated);
       toast({ title: "Badge updated", description: `"${formName}" has been updated` });
     } else {
       const newBadge: BadgeDefinition = {
@@ -268,7 +230,7 @@ export default function BadgesPage() {
         levels: parsedLevels,
         progress: 0,
       };
-      setBadges([...badges, newBadge]);
+      saveBadges([...badges, newBadge]);
       toast({ title: "Badge created", description: `"${formName}" has been added` });
     }
 
@@ -280,7 +242,7 @@ export default function BadgesPage() {
   const handleDelete = () => {
     if (deleteId) {
       const badge = badges.find(b => b.id === deleteId);
-      setBadges(badges.filter(b => b.id !== deleteId));
+      saveBadges(badges.filter(b => b.id !== deleteId));
       toast({ title: "Badge deleted", description: badge ? `"${badge.name}" has been removed` : "Badge removed" });
       setDeleteId(null);
     }
@@ -362,10 +324,16 @@ export default function BadgesPage() {
           <Target className="h-5 w-5 text-muted-foreground" />
           In Progress ({inProgressBadges.length})
         </h3>
-        {inProgressBadges.length === 0 ? (
+        {badges.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-no-badges">
+              No badges yet. Create one to start tracking achievements!
+            </CardContent>
+          </Card>
+        ) : inProgressBadges.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
-              No badges in progress. Create one to start tracking!
+              All badges earned! Create more to continue tracking.
             </CardContent>
           </Card>
         ) : (

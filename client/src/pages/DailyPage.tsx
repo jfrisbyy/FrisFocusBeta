@@ -1,48 +1,92 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import DatePicker from "@/components/DatePicker";
 import TaskGroup from "@/components/TaskGroup";
 import DailySummary from "@/components/DailySummary";
 import { useToast } from "@/hooks/use-toast";
+import {
+  loadTasksFromStorage,
+  loadPenaltiesFromStorage,
+  loadCategoriesFromStorage,
+  loadDailyLogFromStorage,
+  saveDailyLogToStorage,
+  type StoredTask,
+  type StoredPenalty,
+} from "@/lib/storage";
 
-// todo: remove mock functionality
-const mockTasks = [
-  { id: "1", name: "Morning workout", value: 15, category: "Health", isBooster: true },
-  { id: "2", name: "Evening walk", value: 5, category: "Health" },
-  { id: "3", name: "Gym session", value: 20, category: "Health", isBooster: true },
-  { id: "4", name: "Read 30 minutes", value: 10, category: "Productivity" },
-  { id: "5", name: "Complete work tasks", value: 15, category: "Productivity" },
-  { id: "6", name: "Learn something new", value: 10, category: "Productivity" },
-  { id: "7", name: "Bible study", value: 15, category: "Spiritual", isBooster: true },
-  { id: "8", name: "Prayer time", value: 10, category: "Spiritual" },
-  { id: "9", name: "Connect with friend", value: 5, category: "Social" },
-  { id: "10", name: "Ate junk food", value: -10, category: "Penalties" },
-  { id: "11", name: "Skipped workout", value: -15, category: "Penalties" },
-  { id: "12", name: "Wasted time on social media", value: -10, category: "Penalties" },
-];
+interface DisplayTask {
+  id: string;
+  name: string;
+  value: number;
+  category: string;
+  isBooster?: boolean;
+}
 
 export default function DailyPage() {
   const { toast } = useToast();
   const [date, setDate] = useState(new Date());
-  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set(["1", "4", "7"]));
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [allTasks, setAllTasks] = useState<DisplayTask[]>([]);
+
+  // Load tasks and penalties from localStorage on mount
+  useEffect(() => {
+    const storedTasks = loadTasksFromStorage();
+    const storedPenalties = loadPenaltiesFromStorage();
+    const storedCategories = loadCategoriesFromStorage();
+
+    // Create a map of category IDs to names
+    const categoryMap = new Map(storedCategories.map(c => [c.id, c.name]));
+
+    // Convert tasks to display format
+    const taskItems: DisplayTask[] = storedTasks.map((task: StoredTask) => ({
+      id: task.id,
+      name: task.name,
+      value: task.value,
+      category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
+      isBooster: task.boostEnabled,
+    }));
+
+    // Convert penalties to display format (always in Penalties category)
+    const penaltyItems: DisplayTask[] = storedPenalties.map((penalty: StoredPenalty) => ({
+      id: penalty.id,
+      name: penalty.name,
+      value: -Math.abs(penalty.value), // Ensure negative
+      category: "Penalties",
+    }));
+
+    setAllTasks([...taskItems, ...penaltyItems]);
+  }, []);
+
+  // Load daily log when date changes
+  useEffect(() => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const log = loadDailyLogFromStorage(dateStr);
+    if (log) {
+      setCompletedIds(new Set(log.completedTaskIds));
+      setNotes(log.notes);
+    } else {
+      setCompletedIds(new Set());
+      setNotes("");
+    }
+  }, [date]);
 
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(mockTasks.map(t => t.category)));
+    const cats = Array.from(new Set(allTasks.map(t => t.category)));
     return cats.sort((a, b) => {
       if (a === "Penalties") return 1;
       if (b === "Penalties") return -1;
       return a.localeCompare(b);
     });
-  }, []);
+  }, [allTasks]);
 
   const tasksByCategory = useMemo(() => {
     return categories.reduce((acc, cat) => {
-      acc[cat] = mockTasks.filter(t => t.category === cat);
+      acc[cat] = allTasks.filter(t => t.category === cat);
       return acc;
-    }, {} as Record<string, typeof mockTasks>);
-  }, [categories]);
+    }, {} as Record<string, DisplayTask[]>);
+  }, [categories, allTasks]);
 
   const handleTaskToggle = (taskId: string, checked: boolean) => {
     setCompletedIds((prev) => {
@@ -56,36 +100,60 @@ export default function DailyPage() {
     });
   };
 
-  const positivePoints = mockTasks
+  const positivePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value > 0)
     .reduce((sum, t) => sum + t.value, 0);
 
-  const negativePoints = mockTasks
+  const negativePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value < 0)
     .reduce((sum, t) => sum + t.value, 0);
 
   const handleSave = () => {
     setIsSaving(true);
+    const dateStr = format(date, "yyyy-MM-dd");
+    
+    // Save to localStorage
+    saveDailyLogToStorage({
+      date: dateStr,
+      completedTaskIds: Array.from(completedIds),
+      notes,
+    });
+
     setTimeout(() => {
       setIsSaving(false);
       toast({
         title: "Day saved",
         description: `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
       });
-      console.log("Saved day:", {
-        date: format(date, "yyyy-MM-dd"),
-        completedTaskIds: Array.from(completedIds),
-        notes,
-        dailyPoints: positivePoints + negativePoints,
-      });
-    }, 500);
+    }, 300);
   };
+
+  // Show empty state if no tasks
+  if (allTasks.length === 0) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight" data-testid="heading-daily-log">Daily Log</h2>
+            <p className="text-muted-foreground text-sm">Track your tasks for the day</p>
+          </div>
+          <DatePicker date={date} onDateChange={setDate} />
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-muted-foreground mb-2" data-testid="text-no-tasks">No tasks or penalties found</p>
+          <p className="text-sm text-muted-foreground">
+            Go to the Tasks page to add tasks and penalties to track.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Daily Log</h2>
+          <h2 className="text-2xl font-semibold tracking-tight" data-testid="heading-daily-log">Daily Log</h2>
           <p className="text-muted-foreground text-sm">Track your tasks for the day</p>
         </div>
         <DatePicker date={date} onDateChange={setDate} />

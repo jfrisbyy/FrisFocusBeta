@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, subDays, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  loadJournalFromStorage,
+  saveJournalToStorage,
+  type StoredJournalEntry,
+} from "@/lib/storage";
 
 interface JournalEntry {
   id: string;
@@ -45,52 +50,9 @@ interface JournalEntry {
   createdAt: string;
 }
 
-// todo: remove mock functionality
-const generateMockEntries = (): JournalEntry[] => {
-  const entries: JournalEntry[] = [];
-  const today = new Date();
-  
-  const mockTitles = [
-    "Morning reflection",
-    "Evening thoughts",
-    "Gratitude note",
-    "Weekly review",
-    "Quick thought",
-    "Prayer notes",
-    "Goal check-in",
-  ];
-
-  const mockContents = [
-    "Great day! Hit all my goals and felt really productive. The morning workout set a positive tone.",
-    "Tough morning but pushed through. Remember why you started. This journey is about growth.",
-    "Travel day, did what I could. Sometimes rest is productive too.",
-    "Back on track after yesterday. Feeling motivated! Ready to crush this week.",
-    "Need to focus more on Bible study this week. Making that a priority.",
-    "Perfect day! Everything clicked. Grateful for the energy and focus.",
-    "Missed gym but made up for it with extra reading time. Balance is key.",
-    "Sunday rest day. Spent quality time with family. These moments matter.",
-  ];
-
-  for (let i = 0; i < 15; i++) {
-    const date = subDays(today, Math.floor(i / 2));
-    const dateStr = format(date, "yyyy-MM-dd");
-    const hours = 9 + (i % 3) * 5;
-    
-    entries.push({
-      id: `entry-${i}`,
-      date: dateStr,
-      title: mockTitles[i % mockTitles.length],
-      content: mockContents[i % mockContents.length],
-      createdAt: `${dateStr}T${hours.toString().padStart(2, '0')}:00:00Z`,
-    });
-  }
-
-  return entries;
-};
-
 export default function JournalPage() {
   const { toast } = useToast();
-  const [entries, setEntries] = useState<JournalEntry[]>(() => generateMockEntries());
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
@@ -98,6 +60,18 @@ export default function JournalPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formContent, setFormContent] = useState("");
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
+
+  // Load entries from localStorage on mount
+  useEffect(() => {
+    const storedEntries = loadJournalFromStorage();
+    setEntries(storedEntries);
+  }, []);
+
+  // Save entries to localStorage
+  const saveEntries = (newEntries: JournalEntry[]) => {
+    setEntries(newEntries);
+    saveJournalToStorage(newEntries);
+  };
 
   const entriesPerPage = 10;
   
@@ -157,14 +131,14 @@ export default function JournalPage() {
         content: formContent.trim(),
         createdAt: now.toISOString(),
       };
-      setEntries([newEntry, ...entries]);
+      saveEntries([newEntry, ...entries]);
       toast({
         title: "Entry created",
         description: "Your journal entry has been added",
       });
       setIsCreating(false);
     } else if (editingEntry) {
-      setEntries(entries.map(e =>
+      saveEntries(entries.map(e =>
         e.id === editingEntry.id 
           ? { ...e, title: formTitle.trim(), content: formContent.trim() } 
           : e
@@ -183,7 +157,7 @@ export default function JournalPage() {
   const handleDelete = () => {
     if (!deleteEntry) return;
     
-    setEntries(entries.filter(e => e.id !== deleteEntry.id));
+    saveEntries(entries.filter(e => e.id !== deleteEntry.id));
     toast({
       title: "Entry deleted",
       description: `"${deleteEntry.title}" has been removed`,
@@ -276,7 +250,7 @@ export default function JournalPage() {
         </CardHeader>
         <CardContent className="p-0">
           {sortedDates.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">
+            <div className="p-8 text-center text-muted-foreground" data-testid="text-no-entries">
               {searchQuery ? "No entries match your search." : "No journal entries yet. Click 'New Entry' to start."}
             </div>
           ) : (
@@ -287,7 +261,7 @@ export default function JournalPage() {
                     <span className="text-sm font-medium">
                       {format(parseISO(dateStr), "EEEE, MMMM d, yyyy")}
                     </span>
-                    <Badge variant="secondary" size="sm">
+                    <Badge variant="secondary" className="text-xs">
                       {groupedEntries[dateStr].length} {groupedEntries[dateStr].length === 1 ? 'entry' : 'entries'}
                     </Badge>
                   </div>
@@ -364,7 +338,6 @@ export default function JournalPage() {
         </div>
       )}
 
-      {/* Create/Edit Dialog */}
       <Dialog 
         open={isCreating || !!editingEntry} 
         onOpenChange={(open) => {
@@ -421,7 +394,6 @@ export default function JournalPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteEntry} onOpenChange={(open) => !open && setDeleteEntry(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

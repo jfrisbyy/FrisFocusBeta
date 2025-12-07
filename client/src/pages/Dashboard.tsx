@@ -1,17 +1,32 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { format, startOfWeek, addDays, subWeeks } from "date-fns";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
-import RecentWeeks, { WeekData, DayData, WeekBooster, WeekBadge, WeekMilestone } from "@/components/RecentWeeks";
+import RecentWeeks, { WeekData, DayData } from "@/components/RecentWeeks";
 import StreaksCard from "@/components/StreaksCard";
 import AlertsPanel from "@/components/AlertsPanel";
 import WelcomeMessage from "@/components/WelcomeMessage";
 import MilestonesPanel from "@/components/MilestonesPanel";
 import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels } from "@shared/schema";
+import {
+  loadMilestonesFromStorage,
+  saveMilestonesToStorage,
+  loadDailyGoalFromStorage,
+  saveDailyGoalToStorage,
+  loadWeeklyGoalFromStorage,
+  saveWeeklyGoalToStorage,
+  loadUserProfileFromStorage,
+  saveUserProfileToStorage,
+  loadDailyLogsFromStorage,
+  loadTasksFromStorage,
+  loadPenaltiesFromStorage,
+  loadBadgesFromStorage,
+  StoredMilestone,
+} from "@/lib/storage";
 
 const getMockWeekData = () => {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -283,30 +298,281 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { isOnboarding } = useOnboarding();
   
-  const initialDays = useMemo(() => isOnboarding ? getMockWeekData() : getEmptyWeekData(), [isOnboarding]);
-  const initialWeeks = useMemo(() => isOnboarding ? getMockRecentWeeks(350) : [], [isOnboarding]);
-  const initialMilestones = useMemo(() => isOnboarding ? getMockMilestones() : [], [isOnboarding]);
-  const initialBoosters = useMemo(() => isOnboarding ? getMockBoosters() : [], [isOnboarding]);
-  const initialBadges = useMemo(() => isOnboarding ? getMockBadges() : [], [isOnboarding]);
-  const initialAlerts = useMemo(() => isOnboarding ? getMockAlerts() : [], [isOnboarding]);
-  
-  const [days] = useState(initialDays);
+  // State initialization
+  const [days, setDays] = useState<{ date: string; dayName: string; points: number | null }[]>([]);
   const [weeklyGoal, setWeeklyGoal] = useState<number>(350);
-  const [recentWeeks, setRecentWeeks] = useState<WeekData[]>(initialWeeks);
-  const [dayStreak] = useState(isOnboarding ? 5 : 0);
-  const [weekStreak] = useState(isOnboarding ? 3 : 0);
-  const [longestDayStreak] = useState(isOnboarding ? 14 : 0);
-  const [longestWeekStreak] = useState(isOnboarding ? 8 : 0);
-  const [alerts] = useState<TaskAlert[]>(initialAlerts);
-  const [userName, setUserName] = useState(isOnboarding ? "Jordan" : "You");
-  const [encouragementMessage, setEncouragementMessage] = useState(
-    isOnboarding 
-      ? "Let's start this week off right, you can do it I believe in you!"
-      : "Welcome! Set up your tasks and start logging your progress."
-  );
-  const [boosters] = useState<UnifiedBooster[]>(initialBoosters);
-  const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
-  const [badges] = useState<BadgeWithLevels[]>(initialBadges);
+  const [recentWeeks, setRecentWeeks] = useState<WeekData[]>([]);
+  const [dayStreak, setDayStreak] = useState(0);
+  const [weekStreak, setWeekStreak] = useState(0);
+  const [longestDayStreak, setLongestDayStreak] = useState(0);
+  const [longestWeekStreak, setLongestWeekStreak] = useState(0);
+  const [alerts, setAlerts] = useState<TaskAlert[]>([]);
+  const [userName, setUserName] = useState("You");
+  const [encouragementMessage, setEncouragementMessage] = useState("Welcome! Set up your tasks and start logging your progress.");
+  const [boosters, setBoosters] = useState<UnifiedBooster[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [badges, setBadges] = useState<BadgeWithLevels[]>([]);
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    // Use mock data during onboarding, otherwise load from storage
+    if (isOnboarding) {
+      setDays(getMockWeekData());
+      setRecentWeeks(getMockRecentWeeks(350));
+      setMilestones(getMockMilestones());
+      setBoosters(getMockBoosters());
+      setBadges(getMockBadges());
+      setAlerts(getMockAlerts());
+      setUserName("Jordan");
+      setEncouragementMessage("Let's start this week off right, you can do it I believe in you!");
+      setDayStreak(5);
+      setWeekStreak(3);
+      setLongestDayStreak(14);
+      setLongestWeekStreak(8);
+      return;
+    }
+
+    // Load user profile
+    const profile = loadUserProfileFromStorage();
+    setUserName(profile.userName);
+    setEncouragementMessage(profile.encouragementMessage);
+
+    // Load goals
+    setWeeklyGoal(loadWeeklyGoalFromStorage());
+
+    // Load milestones
+    const storedMilestones = loadMilestonesFromStorage();
+    setMilestones(storedMilestones.map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description || "",
+      points: m.points,
+      deadline: m.deadline,
+      achieved: m.achieved,
+      achievedAt: m.achievedAt,
+    })));
+
+    // Load badges
+    const storedBadges = loadBadgesFromStorage();
+    setBadges(storedBadges.map(b => ({
+      id: b.id,
+      name: b.name,
+      description: b.description,
+      icon: b.icon,
+      conditionType: b.conditionType as "taskCompletions" | "perfectDaysStreak" | "negativeFreeStreak" | "weeklyGoalStreak",
+      taskName: b.taskName,
+      levels: b.levels,
+      currentProgress: b.currentProgress || 0,
+    })));
+
+    // Load tasks and penalties for point calculations
+    const tasks = loadTasksFromStorage();
+    const penalties = loadPenaltiesFromStorage();
+    const dailyLogs = loadDailyLogsFromStorage();
+
+    // Calculate current week data from daily logs
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const currentWeekDays = Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(weekStart, i);
+      const dateKey = format(date, "yyyy-MM-dd");
+      const log = dailyLogs[dateKey];
+      
+      let points: number | null = null;
+      if (log) {
+        points = log.completedTaskIds.reduce((sum, taskId) => {
+          const task = tasks.find(t => t.id === taskId);
+          const penalty = penalties.find(p => p.id === taskId);
+          if (task) return sum + task.value;
+          if (penalty) return sum - penalty.value;
+          return sum;
+        }, 0);
+      }
+      
+      return {
+        date: format(date, "MMM d"),
+        dayName: format(date, "EEE"),
+        points,
+      };
+    });
+    setDays(currentWeekDays);
+
+    // Build recent weeks from daily logs (last 5 weeks)
+    const recentWeeksData: WeekData[] = [];
+    for (let weekOffset = 1; weekOffset <= 5; weekOffset++) {
+      const pastWeekStart = startOfWeek(subWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
+      const pastWeekEnd = addDays(pastWeekStart, 6);
+      
+      const weekDays: DayData[] = [];
+      let weekHasLogs = false;
+      
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const date = addDays(pastWeekStart, dayIndex);
+        const dateKey = format(date, "yyyy-MM-dd");
+        const log = dailyLogs[dateKey];
+        
+        let dayPoints: number | null = null;
+        if (log) {
+          weekHasLogs = true;
+          dayPoints = log.completedTaskIds.reduce((sum, taskId) => {
+            const task = tasks.find(t => t.id === taskId);
+            const penalty = penalties.find(p => p.id === taskId);
+            if (task) return sum + task.value;
+            if (penalty) return sum - penalty.value;
+            return sum;
+          }, 0);
+        }
+        
+        weekDays.push({
+          date: format(date, "MMM d"),
+          dayName: format(date, "EEE"),
+          points: dayPoints,
+        });
+      }
+      
+      // Only add weeks that have at least one log
+      if (weekHasLogs) {
+        const weekTotal = weekDays.reduce((sum, d) => sum + (d.points || 0), 0);
+        recentWeeksData.push({
+          id: `week-${weekOffset}`,
+          weekStart: format(pastWeekStart, "MMM d"),
+          weekEnd: format(pastWeekEnd, "MMM d"),
+          points: weekTotal,
+          defaultGoal: loadWeeklyGoalFromStorage(),
+          note: undefined,
+          customGoal: undefined,
+          days: weekDays,
+          boosters: [],
+          badges: [],
+          milestones: [],
+        });
+      }
+    }
+    setRecentWeeks(recentWeeksData);
+
+    // Calculate streaks from daily logs
+    const sortedDates = Object.keys(dailyLogs).sort();
+    
+    // Calculate current day streak (consecutive days ending at today or yesterday)
+    let currentDayStreakCount = 0;
+    let checkDate = new Date();
+    // Check if today has a log, if not start from yesterday
+    if (!dailyLogs[format(checkDate, "yyyy-MM-dd")]) {
+      checkDate = addDays(checkDate, -1);
+    }
+    while (true) {
+      const dateKey = format(checkDate, "yyyy-MM-dd");
+      if (dailyLogs[dateKey]) {
+        currentDayStreakCount++;
+        checkDate = addDays(checkDate, -1);
+      } else {
+        break;
+      }
+    }
+    
+    // Calculate longest consecutive day streak
+    let maxDayStreakCount = 0;
+    let tempStreak = 0;
+    let prevDate: Date | null = null;
+    
+    for (const dateStr of sortedDates) {
+      const currentDate = new Date(dateStr);
+      if (prevDate === null) {
+        tempStreak = 1;
+      } else {
+        const expectedPrev = addDays(currentDate, -1);
+        if (format(prevDate, "yyyy-MM-dd") === format(expectedPrev, "yyyy-MM-dd")) {
+          tempStreak++;
+        } else {
+          tempStreak = 1;
+        }
+      }
+      if (tempStreak > maxDayStreakCount) maxDayStreakCount = tempStreak;
+      prevDate = currentDate;
+    }
+    
+    setDayStreak(currentDayStreakCount);
+    setLongestDayStreak(maxDayStreakCount);
+
+    // Calculate week streaks (weeks where goal was met)
+    const weeklyGoalValue = loadWeeklyGoalFromStorage();
+    let currentWeekStreakCount = 0;
+    let maxWeekStreakCount = 0;
+    let tempWeekStreak = 0;
+    
+    // Check recent weeks (up to 52 weeks back)
+    for (let weekOffset = 0; weekOffset < 52; weekOffset++) {
+      const weekStartDate = startOfWeek(subWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
+      let weekTotal = 0;
+      
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const date = addDays(weekStartDate, dayIndex);
+        const dateKey = format(date, "yyyy-MM-dd");
+        const log = dailyLogs[dateKey];
+        
+        if (log) {
+          weekTotal += log.completedTaskIds.reduce((sum, taskId) => {
+            const task = tasks.find(t => t.id === taskId);
+            const penalty = penalties.find(p => p.id === taskId);
+            if (task) return sum + task.value;
+            if (penalty) return sum - penalty.value;
+            return sum;
+          }, 0);
+        }
+      }
+      
+      const goalMet = weekTotal >= weeklyGoalValue;
+      
+      if (weekOffset === 0 || (weekOffset > 0 && currentWeekStreakCount > 0)) {
+        if (goalMet) {
+          if (weekOffset === 0) currentWeekStreakCount = 1;
+          else currentWeekStreakCount++;
+        } else if (weekOffset > 0) {
+          // Stop counting current streak
+        }
+      }
+      
+      if (goalMet) {
+        tempWeekStreak++;
+        if (tempWeekStreak > maxWeekStreakCount) maxWeekStreakCount = tempWeekStreak;
+      } else {
+        tempWeekStreak = 0;
+      }
+    }
+    
+    setWeekStreak(currentWeekStreakCount);
+    setLongestWeekStreak(maxWeekStreakCount);
+
+    // Calculate boosters from tasks with boost enabled
+    const taskBoosters: UnifiedBooster[] = tasks
+      .filter(t => t.boostEnabled && t.boostThreshold && t.boostPoints)
+      .map(t => {
+        // Count completions in the current period
+        let completions = 0;
+        const periodStart = t.boostPeriod === "month" 
+          ? subWeeks(new Date(), 4) 
+          : startOfWeek(new Date(), { weekStartsOn: 1 });
+        
+        Object.entries(dailyLogs).forEach(([dateStr, log]) => {
+          const logDate = new Date(dateStr);
+          if (logDate >= periodStart && log.completedTaskIds.includes(t.id)) {
+            completions++;
+          }
+        });
+        
+        return {
+          id: `boost-${t.id}`,
+          name: t.name,
+          description: `Complete ${t.boostThreshold} times per ${t.boostPeriod}`,
+          points: t.boostPoints!,
+          achieved: completions >= (t.boostThreshold || 0),
+          progress: completions,
+          required: t.boostThreshold,
+          period: t.boostPeriod,
+          isNegative: false,
+        };
+      });
+    setBoosters(taskBoosters);
+  }, [isOnboarding]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -325,6 +591,7 @@ export default function Dashboard() {
 
   const handleGoalChange = (newGoal: number) => {
     setWeeklyGoal(newGoal);
+    saveWeeklyGoalToStorage(newGoal);
   };
 
   const handleWeekUpdate = (weekId: string, note: string, customGoal?: number) => {
@@ -338,6 +605,7 @@ export default function Dashboard() {
   const handleWelcomeUpdate = (newName: string, newMessage: string) => {
     setUserName(newName);
     setEncouragementMessage(newMessage);
+    saveUserProfileToStorage({ userName: newName, encouragementMessage: newMessage });
   };
 
   const handleMilestoneAdd = (milestone: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
@@ -346,21 +614,51 @@ export default function Dashboard() {
       id: String(Date.now()),
       achieved: false,
     };
-    setMilestones([...milestones, newMilestone]);
+    const updated = [...milestones, newMilestone];
+    setMilestones(updated);
+    saveMilestonesToStorage(updated.map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      points: m.points,
+      deadline: m.deadline,
+      achieved: m.achieved,
+      achievedAt: m.achievedAt,
+    })));
   };
 
   const handleMilestoneEdit = (id: string, updates: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
-    setMilestones(milestones.map(m => 
+    const updated = milestones.map(m => 
       m.id === id ? { ...m, ...updates } : m
-    ));
+    );
+    setMilestones(updated);
+    saveMilestonesToStorage(updated.map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      points: m.points,
+      deadline: m.deadline,
+      achieved: m.achieved,
+      achievedAt: m.achievedAt,
+    })));
   };
 
   const handleMilestoneDelete = (id: string) => {
-    setMilestones(milestones.filter(m => m.id !== id));
+    const updated = milestones.filter(m => m.id !== id);
+    setMilestones(updated);
+    saveMilestonesToStorage(updated.map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      points: m.points,
+      deadline: m.deadline,
+      achieved: m.achieved,
+      achievedAt: m.achievedAt,
+    })));
   };
 
   const handleMilestoneToggle = (id: string) => {
-    setMilestones(milestones.map(m => 
+    const updated = milestones.map(m => 
       m.id === id 
         ? { 
             ...m, 
@@ -368,7 +666,17 @@ export default function Dashboard() {
             achievedAt: !m.achieved ? new Date().toISOString() : undefined 
           } 
         : m
-    ));
+    );
+    setMilestones(updated);
+    saveMilestonesToStorage(updated.map(m => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      points: m.points,
+      deadline: m.deadline,
+      achieved: m.achieved,
+      achievedAt: m.achievedAt,
+    })));
   };
 
   return (

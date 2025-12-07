@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
+import { clearAllFrisFocusData, STORAGE_KEYS } from "@/lib/storage";
 
 interface OnboardingContextType {
   isOnboarding: boolean;
@@ -8,12 +9,10 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-const STORAGE_KEY = "frisfocus_started";
-
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [hasStartedJourney, setHasStartedJourney] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem(STORAGE_KEY) === "true";
+      return localStorage.getItem(STORAGE_KEYS.ONBOARDING) === "true";
     }
     return false;
   });
@@ -21,7 +20,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const isOnboarding = !hasStartedJourney;
 
   const startJourney = () => {
-    localStorage.setItem(STORAGE_KEY, "true");
+    // Clear all existing data when starting fresh journey
+    clearAllFrisFocusData();
+    // Then mark as started
+    localStorage.setItem(STORAGE_KEYS.ONBOARDING, "true");
     setHasStartedJourney(true);
   };
 
