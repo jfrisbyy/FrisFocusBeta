@@ -46,6 +46,7 @@ import {
   ArrowLeft,
   Pencil,
   Trash2,
+  Gift,
 } from "lucide-react";
 import type { 
   StoredFriend, 
@@ -55,6 +56,7 @@ import type {
   VisibilityLevel,
   StoredCircleMessage,
   StoredCirclePost,
+  StoredCirclePostComment,
   StoredDirectMessage,
   StoredCommunityPost,
   StoredCircleTaskAdjustmentRequest,
@@ -71,6 +73,12 @@ interface FriendRequest {
   direction: "incoming" | "outgoing";
 }
 
+interface CircleBadgeReward {
+  type: "points" | "gift" | "both";
+  points?: number;
+  gift?: string;
+}
+
 interface CircleBadge {
   id: string;
   name: string;
@@ -79,6 +87,7 @@ interface CircleBadge {
   progress: number;
   required: number;
   earned: boolean;
+  reward?: CircleBadgeReward;
 }
 
 const demoFriends: StoredFriend[] = [
@@ -88,7 +97,9 @@ const demoFriends: StoredFriend[] = [
     firstName: "Alex",
     lastName: "Chen",
     profileImageUrl: undefined,
+    todayPoints: 45,
     weeklyPoints: 485,
+    totalPoints: 2340,
     dayStreak: 12,
     weekStreak: 4,
     totalBadgesEarned: 8,
@@ -101,7 +112,9 @@ const demoFriends: StoredFriend[] = [
     firstName: "Jordan",
     lastName: "Taylor",
     profileImageUrl: undefined,
+    todayPoints: 30,
     weeklyPoints: 320,
+    totalPoints: 1580,
     dayStreak: 7,
     weekStreak: 2,
     totalBadgesEarned: 5,
@@ -114,7 +127,9 @@ const demoFriends: StoredFriend[] = [
     firstName: "Sam",
     lastName: "Rivera",
     profileImageUrl: undefined,
+    todayPoints: 55,
     weeklyPoints: 560,
+    totalPoints: 4250,
     dayStreak: 21,
     weekStreak: 6,
     totalBadgesEarned: 12,
@@ -127,7 +142,9 @@ const demoFriends: StoredFriend[] = [
     firstName: "Morgan",
     lastName: "Kim",
     profileImageUrl: undefined,
+    todayPoints: 20,
     weeklyPoints: 280,
+    totalPoints: 890,
     dayStreak: 5,
     weekStreak: 1,
     totalBadgesEarned: 3,
@@ -348,17 +365,17 @@ const demoTaskRequests: StoredCircleTaskAdjustmentRequest[] = [
 
 const demoCircleBadges: Record<string, CircleBadge[]> = {
   "circle-1": [
-    { id: "cb1", name: "First 5K", description: "Complete your first 5K run", icon: "target", progress: 1, required: 1, earned: true },
-    { id: "cb2", name: "Marathon Ready", description: "Complete 20 long runs", icon: "flame", progress: 12, required: 20, earned: false },
-    { id: "cb3", name: "Consistency Queen", description: "Log 7 days in a row", icon: "calendar", progress: 5, required: 7, earned: false },
+    { id: "cb1", name: "First 5K", description: "Complete your first 5K run", icon: "target", progress: 1, required: 1, earned: true, reward: { type: "points", points: 50 } },
+    { id: "cb2", name: "Marathon Ready", description: "Complete 20 long runs", icon: "flame", progress: 12, required: 20, earned: false, reward: { type: "both", points: 200, gift: "Free running shoes" } },
+    { id: "cb3", name: "Consistency Queen", description: "Log 7 days in a row", icon: "calendar", progress: 5, required: 7, earned: false, reward: { type: "points", points: 75 } },
   ],
   "circle-2": [
-    { id: "cb4", name: "Chore Champion", description: "Complete 50 tasks", icon: "trophy", progress: 38, required: 50, earned: false },
-    { id: "cb5", name: "Team Player", description: "Everyone hit goal 4 weeks", icon: "users", progress: 2, required: 4, earned: false },
+    { id: "cb4", name: "Chore Champion", description: "Complete 50 tasks", icon: "trophy", progress: 38, required: 50, earned: false, reward: { type: "both", points: 100, gift: "Pizza night" } },
+    { id: "cb5", name: "Team Player", description: "Everyone hit goal 4 weeks", icon: "users", progress: 2, required: 4, earned: false, reward: { type: "gift", gift: "Family movie night" } },
   ],
   "circle-3": [
-    { id: "cb6", name: "Bookworm", description: "Read 5 books", icon: "book", progress: 3, required: 5, earned: false },
-    { id: "cb7", name: "Literary Critic", description: "Write 10 reviews", icon: "star", progress: 7, required: 10, earned: false },
+    { id: "cb6", name: "Bookworm", description: "Read 5 books", icon: "book", progress: 3, required: 5, earned: false, reward: { type: "gift", gift: "New book of choice" } },
+    { id: "cb7", name: "Literary Critic", description: "Write 10 reviews", icon: "star", progress: 7, required: 10, earned: false, reward: { type: "points", points: 150 } },
   ],
 };
 
@@ -371,20 +388,21 @@ interface CircleAward {
   category?: string;
   winner?: { userId: string; userName: string; achievedAt: string };
   endDate?: string;
+  reward?: CircleBadgeReward;
 }
 
 const demoCircleAwards: Record<string, CircleAward[]> = {
   "circle-1": [
-    { id: "ca1", name: "Speed Demon", description: "First to 500 points this month", type: "first_to", target: 500, winner: { userId: "u1", userName: "Sarah M", achievedAt: new Date(Date.now() - 172800000).toISOString() } },
-    { id: "ca2", name: "Cardio King/Queen", description: "Most points in Cardio category", type: "most_in_category", category: "Cardio" },
-    { id: "ca3", name: "Weekly Champion", description: "Highest points this week", type: "weekly_champion" },
+    { id: "ca1", name: "Speed Demon", description: "First to 500 points this month", type: "first_to", target: 500, winner: { userId: "u1", userName: "Sarah M", achievedAt: new Date(Date.now() - 172800000).toISOString() }, reward: { type: "both", points: 100, gift: "Champion trophy" } },
+    { id: "ca2", name: "Cardio King/Queen", description: "Most points in Cardio category", type: "most_in_category", category: "Cardio", reward: { type: "points", points: 75 } },
+    { id: "ca3", name: "Weekly Champion", description: "Highest points this week", type: "weekly_champion", reward: { type: "gift", gift: "Choose next workout" } },
   ],
   "circle-2": [
-    { id: "ca4", name: "First to 100", description: "First to reach 100 points", type: "first_to", target: 100 },
-    { id: "ca5", name: "Cleaning Star", description: "Most points in Cleaning tasks", type: "most_in_category", category: "Cleaning", winner: { userId: "u5", userName: "Tommy", achievedAt: new Date(Date.now() - 86400000).toISOString() } },
+    { id: "ca4", name: "First to 100", description: "First to reach 100 points", type: "first_to", target: 100, reward: { type: "gift", gift: "Extra screen time" } },
+    { id: "ca5", name: "Cleaning Star", description: "Most points in Cleaning tasks", type: "most_in_category", category: "Cleaning", winner: { userId: "u5", userName: "Tommy", achievedAt: new Date(Date.now() - 86400000).toISOString() }, reward: { type: "both", points: 50, gift: "Dessert of choice" } },
   ],
   "circle-3": [
-    { id: "ca6", name: "Reading Race", description: "First to finish 3 books", type: "first_to", target: 3 },
+    { id: "ca6", name: "Reading Race", description: "First to finish 3 books", type: "first_to", target: 3, reward: { type: "gift", gift: "Free book purchase" } },
   ],
 };
 
@@ -441,18 +459,25 @@ const demoCircleMessages: Record<string, StoredCircleMessage[]> = {
 
 const demoCirclePosts: Record<string, StoredCirclePost[]> = {
   "circle-1": [
-    { id: "cp1", circleId: "circle-1", authorId: "u1", authorName: "Sarah M", content: "Just finished my first half marathon! 13.1 miles in 2:15. Couldn't have done it without this group!", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), likes: ["u2", "u3", "you"] },
-    { id: "cp2", circleId: "circle-1", authorId: "u3", authorName: "Emma T", content: "New week, new goals! Let's crush it everyone.", createdAt: new Date(Date.now() - 86400000).toISOString(), likes: ["u1"] },
+    { id: "cp1", circleId: "circle-1", authorId: "u1", authorName: "Sarah M", content: "Just finished my first half marathon! 13.1 miles in 2:15. Couldn't have done it without this group!", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), likes: ["u2", "u3", "you"], comments: [
+      { id: "cpc1", authorId: "u2", authorName: "Lisa K", content: "Amazing achievement! So proud of you!", createdAt: new Date(Date.now() - 86400000 * 2 + 3600000).toISOString(), likes: ["u1", "you"] },
+      { id: "cpc2", authorId: "u3", authorName: "Emma T", content: "You're an inspiration!", createdAt: new Date(Date.now() - 86400000 * 2 + 7200000).toISOString(), likes: ["u1"] },
+    ] },
+    { id: "cp2", circleId: "circle-1", authorId: "u3", authorName: "Emma T", content: "New week, new goals! Let's crush it everyone.", createdAt: new Date(Date.now() - 86400000).toISOString(), likes: ["u1"], comments: [] },
   ],
   "circle-2": [
-    { id: "cp3", circleId: "circle-2", authorId: "you", authorName: "You", content: "Family meeting this Sunday! Let's review our weekly points and plan the next week's chores.", createdAt: new Date(Date.now() - 172800000).toISOString(), likes: ["u4", "u5"] },
+    { id: "cp3", circleId: "circle-2", authorId: "you", authorName: "You", content: "Family meeting this Sunday! Let's review our weekly points and plan the next week's chores.", createdAt: new Date(Date.now() - 172800000).toISOString(), likes: ["u4", "u5"], comments: [
+      { id: "cpc3", authorId: "u4", authorName: "Dad", content: "Great idea! I'll prepare the snacks.", createdAt: new Date(Date.now() - 172800000 + 3600000).toISOString(), likes: [] },
+    ] },
   ],
   "circle-3": [],
 };
 
 const demoCommunityPosts: StoredCommunityPost[] = [
-  { id: "feed-1", authorId: "friend-3", authorName: "Sam Rivera", content: "Just hit a 21-day streak! Consistency is key. Keep pushing everyone!", visibility: "public", createdAt: new Date(Date.now() - 3600000).toISOString(), likes: ["friend-1", "you"], comments: [] },
-  { id: "feed-2", authorId: "friend-1", authorName: "Alex Chen", content: "New personal best today - 50 points in one day! Time to celebrate.", visibility: "friends", createdAt: new Date(Date.now() - 7200000).toISOString(), likes: ["friend-2"], comments: [{ id: "c1", authorId: "friend-2", authorName: "Jordan Taylor", content: "Amazing work!", createdAt: new Date(Date.now() - 5400000).toISOString() }] },
+  { id: "feed-1", authorId: "friend-3", authorName: "Sam Rivera", content: "Just hit a 21-day streak! Consistency is key. Keep pushing everyone!", visibility: "public", createdAt: new Date(Date.now() - 3600000).toISOString(), likes: ["friend-1", "you"], comments: [
+    { id: "c0", authorId: "friend-1", authorName: "Alex Chen", content: "Incredible consistency! Keep it up!", createdAt: new Date(Date.now() - 1800000).toISOString(), likes: ["friend-3"] },
+  ] },
+  { id: "feed-2", authorId: "friend-1", authorName: "Alex Chen", content: "New personal best today - 50 points in one day! Time to celebrate.", visibility: "friends", createdAt: new Date(Date.now() - 7200000).toISOString(), likes: ["friend-2"], comments: [{ id: "c1", authorId: "friend-2", authorName: "Jordan Taylor", content: "Amazing work!", createdAt: new Date(Date.now() - 5400000).toISOString(), likes: ["friend-1", "you"] }] },
   { id: "feed-3", authorId: "you", authorName: "You", content: "Starting my marathon training journey with the Marathon Mommy's circle. Here we go!", visibility: "public", createdAt: new Date(Date.now() - 86400000).toISOString(), likes: ["friend-1", "friend-3"], comments: [] },
 ];
 
@@ -489,6 +514,7 @@ export default function CommunityPage() {
   const [newPostVisibility, setNewPostVisibility] = useState<"public" | "friends">("friends");
   const [circleMessages, setCircleMessages] = useState<Record<string, StoredCircleMessage[]>>(demoCircleMessages);
   const [circlePosts, setCirclePosts] = useState<Record<string, StoredCirclePost[]>>(demoCirclePosts);
+  const [circleMembers, setCircleMembers] = useState<Record<string, StoredCircleMember[]>>(demoCircleMembers);
   const [newCircleMessage, setNewCircleMessage] = useState("");
   const [newCirclePost, setNewCirclePost] = useState("");
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>(demoTaskRequests);
@@ -543,6 +569,9 @@ export default function CommunityPage() {
   
   // Leaderboard view mode (day/week/all time)
   const [leaderboardViewMode, setLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
+  const [friendsLeaderboardViewMode, setFriendsLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
+  const [expandedDMFriend, setExpandedDMFriend] = useState<string | null>(null);
+  const [dmMessages, setDmMessages] = useState<Record<string, string>>({});
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
   
   // Demo data for member daily completions (today)
@@ -757,20 +786,30 @@ export default function CommunityPage() {
   };
 
   const isOwnerOrAdmin = (circleId: string) => {
-    const members = demoCircleMembers[circleId] || [];
+    const members = circleMembers[circleId] || [];
     const me = members.find(m => m.userId === "you");
     return me?.role === "owner" || me?.role === "admin";
   };
 
   const getUserRole = (circleId: string) => {
-    const members = demoCircleMembers[circleId] || [];
+    const members = circleMembers[circleId] || [];
     const me = members.find(m => m.userId === "you");
     return me?.role || "member";
   };
 
   const sortedLeaderboard = useMemo(() => {
-    return [...friends].sort((a, b) => b.weeklyPoints - a.weeklyPoints);
-  }, [friends]);
+    return [...friends].sort((a, b) => {
+      switch (friendsLeaderboardViewMode) {
+        case "day":
+          return b.todayPoints - a.todayPoints;
+        case "alltime":
+          return b.totalPoints - a.totalPoints;
+        case "week":
+        default:
+          return b.weeklyPoints - a.weeklyPoints;
+      }
+    });
+  }, [friends, friendsLeaderboardViewMode]);
 
   const filteredFriends = useMemo(() => {
     if (!searchQuery) return friends;
@@ -848,9 +887,12 @@ export default function CommunityPage() {
         memberCount: 1,
       };
       setCircles([...circles, newCircle]);
-      demoCircleMembers[newCircle.id] = [
-        { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
-      ];
+      setCircleMembers({ 
+        ...circleMembers, 
+        [newCircle.id]: [
+          { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
+        ]
+      });
       setCircleTasks({ ...circleTasks, [newCircle.id]: [] });
       setCircleMessages({ ...circleMessages, [newCircle.id]: [] });
       setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
@@ -923,12 +965,30 @@ export default function CommunityPage() {
         authorName: "You",
         content: newComment.trim(),
         createdAt: new Date().toISOString(),
+        likes: [],
       };
       return { ...post, comments: [...post.comments, comment] };
     }));
     setNewComment("");
     setCommentingPostId(null);
     toast({ title: "Comment added" });
+  };
+
+  const handleLikeComment = (postId: string, commentId: string) => {
+    setCommunityPosts(communityPosts.map(post => {
+      if (post.id !== postId) return post;
+      return {
+        ...post,
+        comments: post.comments.map(comment => {
+          if (comment.id !== commentId) return comment;
+          const liked = comment.likes.includes("you");
+          return {
+            ...comment,
+            likes: liked ? comment.likes.filter(id => id !== "you") : [...comment.likes, "you"]
+          };
+        })
+      };
+    }));
   };
 
   const handleDeletePost = (postId: string) => {
@@ -942,6 +1002,25 @@ export default function CommunityPage() {
       return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
     }));
     toast({ title: "Comment deleted" });
+  };
+
+  const handleSendDirectMessage = (friendId: string, friendName: string) => {
+    const message = dmMessages[friendId] || "";
+    if (!message.trim()) return;
+    const msg: StoredDirectMessage = {
+      id: `dm-${Date.now()}`,
+      senderId: "you",
+      senderName: "You",
+      recipientId: friendId,
+      recipientName: friendName,
+      content: message.trim(),
+      createdAt: new Date().toISOString(),
+      read: true,
+    };
+    const currentMsgs = directMessages[friendId] || [];
+    setDirectMessages({ ...directMessages, [friendId]: [...currentMsgs, msg] });
+    setDmMessages({ ...dmMessages, [friendId]: "" });
+    toast({ title: "Message sent" });
   };
 
   const handleSendCircleMessage = () => {
@@ -969,11 +1048,85 @@ export default function CommunityPage() {
       content: newCirclePost.trim(),
       createdAt: new Date().toISOString(),
       likes: [],
+      comments: [],
     };
     const current = circlePosts[selectedCircle.id] || [];
     setCirclePosts({ ...circlePosts, [selectedCircle.id]: [newPost, ...current] });
     setNewCirclePost("");
     toast({ title: "Post added to board" });
+  };
+
+  const [circlePostCommentingId, setCirclePostCommentingId] = useState<string | null>(null);
+  const [newCirclePostComment, setNewCirclePostComment] = useState("");
+
+  const handleLikeCirclePost = (postId: string) => {
+    if (!selectedCircle) return;
+    setCirclePosts({
+      ...circlePosts,
+      [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).map(post => {
+        if (post.id !== postId) return post;
+        const liked = post.likes.includes("you");
+        return {
+          ...post,
+          likes: liked ? post.likes.filter(id => id !== "you") : [...post.likes, "you"]
+        };
+      })
+    });
+  };
+
+  const handleAddCirclePostComment = (postId: string) => {
+    if (!selectedCircle || !newCirclePostComment.trim()) return;
+    const comment: StoredCirclePostComment = {
+      id: `cpc-${Date.now()}`,
+      authorId: "you",
+      authorName: "You",
+      content: newCirclePostComment.trim(),
+      createdAt: new Date().toISOString(),
+      likes: [],
+    };
+    setCirclePosts({
+      ...circlePosts,
+      [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).map(post => {
+        if (post.id !== postId) return post;
+        return { ...post, comments: [...post.comments, comment] };
+      })
+    });
+    setNewCirclePostComment("");
+    setCirclePostCommentingId(null);
+    toast({ title: "Comment added" });
+  };
+
+  const handleLikeCirclePostComment = (postId: string, commentId: string) => {
+    if (!selectedCircle) return;
+    setCirclePosts({
+      ...circlePosts,
+      [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).map(post => {
+        if (post.id !== postId) return post;
+        return {
+          ...post,
+          comments: post.comments.map(comment => {
+            if (comment.id !== commentId) return comment;
+            const liked = comment.likes.includes("you");
+            return {
+              ...comment,
+              likes: liked ? comment.likes.filter(id => id !== "you") : [...comment.likes, "you"]
+            };
+          })
+        };
+      })
+    });
+  };
+
+  const handleDeleteCirclePostComment = (postId: string, commentId: string) => {
+    if (!selectedCircle) return;
+    setCirclePosts({
+      ...circlePosts,
+      [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).map(post => {
+        if (post.id !== postId) return post;
+        return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
+      })
+    });
+    toast({ title: "Comment deleted" });
   };
 
   const handleAddTask = () => {
@@ -1180,12 +1333,24 @@ export default function CommunityPage() {
       }
     }
     
+    // Update the member's weeklyPoints in the leaderboard
+    const updateMemberPoints = (delta: number) => {
+      const members = circleMembers[circleId] || [];
+      const updatedMembers = members.map(member => 
+        member.userId === "you" 
+          ? { ...member, weeklyPoints: member.weeklyPoints + delta }
+          : member
+      );
+      setCircleMembers({ ...circleMembers, [circleId]: updatedMembers });
+    };
+    
     if (isCompleted) {
       // Remove completion
       setMyCompletedTasks({ ...myCompletedTasks, [circleId]: myCompleted.filter(id => id !== taskId) });
       const circleCompletions = circleTaskCompletions[circleId] || {};
       const taskCompletions = (circleCompletions[taskId] || []).filter(c => c.userId !== "you");
       setCircleTaskCompletions({ ...circleTaskCompletions, [circleId]: { ...circleCompletions, [taskId]: taskCompletions } });
+      updateMemberPoints(-task.value);
     } else {
       // Add completion
       setMyCompletedTasks({ ...myCompletedTasks, [circleId]: [...myCompleted, taskId] });
@@ -1198,6 +1363,7 @@ export default function CommunityPage() {
           [taskId]: [...taskCompletions, { userId: "you", userName: "You", completedAt: new Date().toISOString() }]
         }
       });
+      updateMemberPoints(task.value);
       toast({ title: "Task completed!", description: `+${task.value} points` });
     }
   };
@@ -1542,11 +1708,41 @@ export default function CommunityPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5" />
-                  Leaderboard
-                </CardTitle>
-                <CardDescription>This week's top performers</CardDescription>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5" />
+                    Leaderboard
+                  </CardTitle>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant={friendsLeaderboardViewMode === "day" ? "default" : "ghost"}
+                      onClick={() => setFriendsLeaderboardViewMode("day")}
+                      data-testid="button-leaderboard-day"
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={friendsLeaderboardViewMode === "week" ? "default" : "ghost"}
+                      onClick={() => setFriendsLeaderboardViewMode("week")}
+                      data-testid="button-leaderboard-week"
+                    >
+                      Week
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={friendsLeaderboardViewMode === "alltime" ? "default" : "ghost"}
+                      onClick={() => setFriendsLeaderboardViewMode("alltime")}
+                      data-testid="button-leaderboard-alltime"
+                    >
+                      All Time
+                    </Button>
+                  </div>
+                </div>
+                <CardDescription>
+                  {friendsLeaderboardViewMode === "day" ? "Today's" : friendsLeaderboardViewMode === "week" ? "This week's" : "All-time"} top performers
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -1569,13 +1765,87 @@ export default function CommunityPage() {
                           {getName(friend.firstName, friend.lastName)}
                         </span>
                       </div>
-                      <Badge variant="outline">{friend.weeklyPoints} pts</Badge>
+                      <Badge variant="outline">
+                        {friendsLeaderboardViewMode === "day" 
+                          ? friend.todayPoints 
+                          : friendsLeaderboardViewMode === "week" 
+                            ? friend.weeklyPoints 
+                            : friend.totalPoints} pts
+                      </Badge>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="w-5 h-5" />
+                Messages
+              </CardTitle>
+              <CardDescription>Recent conversations with friends</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Object.entries(directMessages).filter(([_, msgs]) => msgs.length > 0).map(([friendId, msgs]) => {
+                  const friend = friends.find(f => f.friendId === friendId);
+                  const lastMsg = msgs[msgs.length - 1];
+                  const isExpanded = expandedDMFriend === friendId;
+                  return (
+                    <div key={friendId} className="border rounded-md p-3" data-testid={`dm-card-${friendId}`}>
+                      <div 
+                        className="flex items-center justify-between gap-2 cursor-pointer"
+                        onClick={() => setExpandedDMFriend(isExpanded ? null : friendId)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-sm">
+                              {friend ? getInitials(friend.firstName, friend.lastName) : "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm">{friend ? getName(friend.firstName, friend.lastName) : "Unknown"}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[180px]">{lastMsg.content}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                      </div>
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t space-y-2">
+                          <ScrollArea className="h-[150px]">
+                            {msgs.map((msg) => (
+                              <div key={msg.id} className={`flex mb-2 ${msg.senderId === "you" ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[80%] p-2 rounded-md text-sm ${msg.senderId === "you" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                  {msg.content}
+                                </div>
+                              </div>
+                            ))}
+                          </ScrollArea>
+                          <div className="flex gap-2 mt-2">
+                            <Input
+                              placeholder="Type a message..."
+                              value={dmMessages[friendId] || ""}
+                              onChange={(e) => setDmMessages({ ...dmMessages, [friendId]: e.target.value })}
+                              onKeyDown={(e) => e.key === "Enter" && handleSendDirectMessage(friendId, friend?.firstName || "Friend")}
+                              data-testid={`input-dm-${friendId}`}
+                            />
+                            <Button size="icon" onClick={() => handleSendDirectMessage(friendId, friend?.firstName || "Friend")} data-testid={`button-send-dm-${friendId}`}>
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {Object.entries(directMessages).filter(([_, msgs]) => msgs.length > 0).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">No conversations yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {incomingRequests.length > 0 && (
             <Card>
@@ -2153,7 +2423,7 @@ export default function CommunityPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {(demoCircleMembers[selectedCircle.id] || [])
+                        {(circleMembers[selectedCircle.id] || [])
                           .sort((a, b) => b.weeklyPoints - a.weeklyPoints)
                           .map((member, index) => {
                             const isExpanded = expandedMemberId === member.userId;
@@ -2395,6 +2665,18 @@ export default function CommunityPage() {
                               <span className="text-sm text-muted-foreground">{badge.progress}/{badge.required}</span>
                             </div>
                             <p className="text-sm text-muted-foreground mb-2">{badge.description}</p>
+                            {badge.reward && (
+                              <div className="flex items-center gap-2 mb-2 p-2 rounded bg-muted/50">
+                                <Gift className="w-4 h-4 text-primary" />
+                                <span className="text-sm font-medium">Reward:</span>
+                                {badge.reward.points && (
+                                  <Badge variant="outline" className="text-xs">+{badge.reward.points} pts</Badge>
+                                )}
+                                {badge.reward.gift && (
+                                  <span className="text-sm text-muted-foreground">{badge.reward.gift}</span>
+                                )}
+                              </div>
+                            )}
                             <Progress value={(badge.progress / badge.required) * 100} className="h-2" />
                           </div>
                         ))}
@@ -2556,6 +2838,18 @@ export default function CommunityPage() {
                               </Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mb-2">{award.description}</p>
+                            {award.reward && (
+                              <div className="flex items-center gap-2 mb-2 p-2 rounded bg-muted/50">
+                                <Gift className="w-4 h-4 text-primary" />
+                                <span className="text-sm font-medium">Prize:</span>
+                                {award.reward.points && (
+                                  <Badge variant="outline" className="text-xs">+{award.reward.points} pts</Badge>
+                                )}
+                                {award.reward.gift && (
+                                  <span className="text-sm text-muted-foreground">{award.reward.gift}</span>
+                                )}
+                              </div>
+                            )}
                             {award.winner ? (
                               <div className="flex items-center gap-2 p-2 rounded bg-green-500/20">
                                 <CheckCircle className="w-4 h-4 text-green-500" />
@@ -2648,7 +2942,7 @@ export default function CommunityPage() {
                       
                       <div className="space-y-4">
                         {(circlePosts[selectedCircle.id] || []).map((post) => (
-                          <div key={post.id} className="p-4 rounded-md border">
+                          <div key={post.id} className="p-4 rounded-md border" data-testid={`circle-post-${post.id}`}>
                             <div className="flex items-start gap-3">
                               <Avatar>
                                 <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
@@ -2660,11 +2954,80 @@ export default function CommunityPage() {
                                 </div>
                                 <p className="mt-2">{post.content}</p>
                                 <div className="flex items-center gap-4 mt-3">
-                                  <Button variant="ghost" size="sm">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleLikeCirclePost(post.id)}
+                                    data-testid={`button-like-circle-post-${post.id}`}
+                                  >
                                     <Heart className={`w-4 h-4 mr-1 ${post.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
                                     {post.likes.length}
                                   </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => setCirclePostCommentingId(circlePostCommentingId === post.id ? null : post.id)}
+                                    data-testid={`button-comment-circle-post-${post.id}`}
+                                  >
+                                    <MessageCircle className="w-4 h-4 mr-1" />
+                                    {post.comments.length}
+                                  </Button>
                                 </div>
+                                
+                                {circlePostCommentingId === post.id && (
+                                  <div className="mt-4 flex gap-2">
+                                    <Input
+                                      placeholder="Write a comment..."
+                                      value={newCirclePostComment}
+                                      onChange={(e) => setNewCirclePostComment(e.target.value)}
+                                      onKeyDown={(e) => e.key === "Enter" && handleAddCirclePostComment(post.id)}
+                                      data-testid={`input-circle-post-comment-${post.id}`}
+                                    />
+                                    <Button size="icon" onClick={() => handleAddCirclePostComment(post.id)} data-testid={`button-submit-circle-post-comment-${post.id}`}>
+                                      <Send className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                                
+                                {post.comments.length > 0 && (
+                                  <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
+                                    {post.comments.map((comment) => (
+                                      <div key={comment.id} className="flex gap-2" data-testid={`circle-post-comment-${comment.id}`}>
+                                        <Avatar className="h-6 w-6">
+                                          <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                          <div className="flex items-baseline gap-2 flex-wrap">
+                                            <span className="font-medium text-sm">{comment.authorName}</span>
+                                            <span className="text-xs text-muted-foreground">{formatTime(comment.createdAt)}</span>
+                                            {comment.authorId === "you" && (
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5"
+                                                onClick={() => handleDeleteCirclePostComment(post.id, comment.id)}
+                                                data-testid={`button-delete-circle-comment-${comment.id}`}
+                                              >
+                                                <Trash2 className="w-3 h-3 text-muted-foreground" />
+                                              </Button>
+                                            )}
+                                          </div>
+                                          <p className="text-sm">{comment.content}</p>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-6 px-2 mt-1"
+                                            onClick={() => handleLikeCirclePostComment(post.id, comment.id)}
+                                            data-testid={`button-like-circle-comment-${comment.id}`}
+                                          >
+                                            <Heart className={`w-3 h-3 mr-1 ${comment.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
+                                            <span className="text-xs">{comment.likes.length}</span>
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -2695,7 +3058,7 @@ export default function CommunityPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {(demoCircleMembers[selectedCircle.id] || []).map((member) => (
+                        {(circleMembers[selectedCircle.id] || []).map((member) => (
                           <div
                             key={member.id}
                             className="flex items-center justify-between gap-4 p-3 rounded-md border"
@@ -2892,12 +3255,12 @@ export default function CommunityPage() {
                       {post.comments.length > 0 && (
                         <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
                           {post.comments.map((comment) => (
-                            <div key={comment.id} className="flex gap-2">
+                            <div key={comment.id} className="flex gap-2" data-testid={`feed-comment-${comment.id}`}>
                               <Avatar className="h-6 w-6">
                                 <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1">
-                                <div className="flex items-baseline gap-2">
+                                <div className="flex items-baseline gap-2 flex-wrap">
                                   <span className="font-medium text-sm">{comment.authorName}</span>
                                   <span className="text-xs text-muted-foreground">{formatTime(comment.createdAt)}</span>
                                   {comment.authorId === "you" && (
@@ -2913,6 +3276,16 @@ export default function CommunityPage() {
                                   )}
                                 </div>
                                 <p className="text-sm">{comment.content}</p>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 px-2 mt-1"
+                                  onClick={() => handleLikeComment(post.id, comment.id)}
+                                  data-testid={`button-like-comment-${comment.id}`}
+                                >
+                                  <Heart className={`w-3 h-3 mr-1 ${comment.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
+                                  <span className="text-xs">{comment.likes.length}</span>
+                                </Button>
                               </div>
                             </div>
                           ))}

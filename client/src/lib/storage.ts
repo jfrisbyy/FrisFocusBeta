@@ -226,9 +226,18 @@ export function saveMilestonesToStorage(milestones: StoredMilestone[]): void {
 }
 
 // ============ USER PROFILE ============
+export interface StoredFriendWelcomeMessage {
+  friendId: string;
+  friendName: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface StoredUserProfile {
   userName: string;
   encouragementMessage: string;
+  useCustomMessage?: boolean;
+  friendWelcomeMessages?: StoredFriendWelcomeMessage[];
 }
 
 export function loadUserProfileFromStorage(): StoredUserProfile {
@@ -368,7 +377,9 @@ export interface StoredFriend {
   firstName: string;
   lastName: string;
   profileImageUrl?: string;
+  todayPoints: number;
   weeklyPoints: number;
+  totalPoints: number;
   dayStreak: number;
   weekStreak: number;
   totalBadgesEarned: number;
@@ -467,6 +478,15 @@ export interface StoredCircleMessage {
   createdAt: string;
 }
 
+export interface StoredCirclePostComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+  likes: string[];
+}
+
 export interface StoredCirclePost {
   id: string;
   circleId: string;
@@ -475,6 +495,7 @@ export interface StoredCirclePost {
   content: string;
   createdAt: string;
   likes: string[];
+  comments: StoredCirclePostComment[];
 }
 
 export interface StoredDirectMessage {
@@ -507,6 +528,7 @@ export interface StoredPostComment {
   authorName: string;
   content: string;
   createdAt: string;
+  likes: string[];
 }
 
 export interface StoredFriendActivity {

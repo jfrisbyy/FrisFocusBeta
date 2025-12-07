@@ -36,6 +36,7 @@ import {
   StoredMilestone,
   StoredTodoItem,
   StoredDueDateItem,
+  StoredFriendWelcomeMessage,
 } from "@/lib/storage";
 
 const getMockWeekData = () => {
@@ -373,6 +374,8 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<TaskAlert[]>([]);
   const [userName, setUserName] = useState("You");
   const [encouragementMessage, setEncouragementMessage] = useState("Welcome! Set up your tasks and start logging your progress.");
+  const [useCustomMessage, setUseCustomMessage] = useState(false);
+  const [friendWelcomeMessages, setFriendWelcomeMessages] = useState<StoredFriendWelcomeMessage[]>([]);
   const [boosters, setBoosters] = useState<UnifiedBooster[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [badges, setBadges] = useState<BadgeWithLevels[]>([]);
@@ -394,6 +397,11 @@ export default function Dashboard() {
       setAlerts(getMockAlerts());
       setUserName("Jordan");
       setEncouragementMessage("Let's start this week off right, you can do it I believe in you!");
+      setUseCustomMessage(true);
+      setFriendWelcomeMessages([
+        { friendId: "friend-1", friendName: "Alex Chen", message: "You've got this! Crush it this week!", createdAt: new Date(Date.now() - 3600000).toISOString() },
+        { friendId: "friend-3", friendName: "Sam Rivera", message: "Keep up the amazing streak!", createdAt: new Date(Date.now() - 7200000).toISOString() },
+      ]);
       setDayStreak(5);
       setWeekStreak(3);
       setLongestDayStreak(14);
@@ -409,6 +417,8 @@ export default function Dashboard() {
     const profile = loadUserProfileFromStorage();
     setUserName(profile.userName);
     setEncouragementMessage(profile.encouragementMessage);
+    setUseCustomMessage(profile.useCustomMessage ?? false);
+    setFriendWelcomeMessages(profile.friendWelcomeMessages ?? []);
 
     // Load goals
     setWeeklyGoal(loadWeeklyGoalFromStorage());
@@ -713,11 +723,29 @@ export default function Dashboard() {
     ));
   };
 
-  const handleWelcomeUpdate = (newName: string, newMessage: string) => {
+  const handleWelcomeUpdate = (newName: string, newMessage: string, customMode: boolean) => {
     setUserName(newName);
     setEncouragementMessage(newMessage);
+    setUseCustomMessage(customMode);
     if (!useMockData) {
-      saveUserProfileToStorage({ userName: newName, encouragementMessage: newMessage });
+      saveUserProfileToStorage({ 
+        userName: newName, 
+        encouragementMessage: newMessage,
+        useCustomMessage: customMode,
+        friendWelcomeMessages,
+      });
+    }
+  };
+
+  const handleDismissFriendMessage = (friendId: string) => {
+    const updated = friendWelcomeMessages.filter(m => m.friendId !== friendId);
+    setFriendWelcomeMessages(updated);
+    if (!useMockData) {
+      const profile = loadUserProfileFromStorage();
+      saveUserProfileToStorage({
+        ...profile,
+        friendWelcomeMessages: updated,
+      });
     }
   };
 
@@ -856,7 +884,10 @@ export default function Dashboard() {
       <WelcomeMessage
         userName={userName}
         message={encouragementMessage}
+        useCustomMessage={useCustomMessage}
+        friendMessages={friendWelcomeMessages}
         onUpdate={handleWelcomeUpdate}
+        onDismissFriendMessage={handleDismissFriendMessage}
       />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
