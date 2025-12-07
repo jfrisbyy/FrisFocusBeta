@@ -12,7 +12,7 @@ const navItems = [
   { path: "/journal", label: "Journal", icon: BookOpen },
   { path: "/insights", label: "Insights", icon: Sparkles },
   { path: "/fitness", label: "Fitness", icon: Dumbbell },
-  { path: "/friends", label: "Friends", icon: Users },
+  { path: "/community", label: "Community", icon: Users },
 ];
 
 export default function Navigation() {

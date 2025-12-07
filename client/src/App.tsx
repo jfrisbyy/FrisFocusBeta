@@ -16,7 +16,7 @@ import BadgesPage from "@/pages/BadgesPage";
 import JournalPage from "@/pages/JournalPage";
 import InsightsPage from "@/pages/InsightsPage";
 import FitnessPage from "@/pages/FitnessPage";
-import FriendsPage from "@/pages/FriendsPage";
+import CommunityPage from "@/pages/CommunityPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -42,7 +42,7 @@ function Router() {
         <Route path="/journal" component={JournalPage} />
         <Route path="/insights" component={InsightsPage} />
         <Route path="/fitness" component={FitnessPage} />
-        <Route path="/friends" component={FriendsPage} />
+        <Route path="/community" component={CommunityPage} />
         <Route component={NotFound} />
       </Switch>
     </div>

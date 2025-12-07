@@ -359,5 +359,153 @@ export function getWeekId(date: Date): string {
   return `${year}-W${weekNum.toString().padStart(2, '0')}`;
 }
 
+// ============ FRIENDS (LOCAL STORAGE FOR DEMO) ============
+export type VisibilityLevel = "full" | "tasks_only" | "points_only" | "hidden";
+
+export interface StoredFriend {
+  id: string;
+  friendId: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  weeklyPoints: number;
+  dayStreak: number;
+  weekStreak: number;
+  totalBadgesEarned: number;
+  visibilityLevel: VisibilityLevel;
+  hiddenTaskIds: string[]; // Tasks hidden from this friend
+}
+
+export interface StoredFriendRequest {
+  id: string;
+  requesterId?: string;
+  addresseeId?: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  createdAt: string;
+  direction: "incoming" | "outgoing";
+}
+
+// ============ CIRCLES ============
+export interface StoredCircle {
+  id: string;
+  name: string;
+  description: string;
+  iconColor: string;
+  createdAt: string;
+  createdBy: string;
+  memberCount: number;
+}
+
+export interface StoredCircleMember {
+  id: string;
+  circleId: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  role: "owner" | "admin" | "member";
+  joinedAt: string;
+  weeklyPoints: number;
+}
+
+export interface StoredCircleTask {
+  id: string;
+  circleId: string;
+  name: string;
+  value: number;
+  category?: string;
+}
+
+export interface StoredCircleBadge {
+  id: string;
+  circleId: string;
+  name: string;
+  description: string;
+  icon: string;
+  conditionType: string;
+  levels: StoredBadgeLevel[];
+  currentProgress?: number;
+}
+
+export interface StoredCircleLog {
+  id: string;
+  circleId: string;
+  date: string;
+  userId: string;
+  firstName: string;
+  completedTaskIds: string[];
+  points: number;
+}
+
+const COMMUNITY_STORAGE_KEYS = {
+  FRIENDS: "frisfocus_friends",
+  FRIEND_REQUESTS: "frisfocus_friend_requests",
+  CIRCLES: "frisfocus_circles",
+  CIRCLE_MEMBERS: "frisfocus_circle_members",
+  CIRCLE_TASKS: "frisfocus_circle_tasks",
+  CIRCLE_BADGES: "frisfocus_circle_badges",
+  CIRCLE_LOGS: "frisfocus_circle_logs",
+} as const;
+
+// Friends storage functions
+export function loadFriendsFromStorage(): StoredFriend[] {
+  return loadFromStorage<StoredFriend[]>(COMMUNITY_STORAGE_KEYS.FRIENDS, []);
+}
+
+export function saveFriendsToStorage(friends: StoredFriend[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.FRIENDS, friends);
+}
+
+export function loadFriendRequestsFromStorage(): StoredFriendRequest[] {
+  return loadFromStorage<StoredFriendRequest[]>(COMMUNITY_STORAGE_KEYS.FRIEND_REQUESTS, []);
+}
+
+export function saveFriendRequestsToStorage(requests: StoredFriendRequest[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.FRIEND_REQUESTS, requests);
+}
+
+// Circles storage functions
+export function loadCirclesFromStorage(): StoredCircle[] {
+  return loadFromStorage<StoredCircle[]>(COMMUNITY_STORAGE_KEYS.CIRCLES, []);
+}
+
+export function saveCirclesToStorage(circles: StoredCircle[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLES, circles);
+}
+
+export function loadCircleMembersFromStorage(): StoredCircleMember[] {
+  return loadFromStorage<StoredCircleMember[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_MEMBERS, []);
+}
+
+export function saveCircleMembersToStorage(members: StoredCircleMember[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_MEMBERS, members);
+}
+
+export function loadCircleTasksFromStorage(): StoredCircleTask[] {
+  return loadFromStorage<StoredCircleTask[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_TASKS, []);
+}
+
+export function saveCircleTasksToStorage(tasks: StoredCircleTask[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_TASKS, tasks);
+}
+
+export function loadCircleBadgesFromStorage(): StoredCircleBadge[] {
+  return loadFromStorage<StoredCircleBadge[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_BADGES, []);
+}
+
+export function saveCircleBadgesToStorage(badges: StoredCircleBadge[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_BADGES, badges);
+}
+
+export function loadCircleLogsFromStorage(): StoredCircleLog[] {
+  return loadFromStorage<StoredCircleLog[]>(COMMUNITY_STORAGE_KEYS.CIRCLE_LOGS, []);
+}
+
+export function saveCircleLogsToStorage(logs: StoredCircleLog[]): void {
+  saveToStorage(COMMUNITY_STORAGE_KEYS.CIRCLE_LOGS, logs);
+}
+
 // Export storage keys for reference
-export { STORAGE_KEYS };
+export { STORAGE_KEYS, COMMUNITY_STORAGE_KEYS };

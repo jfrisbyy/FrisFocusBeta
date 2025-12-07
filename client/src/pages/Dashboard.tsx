@@ -289,6 +289,46 @@ const getMockBadges = (): BadgeWithLevels[] => [
     ],
     currentProgress: 18,
   },
+  {
+    id: "badge-4",
+    name: "Early Riser",
+    description: "Complete morning routine before 7am",
+    icon: "sunrise",
+    conditionType: "taskCompletions",
+    taskName: "Morning routine",
+    levels: [
+      { level: 1, required: 7, earned: false },
+      { level: 2, required: 30, earned: false },
+      { level: 3, required: 90, earned: false },
+    ],
+    currentProgress: 4,
+  },
+  {
+    id: "badge-5",
+    name: "Hydration Hero",
+    description: "Drink 8 glasses of water daily",
+    icon: "droplet",
+    conditionType: "taskCompletions",
+    taskName: "Drink water",
+    levels: [
+      { level: 1, required: 14, earned: false },
+      { level: 2, required: 60, earned: false },
+    ],
+    currentProgress: 9,
+  },
+  {
+    id: "badge-6",
+    name: "Goal Getter",
+    description: "Hit weekly goal consecutively",
+    icon: "target",
+    conditionType: "weeklyGoalStreak",
+    levels: [
+      { level: 1, required: 4, earned: false },
+      { level: 2, required: 12, earned: false },
+      { level: 3, required: 26, earned: false },
+    ],
+    currentProgress: 2,
+  },
 ];
 
 const getMockWeeklyTodos = (): StoredTodoItem[] => [
