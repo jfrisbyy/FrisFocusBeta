@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Zap } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, AlertTriangle, AlertCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskForm, { TaskWithBooster } from "./TaskForm";
 import { BoosterRule } from "./BoosterRuleConfig";
@@ -21,14 +21,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { TaskPriority, PenaltyRule } from "@shared/schema";
 
 interface Task {
   id: string;
   name: string;
   value: number;
   category: string;
+  priority: TaskPriority;
   group?: string;
   boosterRule?: BoosterRule;
+  penaltyRule?: PenaltyRule;
 }
 
 interface TaskListProps {
@@ -38,12 +41,18 @@ interface TaskListProps {
   onDelete: (id: string) => void;
 }
 
+const priorityConfig: Record<TaskPriority, { label: string; variant: "default" | "secondary" | "outline"; icon: typeof AlertTriangle }> = {
+  mustDo: { label: "Must Do", variant: "default", icon: AlertTriangle },
+  shouldDo: { label: "Should Do", variant: "secondary", icon: AlertCircle },
+  couldDo: { label: "Could Do", variant: "outline", icon: Check },
+};
+
+const priorityOrder: TaskPriority[] = ["mustDo", "shouldDo", "couldDo"];
+
 export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  const categories = Array.from(new Set(tasks.map(t => t.category)));
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -51,7 +60,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
 
   const handleEditSubmit = (values: TaskWithBooster) => {
     if (editingTask) {
-      onEdit(editingTask.id, values);
+      onEdit(editingTask.id, values as Omit<Task, "id">);
       setEditingTask(null);
     }
   };
@@ -62,6 +71,8 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
       setDeleteId(null);
     }
   };
+
+  const categories = Array.from(new Set(tasks.map(t => t.category)));
 
   return (
     <>
@@ -74,20 +85,36 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          {categories.length === 0 ? (
+          {tasks.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               No tasks yet. Add your first task to get started.
             </div>
           ) : (
             <div className="divide-y">
-              {categories.map((category) => (
-                <div key={category}>
-                  <div className="bg-muted/30 px-6 py-2">
-                    <span className="text-sm font-medium text-muted-foreground">{category}</span>
-                  </div>
-                  {tasks
-                    .filter((t) => t.category === category)
-                    .map((task) => (
+              {priorityOrder.map((priority) => {
+                const priorityTasks = tasks.filter((t) => t.priority === priority);
+                if (priorityTasks.length === 0) return null;
+
+                const config = priorityConfig[priority];
+                const Icon = config.icon;
+
+                return (
+                  <div key={priority}>
+                    <div className="bg-muted/30 px-6 py-2 flex items-center gap-2">
+                      <Icon className={cn(
+                        "h-4 w-4",
+                        priority === "mustDo" && "text-chart-3",
+                        priority === "shouldDo" && "text-chart-2",
+                        priority === "couldDo" && "text-muted-foreground"
+                      )} />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {config.label}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {priorityTasks.length}
+                      </Badge>
+                    </div>
+                    {priorityTasks.map((task) => (
                       <div
                         key={task.id}
                         className="flex items-center justify-between gap-4 px-6 py-3 hover-elevate"
@@ -95,6 +122,9 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-wrap">
                           <span className="text-sm font-medium truncate">{task.name}</span>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {task.category}
+                          </Badge>
                           {task.boosterRule?.enabled && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -106,6 +136,21 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
                               <TooltipContent>
                                 <p>
                                   Complete {task.boosterRule.timesRequired} times per {task.boosterRule.period} for +{task.boosterRule.bonusPoints} bonus
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {task.penaltyRule?.enabled && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs text-chart-3 border-chart-3/30 shrink-0 gap-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  -{task.penaltyRule.penaltyPoints}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  Penalty of -{task.penaltyRule.penaltyPoints} if done {task.penaltyRule.condition === "lessThan" ? "less than" : "more than"} {task.penaltyRule.timesThreshold} times/week
                                 </p>
                               </TooltipContent>
                             </Tooltip>
@@ -144,8 +189,9 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
                         </div>
                       </div>
                     ))}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -154,7 +200,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete }: TaskListPro
       <TaskForm
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSubmit={onAdd}
+        onSubmit={onAdd as (values: TaskWithBooster) => void}
         title="Add Task"
         categories={categories.length > 0 ? categories : undefined}
       />
