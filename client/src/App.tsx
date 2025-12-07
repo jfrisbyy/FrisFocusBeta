@@ -65,7 +65,7 @@ function AuthenticatedApp() {
 
   return (
     <div className="min-h-screen bg-background">
-      {isAuthenticated && <Navigation />}
+      <Navigation />
       <main>
         <Router />
       </main>

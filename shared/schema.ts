@@ -381,3 +381,26 @@ export const basketballRuns = pgTable("basketball_runs", {
 export const insertBasketballRunSchema = createInsertSchema(basketballRuns).omit({ id: true });
 export type InsertBasketballRun = z.infer<typeof insertBasketballRunSchema>;
 export type BasketballRun = typeof basketballRuns.$inferSelect;
+
+// ==================== GPT OAuth Tables ====================
+
+// OAuth access tokens for GPT integration
+export const gptAccessTokens = pgTable("gpt_access_tokens", {
+  token: varchar("token").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type GptAccessToken = typeof gptAccessTokens.$inferSelect;
+
+// OAuth authorization codes (short-lived, for exchange)
+export const gptAuthCodes = pgTable("gpt_auth_codes", {
+  code: varchar("code").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  redirectUri: text("redirect_uri").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type GptAuthCode = typeof gptAuthCodes.$inferSelect;

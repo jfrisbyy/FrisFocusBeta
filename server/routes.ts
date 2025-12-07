@@ -5,23 +5,56 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import OpenAI from "openai";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import {
   nutritionLogs,
   bodyComposition,
   strengthWorkouts,
   skillWorkouts,
   basketballRuns,
+  gptAccessTokens,
+  gptAuthCodes,
   insertNutritionLogSchema,
   insertBodyCompositionSchema,
   insertStrengthWorkoutSchema,
   insertSkillWorkoutSchema,
   insertBasketballRunSchema,
 } from "@shared/schema";
+import { lt } from "drizzle-orm";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
+
+// Clean up expired OAuth tokens periodically
+setInterval(async () => {
+  try {
+    const now = new Date();
+    await db.delete(gptAuthCodes).where(lt(gptAuthCodes.expiresAt, now));
+    await db.delete(gptAccessTokens).where(lt(gptAccessTokens.expiresAt, now));
+  } catch (error) {
+    console.error("Error cleaning up expired OAuth tokens:", error);
+  }
+}, 60000); // Run every minute
+
+// GPT OAuth Configuration - Whitelist of allowed redirect URIs for security
+// ChatGPT custom GPTs use specific redirect URIs that must be validated
+const ALLOWED_GPT_REDIRECT_URIS = [
+  "https://chat.openai.com/aip/g-",
+  "https://chatgpt.com/aip/g-",
+];
+
+function isValidRedirectUri(redirectUri: string): boolean {
+  if (!redirectUri) return false;
+  try {
+    const url = new URL(redirectUri);
+    // Allow any ChatGPT callback URL (they use dynamic paths for GPT IDs)
+    return ALLOWED_GPT_REDIRECT_URIS.some(allowed => redirectUri.startsWith(allowed));
+  } catch {
+    return false;
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -210,6 +243,243 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("AI insights error:", error);
       res.status(500).json({ error: "Failed to get AI response" });
+    }
+  });
+
+  // ==================== GPT OAuth Endpoints ====================
+  // These endpoints allow a ChatGPT custom GPT to access user fitness data via OAuth
+
+  // Authorization endpoint - GPT redirects users here
+  app.get("/api/gpt/authorize", async (req: any, res) => {
+    const { redirect_uri, state, client_id } = req.query;
+
+    // Validate redirect_uri against whitelist
+    if (!isValidRedirectUri(redirect_uri as string)) {
+      return res.status(400).json({ error: "invalid_redirect_uri", error_description: "Redirect URI not allowed" });
+    }
+
+    // If user is not authenticated, redirect to login first
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      // Store OAuth params in session for after login
+      req.session.gptOAuth = { redirect_uri, state, client_id };
+      return res.redirect("/api/login");
+    }
+
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      // Generate authorization code
+      const code = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await db.insert(gptAuthCodes).values({
+        code,
+        userId,
+        redirectUri: redirect_uri as string,
+        expiresAt,
+      });
+
+      // Redirect back to GPT with the code
+      const redirectUrl = new URL(redirect_uri as string);
+      redirectUrl.searchParams.set("code", code);
+      if (state) {
+        redirectUrl.searchParams.set("state", state as string);
+      }
+      res.redirect(redirectUrl.toString());
+    } catch (error) {
+      console.error("Error creating auth code:", error);
+      res.status(500).json({ error: "Failed to create authorization code" });
+    }
+  });
+
+  // Callback after login to continue OAuth flow
+  app.get("/api/gpt/callback", async (req: any, res) => {
+    const gptOAuth = req.session?.gptOAuth;
+    if (!gptOAuth) {
+      return res.status(400).json({ error: "No OAuth session found" });
+    }
+
+    // Validate redirect_uri from session
+    if (!isValidRedirectUri(gptOAuth.redirect_uri)) {
+      delete req.session.gptOAuth;
+      return res.status(400).json({ error: "invalid_redirect_uri", error_description: "Redirect URI not allowed" });
+    }
+
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      // Generate authorization code
+      const code = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await db.insert(gptAuthCodes).values({
+        code,
+        userId,
+        redirectUri: gptOAuth.redirect_uri,
+        expiresAt,
+      });
+
+      // Clear OAuth session
+      delete req.session.gptOAuth;
+
+      // Redirect back to GPT with the code
+      const redirectUrl = new URL(gptOAuth.redirect_uri);
+      redirectUrl.searchParams.set("code", code);
+      if (gptOAuth.state) {
+        redirectUrl.searchParams.set("state", gptOAuth.state);
+      }
+      res.redirect(redirectUrl.toString());
+    } catch (error) {
+      console.error("Error creating auth code:", error);
+      res.status(500).json({ error: "Failed to create authorization code" });
+    }
+  });
+
+  // Token endpoint - GPT exchanges authorization code for access token
+  app.post("/api/gpt/token", async (req, res) => {
+    const { code, redirect_uri, grant_type } = req.body;
+
+    if (grant_type !== "authorization_code") {
+      return res.status(400).json({ error: "unsupported_grant_type" });
+    }
+
+    try {
+      // Find the auth code
+      const [authCode] = await db.select().from(gptAuthCodes).where(eq(gptAuthCodes.code, code));
+
+      if (!authCode) {
+        return res.status(400).json({ error: "invalid_grant", error_description: "Invalid or expired authorization code" });
+      }
+
+      if (authCode.expiresAt < new Date()) {
+        await db.delete(gptAuthCodes).where(eq(gptAuthCodes.code, code));
+        return res.status(400).json({ error: "invalid_grant", error_description: "Authorization code expired" });
+      }
+
+      // Validate redirect_uri matches the one used during authorization
+      if (redirect_uri && authCode.redirectUri !== redirect_uri) {
+        await db.delete(gptAuthCodes).where(eq(gptAuthCodes.code, code));
+        return res.status(400).json({ error: "invalid_grant", error_description: "Redirect URI mismatch" });
+      }
+
+      // Delete the code (single use)
+      await db.delete(gptAuthCodes).where(eq(gptAuthCodes.code, code));
+
+      // Generate access token
+      const accessToken = randomBytes(32).toString("hex");
+      const expiresIn = 3600 * 24; // 24 hours
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+      await db.insert(gptAccessTokens).values({
+        token: accessToken,
+        userId: authCode.userId,
+        expiresAt,
+      });
+
+      res.json({
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: expiresIn,
+      });
+    } catch (error) {
+      console.error("Error exchanging auth code for token:", error);
+      res.status(500).json({ error: "server_error", error_description: "Failed to exchange authorization code" });
+    }
+  });
+
+  // Middleware to verify GPT access token
+  const verifyGptToken = async (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing or invalid authorization header" });
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+      const [tokenData] = await db.select().from(gptAccessTokens).where(eq(gptAccessTokens.token, token));
+
+      if (!tokenData) {
+        return res.status(401).json({ error: "Invalid access token" });
+      }
+
+      if (tokenData.expiresAt < new Date()) {
+        await db.delete(gptAccessTokens).where(eq(gptAccessTokens.token, token));
+        return res.status(401).json({ error: "Access token expired" });
+      }
+
+      req.gptUserId = tokenData.userId;
+      next();
+    } catch (error) {
+      console.error("Error verifying GPT token:", error);
+      res.status(500).json({ error: "Failed to verify access token" });
+    }
+  };
+
+  // GPT Data endpoint - Returns all fitness data for the authenticated user
+  app.get("/api/gpt/data", verifyGptToken, async (req: any, res) => {
+    try {
+      const userId = req.gptUserId;
+
+      // Fetch all fitness data for the user
+      const [nutrition, bodyComp, strength, skill, runs] = await Promise.all([
+        db.select().from(nutritionLogs).where(eq(nutritionLogs.userId, userId)),
+        db.select().from(bodyComposition).where(eq(bodyComposition.userId, userId)),
+        db.select().from(strengthWorkouts).where(eq(strengthWorkouts.userId, userId)),
+        db.select().from(skillWorkouts).where(eq(skillWorkouts.userId, userId)),
+        db.select().from(basketballRuns).where(eq(basketballRuns.userId, userId)),
+      ]);
+
+      res.json({
+        nutritionLogs: nutrition,
+        bodyComposition: bodyComp,
+        strengthWorkouts: strength,
+        skillWorkouts: skill,
+        basketballRuns: runs,
+      });
+    } catch (error) {
+      console.error("Error fetching GPT data:", error);
+      res.status(500).json({ error: "Failed to fetch fitness data" });
+    }
+  });
+
+  // GPT endpoint to get specific data type
+  app.get("/api/gpt/data/:type", verifyGptToken, async (req: any, res) => {
+    try {
+      const userId = req.gptUserId;
+      const { type } = req.params;
+
+      let data;
+      switch (type) {
+        case "nutrition":
+          data = await db.select().from(nutritionLogs).where(eq(nutritionLogs.userId, userId));
+          break;
+        case "body-composition":
+          data = await db.select().from(bodyComposition).where(eq(bodyComposition.userId, userId));
+          break;
+        case "strength":
+          data = await db.select().from(strengthWorkouts).where(eq(strengthWorkouts.userId, userId));
+          break;
+        case "skill":
+          data = await db.select().from(skillWorkouts).where(eq(skillWorkouts.userId, userId));
+          break;
+        case "runs":
+          data = await db.select().from(basketballRuns).where(eq(basketballRuns.userId, userId));
+          break;
+        default:
+          return res.status(400).json({ error: `Unknown data type: ${type}` });
+      }
+
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching GPT data:", error);
+      res.status(500).json({ error: "Failed to fetch fitness data" });
     }
   });
 
