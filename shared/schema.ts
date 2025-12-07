@@ -404,3 +404,72 @@ export const gptAuthCodes = pgTable("gpt_auth_codes", {
 });
 
 export type GptAuthCode = typeof gptAuthCodes.$inferSelect;
+
+// ==================== FRIENDS & SOCIAL TABLES ====================
+
+// Friendship status enum
+export const friendshipStatusEnum = z.enum(["pending", "accepted", "declined"]);
+export type FriendshipStatus = z.infer<typeof friendshipStatusEnum>;
+
+// Friendships table - tracks friend requests and connections
+export const friendships = pgTable("friendships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requesterId: varchar("requester_id").notNull().references(() => users.id),
+  addresseeId: varchar("addressee_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFriendshipSchema = createInsertSchema(friendships).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFriendship = z.infer<typeof insertFriendshipSchema>;
+export type Friendship = typeof friendships.$inferSelect;
+
+// User stats table - stores computed stats for sharing with friends
+export const userStats = pgTable("user_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  weeklyPoints: integer("weekly_points").default(0),
+  dayStreak: integer("day_streak").default(0),
+  weekStreak: integer("week_streak").default(0),
+  longestDayStreak: integer("longest_day_streak").default(0),
+  longestWeekStreak: integer("longest_week_streak").default(0),
+  totalBadgesEarned: integer("total_badges_earned").default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserStatsSchema = createInsertSchema(userStats).omit({ id: true, updatedAt: true });
+export type InsertUserStats = z.infer<typeof insertUserStatsSchema>;
+export type UserStats = typeof userStats.$inferSelect;
+
+// Sharing settings table - controls what data is visible to friends
+export const sharingSettings = pgTable("sharing_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  sharePoints: boolean("share_points").default(true),
+  shareStreaks: boolean("share_streaks").default(true),
+  shareBadges: boolean("share_badges").default(true),
+  profilePublic: boolean("profile_public").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSharingSettingsSchema = createInsertSchema(sharingSettings).omit({ id: true, updatedAt: true });
+export type InsertSharingSettings = z.infer<typeof insertSharingSettingsSchema>;
+export type SharingSettings = typeof sharingSettings.$inferSelect;
+
+// Friend with stats for display
+export const friendWithStatsSchema = z.object({
+  id: z.string(),
+  friendId: z.string(),
+  firstName: z.string().nullable(),
+  lastName: z.string().nullable(),
+  profileImageUrl: z.string().nullable(),
+  weeklyPoints: z.number().nullable(),
+  dayStreak: z.number().nullable(),
+  weekStreak: z.number().nullable(),
+  totalBadgesEarned: z.number().nullable(),
+  sharePoints: z.boolean(),
+  shareStreaks: z.boolean(),
+  shareBadges: z.boolean(),
+});
+export type FriendWithStats = z.infer<typeof friendWithStatsSchema>;
