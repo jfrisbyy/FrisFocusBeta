@@ -154,3 +154,107 @@ export const taskAlertSchema = z.object({
   threshold: z.number().int(),
 });
 export type TaskAlert = z.infer<typeof taskAlertSchema>;
+
+// Negative booster (e.g., if done 2+ times per week, minus points)
+export const negativeBoosterSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  description: z.string(),
+  timesThreshold: z.number().int().min(1),
+  period: z.enum(["week", "month"]),
+  penaltyPoints: z.number().int().min(1),
+  currentCount: z.number().int().min(0),
+  triggered: z.boolean(),
+});
+export type NegativeBooster = z.infer<typeof negativeBoosterSchema>;
+
+export const insertNegativeBoosterSchema = negativeBoosterSchema.omit({ id: true, currentCount: true, triggered: true });
+export type InsertNegativeBooster = z.infer<typeof insertNegativeBoosterSchema>;
+
+// Milestone (non-task based achievements with points)
+export const milestoneSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  description: z.string(),
+  points: z.number().int().min(1),
+  achieved: z.boolean(),
+  achievedAt: z.string().optional(),
+});
+export type Milestone = z.infer<typeof milestoneSchema>;
+
+export const insertMilestoneSchema = milestoneSchema.omit({ id: true, achieved: true, achievedAt: true });
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+
+// Penalty item (editable negative tasks)
+export const penaltyItemSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  value: z.number().int().max(-1),
+  category: z.string().default("Penalties"),
+});
+export type PenaltyItem = z.infer<typeof penaltyItemSchema>;
+
+export const insertPenaltyItemSchema = penaltyItemSchema.omit({ id: true });
+export type InsertPenaltyItem = z.infer<typeof insertPenaltyItemSchema>;
+
+// Badge level definition
+export const badgeLevelSchema = z.object({
+  level: z.number().int().min(1),
+  required: z.number().int().min(1),
+  earned: z.boolean(),
+  earnedAt: z.string().optional(),
+});
+export type BadgeLevel = z.infer<typeof badgeLevelSchema>;
+
+// Badge definition with levels
+export const badgeWithLevelsSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  description: z.string(),
+  icon: z.string(),
+  conditionType: z.enum(["taskCompletions", "perfectDaysStreak", "negativeFreeStreak", "weeklyGoalStreak"]),
+  taskName: z.string().optional(),
+  levels: z.array(badgeLevelSchema),
+  currentProgress: z.number().int().min(0),
+});
+export type BadgeWithLevels = z.infer<typeof badgeWithLevelsSchema>;
+
+export const insertBadgeWithLevelsSchema = badgeWithLevelsSchema.omit({ id: true, currentProgress: true }).extend({
+  levels: z.array(badgeLevelSchema.omit({ earned: true, earnedAt: true })),
+});
+export type InsertBadgeWithLevels = z.infer<typeof insertBadgeWithLevelsSchema>;
+
+// Journal entry (multiple per day)
+export const journalEntrySchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  title: z.string(),
+  content: z.string(),
+  createdAt: z.string(),
+});
+export type JournalEntry = z.infer<typeof journalEntrySchema>;
+
+export const insertJournalEntrySchema = journalEntrySchema.omit({ id: true, createdAt: true });
+export type InsertJournalEntry = z.infer<typeof insertJournalEntrySchema>;
+
+// Current week settings
+export const currentWeekSettingsSchema = z.object({
+  note: z.string().optional(),
+  isCustomGoalWeek: z.boolean(),
+  customGoal: z.number().int().min(1).optional(),
+});
+export type CurrentWeekSettings = z.infer<typeof currentWeekSettingsSchema>;
+
+// Unified booster for display
+export const unifiedBoosterSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  points: z.number().int(),
+  achieved: z.boolean(),
+  progress: z.number().int().optional(),
+  required: z.number().int().optional(),
+  period: z.enum(["week", "month"]).optional(),
+  isNegative: z.boolean().default(false),
+});
+export type UnifiedBooster = z.infer<typeof unifiedBoosterSchema>;

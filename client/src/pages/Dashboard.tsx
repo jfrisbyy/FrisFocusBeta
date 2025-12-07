@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { format, startOfWeek, addDays, subWeeks, subDays } from "date-fns";
+import { format, startOfWeek, addDays, subWeeks } from "date-fns";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
@@ -8,9 +8,11 @@ import RecentWeeks, { WeekData } from "@/components/RecentWeeks";
 import StreaksCard from "@/components/StreaksCard";
 import AlertsPanel from "@/components/AlertsPanel";
 import WelcomeMessage from "@/components/WelcomeMessage";
-import type { TaskAlert } from "@shared/schema";
+import MilestonesPanel from "@/components/MilestonesPanel";
+import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
+import CurrentWeekSettings from "@/components/CurrentWeekSettings";
+import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels } from "@shared/schema";
 
-// todo: remove mock functionality
 const getMockWeekData = () => {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -25,24 +27,14 @@ const getMockWeekData = () => {
   return days;
 };
 
-const mockSystemBoosters = [
+const getMockBoosters = (): UnifiedBooster[] => [
   {
     id: "booster_5of7_tracking",
     name: "5 of 7 Tracking",
     description: "Log at least 5 days this week",
     points: 10,
     achieved: true,
-    icon: "tracking" as const,
-    type: "system" as const,
-  },
-  {
-    id: "booster_finish_bible_book",
-    name: "Finish Bible Book",
-    description: "Complete a book of the Bible",
-    points: 10,
-    achieved: false,
-    icon: "bible" as const,
-    type: "system" as const,
+    isNegative: false,
   },
   {
     id: "booster_3days_lifting",
@@ -50,45 +42,54 @@ const mockSystemBoosters = [
     description: "Hit the gym at least 3 days",
     points: 10,
     achieved: true,
-    icon: "lifting" as const,
-    type: "system" as const,
+    isNegative: false,
   },
-];
-
-const mockCustomBoosters = [
   {
-    id: "custom-1",
-    taskName: "Read 30 minutes",
-    timesRequired: 4,
-    timesCompleted: 3,
-    period: "week" as const,
-    bonusPoints: 20,
+    id: "custom-reading",
+    name: "Read 30 minutes",
+    description: "Complete 4 times per week",
+    points: 20,
     achieved: false,
-    type: "custom" as const,
+    progress: 3,
+    required: 4,
+    period: "week",
+    isNegative: false,
   },
   {
-    id: "custom-2",
-    taskName: "Morning workout",
-    timesRequired: 5,
-    timesCompleted: 5,
-    period: "week" as const,
-    bonusPoints: 15,
+    id: "custom-workout",
+    name: "Morning workout",
+    description: "Complete 5 times per week",
+    points: 15,
     achieved: true,
-    type: "custom" as const,
+    progress: 5,
+    required: 5,
+    period: "week",
+    isNegative: false,
   },
   {
-    id: "custom-3",
-    taskName: "Bible study",
-    timesRequired: 7,
-    timesCompleted: 4,
-    period: "week" as const,
-    bonusPoints: 25,
+    id: "negative-junkfood",
+    name: "Junk Food",
+    description: "If eaten 3+ times per week",
+    points: -15,
     achieved: false,
-    type: "custom" as const,
+    progress: 1,
+    required: 3,
+    period: "week",
+    isNegative: true,
+  },
+  {
+    id: "negative-socialmedia",
+    name: "Social Media Binge",
+    description: "If wasted 2+ hours twice this week",
+    points: -20,
+    achieved: true,
+    progress: 2,
+    required: 2,
+    period: "week",
+    isNegative: true,
   },
 ];
 
-// todo: remove mock functionality
 const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
   const today = new Date();
   return [
@@ -119,19 +120,9 @@ const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
       note: undefined,
       customGoal: undefined,
     },
-    {
-      id: "week-4",
-      weekStart: format(startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 }), "MMM d"),
-      weekEnd: format(addDays(startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 }), 6), "MMM d"),
-      points: 195,
-      defaultGoal,
-      note: "Vacation week",
-      customGoal: 200,
-    },
   ];
 };
 
-// todo: remove mock functionality
 const getMockAlerts = (): TaskAlert[] => [
   {
     taskId: "alert-1",
@@ -149,37 +140,99 @@ const getMockAlerts = (): TaskAlert[] => [
   },
 ];
 
+const getMockMilestones = (): Milestone[] => [
+  {
+    id: "milestone-1",
+    name: "Buy a car",
+    description: "Save up and purchase first vehicle",
+    points: 100,
+    achieved: false,
+  },
+  {
+    id: "milestone-2",
+    name: "Run a 5K",
+    description: "Complete first 5K race",
+    points: 50,
+    achieved: true,
+    achievedAt: "2024-11-15",
+  },
+];
+
+const getMockBadges = (): BadgeWithLevels[] => [
+  {
+    id: "badge-1",
+    name: "Purified",
+    description: "Negative-free days streak",
+    icon: "shield",
+    conditionType: "negativeFreeStreak",
+    levels: [
+      { level: 1, required: 10, earned: true, earnedAt: "2024-11-01" },
+      { level: 2, required: 30, earned: false },
+      { level: 3, required: 60, earned: false },
+    ],
+    currentProgress: 18,
+  },
+  {
+    id: "badge-2",
+    name: "Beast Mode",
+    description: "Perfect days in a row",
+    icon: "flame",
+    conditionType: "perfectDaysStreak",
+    levels: [
+      { level: 1, required: 3, earned: true, earnedAt: "2024-11-05" },
+      { level: 2, required: 7, earned: true, earnedAt: "2024-11-12" },
+      { level: 3, required: 14, earned: false },
+    ],
+    currentProgress: 10,
+  },
+  {
+    id: "badge-3",
+    name: "Scripture Scholar",
+    description: "Bible study completions",
+    icon: "book",
+    conditionType: "taskCompletions",
+    taskName: "Bible study",
+    levels: [
+      { level: 1, required: 30, earned: false },
+      { level: 2, required: 100, earned: false },
+    ],
+    currentProgress: 18,
+  },
+];
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const [days] = useState(getMockWeekData);
-  // todo: remove mock functionality - weekly goal will come from backend
   const [weeklyGoal, setWeeklyGoal] = useState<number>(350);
-  // todo: remove mock functionality - recent weeks will come from backend
   const [recentWeeks, setRecentWeeks] = useState<WeekData[]>(() => getMockRecentWeeks(350));
-  // todo: remove mock functionality - streaks will come from backend
   const [dayStreak] = useState(5);
   const [weekStreak] = useState(3);
   const [longestDayStreak] = useState(14);
   const [longestWeekStreak] = useState(8);
-  // todo: remove mock functionality - alerts will come from backend
   const [alerts] = useState<TaskAlert[]>(getMockAlerts);
-  // todo: remove mock functionality - user settings will come from backend
   const [userName, setUserName] = useState("Jordan");
   const [encouragementMessage, setEncouragementMessage] = useState(
     "Let's start this week off right, you can do it I believe in you!"
   );
+  const [boosters] = useState<UnifiedBooster[]>(getMockBoosters);
+  const [milestones, setMilestones] = useState<Milestone[]>(getMockMilestones);
+  const [badges] = useState<BadgeWithLevels[]>(getMockBadges);
+  const [weekNote, setWeekNote] = useState("");
+  const [isCustomGoalWeek, setIsCustomGoalWeek] = useState(false);
+  const [customWeekGoal, setCustomWeekGoal] = useState<number | undefined>();
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
   const weekRange = `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d")}`;
 
   const weekTotal = days.reduce((sum, d) => sum + (d.points || 0), 0);
-  const systemBoosterPoints = mockSystemBoosters.filter(b => b.achieved).reduce((sum, b) => sum + b.points, 0);
-  const customBoosterPoints = mockCustomBoosters.filter(b => b.achieved).reduce((sum, b) => sum + b.bonusPoints, 0);
-  const boosterPoints = systemBoosterPoints + customBoosterPoints;
+  const positiveBoosterPoints = boosters.filter(b => b.achieved && !b.isNegative).reduce((sum, b) => sum + b.points, 0);
+  const negativeBoosterPoints = boosters.filter(b => b.achieved && b.isNegative).reduce((sum, b) => sum + Math.abs(b.points), 0);
+  const milestonePoints = milestones.filter(m => m.achieved).reduce((sum, m) => sum + m.points, 0);
+  const boosterPoints = positiveBoosterPoints - negativeBoosterPoints + milestonePoints;
   const finalTotal = weekTotal + boosterPoints;
 
-  const handleDayClick = (date: string) => {
+  const handleDayClick = () => {
     navigate("/daily");
   };
 
@@ -200,6 +253,45 @@ export default function Dashboard() {
     setEncouragementMessage(newMessage);
   };
 
+  const handleMilestoneAdd = (milestone: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
+    const newMilestone: Milestone = {
+      ...milestone,
+      id: String(Date.now()),
+      achieved: false,
+    };
+    setMilestones([...milestones, newMilestone]);
+  };
+
+  const handleMilestoneEdit = (id: string, updates: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
+    setMilestones(milestones.map(m => 
+      m.id === id ? { ...m, ...updates } : m
+    ));
+  };
+
+  const handleMilestoneDelete = (id: string) => {
+    setMilestones(milestones.filter(m => m.id !== id));
+  };
+
+  const handleMilestoneToggle = (id: string) => {
+    setMilestones(milestones.map(m => 
+      m.id === id 
+        ? { 
+            ...m, 
+            achieved: !m.achieved, 
+            achievedAt: !m.achieved ? new Date().toISOString() : undefined 
+          } 
+        : m
+    ));
+  };
+
+  const handleCurrentWeekUpdate = (note: string, isCustom: boolean, customGoal?: number) => {
+    setWeekNote(note);
+    setIsCustomGoalWeek(isCustom);
+    setCustomWeekGoal(customGoal);
+  };
+
+  const effectiveGoal = isCustomGoalWeek && customWeekGoal ? customWeekGoal : weeklyGoal;
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <WelcomeMessage
@@ -214,7 +306,7 @@ export default function Dashboard() {
             weekTotal={finalTotal}
             weekRange={weekRange}
             boosterPoints={boosterPoints}
-            weeklyGoal={weeklyGoal}
+            weeklyGoal={effectiveGoal}
             onGoalChange={handleGoalChange}
           />
           <StreaksCard
@@ -223,18 +315,33 @@ export default function Dashboard() {
             longestDayStreak={longestDayStreak}
             longestWeekStreak={longestWeekStreak}
           />
+          <EarnedBadgesPanel badges={badges} />
         </div>
         <div className="lg:col-span-2 space-y-6">
           <WeeklyTable days={days} onDayClick={handleDayClick} />
           <AlertsPanel alerts={alerts} />
+          <CurrentWeekSettings
+            weekRange={weekRange}
+            note={weekNote}
+            isCustomGoalWeek={isCustomGoalWeek}
+            customGoal={customWeekGoal}
+            defaultGoal={weeklyGoal}
+            onUpdate={handleCurrentWeekUpdate}
+          />
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="max-w-md">
-          <BoostersPanel 
-            systemBoosters={mockSystemBoosters}
-            customBoosters={mockCustomBoosters}
+          <BoostersPanel boosters={boosters} />
+        </div>
+        <div className="max-w-md">
+          <MilestonesPanel
+            milestones={milestones}
+            onAdd={handleMilestoneAdd}
+            onEdit={handleMilestoneEdit}
+            onDelete={handleMilestoneDelete}
+            onToggleAchieved={handleMilestoneToggle}
           />
         </div>
         <div className="max-w-lg">
