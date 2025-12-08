@@ -98,6 +98,7 @@ interface CircleBadge {
   required: number;
   earned: boolean;
   reward?: CircleBadgeReward;
+  taskId?: string;
 }
 
 interface APICommunityPost {
@@ -418,6 +419,7 @@ interface CircleAward {
   winner?: { userId: string; userName: string; achievedAt: string };
   endDate?: string;
   reward?: CircleBadgeReward;
+  taskId?: string;
 }
 
 const demoCircleAwards: Record<string, CircleAward[]> = {
@@ -1564,6 +1566,7 @@ export default function CommunityPage() {
   const [newBadgeRewardType, setNewBadgeRewardType] = useState<"none" | "points" | "gift" | "both">("none");
   const [newBadgeRewardPoints, setNewBadgeRewardPoints] = useState("50");
   const [newBadgeRewardGift, setNewBadgeRewardGift] = useState("");
+  const [newBadgeTaskId, setNewBadgeTaskId] = useState<string>("");
   
   const [showAddAward, setShowAddAward] = useState(false);
   const [newAwardName, setNewAwardName] = useState("");
@@ -1574,6 +1577,7 @@ export default function CommunityPage() {
   const [newAwardRewardType, setNewAwardRewardType] = useState<"none" | "points" | "gift" | "both">("none");
   const [newAwardRewardPoints, setNewAwardRewardPoints] = useState("50");
   const [newAwardRewardGift, setNewAwardRewardGift] = useState("");
+  const [newAwardTaskId, setNewAwardTaskId] = useState<string>("");
   
   // Badge/Award requests for approval
   const [badgeRequests, setBadgeRequests] = useState<{ id: string; circleId: string; requesterId: string; requesterName: string; type: "badge" | "award"; data: any; status: string; createdAt: string }[]>([]);
@@ -1591,6 +1595,7 @@ export default function CommunityPage() {
   const [editBadgeRewardType, setEditBadgeRewardType] = useState<"none" | "points" | "gift" | "both">("none");
   const [editBadgeRewardPoints, setEditBadgeRewardPoints] = useState("50");
   const [editBadgeRewardGift, setEditBadgeRewardGift] = useState("");
+  const [editBadgeTaskId, setEditBadgeTaskId] = useState<string>("");
 
   const [editingAward, setEditingAward] = useState<CircleAward | null>(null);
   const [editAwardName, setEditAwardName] = useState("");
@@ -1601,6 +1606,7 @@ export default function CommunityPage() {
   const [editAwardRewardType, setEditAwardRewardType] = useState<"none" | "points" | "gift" | "both">("none");
   const [editAwardRewardPoints, setEditAwardRewardPoints] = useState("50");
   const [editAwardRewardGift, setEditAwardRewardGift] = useState("");
+  const [editAwardTaskId, setEditAwardTaskId] = useState<string>("");
 
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
@@ -2549,6 +2555,7 @@ export default function CommunityPage() {
           icon: "target",
           required: parseInt(newBadgeRequired) || 10,
           reward,
+          taskId: newBadgeTaskId || undefined,
         }
       }, {
         onSuccess: () => {
@@ -2562,6 +2569,7 @@ export default function CommunityPage() {
       setNewBadgeRewardType("none");
       setNewBadgeRewardPoints("50");
       setNewBadgeRewardGift("");
+      setNewBadgeTaskId("");
       return;
     }
 
@@ -2575,6 +2583,7 @@ export default function CommunityPage() {
         required: parseInt(newBadgeRequired) || 10,
         earned: false,
         reward,
+        taskId: newBadgeTaskId || undefined,
       };
       const current = circleBadges[selectedCircle.id] || [];
       setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
@@ -2586,7 +2595,7 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "badge" as const,
-        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10, reward },
+        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10, reward, taskId: newBadgeTaskId || undefined },
         status: "pending",
         createdAt: new Date().toISOString(),
       };
@@ -2601,6 +2610,7 @@ export default function CommunityPage() {
     setNewBadgeRewardType("none");
     setNewBadgeRewardPoints("50");
     setNewBadgeRewardGift("");
+    setNewBadgeTaskId("");
   };
 
   const handleAddAward = () => {
@@ -2630,6 +2640,7 @@ export default function CommunityPage() {
           target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
           category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
           reward: awardReward,
+          taskId: newAwardTaskId || undefined,
         }
       }, {
         onSuccess: () => {
@@ -2645,6 +2656,7 @@ export default function CommunityPage() {
       setNewAwardRewardType("none");
       setNewAwardRewardPoints("50");
       setNewAwardRewardGift("");
+      setNewAwardTaskId("");
       return;
     }
 
@@ -2657,6 +2669,7 @@ export default function CommunityPage() {
         target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
         category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
         reward: awardReward,
+        taskId: newAwardTaskId || undefined,
       };
       const current = circleAwards[selectedCircle.id] || [];
       setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
@@ -2668,7 +2681,7 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "award" as const,
-        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory, reward: awardReward },
+        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory, reward: awardReward, taskId: newAwardTaskId || undefined },
         status: "pending",
         createdAt: new Date().toISOString(),
       };
@@ -2685,6 +2698,7 @@ export default function CommunityPage() {
     setNewAwardRewardType("none");
     setNewAwardRewardPoints("50");
     setNewAwardRewardGift("");
+    setNewAwardTaskId("");
   };
 
   const handleApproveBadgeRequest = (requestId: string) => {
@@ -2792,6 +2806,7 @@ export default function CommunityPage() {
     setEditBadgeName(badge.name);
     setEditBadgeDescription(badge.description);
     setEditBadgeRequired(badge.required.toString());
+    setEditBadgeTaskId(badge.taskId || "");
     if (badge.reward) {
       setEditBadgeRewardType(badge.reward.type);
       setEditBadgeRewardPoints(badge.reward.points?.toString() || "50");
@@ -2826,6 +2841,7 @@ export default function CommunityPage() {
           description: editBadgeDescription.trim(),
           required: parseInt(editBadgeRequired) || 10,
           reward,
+          taskId: editBadgeTaskId || undefined,
         }
       }, {
         onSuccess: () => {
@@ -2838,7 +2854,7 @@ export default function CommunityPage() {
     
     const updatedBadges = (circleBadges[selectedCircle.id] || []).map(b =>
       b.id === editingBadge.id
-        ? { ...b, name: editBadgeName.trim(), description: editBadgeDescription.trim(), required: parseInt(editBadgeRequired) || 10, reward }
+        ? { ...b, name: editBadgeName.trim(), description: editBadgeDescription.trim(), required: parseInt(editBadgeRequired) || 10, reward, taskId: editBadgeTaskId || undefined }
         : b
     );
     setCircleBadges({ ...circleBadges, [selectedCircle.id]: updatedBadges });
@@ -2874,6 +2890,7 @@ export default function CommunityPage() {
     setEditAwardType(award.type);
     setEditAwardTarget(award.target?.toString() || "100");
     setEditAwardCategory(award.category || "");
+    setEditAwardTaskId(award.taskId || "");
     if (award.reward) {
       setEditAwardRewardType(award.reward.type);
       setEditAwardRewardPoints(award.reward.points?.toString() || "50");
@@ -2910,6 +2927,7 @@ export default function CommunityPage() {
           target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined,
           category: editAwardType === "most_in_category" ? editAwardCategory : undefined,
           reward,
+          taskId: editAwardTaskId || undefined,
         }
       }, {
         onSuccess: () => {
@@ -2922,7 +2940,7 @@ export default function CommunityPage() {
     
     const updatedAwards = (circleAwards[selectedCircle.id] || []).map(a =>
       a.id === editingAward.id
-        ? { ...a, name: editAwardName.trim(), description: editAwardDescription.trim(), type: editAwardType, target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined, category: editAwardType === "most_in_category" ? editAwardCategory : undefined, reward }
+        ? { ...a, name: editAwardName.trim(), description: editAwardDescription.trim(), type: editAwardType, target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined, category: editAwardType === "most_in_category" ? editAwardCategory : undefined, reward, taskId: editAwardTaskId || undefined }
         : a
     );
     setCircleAwards({ ...circleAwards, [selectedCircle.id]: updatedAwards });
@@ -4650,6 +4668,20 @@ export default function CommunityPage() {
                                   />
                                 </div>
                               )}
+                              <div className="space-y-2">
+                                <Label>Linked Task (Optional)</Label>
+                                <Select value={newBadgeTaskId} onValueChange={setNewBadgeTaskId}>
+                                  <SelectTrigger data-testid="select-badge-task">
+                                    <SelectValue placeholder="Select a task to track" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">No specific task</SelectItem>
+                                    {(circleTasks[selectedCircle.id] || []).map(task => (
+                                      <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setShowAddBadge(false)}>Cancel</Button>
@@ -4705,6 +4737,20 @@ export default function CommunityPage() {
                               <Input value={editBadgeRewardGift} onChange={(e) => setEditBadgeRewardGift(e.target.value)} data-testid="input-edit-badge-reward-gift" />
                             </div>
                           )}
+                          <div className="space-y-2">
+                            <Label>Linked Task (Optional)</Label>
+                            <Select value={editBadgeTaskId} onValueChange={setEditBadgeTaskId}>
+                              <SelectTrigger data-testid="select-edit-badge-task">
+                                <SelectValue placeholder="Select a task to track" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">No specific task</SelectItem>
+                                {(circleTasks[selectedCircle.id] || []).map(task => (
+                                  <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setEditingBadge(null)}>Cancel</Button>
@@ -4919,6 +4965,20 @@ export default function CommunityPage() {
                                   />
                                 </div>
                               )}
+                              <div className="space-y-2">
+                                <Label>Linked Task (Optional)</Label>
+                                <Select value={newAwardTaskId} onValueChange={setNewAwardTaskId}>
+                                  <SelectTrigger data-testid="select-award-task">
+                                    <SelectValue placeholder="Select a task to track" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">No specific task</SelectItem>
+                                    {(circleTasks[selectedCircle.id] || []).map(task => (
+                                      <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </div>
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setShowAddAward(false)}>Cancel</Button>
@@ -4993,6 +5053,20 @@ export default function CommunityPage() {
                               <Input value={editAwardRewardGift} onChange={(e) => setEditAwardRewardGift(e.target.value)} data-testid="input-edit-award-reward-gift" />
                             </div>
                           )}
+                          <div className="space-y-2">
+                            <Label>Linked Task (Optional)</Label>
+                            <Select value={editAwardTaskId} onValueChange={setEditAwardTaskId}>
+                              <SelectTrigger data-testid="select-edit-award-task">
+                                <SelectValue placeholder="Select a task to track" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">No specific task</SelectItem>
+                                {(circleTasks[selectedCircle.id] || []).map(task => (
+                                  <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setEditingAward(null)}>Cancel</Button>

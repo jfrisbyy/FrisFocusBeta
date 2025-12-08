@@ -653,6 +653,9 @@ export const circles = pgTable("circles", {
   description: text("description"),
   ownerId: varchar("owner_id").notNull().references(() => users.id),
   isPrivate: boolean("is_private").default(false),
+  dailyPointGoal: integer("daily_point_goal"),
+  weeklyPointGoal: integer("weekly_point_goal"),
+  totalCirclePoints: integer("total_circle_points").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -795,6 +798,7 @@ export const circleBadges = pgTable("circle_badges", {
   icon: varchar("icon").default("star"),
   progress: integer("progress").default(0),
   required: integer("required").notNull().default(1),
+  taskId: varchar("task_id"), // Optional: link badge to specific task
   rewardType: varchar("reward_type"), // "points", "gift", "both"
   rewardPoints: integer("reward_points"),
   rewardGift: text("reward_gift"),
@@ -831,6 +835,7 @@ export const circleAwards = pgTable("circle_awards", {
   type: varchar("type").notNull(), // "first_to", "most_in_category", "weekly_champion"
   target: integer("target"), // For "first_to" type
   category: varchar("category"), // For "most_in_category" type
+  taskId: varchar("task_id"), // Optional: link award to specific task
   winnerId: varchar("winner_id").references(() => users.id),
   winnerAchievedAt: timestamp("winner_achieved_at"),
   rewardType: varchar("reward_type"), // "points", "gift", "both"
@@ -844,6 +849,27 @@ export const circleAwards = pgTable("circle_awards", {
 export const insertCircleAwardSchema = createInsertSchema(circleAwards).omit({ id: true, createdAt: true });
 export type InsertCircleAward = z.infer<typeof insertCircleAwardSchema>;
 export type CircleAward = typeof circleAwards.$inferSelect;
+
+// Circle competitions - circle vs circle competitions
+export const circleCompetitions = pgTable("circle_competitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  circleOneId: varchar("circle_one_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  circleTwoId: varchar("circle_two_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  startDate: varchar("start_date").notNull(), // YYYY-MM-DD format
+  endDate: varchar("end_date").notNull(), // YYYY-MM-DD format
+  circleOnePoints: integer("circle_one_points").default(0),
+  circleTwoPoints: integer("circle_two_points").default(0),
+  winnerId: varchar("winner_id"),
+  status: varchar("status").notNull().default("pending"), // "pending", "active", "completed"
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleCompetitionSchema = createInsertSchema(circleCompetitions).omit({ id: true, createdAt: true });
+export type InsertCircleCompetition = z.infer<typeof insertCircleCompetitionSchema>;
+export type CircleCompetition = typeof circleCompetitions.$inferSelect;
 
 // Cheerlines - encouraging messages sent from one user to another
 export const cheerlines = pgTable("cheerlines", {
