@@ -1686,6 +1686,49 @@ export default function CommunityPage() {
     },
   });
 
+  // Competition messages query
+  const competitionMessagesQuery = useQuery<{
+    id: string;
+    competitionId: string;
+    senderId: string;
+    senderName: string;
+    senderCircleId: string;
+    senderCircleName: string;
+    content: string;
+    createdAt: string;
+  }[]>({
+    queryKey: ['/api/competitions', showCompetitionChat, 'messages'],
+    enabled: !isDemo && !!showCompetitionChat,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/competitions/${showCompetitionChat}/messages`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Competition messages mutation
+  const sendCompetitionMessageMutation = useMutation({
+    mutationFn: async (data: { competitionId: string; content: string }) => {
+      const res = await apiRequest("POST", `/api/competitions/${data.competitionId}/messages`, { content: data.content });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to send message');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { competitionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/competitions', competitionId, 'messages'] });
+      setNewCompetitionMessages(prev => ({ ...prev, [competitionId]: "" }));
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send message", description: error.message, variant: "destructive" });
+    },
+  });
+
   const generateInviteCodeMutation = useMutation({
     mutationFn: async (circleId: string) => {
       const res = await apiRequest("PUT", `/api/circles/${circleId}/invite-code`);
@@ -2980,6 +3023,14 @@ export default function CommunityPage() {
   const handleSendCompetitionMessage = (competitionId: string, myCircleName: string) => {
     const messageContent = newCompetitionMessages[competitionId]?.trim() || "";
     if (!messageContent) return;
+    
+    // Use API for authenticated users
+    if (!isDemo) {
+      sendCompetitionMessageMutation.mutate({ competitionId, content: messageContent });
+      return;
+    }
+    
+    // Demo mode - use local state
     const newMsg = {
       id: `cm-${Date.now()}`,
       senderId: "you",

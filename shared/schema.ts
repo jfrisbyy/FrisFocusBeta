@@ -920,6 +920,20 @@ export const insertCompetitionMemberTaskStatsSchema = createInsertSchema(competi
 export type InsertCompetitionMemberTaskStats = z.infer<typeof insertCompetitionMemberTaskStatsSchema>;
 export type CompetitionMemberTaskStats = typeof competitionMemberTaskStats.$inferSelect;
 
+// Competition messages - chat messages in competitions
+export const competitionMessages = pgTable("competition_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competitionId: varchar("competition_id").notNull().references(() => circleCompetitions.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  senderCircleId: varchar("sender_circle_id").notNull().references(() => circles.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCompetitionMessageSchema = createInsertSchema(competitionMessages).omit({ id: true, createdAt: true });
+export type InsertCompetitionMessage = z.infer<typeof insertCompetitionMessageSchema>;
+export type CompetitionMessage = typeof competitionMessages.$inferSelect;
+
 // Circle competition invites - pending invitations to compete
 export const circleCompetitionInvites = pgTable("circle_competition_invites", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

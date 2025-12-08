@@ -82,6 +82,8 @@ import {
   circleCompetitionInvites,
   insertCircleCompetitionSchema,
   insertCircleCompetitionInviteSchema,
+  competitionMessages,
+  insertCompetitionMessageSchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -3490,6 +3492,120 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error fetching opponent leaderboard:", error);
       res.status(500).json({ error: "Failed to fetch opponent leaderboard" });
+    }
+  });
+
+  // ==================== COMPETITION MESSAGES API ====================
+
+  // Get messages for a competition
+  app.get("/api/competitions/:competitionId/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const competitionId = req.params.competitionId;
+
+      // Get competition
+      const [competition] = await db.select().from(circleCompetitions).where(eq(circleCompetitions.id, competitionId));
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      // Verify user is a member of one of the competing circles
+      const [membershipOne] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, competition.circleOneId), eq(circleMembers.userId, userId))
+      );
+      const [membershipTwo] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, competition.circleTwoId), eq(circleMembers.userId, userId))
+      );
+      
+      if (!membershipOne && !membershipTwo) {
+        return res.status(403).json({ error: "Must be a member of one of the competing circles" });
+      }
+
+      // Get messages ordered by creation date
+      const messages = await db.select().from(competitionMessages)
+        .where(eq(competitionMessages.competitionId, competitionId))
+        .orderBy(competitionMessages.createdAt);
+
+      // Enrich with sender info and circle names
+      const enrichedMessages = await Promise.all(messages.map(async (msg) => {
+        const [sender] = await db.select().from(users).where(eq(users.id, msg.senderId));
+        const [senderCircle] = await db.select().from(circles).where(eq(circles.id, msg.senderCircleId));
+        
+        return {
+          id: msg.id,
+          competitionId: msg.competitionId,
+          senderId: msg.senderId,
+          senderName: sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+          senderCircleId: msg.senderCircleId,
+          senderCircleName: senderCircle?.name || 'Unknown Circle',
+          content: msg.content,
+          createdAt: msg.createdAt,
+        };
+      }));
+
+      res.json(enrichedMessages);
+    } catch (error) {
+      console.error("Error fetching competition messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Send a message to a competition
+  app.post("/api/competitions/:competitionId/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const competitionId = req.params.competitionId;
+      const { content } = req.body;
+
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Message content is required" });
+      }
+
+      // Get competition
+      const [competition] = await db.select().from(circleCompetitions).where(eq(circleCompetitions.id, competitionId));
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      // Verify user is a member of one of the competing circles and get their circle
+      const [membershipOne] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, competition.circleOneId), eq(circleMembers.userId, userId))
+      );
+      const [membershipTwo] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, competition.circleTwoId), eq(circleMembers.userId, userId))
+      );
+      
+      if (!membershipOne && !membershipTwo) {
+        return res.status(403).json({ error: "Must be a member of one of the competing circles" });
+      }
+
+      const senderCircleId = membershipOne ? competition.circleOneId : competition.circleTwoId;
+
+      // Insert the message
+      const [newMessage] = await db.insert(competitionMessages).values({
+        competitionId,
+        senderId: userId,
+        senderCircleId,
+        content: content.trim(),
+      }).returning();
+
+      // Get sender info for response
+      const [sender] = await db.select().from(users).where(eq(users.id, userId));
+      const [senderCircle] = await db.select().from(circles).where(eq(circles.id, senderCircleId));
+
+      res.json({
+        id: newMessage.id,
+        competitionId: newMessage.competitionId,
+        senderId: newMessage.senderId,
+        senderName: sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+        senderCircleId: newMessage.senderCircleId,
+        senderCircleName: senderCircle?.name || 'Unknown Circle',
+        content: newMessage.content,
+        createdAt: newMessage.createdAt,
+      });
+    } catch (error) {
+      console.error("Error sending competition message:", error);
+      res.status(500).json({ error: "Failed to send message" });
     }
   });
 
