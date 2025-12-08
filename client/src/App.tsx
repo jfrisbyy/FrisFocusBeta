@@ -17,6 +17,7 @@ import JournalPage from "@/pages/JournalPage";
 import InsightsPage from "@/pages/InsightsPage";
 import FitnessPage from "@/pages/FitnessPage";
 import CommunityPage from "@/pages/CommunityPage";
+import FriendsPage from "@/pages/FriendsPage";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
         <Route path="/insights" component={InsightsPage} />
         <Route path="/fitness" component={FitnessPage} />
         <Route path="/community" component={CommunityPage} />
+        <Route path="/friends" component={FriendsPage} />
         <Route component={NotFound} />
       </Switch>
     </div>

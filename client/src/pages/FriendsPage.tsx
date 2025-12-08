@@ -13,7 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Users, UserPlus, Mail, Check, X, Settings, Trophy, Flame, Calendar, Loader2, Star } from "lucide-react";
+import { Users, UserPlus, Mail, Check, X, Settings, Trophy, Flame, Calendar, Loader2, Star, ChevronLeft, ChevronRight, Search, MessageSquare } from "lucide-react";
+import ProfileHoverCard from "@/components/ProfileHoverCard";
+import { getAvailableUsers, type DemoUser } from "@/lib/demoUsers";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Friend {
   id: string;
@@ -130,6 +133,9 @@ export default function FriendsPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
   const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [directoryPage, setDirectoryPage] = useState(0);
+  const [directorySearch, setDirectorySearch] = useState("");
+  const USERS_PER_PAGE = 4;
 
   const { data: friends = [], isLoading: loadingFriends, isFetched: friendsFetched } = useQuery<Friend[]>({
     queryKey: ["/api/friends"],
@@ -248,6 +254,29 @@ export default function FriendsPage() {
   const displayOutgoing = useDemoData ? demoOutgoingRequests : outgoingRequests;
   const displaySettings = useDemoData ? demoSettings : settings;
 
+  // User directory for discovering new users (demo mode only)
+  const availableUsers = isDemo ? getAvailableUsers() : [];
+  const filteredUsers = availableUsers.filter(user => {
+    const searchLower = directorySearch.toLowerCase();
+    return (
+      user.displayName?.toLowerCase().includes(searchLower) ||
+      user.username?.toLowerCase().includes(searchLower) ||
+      user.firstName?.toLowerCase().includes(searchLower) ||
+      user.lastName?.toLowerCase().includes(searchLower)
+    );
+  });
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+  const paginatedUsers = filteredUsers.slice(
+    directoryPage * USERS_PER_PAGE,
+    (directoryPage + 1) * USERS_PER_PAGE
+  );
+
+  // Reset page when search changes
+  const handleDirectorySearch = (value: string) => {
+    setDirectorySearch(value);
+    setDirectoryPage(0);
+  };
+
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -296,6 +325,129 @@ export default function FriendsPage() {
               </form>
             </CardContent>
           </Card>
+
+          {/* User Directory - Discover new users (demo mode only) */}
+          {isDemo && availableUsers.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Discover Users
+                </CardTitle>
+                <CardDescription>Browse active users and connect with them</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name or username..."
+                    value={directorySearch}
+                    onChange={(e) => handleDirectorySearch(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-directory-search"
+                  />
+                </div>
+
+                {/* User list */}
+                <div className="space-y-3">
+                  {paginatedUsers.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">
+                      {directorySearch ? "No users match your search" : "No users available"}
+                    </p>
+                  ) : (
+                    paginatedUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/30"
+                        data-testid={`directory-user-${user.id}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <ProfileHoverCard userId={user.id} isDemo={true}>
+                            <Avatar className="cursor-pointer">
+                              <AvatarImage src={user.profileImageUrl ?? undefined} />
+                              <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+                            </Avatar>
+                          </ProfileHoverCard>
+                          <div className="min-w-0">
+                            <ProfileHoverCard userId={user.id} isDemo={true}>
+                              <p className="font-medium truncate cursor-pointer hover:underline">
+                                {user.displayName || getName(user.firstName, user.lastName)}
+                              </p>
+                            </ProfileHoverCard>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                              {user.weeklyPoints !== undefined && (
+                                <span className="flex items-center gap-1">
+                                  <Trophy className="w-3 h-3" /> {user.weeklyPoints} pts
+                                </span>
+                              )}
+                              {user.dayStreak !== undefined && (
+                                <span className="flex items-center gap-1">
+                                  <Flame className="w-3 h-3" /> {user.dayStreak}d
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              toast({ title: "Demo Mode", description: "Sign in to send messages" });
+                            }}
+                            data-testid={`button-message-${user.id}`}
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              toast({ title: "Demo Mode", description: "Sign in to add friends" });
+                            }}
+                            data-testid={`button-add-friend-${user.id}`}
+                          >
+                            <UserPlus className="w-4 h-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Pagination controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDirectoryPage(p => Math.max(0, p - 1))}
+                      disabled={directoryPage === 0}
+                      data-testid="button-directory-prev"
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {directoryPage + 1} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDirectoryPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={directoryPage >= totalPages - 1}
+                      data-testid="button-directory-next"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Incoming Friend Requests - shown on Friends tab for visibility */}
           {displayIncoming.length > 0 && (
