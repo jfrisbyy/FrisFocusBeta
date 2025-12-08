@@ -95,6 +95,7 @@ export default function TodoListPanel({
   };
 
   const handleOpenNoteDialog = (itemId: string, currentNote: string) => {
+    if (readOnly && !isDemo) return;
     setEditingItemId(itemId);
     setTempNote(currentNote);
     setNoteDialogOpen(true);
@@ -233,18 +234,23 @@ export default function TodoListPanel({
                 <span className="font-mono text-sm text-muted-foreground">
                   +{item.pointValue}
                 </span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={cn(
-                    "h-7 w-7",
-                    item.note && item.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
-                  )}
-                  onClick={() => handleOpenNoteDialog(item.id, item.note || "")}
-                  data-testid={`button-note-todo-${item.id}`}
-                >
-                  <StickyNote className="h-3 w-3" />
-                </Button>
+                {(!readOnly || isDemo) && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(
+                      "h-7 w-7",
+                      item.note && item.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
+                    )}
+                    onClick={() => handleOpenNoteDialog(item.id, item.note || "")}
+                    data-testid={`button-note-todo-${item.id}`}
+                  >
+                    <StickyNote className="h-3 w-3" />
+                  </Button>
+                )}
+                {readOnly && !isDemo && item.note && item.note.trim() && (
+                  <StickyNote className="h-3 w-3 text-chart-2" />
+                )}
                 {!readOnly && (
                   <Button
                     size="icon"
