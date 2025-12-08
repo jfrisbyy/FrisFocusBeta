@@ -796,6 +796,7 @@ export const userDailyLogs = pgTable("user_daily_logs", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   date: varchar("date").notNull(), // YYYY-MM-DD format
   completedTaskIds: text("completed_task_ids").array().default([]),
+  todoPoints: integer("todo_points").default(0), // Points earned from todo list items
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

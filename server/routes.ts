@@ -2559,7 +2559,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     try {
       const userId = req.user.claims.sub;
       const date = req.params.date;
-      const { completedTaskIds, notes } = req.body;
+      const { completedTaskIds, notes, todoPoints } = req.body;
 
       // Check if log exists for this date
       const [existing] = await db.select().from(userDailyLogs)
@@ -2570,6 +2570,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         const [log] = await db.update(userDailyLogs)
           .set({
             completedTaskIds: completedTaskIds || [],
+            todoPoints: todoPoints || 0,
             notes,
             updatedAt: new Date()
           })
@@ -2582,6 +2583,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           userId,
           date,
           completedTaskIds: completedTaskIds || [],
+          todoPoints: todoPoints || 0,
           notes
         });
         const [log] = await db.insert(userDailyLogs).values(parsed).returning();

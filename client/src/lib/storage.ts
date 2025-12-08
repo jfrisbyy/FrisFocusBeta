@@ -190,6 +190,60 @@ export function saveBadgesToStorage(badges: StoredBadge[]): void {
   saveToStorage(STORAGE_KEYS.BADGES, badges);
 }
 
+/**
+ * Update badge progress based on completed tasks.
+ * Called when a daily log is saved to update badge progress for taskCompletions badges.
+ * @param completedTaskIds - Array of task IDs that were completed
+ * @param tasks - Array of tasks with their names and IDs
+ */
+export function updateBadgeProgressForTasks(
+  completedTaskIds: string[],
+  tasks: { id: string; name: string }[]
+): void {
+  const badges = loadBadgesFromStorage();
+  if (badges.length === 0) return;
+
+  // Create a map of task ID to task name for quick lookup
+  const taskNameMap = new Map(tasks.map(t => [t.id, t.name]));
+  
+  // Get the names of completed tasks
+  const completedTaskNames = completedTaskIds
+    .map(id => taskNameMap.get(id))
+    .filter((name): name is string => !!name);
+
+  let updated = false;
+
+  for (const badge of badges) {
+    // Only process badges that track task completions
+    if (badge.conditionType !== "taskCompletions") continue;
+    if (!badge.taskName) continue;
+
+    // Check if any completed task matches this badge's taskName (case-insensitive)
+    const matchingTasks = completedTaskNames.filter(
+      name => name.toLowerCase() === badge.taskName!.toLowerCase()
+    );
+
+    if (matchingTasks.length > 0) {
+      // Increment progress by the number of matching tasks
+      const newProgress = (badge.currentProgress || 0) + matchingTasks.length;
+      badge.currentProgress = newProgress;
+      updated = true;
+
+      // Check if any levels should be marked as earned
+      for (const level of badge.levels) {
+        if (!level.earned && newProgress >= level.required) {
+          level.earned = true;
+          level.earnedAt = new Date().toISOString();
+        }
+      }
+    }
+  }
+
+  if (updated) {
+    saveBadgesToStorage(badges);
+  }
+}
+
 // ============ JOURNAL ENTRIES ============
 export interface StoredJournalEntry {
   id: string;

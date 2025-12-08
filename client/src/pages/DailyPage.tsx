@@ -18,6 +18,7 @@ import {
   saveJournalToStorage,
   loadDailyTodoListFromStorage,
   saveDailyTodoListToStorage,
+  updateBadgeProgressForTasks,
   type StoredTask,
   type StoredPenalty,
   type StoredJournalEntry,
@@ -126,10 +127,11 @@ export default function DailyPage() {
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
-    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string }) => {
+    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number }) => {
       const response = await apiRequest("PUT", `/api/habit/logs/${data.date}`, {
         completedTaskIds: data.completedTaskIds,
         notes: data.notes,
+        todoPoints: data.todoPoints,
       });
       return response.json();
     },
@@ -402,11 +404,12 @@ export default function DailyPage() {
     }
     
     try {
-      // Save via API
+      // Save via API (include todoPoints for daily summary calculations)
       await saveDailyLogMutation.mutateAsync({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "", // Clear notes from daily log since it's saved to journal
+        todoPoints: totalTodoPoints,
       });
 
       // Also save to localStorage as backup
@@ -415,6 +418,10 @@ export default function DailyPage() {
         completedTaskIds: Array.from(completedIds),
         notes: "",
       });
+
+      // Update badge progress for completed tasks
+      const tasksForBadges = allTasks.map(t => ({ id: t.id, name: t.name }));
+      updateBadgeProgressForTasks(Array.from(completedIds), tasksForBadges);
 
       // Reset the notes field for next entry
       setNotes("");
