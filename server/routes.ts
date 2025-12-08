@@ -820,35 +820,46 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
-  // Send friend request (by email or username)
+  // Send friend request (by email, username, or userId)
   app.post("/api/friends/request", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { email, emailOrUsername } = req.body;
+      const { email, emailOrUsername, userId: targetUserId } = req.body;
 
-      // Support both old 'email' field and new 'emailOrUsername' field
-      const searchValue = emailOrUsername || email;
-
-      if (!searchValue) {
-        return res.status(400).json({ error: "Email or username is required" });
-      }
-
-      // Determine if input looks like an email
-      const isEmail = searchValue.includes("@");
-      
-      // Find user by email or username
+      // Support userId for discovery list, email, or username
       let targetUser;
-      if (isEmail) {
-        const [user] = await db.select().from(users).where(eq(users.email, searchValue));
-        targetUser = user;
-      } else {
-        // Search by username (case-insensitive by using lowercase)
-        const [user] = await db.select().from(users).where(eq(users.username, searchValue.toLowerCase()));
-        targetUser = user;
-      }
       
-      if (!targetUser) {
-        return res.status(404).json({ error: isEmail ? "User not found with that email" : "User not found with that username" });
+      if (targetUserId) {
+        // Find user by ID directly
+        const [user] = await db.select().from(users).where(eq(users.id, targetUserId));
+        targetUser = user;
+        if (!targetUser) {
+          return res.status(404).json({ error: "User not found" });
+        }
+      } else {
+        // Support both old 'email' field and new 'emailOrUsername' field
+        const searchValue = emailOrUsername || email;
+
+        if (!searchValue) {
+          return res.status(400).json({ error: "Email, username, or userId is required" });
+        }
+
+        // Determine if input looks like an email
+        const isEmail = searchValue.includes("@");
+        
+        // Find user by email or username
+        if (isEmail) {
+          const [user] = await db.select().from(users).where(eq(users.email, searchValue));
+          targetUser = user;
+        } else {
+          // Search by username (case-insensitive by using lowercase)
+          const [user] = await db.select().from(users).where(eq(users.username, searchValue.toLowerCase()));
+          targetUser = user;
+        }
+        
+        if (!targetUser) {
+          return res.status(404).json({ error: isEmail ? "User not found with that email" : "User not found with that username" });
+        }
       }
 
       if (targetUser.id === userId) {

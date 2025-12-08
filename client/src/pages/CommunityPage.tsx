@@ -1103,8 +1103,8 @@ export default function CommunityPage() {
   });
 
   const sendFriendRequestMutation = useMutation({
-    mutationFn: async (emailOrUsername: string) => {
-      const res = await apiRequest("POST", "/api/friends/request", { emailOrUsername });
+    mutationFn: async (params: { emailOrUsername?: string; userId?: string }) => {
+      const res = await apiRequest("POST", "/api/friends/request", params);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to send friend request');
@@ -1113,6 +1113,10 @@ export default function CommunityPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === 'string' && (key.startsWith('/api/users') || key.startsWith('/api/users/search'));
+      }});
       toast({ title: "Friend request sent!" });
     },
     onError: (error: Error) => {
@@ -2618,7 +2622,7 @@ export default function CommunityPage() {
         toast({ title: "Friend request sent", description: `Request sent to ${email}` });
         setEmail("");
       } else {
-        sendFriendRequestMutation.mutate(email.trim());
+        sendFriendRequestMutation.mutate({ emailOrUsername: email.trim() });
         setEmail("");
       }
     }
@@ -4532,7 +4536,7 @@ export default function CommunityPage() {
                                         description: `Friend request would be sent to ${u.displayName}`,
                                       });
                                     } else {
-                                      sendFriendRequestMutation.mutate(u.username || u.id);
+                                      sendFriendRequestMutation.mutate({ userId: u.id });
                                     }
                                   }}
                                   data-testid={`button-add-friend-${u.id}`}
@@ -4549,10 +4553,22 @@ export default function CommunityPage() {
                                         description: `Message would open to ${u.displayName}`,
                                       });
                                     } else {
-                                      toast({
-                                        title: "Coming soon",
-                                        description: "Direct messaging will be available soon",
-                                      });
+                                      const pseudoFriend: StoredFriend = {
+                                        id: u.id,
+                                        friendId: u.id,
+                                        firstName: u.firstName || u.displayName || 'User',
+                                        lastName: u.lastName || '',
+                                        profileImageUrl: u.profileImageUrl || undefined,
+                                        todayPoints: 0,
+                                        weeklyPoints: 0,
+                                        totalPoints: 0,
+                                        dayStreak: 0,
+                                        weekStreak: 0,
+                                        totalBadgesEarned: 0,
+                                        visibilityLevel: "full",
+                                        hiddenTaskIds: [],
+                                      };
+                                      setDmFriend(pseudoFriend);
                                     }
                                   }}
                                   data-testid={`button-message-${u.id}`}
