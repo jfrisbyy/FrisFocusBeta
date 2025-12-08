@@ -917,6 +917,23 @@ export default function CommunityPage() {
   const [expandedCompetition, setExpandedCompetition] = useState<string | null>(null);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [expandedOpponentMember, setExpandedOpponentMember] = useState<string | null>(null);
+  const [showCompetitionChat, setShowCompetitionChat] = useState<string | null>(null);
+  const [newCompetitionMessages, setNewCompetitionMessages] = useState<Record<string, string>>({});
+  const [competitionMessages, setCompetitionMessages] = useState<Record<string, { id: string; senderId: string; senderName: string; senderCircleName: string; content: string; createdAt: string; }[]>>({
+    "comp-1": [
+      { id: "cm1", senderId: "u1", senderName: "Sarah M", senderCircleName: "Marathon Mommy's", content: "Great progress everyone! Let's keep pushing!", createdAt: new Date(Date.now() - 3600000 * 2).toISOString() },
+      { id: "cm2", senderId: "opp-1", senderName: "Jake M", senderCircleName: "Fitness Fanatics", content: "Good luck! We're catching up fast!", createdAt: new Date(Date.now() - 3600000).toISOString() },
+      { id: "cm3", senderId: "you", senderName: "You", senderCircleName: "Marathon Mommy's", content: "Bring it on! We've got this!", createdAt: new Date(Date.now() - 1800000).toISOString() },
+    ],
+    "comp-3": [
+      { id: "cm4", senderId: "u4", senderName: "Dad", senderCircleName: "Williams Household", content: "Kids, let's step it up this weekend!", createdAt: new Date(Date.now() - 7200000).toISOString() },
+      { id: "cm5", senderId: "opp-5", senderName: "Mike J", senderCircleName: "The Johnsons", content: "See you at the finish line!", createdAt: new Date(Date.now() - 5400000).toISOString() },
+    ],
+    "comp-4": [
+      { id: "cm6", senderId: "opp-8", senderName: "Nina Y", senderCircleName: "Yoga Warriors", content: "December is our month! Namaste!", createdAt: new Date(Date.now() - 86400000).toISOString() },
+      { id: "cm7", senderId: "u1", senderName: "Sarah M", senderCircleName: "Marathon Mommy's", content: "We're marathon moms - we never give up!", createdAt: new Date(Date.now() - 43200000).toISOString() },
+    ],
+  });
 
   // API queries and mutations for non-demo mode
   const postsQuery = useQuery<APICommunityPost[]>({
@@ -2867,6 +2884,23 @@ export default function CommunityPage() {
     setCircleMessages({ ...circleMessages, [selectedCircle.id]: [...current, newMsg] });
     setNewCircleMessage("");
     clearMessageImage();
+  };
+
+  const handleSendCompetitionMessage = (competitionId: string, myCircleName: string) => {
+    const messageContent = newCompetitionMessages[competitionId]?.trim() || "";
+    if (!messageContent) return;
+    const newMsg = {
+      id: `cm-${Date.now()}`,
+      senderId: "you",
+      senderName: "You",
+      senderCircleName: myCircleName,
+      content: messageContent,
+      createdAt: new Date().toISOString(),
+    };
+    const current = competitionMessages[competitionId] || [];
+    setCompetitionMessages({ ...competitionMessages, [competitionId]: [...current, newMsg] });
+    setNewCompetitionMessages({ ...newCompetitionMessages, [competitionId]: "" });
+    toast({ title: "Message sent", description: "Your message was posted to the competition chat" });
   };
 
   const handleCreateCirclePost = () => {
@@ -6996,6 +7030,69 @@ export default function CommunityPage() {
                                                   </div>
                                                 </div>
                                               )}
+                                              
+                                              <Separator />
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => { e.stopPropagation(); setShowCompetitionChat(showCompetitionChat === competition.id ? null : competition.id); }}
+                                                data-testid={`button-competition-chat-${competition.id}`}
+                                              >
+                                                <MessageCircle className="w-4 h-4 mr-2" />
+                                                {showCompetitionChat === competition.id ? "Hide" : "Show"} Chat
+                                                {(competitionMessages[competition.id]?.length || 0) > 0 && (
+                                                  <Badge variant="secondary" className="ml-2">
+                                                    {competitionMessages[competition.id]?.length}
+                                                  </Badge>
+                                                )}
+                                              </Button>
+                                              {showCompetitionChat === competition.id && (
+                                                <div className="p-3 bg-muted rounded-md space-y-3" onClick={(e) => e.stopPropagation()}>
+                                                  <p className="text-sm font-medium">Competition Chat</p>
+                                                  <ScrollArea className="h-48">
+                                                    <div className="space-y-3 pr-4">
+                                                      {(competitionMessages[competition.id] || []).length === 0 ? (
+                                                        <p className="text-sm text-muted-foreground text-center py-4">
+                                                          No messages yet. Start the conversation!
+                                                        </p>
+                                                      ) : (
+                                                        (competitionMessages[competition.id] || []).map((msg) => (
+                                                          <div key={msg.id} className="flex gap-2" data-testid={`competition-message-${msg.id}`}>
+                                                            <Avatar className="h-6 w-6 flex-shrink-0">
+                                                              <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="flex-1 min-w-0">
+                                                              <div className="flex items-baseline gap-2 flex-wrap">
+                                                                <span className="font-medium text-sm">{msg.senderName}</span>
+                                                                <Badge variant="outline" className="text-xs py-0">{msg.senderCircleName}</Badge>
+                                                                <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                                                              </div>
+                                                              <p className="text-sm mt-0.5">{msg.content}</p>
+                                                            </div>
+                                                          </div>
+                                                        ))
+                                                      )}
+                                                    </div>
+                                                  </ScrollArea>
+                                                  <div className="flex gap-2">
+                                                    <Input
+                                                      placeholder="Send a message..."
+                                                      value={newCompetitionMessages[competition.id] || ""}
+                                                      onChange={(e) => setNewCompetitionMessages({ ...newCompetitionMessages, [competition.id]: e.target.value })}
+                                                      onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleSendCompetitionMessage(competition.id, competition.myCircle.name); } }}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      data-testid={`input-competition-chat-${competition.id}`}
+                                                    />
+                                                    <Button 
+                                                      size="icon" 
+                                                      onClick={(e) => { e.stopPropagation(); handleSendCompetitionMessage(competition.id, competition.myCircle.name); }}
+                                                      data-testid={`button-send-competition-chat-${competition.id}`}
+                                                    >
+                                                      <Send className="w-4 h-4" />
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
                                           )}
                                         </div>
@@ -7406,6 +7503,71 @@ export default function CommunityPage() {
                                             ))}
                                           </div>
                                         )}
+                                      </div>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => { e.stopPropagation(); setShowCompetitionChat(
+                                        showCompetitionChat === competition.id ? null : competition.id
+                                      ); }}
+                                      data-testid={`button-competition-chat-${competition.id}`}
+                                    >
+                                      <MessageCircle className="w-4 h-4 mr-2" />
+                                      {showCompetitionChat === competition.id ? "Hide" : "Show"} Chat
+                                      {(competitionMessages[competition.id]?.length || 0) > 0 && (
+                                        <Badge variant="secondary" className="ml-2">
+                                          {competitionMessages[competition.id]?.length}
+                                        </Badge>
+                                      )}
+                                    </Button>
+                                    {showCompetitionChat === competition.id && (
+                                      <div className="mt-2 p-3 bg-muted rounded-md space-y-3" onClick={(e) => e.stopPropagation()}>
+                                        <p className="text-sm font-medium">Competition Chat</p>
+                                        <ScrollArea className="h-48">
+                                          <div className="space-y-3 pr-4">
+                                            {(competitionMessages[competition.id] || []).length === 0 ? (
+                                              <p className="text-sm text-muted-foreground text-center py-4">
+                                                No messages yet. Start the conversation!
+                                              </p>
+                                            ) : (
+                                              (competitionMessages[competition.id] || []).map((msg) => (
+                                                <div key={msg.id} className="flex gap-2" data-testid={`competition-message-${msg.id}`}>
+                                                  <Avatar className="h-6 w-6 flex-shrink-0">
+                                                    <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
+                                                  </Avatar>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                                      <span className="font-medium text-sm">{msg.senderName}</span>
+                                                      <Badge variant="outline" className="text-xs py-0">
+                                                        {msg.senderCircleName}
+                                                      </Badge>
+                                                      <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                                                    </div>
+                                                    <p className="text-sm mt-0.5">{msg.content}</p>
+                                                  </div>
+                                                </div>
+                                              ))
+                                            )}
+                                          </div>
+                                        </ScrollArea>
+                                        <div className="flex gap-2">
+                                          <Input
+                                            placeholder="Send a message..."
+                                            value={newCompetitionMessages[competition.id] || ""}
+                                            onChange={(e) => setNewCompetitionMessages({ ...newCompetitionMessages, [competition.id]: e.target.value })}
+                                            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleSendCompetitionMessage(competition.id, competition.myCircle.name); } }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            data-testid={`input-competition-chat-${competition.id}`}
+                                          />
+                                          <Button 
+                                            size="icon" 
+                                            onClick={(e) => { e.stopPropagation(); handleSendCompetitionMessage(competition.id, competition.myCircle.name); }}
+                                            data-testid={`button-send-competition-chat-${competition.id}`}
+                                          >
+                                            <Send className="w-4 h-4" />
+                                          </Button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
