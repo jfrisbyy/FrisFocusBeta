@@ -746,6 +746,26 @@ export default function CommunityPage() {
       }
     },
   });
+
+  // Conversations query for non-demo mode - fetches all DM threads
+  const conversationsQuery = useQuery<{
+    partnerId: string;
+    partnerName: string;
+    lastMessage: StoredDirectMessage;
+    unreadCount: number;
+  }[]>({
+    queryKey: ['/api/messages/conversations'],
+    enabled: !isDemo,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", '/api/messages/conversations');
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
   
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -889,6 +909,55 @@ export default function CommunityPage() {
       setCircles(circlesQuery.data);
     }
   }, [isDemo, circlesQuery.data]);
+
+  // Fetch circle details including members when a circle is selected (non-demo mode)
+  useEffect(() => {
+    if (isDemo || !selectedCircle) return;
+    
+    const fetchCircleDetails = async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle.id}`);
+        if (!res.ok) return;
+        
+        const data = await res.json();
+        
+        // Update circle members from API response
+        if (data.members && Array.isArray(data.members)) {
+          const membersForState: StoredCircleMember[] = data.members.map((m: any) => ({
+            id: m.id,
+            circleId: m.circleId,
+            userId: m.userId,
+            firstName: m.user?.firstName || m.user?.displayName || 'Unknown',
+            lastName: m.user?.lastName || '',
+            role: m.role || 'member',
+            joinedAt: m.joinedAt || new Date().toISOString(),
+            weeklyPoints: m.weeklyPoints || 0,
+            profileImageUrl: m.user?.profileImageUrl,
+          }));
+          setCircleMembers(prev => ({ ...prev, [selectedCircle.id]: membersForState }));
+        }
+      } catch (error) {
+        console.error("Error fetching circle details:", error);
+      }
+    };
+    
+    fetchCircleDetails();
+  }, [isDemo, selectedCircle?.id]);
+
+  // Populate direct messages from conversations query (non-demo mode)
+  useEffect(() => {
+    if (isDemo || !conversationsQuery.data) return;
+    
+    // Initialize the directMessages state with conversation partner IDs
+    // Each conversation has a lastMessage which we use to show in the list
+    const dmState: Record<string, StoredDirectMessage[]> = {};
+    conversationsQuery.data.forEach(convo => {
+      if (convo.lastMessage) {
+        dmState[convo.partnerId] = [convo.lastMessage];
+      }
+    });
+    setDirectMessages(dmState);
+  }, [isDemo, conversationsQuery.data]);
 
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
