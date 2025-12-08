@@ -432,8 +432,24 @@ export default function TasksPage() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onMutate: async (newTask) => {
+      // Optimistically add the task to local state immediately
+      const tempId = `temp-${Date.now()}`;
+      setTasks(prev => [...prev, { ...newTask, id: tempId }]);
+      return { tempId };
+    },
+    onSuccess: (data, _variables, context) => {
+      // Replace temp task with real one from server
+      if (context?.tempId && data?.id) {
+        setTasks(prev => prev.map(t => t.id === context.tempId ? { ...t, id: data.id } : t));
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
+    },
+    onError: (_error, _variables, context) => {
+      // Remove the temp task on error
+      if (context?.tempId) {
+        setTasks(prev => prev.filter(t => t.id !== context.tempId));
+      }
     },
   });
 
