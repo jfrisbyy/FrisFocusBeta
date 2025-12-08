@@ -547,9 +547,100 @@ const demoMemberCompetitionStats: Record<string, Record<string, DemoMemberCompet
       ]},
     ],
     "circle-ext-3": [
-      { memberId: "opp-5", memberName: "Mike J", weeklyPoints: 60, taskStats: [] },
-      { memberId: "opp-6", memberName: "Linda J", weeklyPoints: 55, taskStats: [] },
-      { memberId: "opp-7", memberName: "Sam J", weeklyPoints: 50, taskStats: [] },
+      { memberId: "opp-5", memberName: "Mike J", weeklyPoints: 60, taskStats: [
+        { memberId: "opp-5", taskId: "opp-t1", taskName: "Family Dinner", completionCount: 4, points: 40 },
+        { memberId: "opp-5", taskId: "opp-t2", taskName: "Weekly Cleanup", completionCount: 2, points: 20 },
+      ]},
+      { memberId: "opp-6", memberName: "Linda J", weeklyPoints: 55, taskStats: [
+        { memberId: "opp-6", taskId: "opp-t1", taskName: "Family Dinner", completionCount: 3, points: 30 },
+        { memberId: "opp-6", taskId: "opp-t3", taskName: "Grocery Shopping", completionCount: 1, points: 25 },
+      ]},
+      { memberId: "opp-7", memberName: "Sam J", weeklyPoints: 50, taskStats: [
+        { memberId: "opp-7", taskId: "opp-t2", taskName: "Weekly Cleanup", completionCount: 3, points: 30 },
+        { memberId: "opp-7", taskId: "opp-t4", taskName: "Yard Work", completionCount: 2, points: 20 },
+      ]},
+    ],
+  },
+  "comp-4": {
+    "circle-1": [
+      { memberId: "you", memberName: "You", weeklyPoints: 110, taskStats: [
+        { memberId: "you", taskId: "ct1", taskName: "5K Training Run", completionCount: 4, points: 80 },
+        { memberId: "you", taskId: "ct3", taskName: "Stretching Session", completionCount: 3, points: 30 },
+      ]},
+      { memberId: "u1", memberName: "Sarah M", weeklyPoints: 145, taskStats: [
+        { memberId: "u1", taskId: "ct1", taskName: "5K Training Run", completionCount: 5, points: 100 },
+        { memberId: "u1", taskId: "ct2", taskName: "Strength Training", completionCount: 3, points: 45 },
+      ]},
+      { memberId: "u2", memberName: "Lisa K", weeklyPoints: 105, taskStats: [
+        { memberId: "u2", taskId: "ct2", taskName: "Strength Training", completionCount: 4, points: 60 },
+        { memberId: "u2", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 1, points: 30 },
+        { memberId: "u2", taskId: "ct3", taskName: "Stretching Session", completionCount: 1, points: 15 },
+      ]},
+      { memberId: "u3", memberName: "Emma T", weeklyPoints: 90, taskStats: [
+        { memberId: "u3", taskId: "ct1", taskName: "5K Training Run", completionCount: 3, points: 60 },
+        { memberId: "u3", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 1, points: 30 },
+      ]},
+    ],
+    "circle-ext-6": [
+      { memberId: "opp-8", memberName: "Nina Y", weeklyPoints: 125, taskStats: [
+        { memberId: "opp-8", taskId: "yoga-t1", taskName: "Morning Flow", completionCount: 6, points: 90 },
+        { memberId: "opp-8", taskId: "yoga-t2", taskName: "Power Yoga", completionCount: 1, points: 35 },
+      ]},
+      { memberId: "opp-9", memberName: "Derek P", weeklyPoints: 100, taskStats: [
+        { memberId: "opp-9", taskId: "yoga-t1", taskName: "Morning Flow", completionCount: 5, points: 75 },
+        { memberId: "opp-9", taskId: "yoga-t3", taskName: "Meditation", completionCount: 5, points: 25 },
+      ]},
+      { memberId: "opp-10", memberName: "Zoe L", weeklyPoints: 110, taskStats: [
+        { memberId: "opp-10", taskId: "yoga-t2", taskName: "Power Yoga", completionCount: 2, points: 70 },
+        { memberId: "opp-10", taskId: "yoga-t3", taskName: "Meditation", completionCount: 8, points: 40 },
+      ]},
+      { memberId: "opp-11", memberName: "Chris W", weeklyPoints: 85, taskStats: [
+        { memberId: "opp-11", taskId: "yoga-t1", taskName: "Morning Flow", completionCount: 4, points: 60 },
+        { memberId: "opp-11", taskId: "yoga-t3", taskName: "Meditation", completionCount: 5, points: 25 },
+      ]},
+    ],
+  },
+  "comp-5": {
+    "circle-2": [
+      { memberId: "you", memberName: "You", weeklyPoints: 320, taskStats: [
+        { memberId: "you", taskId: "ct6", taskName: "Clean Room", completionCount: 15, points: 150 },
+        { memberId: "you", taskId: "ct7", taskName: "Do Dishes", completionCount: 20, points: 100 },
+        { memberId: "you", taskId: "ct11", taskName: "Walk the Dog", completionCount: 7, points: 70 },
+      ]},
+      { memberId: "u4", memberName: "Dad", weeklyPoints: 410, taskStats: [
+        { memberId: "u4", taskId: "ct9", taskName: "Mow Lawn", completionCount: 8, points: 160 },
+        { memberId: "u4", taskId: "ct8", taskName: "Take Out Trash", completionCount: 30, points: 150 },
+        { memberId: "u4", taskId: "ct11", taskName: "Walk the Dog", completionCount: 10, points: 100 },
+      ]},
+      { memberId: "u5", memberName: "Tommy", weeklyPoints: 260, taskStats: [
+        { memberId: "u5", taskId: "ct10", taskName: "Homework Done", completionCount: 14, points: 210 },
+        { memberId: "u5", taskId: "ct8", taskName: "Take Out Trash", completionCount: 10, points: 50 },
+      ]},
+      { memberId: "u6", memberName: "Sarah", weeklyPoints: 160, taskStats: [
+        { memberId: "u6", taskId: "ct6", taskName: "Clean Room", completionCount: 10, points: 100 },
+        { memberId: "u6", taskId: "ct7", taskName: "Do Dishes", completionCount: 12, points: 60 },
+      ]},
+      { memberId: "u7", memberName: "Baby Jake", weeklyPoints: 100, taskStats: [
+        { memberId: "u7", taskId: "ct6", taskName: "Clean Room", completionCount: 10, points: 100 },
+      ]},
+    ],
+    "circle-ext-7": [
+      { memberId: "opp-12", memberName: "Carlos G", weeklyPoints: 380, taskStats: [
+        { memberId: "opp-12", taskId: "gar-t1", taskName: "Cook Dinner", completionCount: 18, points: 180 },
+        { memberId: "opp-12", taskId: "gar-t2", taskName: "Family Activity", completionCount: 8, points: 200 },
+      ]},
+      { memberId: "opp-13", memberName: "Maria G", weeklyPoints: 340, taskStats: [
+        { memberId: "opp-13", taskId: "gar-t1", taskName: "Cook Dinner", completionCount: 15, points: 150 },
+        { memberId: "opp-13", taskId: "gar-t3", taskName: "Laundry", completionCount: 19, points: 190 },
+      ]},
+      { memberId: "opp-14", memberName: "Juan G", weeklyPoints: 260, taskStats: [
+        { memberId: "opp-14", taskId: "gar-t4", taskName: "Study Time", completionCount: 18, points: 180 },
+        { memberId: "opp-14", taskId: "gar-t5", taskName: "Pet Care", completionCount: 16, points: 80 },
+      ]},
+      { memberId: "opp-15", memberName: "Sofia G", weeklyPoints: 200, taskStats: [
+        { memberId: "opp-15", taskId: "gar-t4", taskName: "Study Time", completionCount: 12, points: 120 },
+        { memberId: "opp-15", taskId: "gar-t5", taskName: "Pet Care", completionCount: 16, points: 80 },
+      ]},
     ],
   },
 };
@@ -565,6 +656,18 @@ const demoOpponentMembers: Record<string, { id: string; firstName: string; lastN
     { id: "opp-5", firstName: "Mike", lastName: "J", weeklyPoints: 60 },
     { id: "opp-6", firstName: "Linda", lastName: "J", weeklyPoints: 55 },
     { id: "opp-7", firstName: "Sam", lastName: "J", weeklyPoints: 50 },
+  ],
+  "circle-ext-6": [
+    { id: "opp-8", firstName: "Nina", lastName: "Y", weeklyPoints: 125 },
+    { id: "opp-9", firstName: "Derek", lastName: "P", weeklyPoints: 100 },
+    { id: "opp-10", firstName: "Zoe", lastName: "L", weeklyPoints: 110 },
+    { id: "opp-11", firstName: "Chris", lastName: "W", weeklyPoints: 85 },
+  ],
+  "circle-ext-7": [
+    { id: "opp-12", firstName: "Carlos", lastName: "G", weeklyPoints: 380 },
+    { id: "opp-13", firstName: "Maria", lastName: "G", weeklyPoints: 340 },
+    { id: "opp-14", firstName: "Juan", lastName: "G", weeklyPoints: 260 },
+    { id: "opp-15", firstName: "Sofia", lastName: "G", weeklyPoints: 200 },
   ],
 };
 
@@ -4728,6 +4831,16 @@ export default function CommunityPage() {
                 const currentUserId = isDemo ? "you" : user?.id;
                 const yourWeeklyPoints = circleMembers[selectedCircle.id]?.find(m => m.userId === currentUserId)?.weeklyPoints || 0;
                 
+                // Calculate actual daily points from today's completions
+                const yourDailyCompletions = isDemo
+                  ? demoMemberDailyCompletions[selectedCircle.id]?.[currentUserId || ""] || []
+                  : (circleCompletionsQuery.data || []).filter(c => c.userId === currentUserId);
+                
+                const yourDailyPoints = yourDailyCompletions.reduce((sum, t) => {
+                  const task = (circleTasks[selectedCircle.id] || []).find(ct => ct.id === t.taskId);
+                  return sum + (task?.value || 0);
+                }, 0);
+                
                 return (
                   <Card className="mb-4">
                     <CardContent className="pt-4">
@@ -4740,10 +4853,10 @@ export default function CommunityPage() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Daily Goal</span>
-                              <span className="font-medium">{Math.round(yourWeeklyPoints / 7)} / {selectedCircle.dailyPointGoal} pts</span>
+                              <span className="font-medium">{yourDailyPoints} / {selectedCircle.dailyPointGoal} pts</span>
                             </div>
                             <Progress 
-                              value={Math.min(100, (yourWeeklyPoints / 7 / selectedCircle.dailyPointGoal) * 100)} 
+                              value={Math.min(100, (yourDailyPoints / selectedCircle.dailyPointGoal) * 100)} 
                               className="h-2"
                             />
                           </div>
