@@ -659,6 +659,24 @@ export default function CommunityPage() {
     },
   });
 
+  // Create circle mutation for non-demo mode
+  const createCircleMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string; iconColor?: string }) => {
+      const res = await apiRequest("POST", "/api/circles", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create circle');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create circle", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Friends list query for non-demo mode
   const friendsQuery = useQuery<StoredFriend[]>({
     queryKey: ['/api/friends'],
@@ -1294,32 +1312,54 @@ export default function CommunityPage() {
 
   const handleCreateCircle = () => {
     if (newCircleName.trim()) {
-      const newCircle: StoredCircle = {
-        id: `circle-${Date.now()}`,
-        name: newCircleName.trim(),
-        description: newCircleDescription.trim() || "A new circle to share goals",
-        iconColor: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
-        createdAt: new Date().toISOString().split("T")[0],
-        createdBy: "you",
-        memberCount: 1,
-      };
-      setCircles([...circles, newCircle]);
-      setCircleMembers({ 
-        ...circleMembers, 
-        [newCircle.id]: [
-          { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
-        ]
-      });
-      setCircleTasks({ ...circleTasks, [newCircle.id]: [] });
-      setCircleMessages({ ...circleMessages, [newCircle.id]: [] });
-      setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
-      toast({
-        title: "Circle created",
-        description: `"${newCircleName}" has been created. Invite members to get started!`,
-      });
-      setShowCreateCircle(false);
-      setNewCircleName("");
-      setNewCircleDescription("");
+      const iconColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`;
+      
+      if (!isDemo) {
+        // In non-demo mode, call the API to persist the circle
+        createCircleMutation.mutate({
+          name: newCircleName.trim(),
+          description: newCircleDescription.trim() || "A new circle to share goals",
+          iconColor,
+        }, {
+          onSuccess: () => {
+            toast({
+              title: "Circle created",
+              description: `"${newCircleName}" has been created. Invite members to get started!`,
+            });
+            setShowCreateCircle(false);
+            setNewCircleName("");
+            setNewCircleDescription("");
+          },
+        });
+      } else {
+        // Demo mode - only update local state
+        const newCircle: StoredCircle = {
+          id: `circle-${Date.now()}`,
+          name: newCircleName.trim(),
+          description: newCircleDescription.trim() || "A new circle to share goals",
+          iconColor,
+          createdAt: new Date().toISOString().split("T")[0],
+          createdBy: "you",
+          memberCount: 1,
+        };
+        setCircles([...circles, newCircle]);
+        setCircleMembers({ 
+          ...circleMembers, 
+          [newCircle.id]: [
+            { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
+          ]
+        });
+        setCircleTasks({ ...circleTasks, [newCircle.id]: [] });
+        setCircleMessages({ ...circleMessages, [newCircle.id]: [] });
+        setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
+        toast({
+          title: "Circle created",
+          description: `"${newCircleName}" has been created. Invite members to get started!`,
+        });
+        setShowCreateCircle(false);
+        setNewCircleName("");
+        setNewCircleDescription("");
+      }
     }
   };
 
