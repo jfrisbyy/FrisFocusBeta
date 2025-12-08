@@ -1502,8 +1502,8 @@ export default function CommunityPage() {
     },
   };
   
-  // Demo data for all-time stats
-  const demoMemberAllTimeStats: Record<string, Record<string, { weeklyHistory: { week: string; points: number }[]; taskTotals: { taskName: string; count: number }[]; totalPoints: number }>> = {
+  // Demo data for all-time stats (including goal streaks)
+  const demoMemberAllTimeStats: Record<string, Record<string, { weeklyHistory: { week: string; points: number }[]; taskTotals: { taskName: string; count: number }[]; totalPoints: number; goalStreak: number }>> = {
     "circle-1": {
       "you": {
         weeklyHistory: [
@@ -1518,6 +1518,7 @@ export default function CommunityPage() {
           { taskName: "Strength Training", count: 8 },
         ],
         totalPoints: 470,
+        goalStreak: 5,
       },
       "u1": {
         weeklyHistory: [
@@ -1532,6 +1533,19 @@ export default function CommunityPage() {
           { taskName: "Long Run (10K+)", count: 12 },
         ],
         totalPoints: 760,
+        goalStreak: 14,
+      },
+      "u2": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 520,
+        goalStreak: 7,
+      },
+      "u3": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 480,
+        goalStreak: 3,
       },
     },
     "circle-2": {
@@ -1547,6 +1561,13 @@ export default function CommunityPage() {
           { taskName: "Take Out Trash", count: 8 },
         ],
         totalPoints: 250,
+        goalStreak: 8,
+      },
+      "u4": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 200,
+        goalStreak: 6,
       },
       "u5": {
         weeklyHistory: [
@@ -1560,6 +1581,33 @@ export default function CommunityPage() {
           { taskName: "Walk the Dog", count: 10 },
         ],
         totalPoints: 160,
+        goalStreak: 4,
+      },
+      "u6": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 180,
+        goalStreak: 2,
+      },
+      "u7": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 75,
+        goalStreak: 1,
+      },
+    },
+    "circle-3": {
+      "you": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 120,
+        goalStreak: 3,
+      },
+      "u8": {
+        weeklyHistory: [],
+        taskTotals: [],
+        totalPoints: 225,
+        goalStreak: 10,
       },
     },
   };
@@ -4058,6 +4106,112 @@ export default function CommunityPage() {
                   ))}
                 </div>
               )}
+
+              {/* Circle vs Circle Competition Rankings */}
+              {circles.length >= 2 && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-yellow-500" />
+                      <CardTitle>Circle Competition</CardTitle>
+                    </div>
+                    <CardDescription>
+                      See how your circles rank against each other by total weekly points
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {(() => {
+                        const circleRankings = circles.map(circle => {
+                          const members = circleMembers[circle.id] || [];
+                          const memberPoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                          
+                          const awards = circleAwards[circle.id] || [];
+                          const awardBonusPoints = awards.reduce((sum, award) => {
+                            if (award.winner && award.reward && (award.reward.type === "points" || award.reward.type === "both") && award.reward.points) {
+                              return sum + award.reward.points;
+                            }
+                            return sum;
+                          }, 0);
+                          
+                          const totalPoints = memberPoints + awardBonusPoints;
+                          const memberCount = members.length;
+                          const avgPoints = memberCount > 0 ? Math.round(memberPoints / memberCount) : 0;
+                          return {
+                            ...circle,
+                            totalPoints,
+                            memberPoints,
+                            awardBonusPoints,
+                            memberCount: members.length || circle.memberCount,
+                            avgPoints,
+                          };
+                        }).sort((a, b) => b.totalPoints - a.totalPoints);
+
+                        return circleRankings.map((circle, index) => {
+                          const rank = index + 1;
+                          const getMedalColor = (r: number) => {
+                            if (r === 1) return "text-yellow-500";
+                            if (r === 2) return "text-gray-400";
+                            if (r === 3) return "text-amber-600";
+                            return "text-muted-foreground";
+                          };
+
+                          return (
+                            <div
+                              key={circle.id}
+                              className="flex items-center gap-3 p-3 rounded-md bg-muted/50 hover-elevate cursor-pointer"
+                              onClick={() => { setSelectedCircle(circle); setCircleDetailTab("leaderboard"); }}
+                              data-testid={`ranking-circle-${circle.id}`}
+                            >
+                              <div className="flex items-center justify-center w-8">
+                                {rank <= 3 ? (
+                                  <Trophy className={`w-5 h-5 ${getMedalColor(rank)}`} />
+                                ) : (
+                                  <span className="text-sm font-medium text-muted-foreground">#{rank}</span>
+                                )}
+                              </div>
+                              <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: circle.iconColor }}
+                              >
+                                <CircleDot className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium truncate">{circle.name}</span>
+                                  {circle.createdBy === "you" && (
+                                    <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {circle.memberCount}
+                                  </span>
+                                  <span>Avg: {circle.avgPoints} pts/member</span>
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-lg font-bold text-primary" data-testid={`text-competition-points-${circle.id}`}>
+                                  {circle.totalPoints}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {circle.awardBonusPoints > 0 ? (
+                                    <span><span className="text-green-500">+{circle.awardBonusPoints}</span> bonus</span>
+                                  ) : (
+                                    "total pts"
+                                  )}
+                                </div>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </>
           ) : (
             <div className="space-y-6">
@@ -4094,9 +4248,19 @@ export default function CommunityPage() {
               {(() => {
                 const currentUserId = isDemo ? "you" : user?.id;
                 const members = circleMembers[selectedCircle.id] || [];
-                const totalCirclePoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                const memberPoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                
+                const awards = circleAwards[selectedCircle.id] || [];
+                const awardBonusPoints = awards.reduce((sum, award) => {
+                  if (award.winner && award.reward && (award.reward.type === "points" || award.reward.type === "both") && award.reward.points) {
+                    return sum + award.reward.points;
+                  }
+                  return sum;
+                }, 0);
+                
+                const totalCirclePoints = memberPoints + awardBonusPoints;
                 const memberCount = members.length;
-                const avgPointsPerMember = memberCount > 0 ? Math.round(totalCirclePoints / memberCount) : 0;
+                const avgPointsPerMember = memberCount > 0 ? Math.round(memberPoints / memberCount) : 0;
                 const yourPoints = members.find(m => m.userId === currentUserId)?.weeklyPoints || 0;
                 
                 return (
@@ -4110,6 +4274,11 @@ export default function CommunityPage() {
                         <div className="text-center p-3 rounded-md bg-muted/50">
                           <div className="text-2xl font-bold text-primary" data-testid="text-total-circle-points">{totalCirclePoints}</div>
                           <div className="text-xs text-muted-foreground">Total Circle Points</div>
+                          {awardBonusPoints > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span className="text-green-500">+{awardBonusPoints}</span> from awards
+                            </div>
+                          )}
                         </div>
                         <div className="text-center p-3 rounded-md bg-muted/50">
                           <div className="text-2xl font-bold" data-testid="text-member-count">{memberCount}</div>
@@ -4598,15 +4767,28 @@ export default function CommunityPage() {
                       {/* Total Points Banner */}
                       {(() => {
                         const members = circleMembers[selectedCircle.id] || [];
-                        const totalCirclePoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                        const memberPoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                        const awards = circleAwards[selectedCircle.id] || [];
+                        const awardBonusPoints = awards.reduce((sum, award) => {
+                          if (award.winner && award.reward && (award.reward.type === "points" || award.reward.type === "both") && award.reward.points) {
+                            return sum + award.reward.points;
+                          }
+                          return sum;
+                        }, 0);
+                        const totalCirclePoints = memberPoints + awardBonusPoints;
                         return (
                           <div className="flex items-center justify-between p-3 mb-4 rounded-md bg-primary/10 border border-primary/20">
                             <div className="flex items-center gap-2">
                               <Users className="w-5 h-5 text-primary" />
                               <span className="font-medium">Combined Circle Total</span>
                             </div>
-                            <div className="text-xl font-bold text-primary" data-testid="text-leaderboard-total-points">
-                              {totalCirclePoints} pts
+                            <div className="flex items-center gap-2">
+                              <div className="text-xl font-bold text-primary" data-testid="text-leaderboard-total-points">
+                                {totalCirclePoints} pts
+                              </div>
+                              {awardBonusPoints > 0 && (
+                                <span className="text-xs text-green-500">+{awardBonusPoints} from awards</span>
+                              )}
                             </div>
                           </div>
                         );
@@ -4688,6 +4870,12 @@ export default function CommunityPage() {
                                       {leaderboardViewMode === "week" && `${member.weeklyPoints} pts`}
                                       {leaderboardViewMode === "alltime" && `${member.weeklyPoints} pts/wk`}
                                     </Badge>
+                                    {allTimeStats?.goalStreak && allTimeStats.goalStreak > 0 && (
+                                      <div className="flex items-center gap-1 text-orange-500" title={`${allTimeStats.goalStreak} day goal streak`}>
+                                        <Flame className="w-4 h-4" />
+                                        <span className="text-xs font-medium">{allTimeStats.goalStreak}</span>
+                                      </div>
+                                    )}
                                     <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                                   </div>
                                 </div>
