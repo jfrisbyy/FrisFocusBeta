@@ -596,6 +596,8 @@ export default function CommunityPage() {
   const friendRequestsQuery = useQuery<FriendRequest[]>({
     queryKey: ['/api/friends/requests'],
     enabled: !isDemo,
+    staleTime: 0, // Always refetch to get latest friend requests
+    refetchOnMount: 'always',
     queryFn: async () => {
       const [incomingRes, outgoingRes] = await Promise.all([
         fetch('/api/friends/requests', { credentials: 'include' }),
@@ -735,6 +737,7 @@ export default function CommunityPage() {
   const [feedPostImagePreview, setFeedPostImagePreview] = useState<string | null>(null);
   const [feedPostUploading, setFeedPostUploading] = useState(false);
   const [feedViewFilter, setFeedViewFilter] = useState<"all" | "friends" | "public">("all");
+  const [communityTab, setCommunityTab] = useState<"friends" | "circles" | "feed">("friends");
   const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
   const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
   const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
@@ -2507,7 +2510,14 @@ export default function CommunityPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="friends" className="w-full">
+      <Tabs value={communityTab} onValueChange={(v) => {
+        setCommunityTab(v as "friends" | "circles" | "feed");
+        // Refetch friend requests when switching to friends tab
+        if (v === "friends" && !isDemo) {
+          friendRequestsQuery.refetch();
+          friendsQuery.refetch();
+        }
+      }} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="friends" data-testid="tab-friends">
             <Users className="w-4 h-4 mr-2" />
