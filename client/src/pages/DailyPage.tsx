@@ -55,6 +55,21 @@ const sampleDailyTodos: StoredTodoItem[] = [
   { id: "demo-todo-4", title: "Take out trash", pointValue: 3, completed: false, order: 3 },
 ];
 
+interface Season {
+  id: string;
+  name: string;
+  isActive: boolean;
+  isArchived: boolean;
+}
+
+interface SeasonWithData {
+  id: string;
+  name: string;
+  tasks: any[];
+  categories: any[];
+  penalties: any[];
+}
+
 export default function DailyPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
@@ -70,20 +85,34 @@ export default function DailyPage() {
 
   const dateStr = format(date, "yyyy-MM-dd");
 
-  // API queries for tasks, penalties, categories
+  // Fetch seasons to check for active season
+  const { data: seasons = [] } = useQuery<Season[]>({
+    queryKey: ["/api/seasons"],
+    enabled: !isDemo,
+  });
+
+  const activeSeason = seasons.find((s) => s.isActive && !s.isArchived);
+
+  // Fetch active season data (tasks/categories/penalties) when a season is active
+  const { data: activeSeasonData, isFetched: activeSeasonDataFetched } = useQuery<SeasonWithData>({
+    queryKey: ["/api/seasons", activeSeason?.id, "data"],
+    enabled: !isDemo && !!activeSeason?.id,
+  });
+
+  // API queries for tasks, penalties, categories (only when no active season)
   const { data: apiTasks, isLoading: loadingTasks, isFetched: tasksFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/tasks"],
-    enabled: !isDemo,
+    enabled: !isDemo && !activeSeason,
   });
 
   const { data: apiPenalties, isLoading: loadingPenalties, isFetched: penaltiesFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/penalties"],
-    enabled: !isDemo,
+    enabled: !isDemo && !activeSeason,
   });
 
   const { data: apiCategories, isFetched: categoriesFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/categories"],
-    enabled: !isDemo,
+    enabled: !isDemo && !activeSeason,
   });
 
   // API query for daily log of selected date
@@ -93,7 +122,7 @@ export default function DailyPage() {
   });
   
   // Check if API queries have completed their initial fetch
-  const apiQueriesReady = isDemo || (tasksFetched && penaltiesFetched);
+  const apiQueriesReady = isDemo || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched));
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
@@ -122,7 +151,7 @@ export default function DailyPage() {
     },
   });
 
-  // Load tasks and penalties from API or localStorage
+  // Load tasks and penalties from API (season or user tasks) or localStorage
   useEffect(() => {
     if (isDemo) {
       setAllTasks(sampleTasks);
@@ -138,7 +167,30 @@ export default function DailyPage() {
       return;
     }
 
-    // If API returned data with actual items, use it; otherwise fall back to localStorage
+    // If there's an active season, use its data
+    if (activeSeason && activeSeasonData) {
+      const categoryMap = new Map(activeSeasonData.categories.map((c: any) => [c.id, c.name]));
+
+      const taskItems: DisplayTask[] = activeSeasonData.tasks.map((task: any) => ({
+        id: task.id,
+        name: task.name,
+        value: task.value,
+        category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
+        isBooster: !!task.boosterRule,
+      }));
+
+      const penaltyItems: DisplayTask[] = activeSeasonData.penalties.map((penalty: any) => ({
+        id: penalty.id,
+        name: penalty.name,
+        value: -Math.abs(penalty.value),
+        category: "Penalties",
+      }));
+
+      setAllTasks([...taskItems, ...penaltyItems]);
+      return;
+    }
+
+    // No active season - use user tasks/penalties or localStorage
     const hasApiData = (apiTasks && apiTasks.length > 0) || (apiPenalties && apiPenalties.length > 0);
     
     if (hasApiData) {
@@ -185,7 +237,7 @@ export default function DailyPage() {
 
       setAllTasks([...taskItems, ...penaltyItems]);
     }
-  }, [isDemo, apiTasks, apiPenalties, apiCategories, apiQueriesReady]);
+  }, [isDemo, apiTasks, apiPenalties, apiCategories, apiQueriesReady, activeSeason, activeSeasonData]);
 
   // Load daily log from API or localStorage when date changes
   useEffect(() => {
