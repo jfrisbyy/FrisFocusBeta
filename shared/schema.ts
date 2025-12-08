@@ -851,16 +851,21 @@ export const insertCircleAwardSchema = createInsertSchema(circleAwards).omit({ i
 export type InsertCircleAward = z.infer<typeof insertCircleAwardSchema>;
 export type CircleAward = typeof circleAwards.$inferSelect;
 
+// Competition type enum
+export const competitionTypeEnum = z.enum(["targetPoints", "timed", "ongoing"]);
+export type CompetitionType = z.infer<typeof competitionTypeEnum>;
+
 // Circle competitions - circle vs circle competitions
 export const circleCompetitions = pgTable("circle_competitions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  competitionType: varchar("competition_type").notNull().default("targetPoints"), // "targetPoints", "timed", "ongoing"
   circleOneId: varchar("circle_one_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
   circleTwoId: varchar("circle_two_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
   startDate: varchar("start_date").notNull(), // YYYY-MM-DD format
-  endDate: varchar("end_date"), // YYYY-MM-DD format (optional for target-based competitions)
-  targetPoints: integer("target_points"), // Target points to win (race-to-points mode)
+  endDate: varchar("end_date"), // YYYY-MM-DD format (required for "timed", null for "ongoing" and "targetPoints")
+  targetPoints: integer("target_points"), // Target points to win (race-to-points mode, null for other types)
   circleOnePoints: integer("circle_one_points").default(0),
   circleTwoPoints: integer("circle_two_points").default(0),
   winnerId: varchar("winner_id"),
@@ -873,12 +878,56 @@ export const insertCircleCompetitionSchema = createInsertSchema(circleCompetitio
 export type InsertCircleCompetition = z.infer<typeof insertCircleCompetitionSchema>;
 export type CircleCompetition = typeof circleCompetitions.$inferSelect;
 
+// Circle competition records - win/loss tracking per circle
+export const circleCompetitionRecords = pgTable("circle_competition_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }).unique(),
+  wins: integer("wins").notNull().default(0),
+  losses: integer("losses").notNull().default(0),
+  ties: integer("ties").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCircleCompetitionRecordSchema = createInsertSchema(circleCompetitionRecords).omit({ id: true, updatedAt: true });
+export type InsertCircleCompetitionRecord = z.infer<typeof insertCircleCompetitionRecordSchema>;
+export type CircleCompetitionRecord = typeof circleCompetitionRecords.$inferSelect;
+
+// Competition member stats - tracks each member's contribution to a competition
+export const competitionMemberStats = pgTable("competition_member_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  competitionId: varchar("competition_id").notNull().references(() => circleCompetitions.id, { onDelete: "cascade" }),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  memberId: varchar("member_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  totalPoints: integer("total_points").notNull().default(0),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow(),
+});
+
+export const insertCompetitionMemberStatsSchema = createInsertSchema(competitionMemberStats).omit({ id: true, lastSyncedAt: true });
+export type InsertCompetitionMemberStats = z.infer<typeof insertCompetitionMemberStatsSchema>;
+export type CompetitionMemberStats = typeof competitionMemberStats.$inferSelect;
+
+// Competition member task stats - tracks tasks completed by each member in a competition
+export const competitionMemberTaskStats = pgTable("competition_member_task_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberStatsId: varchar("member_stats_id").notNull().references(() => competitionMemberStats.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull(),
+  taskName: varchar("task_name").notNull(), // Snapshot of task name at time of completion
+  completionCount: integer("completion_count").notNull().default(0),
+  pointsAwarded: integer("points_awarded").notNull().default(0),
+});
+
+export const insertCompetitionMemberTaskStatsSchema = createInsertSchema(competitionMemberTaskStats).omit({ id: true });
+export type InsertCompetitionMemberTaskStats = z.infer<typeof insertCompetitionMemberTaskStatsSchema>;
+export type CompetitionMemberTaskStats = typeof competitionMemberTaskStats.$inferSelect;
+
 // Circle competition invites - pending invitations to compete
 export const circleCompetitionInvites = pgTable("circle_competition_invites", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   inviterCircleId: varchar("inviter_circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
   inviteeCircleId: varchar("invitee_circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
-  targetPoints: integer("target_points").notNull(),
+  competitionType: varchar("competition_type").notNull().default("targetPoints"), // "targetPoints", "timed", "ongoing"
+  targetPoints: integer("target_points"), // Required for "targetPoints" type, null otherwise
+  endDate: varchar("end_date"), // Required for "timed" type, null otherwise
   name: varchar("name"),
   description: text("description"),
   status: varchar("status").notNull().default("pending"), // "pending", "accepted", "declined"
