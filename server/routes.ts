@@ -25,6 +25,8 @@ import {
   users,
   insertFriendshipSchema,
   insertSharingSettingsSchema,
+  seasons,
+  insertSeasonSchema,
 } from "@shared/schema";
 import { and, or } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -1079,6 +1081,114 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error fetching GPT data:", error);
       res.status(500).json({ error: "Failed to fetch fitness data" });
+    }
+  });
+
+  // ==================== SEASONS API ROUTES ====================
+
+  // Get all seasons for current user
+  app.get("/api/seasons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userSeasons = await db.select().from(seasons).where(eq(seasons.userId, userId));
+      res.json(userSeasons);
+    } catch (error) {
+      console.error("Error fetching seasons:", error);
+      res.status(500).json({ error: "Failed to fetch seasons" });
+    }
+  });
+
+  // Create a new season
+  app.post("/api/seasons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertSeasonSchema.parse({ ...req.body, userId });
+      const [season] = await db.insert(seasons).values(parsed).returning();
+      res.json(season);
+    } catch (error) {
+      console.error("Error creating season:", error);
+      res.status(400).json({ error: "Failed to create season" });
+    }
+  });
+
+  // Activate a season (deactivates all others for this user)
+  app.put("/api/seasons/:id/activate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Verify season belongs to user
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+
+      // Deactivate all seasons for this user
+      await db.update(seasons)
+        .set({ isActive: false })
+        .where(eq(seasons.userId, userId));
+
+      // Activate the selected season
+      const [updated] = await db.update(seasons)
+        .set({ isActive: true })
+        .where(eq(seasons.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error activating season:", error);
+      res.status(500).json({ error: "Failed to activate season" });
+    }
+  });
+
+  // Deactivate a season (sets isActive to false)
+  app.put("/api/seasons/:id/deactivate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Verify season belongs to user
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+
+      // Deactivate the season
+      const [updated] = await db.update(seasons)
+        .set({ isActive: false })
+        .where(eq(seasons.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error deactivating season:", error);
+      res.status(500).json({ error: "Failed to deactivate season" });
+    }
+  });
+
+  // Delete a season
+  app.delete("/api/seasons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Verify season belongs to user
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+
+      await db.delete(seasons).where(eq(seasons.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting season:", error);
+      res.status(500).json({ error: "Failed to delete season" });
     }
   });
 

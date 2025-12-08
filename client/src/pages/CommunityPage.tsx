@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import ProfileHoverCard from "@/components/ProfileHoverCard";
 import {
   Users,
   UserPlus,
@@ -686,7 +687,7 @@ export default function CommunityPage() {
   };
   
   // Demo data for all-time stats
-  const demoMemberAllTimeStats: Record<string, Record<string, { weeklyHistory: { week: string; points: number }[]; taskTotals: { taskName: string; count: number }[] }>> = {
+  const demoMemberAllTimeStats: Record<string, Record<string, { weeklyHistory: { week: string; points: number }[]; taskTotals: { taskName: string; count: number }[]; totalPoints: number }>> = {
     "circle-1": {
       "you": {
         weeklyHistory: [
@@ -700,6 +701,7 @@ export default function CommunityPage() {
           { taskName: "Stretching Session", count: 22 },
           { taskName: "Strength Training", count: 8 },
         ],
+        totalPoints: 470,
       },
       "u1": {
         weeklyHistory: [
@@ -713,6 +715,7 @@ export default function CommunityPage() {
           { taskName: "Strength Training", count: 20 },
           { taskName: "Long Run (10K+)", count: 12 },
         ],
+        totalPoints: 760,
       },
     },
     "circle-2": {
@@ -727,6 +730,7 @@ export default function CommunityPage() {
           { taskName: "Do Dishes", count: 18 },
           { taskName: "Take Out Trash", count: 8 },
         ],
+        totalPoints: 250,
       },
       "u5": {
         weeklyHistory: [
@@ -739,6 +743,7 @@ export default function CommunityPage() {
           { taskName: "Homework Done", count: 20 },
           { taskName: "Walk the Dog", count: 10 },
         ],
+        totalPoints: 160,
       },
     },
   };
@@ -2780,11 +2785,22 @@ export default function CommunityPage() {
                                     }`}>
                                       {index + 1}
                                     </span>
-                                    <Avatar>
-                                      <AvatarFallback>
-                                        {getInitials(member.firstName, member.lastName)}
-                                      </AvatarFallback>
-                                    </Avatar>
+                                    <ProfileHoverCard 
+                                      userId={member.userId}
+                                      showActions={member.userId !== "you"}
+                                      onMessageClick={(id) => {
+                                        toast({ title: "Opening DM", description: `Starting conversation with ${member.firstName}` });
+                                      }}
+                                      onAddFriendClick={(id) => {
+                                        toast({ title: "Friend request sent", description: `Request sent to ${member.firstName}` });
+                                      }}
+                                    >
+                                      <Avatar className="cursor-pointer">
+                                        <AvatarFallback>
+                                          {getInitials(member.firstName, member.lastName)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </ProfileHoverCard>
                                     <div>
                                       <div className="flex items-center gap-2">
                                         <span className="font-medium">{member.firstName} {member.lastName}</span>
@@ -3439,9 +3455,16 @@ export default function CommunityPage() {
                         <div className="space-y-3">
                           {(circleMessages[selectedCircle.id] || []).map((msg) => (
                             <div key={msg.id} className="flex gap-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
-                              </Avatar>
+                              <ProfileHoverCard
+                                userId={msg.senderId}
+                                showActions={msg.senderId !== "you"}
+                                onMessageClick={() => toast({ title: "Opening DM", description: `Starting conversation with ${msg.senderName}` })}
+                                onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${msg.senderName}` })}
+                              >
+                                <Avatar className="h-8 w-8 cursor-pointer">
+                                  <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                              </ProfileHoverCard>
                               <div className="flex-1">
                                 <div className="flex items-baseline gap-2">
                                   <span className="font-medium text-sm">{msg.senderName}</span>
@@ -3495,9 +3518,16 @@ export default function CommunityPage() {
                         {(circlePosts[selectedCircle.id] || []).map((post) => (
                           <div key={post.id} className="p-4 rounded-md border" data-testid={`circle-post-${post.id}`}>
                             <div className="flex items-start gap-3">
-                              <Avatar>
-                                <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
-                              </Avatar>
+                              <ProfileHoverCard
+                                userId={post.authorId}
+                                showActions={post.authorId !== "you"}
+                                onMessageClick={() => toast({ title: "Opening DM", description: `Starting conversation with ${post.authorName}` })}
+                                onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${post.authorName}` })}
+                              >
+                                <Avatar className="cursor-pointer">
+                                  <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                              </ProfileHoverCard>
                               <div className="flex-1">
                                 <div className="flex items-baseline gap-2">
                                   <span className="font-medium">{post.authorName}</span>
