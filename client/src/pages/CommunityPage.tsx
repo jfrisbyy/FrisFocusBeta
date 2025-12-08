@@ -2669,7 +2669,7 @@ export default function CommunityPage() {
           icon: "target",
           required: parseInt(newBadgeRequired) || 10,
           reward,
-          taskId: newBadgeTaskId || undefined,
+          taskId: newBadgeTaskId && newBadgeTaskId !== "_none" ? newBadgeTaskId : undefined,
         }
       }, {
         onSuccess: () => {
@@ -2697,7 +2697,7 @@ export default function CommunityPage() {
         required: parseInt(newBadgeRequired) || 10,
         earned: false,
         reward,
-        taskId: newBadgeTaskId || undefined,
+        taskId: newBadgeTaskId && newBadgeTaskId !== "_none" ? newBadgeTaskId : undefined,
       };
       const current = circleBadges[selectedCircle.id] || [];
       setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
@@ -2754,7 +2754,7 @@ export default function CommunityPage() {
           target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
           category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
           reward: awardReward,
-          taskId: newAwardTaskId || undefined,
+          taskId: newAwardTaskId && newAwardTaskId !== "_none" ? newAwardTaskId : undefined,
         }
       }, {
         onSuccess: () => {
@@ -2783,7 +2783,7 @@ export default function CommunityPage() {
         target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
         category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
         reward: awardReward,
-        taskId: newAwardTaskId || undefined,
+        taskId: newAwardTaskId && newAwardTaskId !== "_none" ? newAwardTaskId : undefined,
       };
       const current = circleAwards[selectedCircle.id] || [];
       setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
@@ -2955,7 +2955,7 @@ export default function CommunityPage() {
           description: editBadgeDescription.trim(),
           required: parseInt(editBadgeRequired) || 10,
           reward,
-          taskId: editBadgeTaskId || undefined,
+          taskId: editBadgeTaskId && editBadgeTaskId !== "_none" ? editBadgeTaskId : undefined,
         }
       }, {
         onSuccess: () => {
@@ -2968,7 +2968,7 @@ export default function CommunityPage() {
     
     const updatedBadges = (circleBadges[selectedCircle.id] || []).map(b =>
       b.id === editingBadge.id
-        ? { ...b, name: editBadgeName.trim(), description: editBadgeDescription.trim(), required: parseInt(editBadgeRequired) || 10, reward, taskId: editBadgeTaskId || undefined }
+        ? { ...b, name: editBadgeName.trim(), description: editBadgeDescription.trim(), required: parseInt(editBadgeRequired) || 10, reward, taskId: editBadgeTaskId && editBadgeTaskId !== "_none" ? editBadgeTaskId : undefined }
         : b
     );
     setCircleBadges({ ...circleBadges, [selectedCircle.id]: updatedBadges });
@@ -3041,7 +3041,7 @@ export default function CommunityPage() {
           target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined,
           category: editAwardType === "most_in_category" ? editAwardCategory : undefined,
           reward,
-          taskId: editAwardTaskId || undefined,
+          taskId: editAwardTaskId && editAwardTaskId !== "_none" ? editAwardTaskId : undefined,
         }
       }, {
         onSuccess: () => {
@@ -3054,7 +3054,7 @@ export default function CommunityPage() {
     
     const updatedAwards = (circleAwards[selectedCircle.id] || []).map(a =>
       a.id === editingAward.id
-        ? { ...a, name: editAwardName.trim(), description: editAwardDescription.trim(), type: editAwardType, target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined, category: editAwardType === "most_in_category" ? editAwardCategory : undefined, reward, taskId: editAwardTaskId || undefined }
+        ? { ...a, name: editAwardName.trim(), description: editAwardDescription.trim(), type: editAwardType, target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined, category: editAwardType === "most_in_category" ? editAwardCategory : undefined, reward, taskId: editAwardTaskId && editAwardTaskId !== "_none" ? editAwardTaskId : undefined }
         : a
     );
     setCircleAwards({ ...circleAwards, [selectedCircle.id]: updatedAwards });
@@ -5109,7 +5109,7 @@ export default function CommunityPage() {
                                     <SelectValue placeholder="Select a task to track" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">No specific task</SelectItem>
+                                    <SelectItem value="_none">No specific task</SelectItem>
                                     {(circleTasks[selectedCircle.id] || []).map(task => (
                                       <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
                                     ))}
@@ -5178,7 +5178,7 @@ export default function CommunityPage() {
                                 <SelectValue placeholder="Select a task to track" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">No specific task</SelectItem>
+                                <SelectItem value="_none">No specific task</SelectItem>
                                 {(circleTasks[selectedCircle.id] || []).map(task => (
                                   <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
                                 ))}
@@ -5406,7 +5406,7 @@ export default function CommunityPage() {
                                     <SelectValue placeholder="Select a task to track" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">No specific task</SelectItem>
+                                    <SelectItem value="_none">No specific task</SelectItem>
                                     {(circleTasks[selectedCircle.id] || []).map(task => (
                                       <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
                                     ))}
@@ -5494,7 +5494,7 @@ export default function CommunityPage() {
                                 <SelectValue placeholder="Select a task to track" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">No specific task</SelectItem>
+                                <SelectItem value="_none">No specific task</SelectItem>
                                 {(circleTasks[selectedCircle.id] || []).map(task => (
                                   <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
                                 ))}
