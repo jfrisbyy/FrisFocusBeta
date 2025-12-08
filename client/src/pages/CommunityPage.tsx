@@ -41,6 +41,8 @@ import {
   Target,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Award,
   MessageCircle,
   Send,
@@ -326,10 +328,15 @@ const demoCircles: StoredCircle[] = [
   },
 ];
 
+type CompetitionType = "targetPoints" | "timed" | "ongoing";
+
 interface DemoCompetition {
   id: string;
   name: string;
   targetPoints: number;
+  competitionType: CompetitionType;
+  startDate: string;
+  endDate?: string;
   status: "active" | "completed";
   myCircle: { id: string; name: string };
   opponentCircle: { id: string; name: string };
@@ -343,9 +350,33 @@ interface DemoCompetitionInvite {
   inviterCircle: { id: string; name: string };
   inviteeCircle: { id: string; name: string };
   targetPoints: number;
+  competitionType: CompetitionType;
+  endDate?: string;
   name: string;
   status: "pending";
   isIncoming: boolean;
+}
+
+interface DemoCircleRecord {
+  circleId: string;
+  wins: number;
+  losses: number;
+  ties: number;
+}
+
+interface DemoMemberTaskStat {
+  memberId: string;
+  taskId: string;
+  taskName: string;
+  completionCount: number;
+  points: number;
+}
+
+interface DemoMemberCompetitionStats {
+  memberId: string;
+  memberName: string;
+  weeklyPoints: number;
+  taskStats: DemoMemberTaskStat[];
 }
 
 const demoCompetitions: Record<string, DemoCompetition[]> = {
@@ -354,6 +385,8 @@ const demoCompetitions: Record<string, DemoCompetition[]> = {
       id: "comp-1",
       name: "Weekly Showdown",
       targetPoints: 500,
+      competitionType: "targetPoints",
+      startDate: "2024-12-01",
       status: "active",
       myCircle: { id: "circle-1", name: "Marathon Mommy's" },
       opponentCircle: { id: "circle-ext-1", name: "Fitness Fanatics" },
@@ -364,6 +397,8 @@ const demoCompetitions: Record<string, DemoCompetition[]> = {
       id: "comp-2",
       name: "Spring Sprint",
       targetPoints: 1000,
+      competitionType: "targetPoints",
+      startDate: "2024-11-15",
       status: "completed",
       myCircle: { id: "circle-1", name: "Marathon Mommy's" },
       opponentCircle: { id: "circle-ext-2", name: "Run Club LA" },
@@ -371,17 +406,44 @@ const demoCompetitions: Record<string, DemoCompetition[]> = {
       opponentPoints: 875,
       winnerId: "circle-1",
     },
+    {
+      id: "comp-4",
+      name: "December Challenge",
+      targetPoints: 0,
+      competitionType: "timed",
+      startDate: "2024-12-01",
+      endDate: "2024-12-31",
+      status: "active",
+      myCircle: { id: "circle-1", name: "Marathon Mommy's" },
+      opponentCircle: { id: "circle-ext-6", name: "Yoga Warriors" },
+      myPoints: 450,
+      opponentPoints: 420,
+    },
   ],
   "circle-2": [
     {
       id: "comp-3",
       name: "Family Face-Off",
       targetPoints: 300,
+      competitionType: "targetPoints",
+      startDate: "2024-12-05",
       status: "active",
       myCircle: { id: "circle-2", name: "Williams Household" },
       opponentCircle: { id: "circle-ext-3", name: "The Johnsons" },
       myPoints: 175,
       opponentPoints: 165,
+    },
+    {
+      id: "comp-5",
+      name: "Ongoing Rivalry",
+      targetPoints: 0,
+      competitionType: "ongoing",
+      startDate: "2024-11-01",
+      status: "active",
+      myCircle: { id: "circle-2", name: "Williams Household" },
+      opponentCircle: { id: "circle-ext-7", name: "The Garcias" },
+      myPoints: 1250,
+      opponentPoints: 1180,
     },
   ],
   "circle-3": [],
@@ -394,6 +456,7 @@ const demoCompetitionInvites: Record<string, DemoCompetitionInvite[]> = {
       inviterCircle: { id: "circle-ext-4", name: "CrossFit Crew" },
       inviteeCircle: { id: "circle-1", name: "Marathon Mommy's" },
       targetPoints: 750,
+      competitionType: "targetPoints",
       name: "Endurance Challenge",
       status: "pending",
       isIncoming: true,
@@ -405,12 +468,90 @@ const demoCompetitionInvites: Record<string, DemoCompetitionInvite[]> = {
       inviterCircle: { id: "circle-2", name: "Williams Household" },
       inviteeCircle: { id: "circle-ext-5", name: "Smith Family" },
       targetPoints: 400,
+      competitionType: "targetPoints",
       name: "Weekend Warrior",
       status: "pending",
       isIncoming: false,
     },
+    {
+      id: "inv-3",
+      inviterCircle: { id: "circle-ext-8", name: "The Martins" },
+      inviteeCircle: { id: "circle-2", name: "Williams Household" },
+      targetPoints: 0,
+      competitionType: "timed",
+      endDate: "2024-12-25",
+      name: "Holiday Hustle",
+      status: "pending",
+      isIncoming: true,
+    },
   ],
   "circle-3": [],
+};
+
+const demoCircleRecords: Record<string, DemoCircleRecord> = {
+  "circle-1": { circleId: "circle-1", wins: 5, losses: 2, ties: 1 },
+  "circle-2": { circleId: "circle-2", wins: 3, losses: 1, ties: 0 },
+  "circle-3": { circleId: "circle-3", wins: 0, losses: 0, ties: 0 },
+};
+
+const demoMemberCompetitionStats: Record<string, Record<string, DemoMemberCompetitionStats[]>> = {
+  "comp-1": {
+    "circle-1": [
+      { memberId: "you", memberName: "You", weeklyPoints: 85, taskStats: [
+        { memberId: "you", taskId: "ct1", taskName: "5K Training Run", completionCount: 3, points: 60 },
+        { memberId: "you", taskId: "ct3", taskName: "Stretching Session", completionCount: 2, points: 20 },
+        { memberId: "you", taskId: "ct5", taskName: "Rest Day", completionCount: 1, points: 5 },
+      ]},
+      { memberId: "u1", memberName: "Sarah M", weeklyPoints: 120, taskStats: [
+        { memberId: "u1", taskId: "ct1", taskName: "5K Training Run", completionCount: 4, points: 80 },
+        { memberId: "u1", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 1, points: 30 },
+        { memberId: "u1", taskId: "ct3", taskName: "Stretching Session", completionCount: 1, points: 10 },
+      ]},
+      { memberId: "u2", memberName: "Lisa K", weeklyPoints: 75, taskStats: [
+        { memberId: "u2", taskId: "ct2", taskName: "Strength Training", completionCount: 3, points: 45 },
+        { memberId: "u2", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 1, points: 30 },
+      ]},
+      { memberId: "u3", memberName: "Emma T", weeklyPoints: 40, taskStats: [
+        { memberId: "u3", taskId: "ct1", taskName: "5K Training Run", completionCount: 2, points: 40 },
+      ]},
+    ],
+    "circle-ext-1": [
+      { memberId: "opp-1", memberName: "Jake M", weeklyPoints: 95, taskStats: [] },
+      { memberId: "opp-2", memberName: "Maria S", weeklyPoints: 85, taskStats: [] },
+      { memberId: "opp-3", memberName: "Tyler B", weeklyPoints: 65, taskStats: [] },
+      { memberId: "opp-4", memberName: "Jen K", weeklyPoints: 35, taskStats: [] },
+    ],
+  },
+  "comp-3": {
+    "circle-2": [
+      { memberId: "you", memberName: "You", weeklyPoints: 55, taskStats: [
+        { memberId: "you", taskId: "ct6", taskName: "Clean Room", completionCount: 3, points: 30 },
+        { memberId: "you", taskId: "ct7", taskName: "Do Dishes", completionCount: 3, points: 15 },
+        { memberId: "you", taskId: "ct11", taskName: "Walk the Dog", completionCount: 1, points: 10 },
+      ]},
+      { memberId: "u4", memberName: "Dad", weeklyPoints: 50, taskStats: [
+        { memberId: "u4", taskId: "ct9", taskName: "Mow Lawn", completionCount: 1, points: 20 },
+        { memberId: "u4", taskId: "ct8", taskName: "Take Out Trash", completionCount: 4, points: 20 },
+        { memberId: "u4", taskId: "ct11", taskName: "Walk the Dog", completionCount: 1, points: 10 },
+      ]},
+      { memberId: "u5", memberName: "Tommy", weeklyPoints: 35, taskStats: [
+        { memberId: "u5", taskId: "ct10", taskName: "Homework Done", completionCount: 2, points: 30 },
+        { memberId: "u5", taskId: "ct8", taskName: "Take Out Trash", completionCount: 1, points: 5 },
+      ]},
+      { memberId: "u6", memberName: "Sarah", weeklyPoints: 25, taskStats: [
+        { memberId: "u6", taskId: "ct6", taskName: "Clean Room", completionCount: 2, points: 20 },
+        { memberId: "u6", taskId: "ct7", taskName: "Do Dishes", completionCount: 1, points: 5 },
+      ]},
+      { memberId: "u7", memberName: "Baby Jake", weeklyPoints: 10, taskStats: [
+        { memberId: "u7", taskId: "ct6", taskName: "Clean Room", completionCount: 1, points: 10 },
+      ]},
+    ],
+    "circle-ext-3": [
+      { memberId: "opp-5", memberName: "Mike J", weeklyPoints: 60, taskStats: [] },
+      { memberId: "opp-6", memberName: "Linda J", weeklyPoints: 55, taskStats: [] },
+      { memberId: "opp-7", memberName: "Sam J", weeklyPoints: 50, taskStats: [] },
+    ],
+  },
 };
 
 const demoOpponentMembers: Record<string, { id: string; firstName: string; lastName: string; weeklyPoints: number }[]> = {
@@ -668,6 +809,8 @@ export default function CommunityPage() {
   
   // Competition state (must be declared before queries that use it)
   const [showOpponentLeaderboard, setShowOpponentLeaderboard] = useState<string | null>(null);
+  const [expandedCompetition, setExpandedCompetition] = useState<string | null>(null);
+  const [expandedMember, setExpandedMember] = useState<string | null>(null);
 
   // API queries and mutations for non-demo mode
   const postsQuery = useQuery<APICommunityPost[]>({
@@ -6305,6 +6448,40 @@ export default function CommunityPage() {
                               </>
                             )}
 
+                            {/* Win/Loss Record */}
+                            {(() => {
+                              const record = demoCircleRecords[selectedCircle.id];
+                              if (!record || (record.wins === 0 && record.losses === 0 && record.ties === 0)) return null;
+                              return (
+                                <Card>
+                                  <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2">
+                                      <Trophy className="w-5 h-5" />
+                                      Competition Record
+                                    </CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="flex items-center justify-center gap-8">
+                                      <div className="text-center">
+                                        <p className="text-3xl font-bold text-green-500" data-testid="text-wins">{record.wins}</p>
+                                        <p className="text-sm text-muted-foreground">Wins</p>
+                                      </div>
+                                      <div className="text-center">
+                                        <p className="text-3xl font-bold text-red-500" data-testid="text-losses">{record.losses}</p>
+                                        <p className="text-sm text-muted-foreground">Losses</p>
+                                      </div>
+                                      {record.ties > 0 && (
+                                        <div className="text-center">
+                                          <p className="text-3xl font-bold text-muted-foreground" data-testid="text-ties">{record.ties}</p>
+                                          <p className="text-sm text-muted-foreground">Ties</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })()}
+
                             {demoCircleInvites.length > 0 && (
                               <Card>
                                 <CardHeader>
@@ -6318,9 +6495,13 @@ export default function CommunityPage() {
                                     <div key={invite.id} className="p-4 rounded-md border">
                                       <div className="flex items-start justify-between gap-4 flex-wrap">
                                         <div>
-                                          <div className="flex items-center gap-2 mb-1">
+                                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <Badge variant={invite.isIncoming ? "default" : "secondary"}>
                                               {invite.isIncoming ? "INCOMING" : "SENT"}
+                                            </Badge>
+                                            <Badge variant="outline">
+                                              {invite.competitionType === "targetPoints" ? "Race to Points" :
+                                               invite.competitionType === "timed" ? "Timed" : "Ongoing"}
                                             </Badge>
                                             {invite.name && <span className="font-medium">{invite.name}</span>}
                                           </div>
@@ -6330,8 +6511,15 @@ export default function CommunityPage() {
                                               : `To: ${invite.inviteeCircle.name}`}
                                           </p>
                                           <p className="text-sm">
-                                            <Target className="w-3 h-3 inline mr-1" />
-                                            Race to {invite.targetPoints.toLocaleString()} points
+                                            {invite.competitionType === "targetPoints" && (
+                                              <><Target className="w-3 h-3 inline mr-1" />Race to {invite.targetPoints.toLocaleString()} points</>
+                                            )}
+                                            {invite.competitionType === "timed" && invite.endDate && (
+                                              <><CalendarIcon className="w-3 h-3 inline mr-1" />Ends {new Date(invite.endDate).toLocaleDateString()}</>
+                                            )}
+                                            {invite.competitionType === "ongoing" && (
+                                              <><Flame className="w-3 h-3 inline mr-1" />Ongoing competition</>
+                                            )}
                                           </p>
                                         </div>
                                         {invite.isIncoming && demoIsOwnerOrAdmin && (
