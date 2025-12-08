@@ -629,18 +629,36 @@ export default function Dashboard() {
     setRecentWeeks(recentWeeksData);
 
     // Calculate streaks from daily logs
-    const sortedDates = Object.keys(dailyLogs).sort();
+    // Helper to calculate daily points for a date
+    const getDailyPoints = (dateKey: string): number => {
+      const log = dailyLogs[dateKey];
+      if (!log) return 0;
+      return log.completedTaskIds.reduce((sum, taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        const penalty = penalties.find(p => p.id === taskId);
+        if (task) return sum + task.value;
+        if (penalty) return sum - penalty.value;
+        return sum;
+      }, 0);
+    };
     
-    // Calculate current day streak (consecutive days ending at today or yesterday)
+    // Get daily goal - from API settings or localStorage
+    const dailyGoalValue = apiSettings?.dailyGoal ?? loadDailyGoalFromStorage();
+    
+    // Calculate current day streak (consecutive days WHERE DAILY GOAL WAS MET)
     let currentDayStreakCount = 0;
     let checkDate = new Date();
-    // Check if today has a log, if not start from yesterday
-    if (!dailyLogs[format(checkDate, "yyyy-MM-dd")]) {
+    // Check if today meets goal, if not start from yesterday
+    const todayKey = format(checkDate, "yyyy-MM-dd");
+    const todayPoints = getDailyPoints(todayKey);
+    if (!dailyLogs[todayKey] || todayPoints < dailyGoalValue) {
       checkDate = addDays(checkDate, -1);
     }
     while (true) {
       const dateKey = format(checkDate, "yyyy-MM-dd");
-      if (dailyLogs[dateKey]) {
+      const dayPoints = getDailyPoints(dateKey);
+      // Only count day if goal was met
+      if (dailyLogs[dateKey] && dayPoints >= dailyGoalValue) {
         currentDayStreakCount++;
         checkDate = addDays(checkDate, -1);
       } else {
@@ -648,25 +666,34 @@ export default function Dashboard() {
       }
     }
     
-    // Calculate longest consecutive day streak
+    // Calculate longest consecutive day streak (days where goal was met)
+    const sortedDates = Object.keys(dailyLogs).sort();
     let maxDayStreakCount = 0;
     let tempStreak = 0;
     let prevDate: Date | null = null;
     
     for (const dateStr of sortedDates) {
-      const currentDate = new Date(dateStr);
-      if (prevDate === null) {
-        tempStreak = 1;
-      } else {
-        const expectedPrev = addDays(currentDate, -1);
-        if (format(prevDate, "yyyy-MM-dd") === format(expectedPrev, "yyyy-MM-dd")) {
-          tempStreak++;
-        } else {
+      const dayPoints = getDailyPoints(dateStr);
+      // Only count if daily goal was met
+      if (dayPoints >= dailyGoalValue) {
+        const currentDate = new Date(dateStr);
+        if (prevDate === null) {
           tempStreak = 1;
+        } else {
+          const expectedPrev = addDays(currentDate, -1);
+          if (format(prevDate, "yyyy-MM-dd") === format(expectedPrev, "yyyy-MM-dd")) {
+            tempStreak++;
+          } else {
+            tempStreak = 1;
+          }
         }
+        if (tempStreak > maxDayStreakCount) maxDayStreakCount = tempStreak;
+        prevDate = currentDate;
+      } else {
+        // Reset streak on days that don't meet goal
+        tempStreak = 0;
+        prevDate = null;
       }
-      if (tempStreak > maxDayStreakCount) maxDayStreakCount = tempStreak;
-      prevDate = currentDate;
     }
     
     setDayStreak(currentDayStreakCount);
