@@ -38,6 +38,7 @@ import {
   Shield,
   Target,
   ChevronRight,
+  ChevronLeft,
   Award,
   MessageCircle,
   Send,
@@ -527,6 +528,7 @@ export default function CommunityPage() {
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [circles, setCircles] = useState<StoredCircle[]>([]);
   const [selectedCircle, setSelectedCircle] = useState<StoredCircle | null>(null);
+  const [selectedTaskDate, setSelectedTaskDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingFriend, setEditingFriend] = useState<StoredFriend | null>(null);
   const [showCreateCircle, setShowCreateCircle] = useState(false);
@@ -1329,15 +1331,14 @@ export default function CommunityPage() {
   useEffect(() => {
     if (isDemo || !selectedCircle || !circleCompletionsQuery.data) return;
     const circleId = selectedCircle.id;
-    const today = new Date().toISOString().split('T')[0];
     
-    // Filter to today's completions and group by taskId
-    const todaysCompletions = circleCompletionsQuery.data.filter((c: any) => c.date === today);
+    // Filter to selected date's completions and group by taskId
+    const dateCompletions = circleCompletionsQuery.data.filter((c: any) => c.date === selectedTaskDate);
     const completionsByTask: Record<string, { userId: string; userName: string; completedAt: string }[]> = {};
     const myTaskIds: string[] = [];
     const currentUserId = user?.id;
     
-    todaysCompletions.forEach((c: any) => {
+    dateCompletions.forEach((c: any) => {
       if (!completionsByTask[c.taskId]) {
         completionsByTask[c.taskId] = [];
       }
@@ -1353,7 +1354,34 @@ export default function CommunityPage() {
     
     setCircleTaskCompletions(prev => ({ ...prev, [circleId]: completionsByTask }));
     setMyCompletedTasks(prev => ({ ...prev, [circleId]: myTaskIds }));
-  }, [isDemo, selectedCircle?.id, circleCompletionsQuery.data, user?.id]);
+    
+    // Calculate weekly points for each member from all completions this week
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
+    weekStart.setHours(0, 0, 0, 0);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    
+    const weeklyCompletions = circleCompletionsQuery.data.filter((c: any) => c.date >= weekStartStr);
+    const memberPointsMap: Record<string, number> = {};
+    
+    const tasks = circleTasks[circleId] || circleTasksQuery.data || [];
+    weeklyCompletions.forEach((c: any) => {
+      const task = tasks.find((t: any) => t.id === c.taskId);
+      if (task) {
+        memberPointsMap[c.userId] = (memberPointsMap[c.userId] || 0) + (task.value || 0);
+      }
+    });
+    
+    // Update member points in state
+    setCircleMembers(prev => {
+      const members = prev[circleId] || [];
+      const updatedMembers = members.map(m => ({
+        ...m,
+        weeklyPoints: memberPointsMap[m.userId] || 0,
+      }));
+      return { ...prev, [circleId]: updatedMembers };
+    });
+  }, [isDemo, selectedCircle?.id, circleCompletionsQuery.data, circleTasksQuery.data, circleTasks, user?.id, selectedTaskDate]);
 
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
@@ -2927,6 +2955,11 @@ export default function CommunityPage() {
   }, [selectedCircle, badgeRequests]);
 
   const handleToggleTaskComplete = (circleId: string, taskId: string, task: StoredCircleTask) => {
+    const today = new Date().toISOString().split('T')[0];
+    if (selectedTaskDate !== today) {
+      return;
+    }
+    
     const myCompleted = myCompletedTasks[circleId] || [];
     const isCompleted = myCompleted.includes(taskId);
     const currentUserId = isDemo ? "you" : user?.id;
@@ -4014,12 +4047,57 @@ export default function CommunityPage() {
                 <TabsContent value="tasks" className="space-y-4 mt-4">
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
                         <div>
                           <CardTitle>Circle Tasks</CardTitle>
                           <CardDescription>
                             Daily tasks for members and shared circle tasks
                           </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => {
+                              const date = new Date(selectedTaskDate);
+                              date.setDate(date.getDate() - 1);
+                              setSelectedTaskDate(date.toISOString().split('T')[0]);
+                            }}
+                            data-testid="button-prev-day"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <div className="text-sm font-medium min-w-[120px] text-center">
+                            {selectedTaskDate === new Date().toISOString().split('T')[0] 
+                              ? "Today" 
+                              : new Date(selectedTaskDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => {
+                              const date = new Date(selectedTaskDate);
+                              date.setDate(date.getDate() + 1);
+                              const today = new Date().toISOString().split('T')[0];
+                              if (date.toISOString().split('T')[0] <= today) {
+                                setSelectedTaskDate(date.toISOString().split('T')[0]);
+                              }
+                            }}
+                            disabled={selectedTaskDate === new Date().toISOString().split('T')[0]}
+                            data-testid="button-next-day"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                          {selectedTaskDate !== new Date().toISOString().split('T')[0] && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedTaskDate(new Date().toISOString().split('T')[0])}
+                              data-testid="button-today"
+                            >
+                              Today
+                            </Button>
+                          )}
                         </div>
                         <Dialog open={showAddTask} onOpenChange={setShowAddTask}>
                           <DialogTrigger asChild>
@@ -4132,6 +4210,7 @@ export default function CommunityPage() {
                                   <div className="flex items-center gap-3">
                                     <Checkbox
                                       checked={isCompleted}
+                                      disabled={selectedTaskDate !== new Date().toISOString().split('T')[0]}
                                       onClick={(e) => { e.stopPropagation(); handleToggleTaskComplete(selectedCircle.id, task.id, task); }}
                                       data-testid={`checkbox-${task.id}`}
                                     />
@@ -4199,7 +4278,7 @@ export default function CommunityPage() {
                                   <div className="flex items-center gap-3">
                                     <Checkbox
                                       checked={isCompletedByMe}
-                                      disabled={isCompletedByAnyone && !isCompletedByMe}
+                                      disabled={(isCompletedByAnyone && !isCompletedByMe) || selectedTaskDate !== new Date().toISOString().split('T')[0]}
                                       onClick={(e) => { e.stopPropagation(); handleToggleTaskComplete(selectedCircle.id, task.id, task); }}
                                       data-testid={`checkbox-${task.id}`}
                                     />
