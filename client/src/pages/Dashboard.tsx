@@ -595,18 +595,25 @@ export default function Dashboard() {
     }
     
     // Build daily logs map from API data or localStorage fallback
-    let dailyLogs: Record<string, { completedTaskIds: string[] }> = {};
+    // Include todoPoints for complete daily summary calculations
+    let dailyLogs: Record<string, { completedTaskIds: string[]; todoPoints: number }> = {};
     const hasApiLogs = apiDailyLogs && apiDailyLogs.length > 0;
     
     if (hasApiLogs) {
       apiDailyLogs.forEach((log: any) => {
-        dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };
+        dailyLogs[log.date] = { 
+          completedTaskIds: log.completedTaskIds || [],
+          todoPoints: log.todoPoints || 0
+        };
       });
     } else {
       // Fallback to localStorage when API returns empty
       const storedLogs = loadDailyLogsFromStorage();
-      storedLogs.forEach((log) => {
-        dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };
+      Object.values(storedLogs).forEach((log) => {
+        dailyLogs[log.date] = { 
+          completedTaskIds: log.completedTaskIds || [],
+          todoPoints: log.todoPoints || 0
+        };
       });
     }
 
@@ -619,13 +626,16 @@ export default function Dashboard() {
       
       let points: number | null = null;
       if (log) {
-        points = log.completedTaskIds.reduce((sum, taskId) => {
+        // Calculate task points
+        const taskPoints = log.completedTaskIds.reduce((sum, taskId) => {
           const task = tasks.find(t => t.id === taskId);
           const penalty = penalties.find(p => p.id === taskId);
           if (task) return sum + task.value;
           if (penalty) return sum - penalty.value;
           return sum;
         }, 0);
+        // Add todoPoints to get total daily points
+        points = taskPoints + (log.todoPoints || 0);
       }
       
       return {
@@ -653,13 +663,16 @@ export default function Dashboard() {
         let dayPoints: number | null = null;
         if (log) {
           weekHasLogs = true;
-          dayPoints = log.completedTaskIds.reduce((sum, taskId) => {
+          // Calculate task points
+          const taskPoints = log.completedTaskIds.reduce((sum, taskId) => {
             const task = tasks.find(t => t.id === taskId);
             const penalty = penalties.find(p => p.id === taskId);
             if (task) return sum + task.value;
             if (penalty) return sum - penalty.value;
             return sum;
           }, 0);
+          // Add todoPoints to get total daily points
+          dayPoints = taskPoints + (log.todoPoints || 0);
         }
         
         weekDays.push({

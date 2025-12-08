@@ -142,6 +142,7 @@ export interface StoredDailyLog {
   date: string; // YYYY-MM-DD format
   completedTaskIds: string[];
   notes: string;
+  todoPoints?: number; // Points earned from daily todo list
 }
 
 export function loadDailyLogsFromStorage(): Record<string, StoredDailyLog> {

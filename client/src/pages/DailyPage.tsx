@@ -412,11 +412,12 @@ export default function DailyPage() {
         todoPoints: totalTodoPoints,
       });
 
-      // Also save to localStorage as backup
+      // Also save to localStorage as backup (include todoPoints)
       saveDailyLogToStorage({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "",
+        todoPoints: totalTodoPoints,
       });
 
       // Update badge progress for completed tasks
@@ -433,11 +434,12 @@ export default function DailyPage() {
           : `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
       });
     } catch (error) {
-      // Fallback to localStorage only
+      // Fallback to localStorage only (include todoPoints)
       saveDailyLogToStorage({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "",
+        todoPoints: totalTodoPoints,
       });
       setNotes("");
       toast({
