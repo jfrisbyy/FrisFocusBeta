@@ -357,6 +357,77 @@ export async function registerRoutes(
     }
   });
 
+  // List all users for discovery (paginated, excludes current user and existing friends)
+  app.get('/api/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { page = '1', limit = '10' } = req.query;
+      
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(parseInt(limit as string) || 10, 20);
+      const offset = (pageNum - 1) * limitNum;
+      
+      // Get user IDs to exclude (current user + any existing relationship)
+      const existingRelationships = await db.select({
+        requesterId: friendships.requesterId,
+        addresseeId: friendships.addresseeId,
+      }).from(friendships).where(
+        or(
+          eq(friendships.requesterId, currentUserId),
+          eq(friendships.addresseeId, currentUserId)
+        )
+      );
+      
+      const excludedIds = new Set<string>([currentUserId]);
+      existingRelationships.forEach(f => {
+        excludedIds.add(f.requesterId);
+        excludedIds.add(f.addresseeId);
+      });
+      const excludedArray = Array.from(excludedIds);
+      
+      const { sql } = await import("drizzle-orm");
+      
+      // Get all users excluding current user and friends
+      const userResults = await db.execute(sql`
+        SELECT id, username, display_name, first_name, last_name, profile_image_url
+        FROM users
+        WHERE id NOT IN (${sql.raw(excludedArray.map(id => `'${id.replace(/'/g, "''")}'`).join(','))})
+        ORDER BY COALESCE(display_name, first_name, username) ASC
+        LIMIT ${limitNum} OFFSET ${offset}
+      `);
+      
+      // Get total count for pagination
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM users
+        WHERE id NOT IN (${sql.raw(excludedArray.map(id => `'${id.replace(/'/g, "''")}'`).join(','))})
+      `);
+      
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      const paginatedUsers = (userResults.rows as any[]).map(row => ({
+        id: row.id,
+        username: row.username,
+        displayName: row.display_name,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        profileImageUrl: row.profile_image_url,
+      }));
+      
+      res.json({
+        users: paginatedUsers,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        }
+      });
+    } catch (error) {
+      console.error("Error listing users:", error);
+      res.status(500).json({ message: "Failed to list users" });
+    }
+  });
+
   // ==================== MEDIA UPLOAD ROUTES (Protected) ====================
 
   // Get upload URL for media files

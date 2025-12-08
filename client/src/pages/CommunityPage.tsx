@@ -1096,6 +1096,12 @@ export default function CommunityPage() {
     enabled: !isDemo && directorySearch.length >= 2,
   });
 
+  // Query for listing all users (when not searching)
+  const allUsersQuery = useQuery<UserSearchResponse>({
+    queryKey: [`/api/users?page=${directoryPage}&limit=${USERS_PER_PAGE}`],
+    enabled: !isDemo && directorySearch.length < 2,
+  });
+
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (emailOrUsername: string) => {
       const res = await apiRequest("POST", "/api/friends/request", { emailOrUsername });
@@ -4446,7 +4452,8 @@ export default function CommunityPage() {
                       lastName: u.lastName,
                       profileImageUrl: u.profileImageUrl,
                     }));
-                  } else if (userSearchQuery.data) {
+                  } else if (directorySearch.length >= 2 && userSearchQuery.data) {
+                    // Searching - use search results
                     displayUsers = userSearchQuery.data.users.map(u => ({
                       id: u.id,
                       displayName: u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Unknown',
@@ -4456,6 +4463,17 @@ export default function CommunityPage() {
                       profileImageUrl: u.profileImageUrl,
                     }));
                     totalPages = userSearchQuery.data.pagination.totalPages;
+                  } else if (allUsersQuery.data) {
+                    // Not searching - show all users
+                    displayUsers = allUsersQuery.data.users.map(u => ({
+                      id: u.id,
+                      displayName: u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Unknown',
+                      username: u.username || '',
+                      firstName: u.firstName || '',
+                      lastName: u.lastName || '',
+                      profileImageUrl: u.profileImageUrl,
+                    }));
+                    totalPages = allUsersQuery.data.pagination.totalPages;
                   }
                   
                   return (
@@ -4478,9 +4496,7 @@ export default function CommunityPage() {
                       </div>
                       
                       <div className="space-y-2">
-                        {!isDemo && directorySearch.length < 2 ? (
-                          <p className="text-sm text-muted-foreground text-center py-2">Enter at least 2 characters to search</p>
-                        ) : !isDemo && userSearchQuery.isLoading ? (
+                        {!isDemo && (userSearchQuery.isLoading || allUsersQuery.isLoading) ? (
                           <p className="text-sm text-muted-foreground text-center py-2">Loading...</p>
                         ) : displayUsers.length > 0 ? (
                           displayUsers.map((u) => (
