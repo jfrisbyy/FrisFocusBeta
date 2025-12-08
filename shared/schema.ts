@@ -722,3 +722,85 @@ export const circlePostComments = pgTable("circle_post_comments", {
 export const insertCirclePostCommentSchema = createInsertSchema(circlePostComments).omit({ id: true, createdAt: true });
 export type InsertCirclePostComment = z.infer<typeof insertCirclePostCommentSchema>;
 export type CirclePostComment = typeof circlePostComments.$inferSelect;
+
+// ==================== USER HABIT DATA TABLES (Cross-Device Sync) ====================
+
+// User tasks - personal task definitions that sync across devices
+export const userTasks = pgTable("user_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  value: integer("value").notNull().default(10),
+  category: varchar("category").notNull().default("General"),
+  priority: varchar("priority").notNull().default("shouldDo"),
+  boostEnabled: boolean("boost_enabled").default(false),
+  boostThreshold: integer("boost_threshold"),
+  boostPeriod: varchar("boost_period"),
+  boostPoints: integer("boost_points"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserTaskSchema = createInsertSchema(userTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserTask = z.infer<typeof insertUserTaskSchema>;
+export type UserTask = typeof userTasks.$inferSelect;
+
+// User categories - personal task categories
+export const userCategories = pgTable("user_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  color: varchar("color"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUserCategorySchema = createInsertSchema(userCategories).omit({ id: true, createdAt: true });
+export type InsertUserCategory = z.infer<typeof insertUserCategorySchema>;
+export type UserCategory = typeof userCategories.$inferSelect;
+
+// User penalties - personal penalty items
+export const userPenalties = pgTable("user_penalties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  value: integer("value").notNull().default(-5),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUserPenaltySchema = createInsertSchema(userPenalties).omit({ id: true, createdAt: true });
+export type InsertUserPenalty = z.infer<typeof insertUserPenaltySchema>;
+export type UserPenalty = typeof userPenalties.$inferSelect;
+
+// User habit settings - goals and preferences per user
+export const userHabitSettings = pgTable("user_habit_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  dailyGoal: integer("daily_goal").default(50),
+  weeklyGoal: integer("weekly_goal").default(350),
+  userName: varchar("user_name").default("You"),
+  encouragementMessage: text("encouragement_message"),
+  penaltyBoostEnabled: boolean("penalty_boost_enabled").default(false),
+  penaltyBoostThreshold: integer("penalty_boost_threshold").default(3),
+  penaltyBoostPeriod: varchar("penalty_boost_period").default("week"),
+  penaltyBoostPoints: integer("penalty_boost_points").default(10),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserHabitSettingsSchema = createInsertSchema(userHabitSettings).omit({ id: true, updatedAt: true });
+export type InsertUserHabitSettings = z.infer<typeof insertUserHabitSettingsSchema>;
+export type UserHabitSettings = typeof userHabitSettings.$inferSelect;
+
+// Daily logs - task completions per day per user
+export const userDailyLogs = pgTable("user_daily_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  completedTaskIds: text("completed_task_ids").array().default([]),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserDailyLogSchema = createInsertSchema(userDailyLogs).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserDailyLog = z.infer<typeof insertUserDailyLogSchema>;
+export type UserDailyLog = typeof userDailyLogs.$inferSelect;
