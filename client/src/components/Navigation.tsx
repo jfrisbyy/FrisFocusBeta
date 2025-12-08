@@ -3,6 +3,9 @@ import { LayoutDashboard, CalendarCheck, ListTodo, Award, BookOpen, Sparkles, Du
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { signInWithPopup, signOut } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+import { SiGoogle } from "react-icons/si";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -19,12 +22,20 @@ export default function Navigation() {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  const handleLogin = () => {
-    window.location.href = "/api/login";
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login error:", error);
+    }
   };
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
@@ -81,8 +92,10 @@ export default function Navigation() {
             size="sm"
             onClick={handleLogin}
             data-testid="button-login"
+            className="gap-2"
           >
-            Sign in with Replit
+            <SiGoogle className="h-4 w-4" />
+            Sign in with Google
           </Button>
         )}
       </div>

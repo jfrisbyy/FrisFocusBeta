@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { isAuthenticated, upsertFirebaseUser, verifyFirebaseToken } from "./firebaseAdmin";
 import OpenAI from "openai";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -67,18 +67,30 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup Replit Auth
-  await setupAuth(app);
-
-  // Auth user endpoint
+  // Auth user endpoint - get current user
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Firebase auth endpoint - create/update user from Firebase token
+  app.post('/api/auth/firebase', isAuthenticated, async (req: any, res) => {
+    try {
+      const decodedToken = req.user.decodedToken;
+      const user = await upsertFirebaseUser(decodedToken);
+      res.json(user);
+    } catch (error) {
+      console.error("Error upserting Firebase user:", error);
+      res.status(500).json({ message: "Failed to create user" });
     }
   });
 

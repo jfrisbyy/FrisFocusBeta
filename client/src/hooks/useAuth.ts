@@ -1,35 +1,70 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import type { User } from "@shared/schema";
 
 export function useAuth() {
-  const { data: user, isLoading, isFetching, status } = useQuery<User | null>({
-    queryKey: ["/api/auth/user"],
-    queryFn: async () => {
-      try {
-        const res = await fetch("/api/auth/user", { credentials: "include" });
-        if (res.status === 401) {
-          return null;
-        }
-        if (!res.ok) {
-          return null;
-        }
-        return await res.json();
-      } catch {
-        return null;
-      }
-    },
-    retry: false,
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Never block rendering - if query is taking too long or errored, show demo mode
-  const shouldShowLoading = isLoading && isFetching && status === "pending";
-  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      
+      if (fbUser) {
+        try {
+          // Get the ID token to send to backend
+          const idToken = await fbUser.getIdToken();
+          
+          // Sync user with backend
+          const res = await fetch("/api/auth/user", {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${idToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+          
+          if (res.ok) {
+            const userData = await res.json();
+            setUser(userData);
+          } else {
+            // User is authenticated with Firebase but not in our DB yet
+            // Create/upsert user
+            const upsertRes = await fetch("/api/auth/firebase", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${idToken}`,
+                "Content-Type": "application/json",
+              },
+            });
+            
+            if (upsertRes.ok) {
+              const userData = await upsertRes.json();
+              setUser(userData);
+            } else {
+              setUser(null);
+            }
+          }
+        } catch (error) {
+          console.error("Error syncing user:", error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   return {
-    user: user ?? null,
-    isLoading: shouldShowLoading,
+    user,
+    firebaseUser,
+    isLoading,
     isAuthenticated: !!user,
   };
 }
