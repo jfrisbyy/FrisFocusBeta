@@ -16,14 +16,6 @@ import MilestonesPanel from "@/components/MilestonesPanel";
 import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
 import TodoListPanel from "@/components/TodoListPanel";
 import DueDatesPanel from "@/components/DueDatesPanel";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Layers } from "lucide-react";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels } from "@shared/schema";
 import {
   loadMilestonesFromStorage,
@@ -490,47 +482,6 @@ export default function Dashboard() {
       lastSyncedStatsRef.current = null;
     },
   });
-
-  // Mutation for activating a season
-  const activateSeasonMutation = useMutation({
-    mutationFn: async (seasonId: string) => {
-      const response = await apiRequest("PUT", `/api/seasons/${seasonId}/activate`, {});
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/habit/logs"] });
-    },
-  });
-
-  // Mutation for deactivating a season
-  const deactivateSeasonMutation = useMutation({
-    mutationFn: async (seasonId: string) => {
-      const response = await apiRequest("PUT", `/api/seasons/${seasonId}/deactivate`, {});
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/habit/logs"] });
-    },
-  });
-
-  // Handler for season selection change
-  const handleSeasonChange = (value: string) => {
-    if (value === "none") {
-      // Deactivate current season
-      if (activeSeason) {
-        deactivateSeasonMutation.mutate(activeSeason.id);
-      }
-    } else {
-      // Activate selected season
-      activateSeasonMutation.mutate(value);
-    }
-  };
 
   // Load data from localStorage on mount or when API data changes
   useEffect(() => {
@@ -1235,39 +1186,6 @@ export default function Dashboard() {
         onUpdate={handleWelcomeUpdate}
         onDismissFriendMessage={handleDismissFriendMessage}
       />
-
-      {!useMockData && seasons.filter(s => !s.isArchived).length > 0 && (
-        <div className="flex items-center gap-3">
-          <Layers className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Season:</span>
-          <Select
-            value={activeSeason?.id || "none"}
-            onValueChange={handleSeasonChange}
-            disabled={activateSeasonMutation.isPending || deactivateSeasonMutation.isPending}
-          >
-            <SelectTrigger 
-              className="w-[200px]" 
-              data-testid="select-season"
-            >
-              <SelectValue placeholder="No active season" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" data-testid="select-season-none">
-                No active season
-              </SelectItem>
-              {seasons.filter(s => !s.isArchived).map((season) => (
-                <SelectItem 
-                  key={season.id} 
-                  value={season.id}
-                  data-testid={`select-season-${season.id}`}
-                >
-                  {season.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">
