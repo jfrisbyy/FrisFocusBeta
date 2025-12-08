@@ -144,6 +144,7 @@ export interface StoredDailyLog {
   notes: string;
   todoPoints?: number; // Points earned from daily todo list
   penaltyPoints?: number; // Negative points from penalties (stored as negative value)
+  taskNotes?: Record<string, string>; // Per-task notes (taskId -> note)
 }
 
 export function loadDailyLogsFromStorage(): Record<string, StoredDailyLog> {
@@ -272,6 +273,7 @@ export interface StoredMilestone {
   deadline?: string;
   achieved: boolean;
   achievedAt?: string;
+  note?: string; // User note attached to milestone
 }
 
 export function loadMilestonesFromStorage(): StoredMilestone[] {
@@ -343,6 +345,7 @@ export interface StoredTodoItem {
   pointValue: number;
   completed: boolean;
   order: number;
+  note?: string; // User note attached to this to-do item
 }
 
 export interface StoredDailyTodoList {

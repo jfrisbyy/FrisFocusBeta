@@ -801,6 +801,7 @@ export const userDailyLogs = pgTable("user_daily_logs", {
   penaltyPoints: integer("penalty_points").default(0), // Negative points from penalties (stored as negative)
   seasonId: varchar("season_id"), // Season active when log was created (for reference)
   notes: text("notes"),
+  taskNotes: jsonb("task_notes"), // Per-task notes (taskId -> note string)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
