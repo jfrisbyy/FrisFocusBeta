@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import TaskList from "@/components/TaskList";
 import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useDemo } from "@/contexts/DemoContext";
-// localStorage persistence - load and save functions
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   loadTasksFromStorage,
   saveTasksToStorage,
@@ -25,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -49,9 +51,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar } from "lucide-react";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
-import type { TaskPriority, PenaltyRule, PenaltyItem, Category } from "@shared/schema";
+import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season } from "@shared/schema";
 
 interface Task {
   id: string;
@@ -156,6 +158,92 @@ export default function TasksPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
+
+  // Seasons state
+  const [seasonDialogOpen, setSeasonDialogOpen] = useState(false);
+  const [seasonName, setSeasonName] = useState("");
+  const [seasonDescription, setSeasonDescription] = useState("");
+
+  // Fetch seasons from API
+  const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Season[]>({
+    queryKey: ["/api/seasons"],
+    enabled: !useMockData,
+  });
+
+  const activeSeason = seasons.find((s) => s.isActive);
+
+  // Create season mutation
+  const createSeasonMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string }) => {
+      const res = await apiRequest("POST", "/api/seasons", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season created", description: `"${seasonName}" has been created` });
+      setSeasonDialogOpen(false);
+      setSeasonName("");
+      setSeasonDescription("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create season", variant: "destructive" });
+    },
+  });
+
+  // Activate season mutation
+  const activateSeasonMutation = useMutation({
+    mutationFn: async (seasonId: string) => {
+      const res = await apiRequest("PUT", `/api/seasons/${seasonId}/activate`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season activated", description: "Your active season has been changed" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to activate season", variant: "destructive" });
+    },
+  });
+
+  // Deactivate season mutation
+  const deactivateSeasonMutation = useMutation({
+    mutationFn: async (seasonId: string) => {
+      const res = await apiRequest("PUT", `/api/seasons/${seasonId}/deactivate`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season deactivated", description: "No season is now active" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to deactivate season", variant: "destructive" });
+    },
+  });
+
+  const handleOpenCreateSeason = () => {
+    setSeasonName("");
+    setSeasonDescription("");
+    setSeasonDialogOpen(true);
+  };
+
+  const handleSaveSeason = () => {
+    if (seasonName.trim()) {
+      createSeasonMutation.mutate({
+        name: seasonName.trim(),
+        description: seasonDescription.trim() || undefined,
+      });
+    }
+  };
+
+  const handleSeasonChange = (value: string) => {
+    if (value === "none") {
+      if (activeSeason) {
+        deactivateSeasonMutation.mutate(activeSeason.id);
+      }
+    } else {
+      activateSeasonMutation.mutate(value);
+    }
+  };
 
   // Persist tasks to localStorage whenever they change (skip during demo/onboarding)
   useEffect(() => {
@@ -390,7 +478,7 @@ export default function TasksPage() {
         <p className="text-muted-foreground text-sm">Manage your tasks and point values</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -478,6 +566,55 @@ export default function TasksPage() {
                 <span className="text-sm text-muted-foreground">No categories yet</span>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                Season
+              </div>
+              <Button size="sm" variant="ghost" onClick={handleOpenCreateSeason} data-testid="button-add-season">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {useMockData ? (
+              <span className="text-sm text-muted-foreground">Seasons not available in demo</span>
+            ) : seasonsLoading ? (
+              <span className="text-sm text-muted-foreground">Loading...</span>
+            ) : (
+              <div className="space-y-2">
+                <Select
+                  value={activeSeason?.id || "none"}
+                  onValueChange={handleSeasonChange}
+                  disabled={activateSeasonMutation.isPending || deactivateSeasonMutation.isPending}
+                >
+                  <SelectTrigger data-testid="select-season">
+                    <SelectValue placeholder="Select a season" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No active season</SelectItem>
+                    {seasons.map((season) => (
+                      <SelectItem key={season.id} value={season.id}>
+                        {season.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeSeason?.description && (
+                  <p className="text-xs text-muted-foreground">{activeSeason.description}</p>
+                )}
+                {seasons.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Create seasons to organize your tasks by time periods
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -713,6 +850,49 @@ export default function TasksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={seasonDialogOpen} onOpenChange={setSeasonDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Season</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="season-name">Name</Label>
+              <Input
+                id="season-name"
+                value={seasonName}
+                onChange={(e) => setSeasonName(e.target.value)}
+                placeholder="e.g., Q1 2025, Summer Focus"
+                data-testid="input-season-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="season-description">Description (optional)</Label>
+              <Textarea
+                id="season-description"
+                value={seasonDescription}
+                onChange={(e) => setSeasonDescription(e.target.value)}
+                placeholder="What's the focus of this season?"
+                rows={3}
+                data-testid="input-season-description"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSeasonDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveSeason}
+              disabled={!seasonName.trim() || createSeasonMutation.isPending}
+              data-testid="button-save-season"
+            >
+              {createSeasonMutation.isPending ? "Creating..." : "Create Season"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
