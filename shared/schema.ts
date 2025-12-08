@@ -194,6 +194,7 @@ export const milestoneSchema = z.object({
   deadline: z.string().optional(),
   achieved: z.boolean(),
   achievedAt: z.string().optional(),
+  note: z.string().optional(),
 });
 export type Milestone = z.infer<typeof milestoneSchema>;
 

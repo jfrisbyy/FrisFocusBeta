@@ -2559,7 +2559,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     try {
       const userId = req.user.claims.sub;
       const date = req.params.date;
-      const { completedTaskIds, notes, todoPoints, penaltyPoints, taskPoints, seasonId } = req.body;
+      const { completedTaskIds, notes, todoPoints, penaltyPoints, taskPoints, seasonId, taskNotes } = req.body;
 
       // Check if log exists for this date
       const [existing] = await db.select().from(userDailyLogs)
@@ -2575,6 +2575,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
             taskPoints: taskPoints || 0,
             seasonId: seasonId || null,
             notes,
+            taskNotes: taskNotes || null,
             updatedAt: new Date()
           })
           .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)))
@@ -2590,7 +2591,8 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           penaltyPoints: penaltyPoints || 0,
           taskPoints: taskPoints || 0,
           seasonId: seasonId || null,
-          notes
+          notes,
+          taskNotes: taskNotes || null
         });
         const [log] = await db.insert(userDailyLogs).values(parsed).returning();
         res.json(log);

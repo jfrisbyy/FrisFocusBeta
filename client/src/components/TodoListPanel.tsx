@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift, Settings } from "lucide-react";
+import { Plus, Trash2, Gift, Settings, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { StoredTodoItem } from "@/lib/storage";
 
@@ -41,6 +49,9 @@ export default function TodoListPanel({
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("5");
   const [showSettings, setShowSettings] = useState(false);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [tempNote, setTempNote] = useState("");
 
   const completedCount = items.filter(item => item.completed).length;
   const allCompleted = items.length > 0 && completedCount === items.length;
@@ -81,6 +92,25 @@ export default function TodoListPanel({
     if (e.key === "Enter") {
       handleAddItem();
     }
+  };
+
+  const handleOpenNoteDialog = (itemId: string, currentNote: string) => {
+    setEditingItemId(itemId);
+    setTempNote(currentNote);
+    setNoteDialogOpen(true);
+  };
+
+  const handleSaveNote = () => {
+    if (editingItemId) {
+      onItemsChange(
+        items.map(item =>
+          item.id === editingItemId ? { ...item, note: tempNote } : item
+        )
+      );
+    }
+    setNoteDialogOpen(false);
+    setEditingItemId(null);
+    setTempNote("");
   };
 
   return (
@@ -203,6 +233,18 @@ export default function TodoListPanel({
                 <span className="font-mono text-sm text-muted-foreground">
                   +{item.pointValue}
                 </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-7 w-7",
+                    item.note && item.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
+                  )}
+                  onClick={() => handleOpenNoteDialog(item.id, item.note || "")}
+                  data-testid={`button-note-todo-${item.id}`}
+                >
+                  <StickyNote className="h-3 w-3" />
+                </Button>
                 {!readOnly && (
                   <Button
                     size="icon"
@@ -252,6 +294,31 @@ export default function TodoListPanel({
           </div>
         )}
       </CardContent>
+
+      <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Note for "{items.find(i => i.id === editingItemId)?.title || "item"}"
+            </DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={tempNote}
+            onChange={(e) => setTempNote(e.target.value)}
+            placeholder="Add a note for this to-do item..."
+            className="min-h-[100px]"
+            data-testid={`textarea-todo-note-${editingItemId}`}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNote} data-testid={`button-save-todo-note-${editingItemId}`}>
+              Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

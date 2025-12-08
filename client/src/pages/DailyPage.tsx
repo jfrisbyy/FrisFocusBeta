@@ -83,6 +83,7 @@ export default function DailyPage() {
   const [todoBonusEnabled, setTodoBonusEnabled] = useState(false);
   const [todoBonusPoints, setTodoBonusPoints] = useState(10);
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
+  const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
 
   const dateStr = format(date, "yyyy-MM-dd");
 
@@ -127,7 +128,7 @@ export default function DailyPage() {
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
-    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number; taskPoints: number; seasonId: string | null }) => {
+    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number; taskPoints: number; seasonId: string | null; taskNotes: Record<string, string> }) => {
       const response = await apiRequest("PUT", `/api/habit/logs/${data.date}`, {
         completedTaskIds: data.completedTaskIds,
         notes: data.notes,
@@ -135,6 +136,7 @@ export default function DailyPage() {
         penaltyPoints: data.penaltyPoints,
         taskPoints: data.taskPoints,
         seasonId: data.seasonId,
+        taskNotes: data.taskNotes,
       });
       return response.json();
     },
@@ -257,10 +259,12 @@ export default function DailyPage() {
     if (apiDailyLog) {
       setCompletedIds(new Set(apiDailyLog.completedTaskIds || []));
       setNotes(apiDailyLog.notes || "");
+      setTaskNotes(apiDailyLog.taskNotes || {});
     } else {
       // API returned null (no log for this date) - start fresh
       setCompletedIds(new Set());
       setNotes("");
+      setTaskNotes({});
     }
   }, [dateStr, isDemo, apiDailyLog, dailyLogFetched]);
 
@@ -305,6 +309,18 @@ export default function DailyPage() {
         next.add(taskId);
       } else {
         next.delete(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleTaskNoteChange = (taskId: string, note: string) => {
+    setTaskNotes((prev) => {
+      const next = { ...prev };
+      if (note.trim()) {
+        next[taskId] = note;
+      } else {
+        delete next[taskId];
       }
       return next;
     });
@@ -419,6 +435,7 @@ export default function DailyPage() {
         penaltyPoints: Math.abs(negativePoints),
         taskPoints: computedTaskPoints,
         seasonId: activeSeason?.id || null,
+        taskNotes,
       });
 
       // Also save to localStorage as backup (include todoPoints and penaltyPoints)
@@ -428,6 +445,7 @@ export default function DailyPage() {
         notes: "",
         todoPoints: totalTodoPoints,
         penaltyPoints: Math.abs(negativePoints),
+        taskNotes,
       });
 
       // Update badge progress for completed tasks
@@ -451,6 +469,7 @@ export default function DailyPage() {
         notes: "",
         todoPoints: totalTodoPoints,
         penaltyPoints: Math.abs(negativePoints),
+        taskNotes,
       });
       setNotes("");
       toast({
@@ -515,6 +534,8 @@ export default function DailyPage() {
               completedIds={completedIds}
               onTaskToggle={handleTaskToggle}
               defaultOpen={category !== "Penalties"}
+              taskNotes={taskNotes}
+              onTaskNoteChange={handleTaskNoteChange}
             />
           ))}
         </div>

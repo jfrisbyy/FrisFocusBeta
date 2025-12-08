@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Flag, Plus, Check, Pencil, Trash2, Trophy, Calendar, AlertCircle } from "lucide-react";
+import { Flag, Plus, Check, Pencil, Trash2, Trophy, Calendar, AlertCircle, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Milestone } from "@shared/schema";
@@ -52,6 +52,12 @@ export default function MilestonesPanel({
   const [formDescription, setFormDescription] = useState("");
   const [formPoints, setFormPoints] = useState("50");
   const [formDeadline, setFormDeadline] = useState("");
+  const [formNote, setFormNote] = useState("");
+  
+  // Note dialog state (for quick notes separate from form)
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
+  const [tempNote, setTempNote] = useState("");
 
   const achievedMilestones = milestones.filter(m => m.achieved);
   const pendingMilestones = milestones.filter(m => !m.achieved);
@@ -62,6 +68,31 @@ export default function MilestonesPanel({
     setFormDescription("");
     setFormPoints("50");
     setFormDeadline("");
+    setFormNote("");
+  };
+
+  const handleOpenNoteDialog = (milestoneId: string, currentNote: string) => {
+    setNoteEditingId(milestoneId);
+    setTempNote(currentNote);
+    setNoteDialogOpen(true);
+  };
+
+  const handleSaveQuickNote = () => {
+    if (noteEditingId) {
+      const milestone = milestones.find(m => m.id === noteEditingId);
+      if (milestone) {
+        onEdit(noteEditingId, {
+          name: milestone.name,
+          description: milestone.description,
+          points: milestone.points,
+          deadline: milestone.deadline,
+          note: tempNote,
+        });
+      }
+    }
+    setNoteDialogOpen(false);
+    setNoteEditingId(null);
+    setTempNote("");
   };
 
   const isOverdue = (deadline?: string) => {
@@ -90,6 +121,7 @@ export default function MilestonesPanel({
     setFormDescription(milestone.description);
     setFormPoints(milestone.points.toString());
     setFormDeadline(milestone.deadline || "");
+    setFormNote(milestone.note || "");
     setDialogOpen(true);
   };
 
@@ -102,6 +134,7 @@ export default function MilestonesPanel({
         description: formDescription,
         points,
         deadline: formDeadline || undefined,
+        note: formNote || undefined,
       });
       toast({ title: "Milestone updated", description: `"${formName}" has been updated` });
     } else {
@@ -110,6 +143,7 @@ export default function MilestonesPanel({
         description: formDescription,
         points,
         deadline: formDeadline || undefined,
+        note: formNote || undefined,
       });
       toast({ title: "Milestone added", description: `"${formName}" has been added` });
     }
@@ -202,6 +236,18 @@ export default function MilestonesPanel({
               <Button
                 size="icon"
                 variant="ghost"
+                className={cn(
+                  "h-6 w-6",
+                  milestone.note && milestone.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
+                )}
+                onClick={() => handleOpenNoteDialog(milestone.id, milestone.note || "")}
+                data-testid={`button-note-milestone-${milestone.id}`}
+              >
+                <StickyNote className="h-3 w-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
                 className="h-6 w-6"
                 onClick={() => handleOpenEdit(milestone)}
                 data-testid={`button-edit-milestone-${milestone.id}`}
@@ -260,6 +306,18 @@ export default function MilestonesPanel({
                     </div>
                   )}
                 </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-6 w-6 shrink-0",
+                    milestone.note && milestone.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
+                  )}
+                  onClick={() => handleOpenNoteDialog(milestone.id, milestone.note || "")}
+                  data-testid={`button-note-milestone-${milestone.id}`}
+                >
+                  <StickyNote className="h-3 w-3" />
+                </Button>
               </div>
             ))}
           </>
@@ -315,6 +373,18 @@ export default function MilestonesPanel({
                 data-testid="input-milestone-deadline"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="milestone-note">Note (optional)</Label>
+              <Textarea
+                id="milestone-note"
+                value={formNote}
+                onChange={(e) => setFormNote(e.target.value)}
+                placeholder="Additional notes or thoughts..."
+                rows={2}
+                className="resize-none"
+                data-testid="input-milestone-note"
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -347,6 +417,31 @@ export default function MilestonesPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Note for "{milestones.find(m => m.id === noteEditingId)?.name || "milestone"}"
+            </DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={tempNote}
+            onChange={(e) => setTempNote(e.target.value)}
+            placeholder="Add a note for this milestone..."
+            className="min-h-[100px]"
+            data-testid={`textarea-milestone-note-${noteEditingId}`}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveQuickNote} data-testid={`button-save-milestone-note-${noteEditingId}`}>
+              Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

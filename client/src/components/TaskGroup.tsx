@@ -17,6 +17,8 @@ interface TaskGroupProps {
   completedIds: Set<string>;
   onTaskToggle: (taskId: string, checked: boolean) => void;
   defaultOpen?: boolean;
+  taskNotes?: Record<string, string>;
+  onTaskNoteChange?: (taskId: string, note: string) => void;
 }
 
 export default function TaskGroup({
@@ -25,6 +27,8 @@ export default function TaskGroup({
   completedIds,
   onTaskToggle,
   defaultOpen = true,
+  taskNotes,
+  onTaskNoteChange,
 }: TaskGroupProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const completedCount = tasks.filter(t => completedIds.has(t.id)).length;
@@ -72,6 +76,8 @@ export default function TaskGroup({
               isBooster={task.isBooster}
               checked={completedIds.has(task.id)}
               onChange={(checked) => onTaskToggle(task.id, checked)}
+              note={taskNotes?.[task.id]}
+              onNoteChange={onTaskNoteChange ? (note) => onTaskNoteChange(task.id, note) : undefined}
             />
           ))}
         </div>
