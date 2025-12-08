@@ -58,6 +58,7 @@ export interface StoredTask {
   boostThreshold?: number;
   boostPeriod?: "week" | "month";
   boostPoints?: number;
+  seasonId?: string;
 }
 
 export function loadTasksFromStorage(): StoredTask[] {

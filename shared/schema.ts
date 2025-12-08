@@ -63,6 +63,7 @@ export const taskSchema = z.object({
   boosterRule: boosterRuleSchema.optional(),
   penaltyRule: penaltyRuleSchema.optional(),
   lastCompletedAt: z.string().optional(),
+  seasonId: z.string().optional(),
 });
 export type Task = z.infer<typeof taskSchema>;
 
@@ -475,3 +476,19 @@ export const friendWithStatsSchema = z.object({
   shareBadges: z.boolean(),
 });
 export type FriendWithStats = z.infer<typeof friendWithStatsSchema>;
+
+// ==================== SEASONS TABLE ====================
+
+// Seasons table - archives tasks into time periods
+export const seasons = pgTable("seasons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSeasonSchema = createInsertSchema(seasons).omit({ id: true, createdAt: true });
+export type InsertSeason = z.infer<typeof insertSeasonSchema>;
+export type Season = typeof seasons.$inferSelect;
