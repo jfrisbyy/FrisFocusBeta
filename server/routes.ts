@@ -95,9 +95,6 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const { username, displayName, profileImageUrl } = req.body;
-      
-      console.log("[DEBUG] PUT /api/auth/user - userId:", userId);
-      console.log("[DEBUG] PUT /api/auth/user - request body:", JSON.stringify(req.body));
 
       // Validate username format if provided
       if (username !== null && username !== undefined) {
@@ -152,16 +149,12 @@ export async function registerRoutes(
       if (profileImageUrl !== undefined) {
         updateData.profileImageUrl = profileImageUrl || null;
       }
-      
-      console.log("[DEBUG] PUT /api/auth/user - updateData:", JSON.stringify(updateData));
 
       // Update user
       const [updatedUser] = await db.update(users)
         .set(updateData)
         .where(eq(users.id, userId))
         .returning();
-      
-      console.log("[DEBUG] PUT /api/auth/user - updatedUser:", JSON.stringify(updatedUser));
 
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });

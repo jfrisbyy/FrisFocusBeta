@@ -14,7 +14,6 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    console.log("[DEBUG] storage.getUser - id:", id, "user:", JSON.stringify(user));
     return user;
   }
 
