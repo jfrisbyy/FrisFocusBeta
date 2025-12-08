@@ -68,20 +68,7 @@ import type {
   StoredFriendActivity,
   CircleTaskType,
 } from "@/lib/storage";
-import {
-  loadFriendsFromStorage,
-  saveFriendsToStorage,
-  loadCirclesFromStorage,
-  saveCirclesToStorage,
-  loadCommunityPostsFromStorage,
-  saveCommunityPostsToStorage,
-  loadDirectMessagesFromStorage,
-  saveDirectMessagesToStorage,
-  loadCircleMessagesFromStorage,
-  saveCircleMessagesToStorage,
-  loadCirclePostsFromStorage,
-  saveCirclePostsToStorage,
-} from "@/lib/storage";
+// Note: localStorage functions removed - API endpoints handle data persistence in non-demo mode
 
 interface FriendRequest {
   id: string;
@@ -663,6 +650,52 @@ export default function CommunityPage() {
       toast({ title: "Friend request declined" });
     },
   });
+
+  // Friends list query for non-demo mode
+  const friendsQuery = useQuery<StoredFriend[]>({
+    queryKey: ['/api/friends'],
+    enabled: !isDemo,
+    queryFn: async () => {
+      const res = await fetch('/api/friends', { credentials: 'include' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.map((f: any) => ({
+        id: f.id,
+        friendId: f.friendId || f.id,
+        firstName: f.firstName || '',
+        lastName: f.lastName || '',
+        profileImageUrl: f.profileImageUrl,
+        todayPoints: f.todayPoints || 0,
+        weeklyPoints: f.weeklyPoints || 0,
+        totalPoints: f.totalPoints || 0,
+        dayStreak: f.dayStreak || 0,
+        weekStreak: f.weekStreak || 0,
+        totalBadgesEarned: f.totalBadgesEarned || 0,
+        visibilityLevel: f.visibilityLevel || 'full',
+        hiddenTaskIds: f.hiddenTaskIds || [],
+      }));
+    },
+  });
+
+  // Circles list query for non-demo mode
+  const circlesQuery = useQuery<StoredCircle[]>({
+    queryKey: ['/api/circles'],
+    enabled: !isDemo,
+    queryFn: async () => {
+      const res = await fetch('/api/circles', { credentials: 'include' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.map((c: any) => ({
+        id: c.id,
+        name: c.name || '',
+        description: c.description || '',
+        iconColor: c.iconColor || 'hsl(217, 91%, 60%)',
+        createdAt: c.createdAt || new Date().toISOString(),
+        createdBy: c.createdBy || '',
+        memberCount: c.memberCount || 1,
+      }));
+    },
+  });
   
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -761,35 +794,15 @@ export default function CommunityPage() {
         },
       });
     } else {
-      // Load real data from storage
-      setFriends(loadFriendsFromStorage());
-      setCircles(loadCirclesFromStorage());
-      setCommunityPosts(loadCommunityPostsFromStorage());
-      // Convert flat array to grouped by friend for direct messages
-      const storedDMs = loadDirectMessagesFromStorage();
-      const groupedDMs: Record<string, StoredDirectMessage[]> = {};
-      storedDMs.forEach(dm => {
-        const key = dm.senderId === "you" ? dm.recipientId : dm.senderId;
-        if (!groupedDMs[key]) groupedDMs[key] = [];
-        groupedDMs[key].push(dm);
-      });
-      setDirectMessages(groupedDMs);
-      // Load circle messages and posts (convert flat to grouped)
-      const storedCircleMessages = loadCircleMessagesFromStorage();
-      const groupedCircleMessages: Record<string, StoredCircleMessage[]> = {};
-      storedCircleMessages.forEach(msg => {
-        if (!groupedCircleMessages[msg.circleId]) groupedCircleMessages[msg.circleId] = [];
-        groupedCircleMessages[msg.circleId].push(msg);
-      });
-      setCircleMessages(groupedCircleMessages);
-      const storedCirclePosts = loadCirclePostsFromStorage();
-      const groupedCirclePosts: Record<string, StoredCirclePost[]> = {};
-      storedCirclePosts.forEach(post => {
-        if (!groupedCirclePosts[post.circleId]) groupedCirclePosts[post.circleId] = [];
-        groupedCirclePosts[post.circleId].push(post);
-      });
-      setCirclePosts(groupedCirclePosts);
-      // Clear demo-specific state
+      // Non-demo mode: Initialize empty state, let API queries populate data
+      // Community posts are loaded via postsQuery
+      // Friend requests are loaded via friendRequestsQuery
+      setFriends([]);
+      setCircles([]);
+      setCommunityPosts([]);
+      setDirectMessages({});
+      setCircleMessages({});
+      setCirclePosts({});
       setRequests([]);
       setCircleMembers({});
       setCircleTasks({});
@@ -802,50 +815,8 @@ export default function CommunityPage() {
     setDataLoaded(true);
   }, [isDemo]);
 
-  // Save community posts to storage when changed (not in demo mode)
-  useEffect(() => {
-    if (!isDemo && dataLoaded) {
-      saveCommunityPostsToStorage(communityPosts);
-    }
-  }, [communityPosts, isDemo, dataLoaded]);
-
-  // Save friends to storage when changed (not in demo mode)
-  useEffect(() => {
-    if (!isDemo && dataLoaded) {
-      saveFriendsToStorage(friends);
-    }
-  }, [friends, isDemo, dataLoaded]);
-
-  // Save circles to storage when changed (not in demo mode)
-  useEffect(() => {
-    if (!isDemo && dataLoaded) {
-      saveCirclesToStorage(circles);
-    }
-  }, [circles, isDemo, dataLoaded]);
-
-  // Save direct messages to storage when changed (not in demo mode)
-  useEffect(() => {
-    if (!isDemo && dataLoaded) {
-      const allDMs: StoredDirectMessage[] = Object.values(directMessages).flat();
-      saveDirectMessagesToStorage(allDMs);
-    }
-  }, [directMessages, isDemo, dataLoaded]);
-
-  // Save circle messages to storage when changed (not in demo mode)
-  useEffect(() => {
-    if (!isDemo && dataLoaded) {
-      const allMessages: StoredCircleMessage[] = Object.values(circleMessages).flat();
-      saveCircleMessagesToStorage(allMessages);
-    }
-  }, [circleMessages, isDemo, dataLoaded]);
-
-  // Save circle posts to storage when changed (not in demo mode)
-  useEffect(() => {
-    if (!isDemo && dataLoaded) {
-      const allPosts: StoredCirclePost[] = Object.values(circlePosts).flat();
-      saveCirclePostsToStorage(allPosts);
-    }
-  }, [circlePosts, isDemo, dataLoaded]);
+  // Note: localStorage saving removed - in non-demo mode, API mutations handle persistence
+  // In demo mode, state changes are ephemeral and not persisted
 
   // Sync friend requests from API query to state (not in demo mode)
   useEffect(() => {
@@ -853,6 +824,20 @@ export default function CommunityPage() {
       setRequests(friendRequestsQuery.data);
     }
   }, [isDemo, friendRequestsQuery.data]);
+
+  // Sync friends from API query to state (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && friendsQuery.data) {
+      setFriends(friendsQuery.data);
+    }
+  }, [isDemo, friendsQuery.data]);
+
+  // Sync circles from API query to state (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && circlesQuery.data) {
+      setCircles(circlesQuery.data);
+    }
+  }, [isDemo, circlesQuery.data]);
 
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
