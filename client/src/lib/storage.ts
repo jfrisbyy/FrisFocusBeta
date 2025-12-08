@@ -196,11 +196,14 @@ export function saveBadgesToStorage(badges: StoredBadge[]): void {
 /**
  * Update badge progress based on completed tasks.
  * Called when a daily log is saved to update badge progress for taskCompletions badges.
- * @param completedTaskIds - Array of task IDs that were completed
+ * Only counts the difference between previous and current completions.
+ * @param completedTaskIds - Array of task IDs that are now completed
+ * @param previousCompletedTaskIds - Array of task IDs that were previously completed for this date
  * @param tasks - Array of tasks with their names and IDs
  */
 export function updateBadgeProgressForTasks(
   completedTaskIds: string[],
+  previousCompletedTaskIds: string[],
   tasks: { id: string; name: string }[]
 ): void {
   const badges = loadBadgesFromStorage();
@@ -209,8 +212,19 @@ export function updateBadgeProgressForTasks(
   // Create a map of task ID to task name for quick lookup
   const taskNameMap = new Map(tasks.map(t => [t.id, t.name]));
   
-  // Get the names of completed tasks
-  const completedTaskNames = completedTaskIds
+  // Find newly completed tasks (in current but not in previous)
+  const previousSet = new Set(previousCompletedTaskIds);
+  const currentSet = new Set(completedTaskIds);
+  
+  const newlyCompleted = completedTaskIds.filter(id => !previousSet.has(id));
+  const newlyUncompleted = previousCompletedTaskIds.filter(id => !currentSet.has(id));
+  
+  // Get task names for newly completed/uncompleted
+  const newlyCompletedNames = newlyCompleted
+    .map(id => taskNameMap.get(id))
+    .filter((name): name is string => !!name);
+  
+  const newlyUncompletedNames = newlyUncompleted
     .map(id => taskNameMap.get(id))
     .filter((name): name is string => !!name);
 
@@ -221,14 +235,21 @@ export function updateBadgeProgressForTasks(
     if (badge.conditionType !== "taskCompletions") continue;
     if (!badge.taskName) continue;
 
-    // Check if any completed task matches this badge's taskName (case-insensitive)
-    const matchingTasks = completedTaskNames.filter(
+    // Count matching tasks that were newly completed
+    const addedCount = newlyCompletedNames.filter(
       name => name.toLowerCase() === badge.taskName!.toLowerCase()
-    );
+    ).length;
+    
+    // Count matching tasks that were uncompleted (removed)
+    const removedCount = newlyUncompletedNames.filter(
+      name => name.toLowerCase() === badge.taskName!.toLowerCase()
+    ).length;
+    
+    const netChange = addedCount - removedCount;
 
-    if (matchingTasks.length > 0) {
-      // Increment progress by the number of matching tasks
-      const newProgress = (badge.currentProgress || 0) + matchingTasks.length;
+    if (netChange !== 0) {
+      // Apply net change to progress (can't go below 0)
+      const newProgress = Math.max(0, (badge.currentProgress || 0) + netChange);
       badge.currentProgress = newProgress;
       updated = true;
 

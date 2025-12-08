@@ -84,6 +84,7 @@ export default function DailyPage() {
   const [todoBonusPoints, setTodoBonusPoints] = useState(10);
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
   const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
+  const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
@@ -257,12 +258,15 @@ export default function DailyPage() {
 
     // If we have API data for this date, use it
     if (apiDailyLog) {
-      setCompletedIds(new Set(apiDailyLog.completedTaskIds || []));
+      const savedIds = apiDailyLog.completedTaskIds || [];
+      setCompletedIds(new Set(savedIds));
+      setSavedCompletedIds(savedIds);
       setNotes(apiDailyLog.notes || "");
       setTaskNotes(apiDailyLog.taskNotes || {});
     } else {
       // API returned null (no log for this date) - start fresh
       setCompletedIds(new Set());
+      setSavedCompletedIds([]);
       setNotes("");
       setTaskNotes({});
     }
@@ -448,9 +452,13 @@ export default function DailyPage() {
         taskNotes,
       });
 
-      // Update badge progress for completed tasks
+      // Update badge progress for completed tasks (only count the difference)
+      const currentCompletedArray = Array.from(completedIds);
       const tasksForBadges = allTasks.map(t => ({ id: t.id, name: t.name }));
-      updateBadgeProgressForTasks(Array.from(completedIds), tasksForBadges);
+      updateBadgeProgressForTasks(currentCompletedArray, savedCompletedIds, tasksForBadges);
+      
+      // Update saved state to match what was just saved
+      setSavedCompletedIds(currentCompletedArray);
 
       // Reset the notes field for next entry
       setNotes("");
