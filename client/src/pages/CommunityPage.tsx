@@ -1,5 +1,6 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useDemo } from "@/contexts/DemoContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -519,6 +520,7 @@ const demoDirectMessages: Record<string, StoredDirectMessage[]> = {
 
 export default function CommunityPage() {
   const { isDemo } = useDemo();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [friends, setFriends] = useState<StoredFriend[]>([]);
@@ -1475,10 +1477,30 @@ export default function CommunityPage() {
     toast({ title: "Comment deleted" });
   };
 
-  const handleSendDirectMessage = (friendId: string, friendName: string) => {
+  const handleSendDirectMessage = async (friendId: string, friendName: string) => {
     const message = dmMessages[friendId] || "";
     const imageUrl = dmImages[friendId] || null;
     if (!message.trim() && !imageUrl) return;
+    
+    if (!isDemo && user) {
+      try {
+        const res = await apiRequest("POST", `/api/messages/${friendId}`, {
+          content: message.trim(),
+          imageUrl: imageUrl || undefined,
+        });
+        const newMessage = await res.json();
+        const currentMsgs = directMessages[friendId] || [];
+        setDirectMessages({ ...directMessages, [friendId]: [...currentMsgs, newMessage] });
+        setDmMessages({ ...dmMessages, [friendId]: "" });
+        clearDmImage(friendId);
+        toast({ title: "Message sent" });
+      } catch (error) {
+        console.error("Error sending message:", error);
+        toast({ title: "Failed to send message", variant: "destructive" });
+      }
+      return;
+    }
+    
     const msg: StoredDirectMessage = {
       id: `dm-${Date.now()}`,
       senderId: "you",
@@ -1496,6 +1518,17 @@ export default function CommunityPage() {
     clearDmImage(friendId);
     toast({ title: "Message sent" });
   };
+  
+  const fetchDirectMessages = useCallback(async (friendId: string) => {
+    if (isDemo || !user) return;
+    try {
+      const res = await apiRequest("GET", `/api/messages/${friendId}`);
+      const messages = await res.json();
+      setDirectMessages(prev => ({ ...prev, [friendId]: messages.reverse() }));
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  }, [isDemo, user]);
 
   // Image upload handler for circle messages and posts
   const handleCircleImageUpload = async (
@@ -2415,33 +2448,36 @@ export default function CommunityPage() {
           
           <ScrollArea className="h-64 pr-4">
             <div className="space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.senderId === "you" ? "justify-end" : "justify-start"}`}
-                >
+              {messages.map((msg) => {
+                const isOwnMessage = isDemo ? msg.senderId === "you" : msg.senderId === user?.id;
+                return (
                   <div
-                    className={`max-w-[80%] p-3 rounded-lg ${
-                      msg.senderId === "you"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
+                    key={msg.id}
+                    className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
                   >
-                    {msg.imageUrl && (
-                      <img 
-                        src={msg.imageUrl} 
-                        alt="Shared image" 
-                        className="max-w-full rounded-md mb-2"
-                        style={{ maxHeight: "150px" }}
-                      />
-                    )}
-                    <p className="text-sm">{msg.content}</p>
-                    <p className={`text-xs mt-1 ${msg.senderId === "you" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                      {formatTime(msg.createdAt)}
-                    </p>
+                    <div
+                      className={`max-w-[80%] p-3 rounded-lg ${
+                        isOwnMessage
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
+                      }`}
+                    >
+                      {msg.imageUrl && (
+                        <img 
+                          src={msg.imageUrl} 
+                          alt="Shared image" 
+                          className="max-w-full rounded-md mb-2"
+                          style={{ maxHeight: "150px" }}
+                        />
+                      )}
+                      <p className="text-sm">{msg.content}</p>
+                      <p className={`text-xs mt-1 ${isOwnMessage ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                        {formatTime(msg.createdAt)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
           
@@ -2671,7 +2707,12 @@ export default function CommunityPage() {
                     <div key={friendId} className="border rounded-md p-3" data-testid={`dm-card-${friendId}`}>
                       <div 
                         className="flex items-center justify-between gap-2 cursor-pointer"
-                        onClick={() => setExpandedDMFriend(isExpanded ? null : friendId)}
+                        onClick={() => {
+                          if (!isExpanded) {
+                            fetchDirectMessages(friendId);
+                          }
+                          setExpandedDMFriend(isExpanded ? null : friendId);
+                        }}
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
@@ -2689,9 +2730,11 @@ export default function CommunityPage() {
                       {isExpanded && (
                         <div className="mt-3 pt-3 border-t space-y-2">
                           <ScrollArea className="h-[150px]">
-                            {msgs.map((msg) => (
-                              <div key={msg.id} className={`flex mb-2 ${msg.senderId === "you" ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[80%] p-2 rounded-md text-sm ${msg.senderId === "you" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                            {msgs.map((msg) => {
+                              const isOwnMessage = isDemo ? msg.senderId === "you" : msg.senderId === user?.id;
+                              return (
+                              <div key={msg.id} className={`flex mb-2 ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[80%] p-2 rounded-md text-sm ${isOwnMessage ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                                   {msg.imageUrl && (
                                     <img 
                                       src={msg.imageUrl} 
@@ -2703,7 +2746,8 @@ export default function CommunityPage() {
                                   {msg.content}
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </ScrollArea>
                           <input
                             type="file"
