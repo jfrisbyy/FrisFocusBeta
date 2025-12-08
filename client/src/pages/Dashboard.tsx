@@ -533,10 +533,18 @@ export default function Dashboard() {
       penalties = loadPenaltiesFromStorage();
     }
     
-    // Build daily logs map from API data
+    // Build daily logs map from API data or localStorage fallback
     let dailyLogs: Record<string, { completedTaskIds: string[] }> = {};
-    if (apiDailyLogs) {
+    const hasApiLogs = apiDailyLogs && apiDailyLogs.length > 0;
+    
+    if (hasApiLogs) {
       apiDailyLogs.forEach((log: any) => {
+        dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };
+      });
+    } else {
+      // Fallback to localStorage when API returns empty
+      const storedLogs = loadDailyLogsFromStorage();
+      storedLogs.forEach((log) => {
         dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };
       });
     }
