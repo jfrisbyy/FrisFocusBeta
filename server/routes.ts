@@ -77,6 +77,7 @@ import {
   insertUserDailyLogSchema,
   userJournalEntries,
   insertUserJournalEntrySchema,
+  circleMemberStats,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -103,6 +104,15 @@ const ALLOWED_GPT_REDIRECT_URIS = [
   "https://chat.openai.com/aip/g-",
   "https://chatgpt.com/aip/g-",
 ];
+
+// Helper to check if two dates are consecutive
+function isConsecutiveDay(date1: string, date2: string): boolean {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  const diffTime = Math.abs(d2.getTime() - d1.getTime());
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+  return diffDays === 1;
+}
 
 function isValidRedirectUri(redirectUri: string): boolean {
   if (!redirectUri) return false;
@@ -2814,6 +2824,144 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error adding comment:", error);
       res.status(400).json({ error: "Failed to add comment" });
+    }
+  });
+
+  // ==================== CIRCLE ANALYTICS API ====================
+
+  // Get circle leaderboard with member stats
+  app.get("/api/circles/:id/leaderboard", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view leaderboard" });
+      }
+
+      // Get all members
+      const members = await db.select().from(circleMembers).where(eq(circleMembers.circleId, circleId));
+      
+      // Get all completions for this circle
+      const completions = await db.select().from(circleTaskCompletions).where(eq(circleTaskCompletions.circleId, circleId));
+      
+      // Get all tasks for point values
+      const tasks = await db.select().from(circleTasks).where(eq(circleTasks.circleId, circleId));
+      const taskMap = new Map(tasks.map(t => [t.id, t]));
+
+      // Get circle for goal info
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      const dailyGoal = circle?.dailyPointGoal || 30;
+
+      // Calculate stats for each member
+      const memberStats = await Promise.all(members.map(async (member) => {
+        const [user] = await db.select().from(users).where(eq(users.id, member.userId));
+        
+        // Filter completions for this member
+        const memberCompletions = completions.filter(c => c.userId === member.userId);
+        
+        // Calculate total points
+        let totalPoints = 0;
+        const taskCounts: Record<string, number> = {};
+        
+        for (const comp of memberCompletions) {
+          const task = taskMap.get(comp.taskId);
+          if (task) {
+            totalPoints += task.value || 0;
+            taskCounts[task.name] = (taskCounts[task.name] || 0) + 1;
+          }
+        }
+
+        // Calculate goal streak (consecutive days hitting daily goal)
+        const datePoints: Record<string, number> = {};
+        for (const comp of memberCompletions) {
+          const task = taskMap.get(comp.taskId);
+          if (task) {
+            datePoints[comp.date] = (datePoints[comp.date] || 0) + (task.value || 0);
+          }
+        }
+
+        // Sort dates and count streak
+        const sortedDates = Object.keys(datePoints).sort().reverse();
+        let goalStreak = 0;
+        let longestStreak = 0;
+        let currentStreak = 0;
+
+        for (let i = 0; i < sortedDates.length; i++) {
+          const date = sortedDates[i];
+          if (datePoints[date] >= dailyGoal) {
+            currentStreak++;
+            if (i === 0 || isConsecutiveDay(sortedDates[i - 1], date)) {
+              if (i === 0) goalStreak = currentStreak;
+            } else {
+              longestStreak = Math.max(longestStreak, currentStreak - 1);
+              currentStreak = 1;
+            }
+          } else {
+            longestStreak = Math.max(longestStreak, currentStreak);
+            currentStreak = 0;
+            if (i === 0) goalStreak = 0;
+          }
+        }
+        longestStreak = Math.max(longestStreak, currentStreak);
+        if (goalStreak === 0 && currentStreak > 0) goalStreak = currentStreak;
+
+        // Build weekly history (last 12 weeks)
+        const weeklyHistory: { week: string; points: number }[] = [];
+        const now = new Date();
+        for (let w = 0; w < 12; w++) {
+          const weekStart = new Date(now);
+          weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (w * 7));
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+          
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          const weekEndStr = weekEnd.toISOString().split('T')[0];
+          
+          let weekPoints = 0;
+          for (const comp of memberCompletions) {
+            if (comp.date >= weekStartStr && comp.date <= weekEndStr) {
+              const task = taskMap.get(comp.taskId);
+              if (task) weekPoints += task.value || 0;
+            }
+          }
+          
+          weeklyHistory.unshift({ week: weekStartStr, points: weekPoints });
+        }
+
+        // Top tasks
+        const taskTotals = Object.entries(taskCounts)
+          .map(([taskName, count]) => ({ taskName, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        return {
+          id: member.id,
+          oderId: member.userId,
+          userId: member.userId,
+          firstName: user?.firstName || 'Unknown',
+          lastName: user?.lastName || '',
+          profileImageUrl: user?.profileImageUrl,
+          role: member.role,
+          totalPoints,
+          goalStreak,
+          longestStreak,
+          weeklyHistory,
+          taskTotals,
+        };
+      }));
+
+      // Sort by total points descending
+      memberStats.sort((a, b) => b.totalPoints - a.totalPoints);
+
+      res.json(memberStats);
+    } catch (error) {
+      console.error("Error fetching circle leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch leaderboard" });
     }
   });
 

@@ -987,3 +987,36 @@ export const userJournalEntries = pgTable("user_journal_entries", {
 export const insertUserJournalEntrySchema = createInsertSchema(userJournalEntries).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUserJournalEntry = z.infer<typeof insertUserJournalEntrySchema>;
 export type UserJournalEntry = typeof userJournalEntries.$inferSelect;
+
+// ==================== CIRCLE MEMBER STATS (Analytics) ====================
+
+// Circle member stats - aggregated all-time stats per member per circle
+export const circleMemberStats = pgTable("circle_member_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  totalPoints: integer("total_points").default(0),
+  goalStreak: integer("goal_streak").default(0), // Consecutive days hitting daily goal
+  longestStreak: integer("longest_streak").default(0),
+  weeklyHistory: jsonb("weekly_history").default([]), // Array of { week: string, points: number }
+  taskTotals: jsonb("task_totals").default([]), // Array of { taskName: string, count: number }
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+export const insertCircleMemberStatsSchema = createInsertSchema(circleMemberStats).omit({ id: true, lastUpdated: true });
+export type InsertCircleMemberStats = z.infer<typeof insertCircleMemberStatsSchema>;
+export type CircleMemberStats = typeof circleMemberStats.$inferSelect;
+
+// Type for weekly history entries
+export const weeklyHistoryEntrySchema = z.object({
+  week: z.string(), // e.g., "2024-W49"
+  points: z.number(),
+});
+export type WeeklyHistoryEntry = z.infer<typeof weeklyHistoryEntrySchema>;
+
+// Type for task totals entries
+export const taskTotalEntrySchema = z.object({
+  taskName: z.string(),
+  count: z.number(),
+});
+export type TaskTotalEntry = z.infer<typeof taskTotalEntrySchema>;
