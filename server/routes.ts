@@ -63,6 +63,8 @@ import {
   insertUserPenaltySchema,
   insertUserHabitSettingsSchema,
   insertUserDailyLogSchema,
+  userJournalEntries,
+  insertUserJournalEntrySchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -2584,6 +2586,107 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error updating daily log:", error);
       res.status(400).json({ error: "Failed to update daily log" });
+    }
+  });
+
+  // ==================== JOURNAL API ====================
+
+  // Get all journal entries for the user
+  app.get("/api/habit/journal", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entries = await db.select().from(userJournalEntries)
+        .where(eq(userJournalEntries.userId, userId))
+        .orderBy(desc(userJournalEntries.createdAt));
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching journal entries:", error);
+      res.status(500).json({ error: "Failed to fetch journal entries" });
+    }
+  });
+
+  // Get journal entries for a specific date
+  app.get("/api/habit/journal/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+      const entries = await db.select().from(userJournalEntries)
+        .where(and(eq(userJournalEntries.userId, userId), eq(userJournalEntries.date, date)))
+        .orderBy(desc(userJournalEntries.createdAt));
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching journal entries for date:", error);
+      res.status(500).json({ error: "Failed to fetch journal entries" });
+    }
+  });
+
+  // Create a new journal entry
+  app.post("/api/habit/journal", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date, title, content } = req.body;
+      
+      const parsed = insertUserJournalEntrySchema.parse({
+        userId,
+        date,
+        title,
+        content,
+      });
+      
+      const [entry] = await db.insert(userJournalEntries).values(parsed).returning();
+      res.json(entry);
+    } catch (error) {
+      console.error("Error creating journal entry:", error);
+      res.status(400).json({ error: "Failed to create journal entry" });
+    }
+  });
+
+  // Update a journal entry
+  app.put("/api/habit/journal/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entryId = req.params.id;
+      const { title, content } = req.body;
+
+      // Verify ownership
+      const [existing] = await db.select().from(userJournalEntries)
+        .where(and(eq(userJournalEntries.id, entryId), eq(userJournalEntries.userId, userId)));
+      
+      if (!existing) {
+        return res.status(404).json({ error: "Journal entry not found" });
+      }
+
+      const [entry] = await db.update(userJournalEntries)
+        .set({ title, content, updatedAt: new Date() })
+        .where(eq(userJournalEntries.id, entryId))
+        .returning();
+      
+      res.json(entry);
+    } catch (error) {
+      console.error("Error updating journal entry:", error);
+      res.status(400).json({ error: "Failed to update journal entry" });
+    }
+  });
+
+  // Delete a journal entry
+  app.delete("/api/habit/journal/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entryId = req.params.id;
+
+      // Verify ownership
+      const [existing] = await db.select().from(userJournalEntries)
+        .where(and(eq(userJournalEntries.id, entryId), eq(userJournalEntries.userId, userId)));
+      
+      if (!existing) {
+        return res.status(404).json({ error: "Journal entry not found" });
+      }
+
+      await db.delete(userJournalEntries).where(eq(userJournalEntries.id, entryId));
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting journal entry:", error);
+      res.status(500).json({ error: "Failed to delete journal entry" });
     }
   });
 

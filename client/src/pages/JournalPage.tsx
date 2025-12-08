@@ -24,9 +24,9 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
+import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +42,9 @@ import {
   saveJournalToStorage,
   type StoredJournalEntry,
 } from "@/lib/storage";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { UserJournalEntry } from "@shared/schema";
 
 interface JournalEntry {
   id: string;
@@ -115,6 +118,7 @@ function getSampleEntries(): JournalEntry[] {
 export default function JournalPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
+  const { user } = useAuth();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
@@ -124,21 +128,78 @@ export default function JournalPage() {
   const [formContent, setFormContent] = useState("");
   const [deleteEntry, setDeleteEntry] = useState<JournalEntry | null>(null);
 
-  // Load entries from localStorage on mount
+  // Fetch journal entries from API
+  const { data: apiEntries } = useQuery<UserJournalEntry[]>({
+    queryKey: ["/api/habit/journal"],
+    enabled: !!user && !isDemo,
+  });
+
+  // Create mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: { date: string; title: string; content: string }) => {
+      const res = await apiRequest("POST", "/api/habit/journal", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
+    },
+  });
+
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, title, content }: { id: string; title: string; content: string }) => {
+      const res = await apiRequest("PUT", `/api/habit/journal/${id}`, { title, content });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/habit/journal/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
+    },
+  });
+
+  // Load entries from API or localStorage on mount
   useEffect(() => {
     if (isDemo) {
       setEntries(getSampleEntries());
       return;
     }
     
-    const storedEntries = loadJournalFromStorage();
-    setEntries(storedEntries);
-  }, [isDemo]);
+    // Use API data if user is logged in and API returned data
+    const hasApiData = apiEntries && apiEntries.length > 0;
+    if (user && hasApiData) {
+      const transformed: JournalEntry[] = apiEntries.map((e) => ({
+        id: e.id,
+        date: e.date,
+        title: e.title,
+        content: e.content,
+        createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
+      }));
+      setEntries(transformed);
+    } else if (!user) {
+      // Not logged in - use localStorage
+      const storedEntries = loadJournalFromStorage();
+      setEntries(storedEntries);
+    } else if (apiEntries && apiEntries.length === 0) {
+      // Logged in but no API data - use localStorage as fallback
+      const storedEntries = loadJournalFromStorage();
+      setEntries(storedEntries);
+    }
+  }, [isDemo, user, apiEntries]);
 
-  // Save entries to localStorage
+  // Save entries to localStorage (for non-authenticated users)
   const saveEntries = (newEntries: JournalEntry[]) => {
     setEntries(newEntries);
-    if (!isDemo) {
+    if (!isDemo && !user) {
       saveJournalToStorage(newEntries);
     }
   };
@@ -182,7 +243,7 @@ export default function JournalPage() {
     setFormContent(entry.content);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formTitle.trim() || !formContent.trim()) {
       toast({
         title: "Missing fields",
@@ -194,29 +255,75 @@ export default function JournalPage() {
 
     if (isCreating) {
       const now = new Date();
-      const newEntry: JournalEntry = {
-        id: `entry-${Date.now()}`,
-        date: format(now, "yyyy-MM-dd"),
-        title: formTitle.trim(),
-        content: formContent.trim(),
-        createdAt: now.toISOString(),
-      };
-      saveEntries([newEntry, ...entries]);
-      toast({
-        title: "Entry created",
-        description: "Your journal entry has been added",
-      });
+      const dateStr = format(now, "yyyy-MM-dd");
+      
+      if (user) {
+        // Use API for authenticated users
+        try {
+          await createMutation.mutateAsync({
+            date: dateStr,
+            title: formTitle.trim(),
+            content: formContent.trim(),
+          });
+          toast({
+            title: "Entry created",
+            description: "Your journal entry has been added",
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to create journal entry",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Use localStorage for non-authenticated users
+        const newEntry: JournalEntry = {
+          id: `entry-${Date.now()}`,
+          date: dateStr,
+          title: formTitle.trim(),
+          content: formContent.trim(),
+          createdAt: now.toISOString(),
+        };
+        saveEntries([newEntry, ...entries]);
+        toast({
+          title: "Entry created",
+          description: "Your journal entry has been added",
+        });
+      }
       setIsCreating(false);
     } else if (editingEntry) {
-      saveEntries(entries.map(e =>
-        e.id === editingEntry.id 
-          ? { ...e, title: formTitle.trim(), content: formContent.trim() } 
-          : e
-      ));
-      toast({
-        title: "Entry updated",
-        description: `Entry "${formTitle}" has been updated`,
-      });
+      if (user) {
+        // Use API for authenticated users
+        try {
+          await updateMutation.mutateAsync({
+            id: editingEntry.id,
+            title: formTitle.trim(),
+            content: formContent.trim(),
+          });
+          toast({
+            title: "Entry updated",
+            description: `Entry "${formTitle}" has been updated`,
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to update journal entry",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Use localStorage for non-authenticated users
+        saveEntries(entries.map(e =>
+          e.id === editingEntry.id 
+            ? { ...e, title: formTitle.trim(), content: formContent.trim() } 
+            : e
+        ));
+        toast({
+          title: "Entry updated",
+          description: `Entry "${formTitle}" has been updated`,
+        });
+      }
       setEditingEntry(null);
     }
 
@@ -224,14 +331,32 @@ export default function JournalPage() {
     setFormContent("");
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteEntry) return;
     
-    saveEntries(entries.filter(e => e.id !== deleteEntry.id));
-    toast({
-      title: "Entry deleted",
-      description: `"${deleteEntry.title}" has been removed`,
-    });
+    if (user) {
+      // Use API for authenticated users
+      try {
+        await deleteMutation.mutateAsync(deleteEntry.id);
+        toast({
+          title: "Entry deleted",
+          description: `"${deleteEntry.title}" has been removed`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete journal entry",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Use localStorage for non-authenticated users
+      saveEntries(entries.filter(e => e.id !== deleteEntry.id));
+      toast({
+        title: "Entry deleted",
+        description: `"${deleteEntry.title}" has been removed`,
+      });
+    }
     setDeleteEntry(null);
   };
 

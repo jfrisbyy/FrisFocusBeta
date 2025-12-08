@@ -804,3 +804,18 @@ export const userDailyLogs = pgTable("user_daily_logs", {
 export const insertUserDailyLogSchema = createInsertSchema(userDailyLogs).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUserDailyLog = z.infer<typeof insertUserDailyLogSchema>;
 export type UserDailyLog = typeof userDailyLogs.$inferSelect;
+
+// User journal entries - personal reflections and notes
+export const userJournalEntries = pgTable("user_journal_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: varchar("date").notNull(),
+  title: varchar("title").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserJournalEntrySchema = createInsertSchema(userJournalEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserJournalEntry = z.infer<typeof insertUserJournalEntrySchema>;
+export type UserJournalEntry = typeof userJournalEntries.$inferSelect;
