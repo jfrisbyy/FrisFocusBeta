@@ -127,11 +127,12 @@ export default function DailyPage() {
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
-    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number }) => {
+    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number }) => {
       const response = await apiRequest("PUT", `/api/habit/logs/${data.date}`, {
         completedTaskIds: data.completedTaskIds,
         notes: data.notes,
         todoPoints: data.todoPoints,
+        penaltyPoints: data.penaltyPoints,
       });
       return response.json();
     },
@@ -404,20 +405,22 @@ export default function DailyPage() {
     }
     
     try {
-      // Save via API (include todoPoints for daily summary calculations)
+      // Save via API (include todoPoints and penaltyPoints for daily summary calculations)
       await saveDailyLogMutation.mutateAsync({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "", // Clear notes from daily log since it's saved to journal
         todoPoints: totalTodoPoints,
+        penaltyPoints: Math.abs(negativePoints),
       });
 
-      // Also save to localStorage as backup (include todoPoints)
+      // Also save to localStorage as backup (include todoPoints and penaltyPoints)
       saveDailyLogToStorage({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "",
         todoPoints: totalTodoPoints,
+        penaltyPoints: Math.abs(negativePoints),
       });
 
       // Update badge progress for completed tasks
@@ -434,12 +437,13 @@ export default function DailyPage() {
           : `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
       });
     } catch (error) {
-      // Fallback to localStorage only (include todoPoints)
+      // Fallback to localStorage only (include todoPoints and penaltyPoints)
       saveDailyLogToStorage({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "",
         todoPoints: totalTodoPoints,
+        penaltyPoints: Math.abs(negativePoints),
       });
       setNotes("");
       toast({
