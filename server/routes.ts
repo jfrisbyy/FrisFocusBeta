@@ -560,6 +560,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
   app.get("/api/friends/requests", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("[DEBUG] Fetching incoming friend requests for userId:", userId);
 
       // Get pending requests where user is the addressee
       const pendingRequests = await db.select().from(friendships).where(
@@ -568,6 +569,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           eq(friendships.addresseeId, userId)
         )
       );
+      console.log("[DEBUG] Found pending requests:", pendingRequests.length, pendingRequests);
 
       // Get requester details
       const requestsWithDetails = await Promise.all(
@@ -584,6 +586,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         })
       );
 
+      console.log("[DEBUG] Returning requests with details:", requestsWithDetails);
       res.json(requestsWithDetails);
     } catch (error) {
       console.error("Error fetching friend requests:", error);
