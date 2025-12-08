@@ -6363,9 +6363,22 @@ export default function CommunityPage() {
                                   <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
                                     {post.comments.map((comment) => (
                                       <div key={comment.id} className="flex gap-2" data-testid={`circle-post-comment-${comment.id}`}>
-                                        <Avatar className="h-6 w-6">
-                                          <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
-                                        </Avatar>
+                                        {comment.authorId ? (
+                                          <ProfileHoverCard
+                                            userId={comment.authorId}
+                                            showActions={comment.authorId !== (isDemo ? "you" : user?.id)}
+                                            onMessageClick={() => toast({ title: "Opening DM", description: `Starting conversation with ${comment.authorName}` })}
+                                            onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${comment.authorName}` })}
+                                          >
+                                            <Avatar className="h-6 w-6 cursor-pointer">
+                                              <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                          </ProfileHoverCard>
+                                        ) : (
+                                          <Avatar className="h-6 w-6">
+                                            <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
+                                          </Avatar>
+                                        )}
                                         <div className="flex-1">
                                           <div className="flex items-baseline gap-2 flex-wrap">
                                             <span className="font-medium text-sm">{comment.authorName}</span>
@@ -7630,9 +7643,16 @@ export default function CommunityPage() {
               <Card key={post.id} data-testid={`feed-post-${post.id}`}>
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-3">
-                    <Avatar>
-                      <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
-                    </Avatar>
+                    <ProfileHoverCard
+                      userId={post.authorId}
+                      showActions={post.authorId !== (isDemo ? "you" : user?.id)}
+                      onMessageClick={() => toast({ title: "Opening DM", description: `Starting conversation with ${post.authorName}` })}
+                      onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${post.authorName}` })}
+                    >
+                      <Avatar className="cursor-pointer">
+                        <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    </ProfileHoverCard>
                     <div className="flex-1">
                       <div className="flex items-baseline gap-2 flex-wrap">
                         <span className="font-medium">{post.authorName}</span>
@@ -7698,9 +7718,22 @@ export default function CommunityPage() {
                         <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
                           {post.comments.map((comment) => (
                             <div key={comment.id} className="flex gap-2" data-testid={`feed-comment-${comment.id}`}>
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
-                              </Avatar>
+                              {comment.authorId ? (
+                                <ProfileHoverCard
+                                  userId={comment.authorId}
+                                  showActions={comment.authorId !== (isDemo ? "you" : user?.id)}
+                                  onMessageClick={() => toast({ title: "Opening DM", description: `Starting conversation with ${comment.authorName}` })}
+                                  onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${comment.authorName}` })}
+                                >
+                                  <Avatar className="h-6 w-6 cursor-pointer">
+                                    <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                </ProfileHoverCard>
+                              ) : (
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                              )}
                               <div className="flex-1">
                                 <div className="flex items-baseline gap-2 flex-wrap">
                                   <span className="font-medium text-sm">{comment.authorName}</span>
