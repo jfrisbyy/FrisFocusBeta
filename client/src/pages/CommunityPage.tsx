@@ -2061,6 +2061,41 @@ export default function CommunityPage() {
     setCircleAwards(prev => ({ ...prev, [selectedCircle.id]: circleAwardsQuery.data }));
   }, [isDemo, selectedCircle?.id, circleAwardsQuery.data]);
 
+  // Sync leaderboard data to circleMembers for points on initial load
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circleLeaderboardQuery.data) return;
+    const circleId = selectedCircle.id;
+    
+    setCircleMembers(prev => {
+      const existingMembers = prev[circleId] || [];
+      if (existingMembers.length === 0) {
+        // If no members yet, create from leaderboard data
+        const membersFromLeaderboard: StoredCircleMember[] = circleLeaderboardQuery.data.map((stat: any) => ({
+          id: stat.id || stat.userId,
+          circleId: circleId,
+          userId: stat.userId,
+          firstName: stat.firstName || 'Unknown',
+          lastName: stat.lastName || '',
+          role: stat.role || 'member',
+          joinedAt: new Date().toISOString(),
+          weeklyPoints: stat.totalPoints || 0,
+          profileImageUrl: stat.profileImageUrl,
+        }));
+        return { ...prev, [circleId]: membersFromLeaderboard };
+      } else {
+        // Update existing members with leaderboard points
+        const updatedMembers = existingMembers.map(m => {
+          const leaderboardStat = circleLeaderboardQuery.data.find((s: any) => s.userId === m.userId);
+          return {
+            ...m,
+            weeklyPoints: leaderboardStat?.totalPoints ?? m.weeklyPoints ?? 0,
+          };
+        });
+        return { ...prev, [circleId]: updatedMembers };
+      }
+    });
+  }, [isDemo, selectedCircle?.id, circleLeaderboardQuery.data]);
+
   // Sync circle posts from API query to local state
   useEffect(() => {
     if (isDemo || !selectedCircle || !circlePostsQuery.data) return;
