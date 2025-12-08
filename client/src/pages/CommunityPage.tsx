@@ -298,6 +298,7 @@ const demoCircles: StoredCircle[] = [
     memberCount: 8,
     dailyPointGoal: 30,
     weeklyPointGoal: 150,
+    inviteCode: "MARATHON2024",
   },
   {
     id: "circle-2",
@@ -309,6 +310,7 @@ const demoCircles: StoredCircle[] = [
     memberCount: 5,
     dailyPointGoal: 25,
     weeklyPointGoal: 100,
+    inviteCode: "WILLIAMS2024",
   },
   {
     id: "circle-3",
@@ -320,12 +322,114 @@ const demoCircles: StoredCircle[] = [
     memberCount: 12,
     dailyPointGoal: 20,
     weeklyPointGoal: 80,
+    inviteCode: "BOOKCLUB2024",
   },
 ];
 
+interface DemoCompetition {
+  id: string;
+  name: string;
+  targetPoints: number;
+  status: "active" | "completed";
+  myCircle: { id: string; name: string };
+  opponentCircle: { id: string; name: string };
+  myPoints: number;
+  opponentPoints: number;
+  winnerId?: string;
+}
+
+interface DemoCompetitionInvite {
+  id: string;
+  inviterCircle: { id: string; name: string };
+  inviteeCircle: { id: string; name: string };
+  targetPoints: number;
+  name: string;
+  status: "pending";
+  isIncoming: boolean;
+}
+
+const demoCompetitions: Record<string, DemoCompetition[]> = {
+  "circle-1": [
+    {
+      id: "comp-1",
+      name: "Weekly Showdown",
+      targetPoints: 500,
+      status: "active",
+      myCircle: { id: "circle-1", name: "Marathon Mommy's" },
+      opponentCircle: { id: "circle-ext-1", name: "Fitness Fanatics" },
+      myPoints: 320,
+      opponentPoints: 280,
+    },
+    {
+      id: "comp-2",
+      name: "Spring Sprint",
+      targetPoints: 1000,
+      status: "completed",
+      myCircle: { id: "circle-1", name: "Marathon Mommy's" },
+      opponentCircle: { id: "circle-ext-2", name: "Run Club LA" },
+      myPoints: 1000,
+      opponentPoints: 875,
+      winnerId: "circle-1",
+    },
+  ],
+  "circle-2": [
+    {
+      id: "comp-3",
+      name: "Family Face-Off",
+      targetPoints: 300,
+      status: "active",
+      myCircle: { id: "circle-2", name: "Williams Household" },
+      opponentCircle: { id: "circle-ext-3", name: "The Johnsons" },
+      myPoints: 175,
+      opponentPoints: 165,
+    },
+  ],
+  "circle-3": [],
+};
+
+const demoCompetitionInvites: Record<string, DemoCompetitionInvite[]> = {
+  "circle-1": [
+    {
+      id: "inv-1",
+      inviterCircle: { id: "circle-ext-4", name: "CrossFit Crew" },
+      inviteeCircle: { id: "circle-1", name: "Marathon Mommy's" },
+      targetPoints: 750,
+      name: "Endurance Challenge",
+      status: "pending",
+      isIncoming: true,
+    },
+  ],
+  "circle-2": [
+    {
+      id: "inv-2",
+      inviterCircle: { id: "circle-2", name: "Williams Household" },
+      inviteeCircle: { id: "circle-ext-5", name: "Smith Family" },
+      targetPoints: 400,
+      name: "Weekend Warrior",
+      status: "pending",
+      isIncoming: false,
+    },
+  ],
+  "circle-3": [],
+};
+
+const demoOpponentMembers: Record<string, { id: string; firstName: string; lastName: string; weeklyPoints: number }[]> = {
+  "circle-ext-1": [
+    { id: "opp-1", firstName: "Jake", lastName: "M", weeklyPoints: 95 },
+    { id: "opp-2", firstName: "Maria", lastName: "S", weeklyPoints: 85 },
+    { id: "opp-3", firstName: "Tyler", lastName: "B", weeklyPoints: 65 },
+    { id: "opp-4", firstName: "Jen", lastName: "K", weeklyPoints: 35 },
+  ],
+  "circle-ext-3": [
+    { id: "opp-5", firstName: "Mike", lastName: "J", weeklyPoints: 60 },
+    { id: "opp-6", firstName: "Linda", lastName: "J", weeklyPoints: 55 },
+    { id: "opp-7", firstName: "Sam", lastName: "J", weeklyPoints: 50 },
+  ],
+};
+
 const demoCircleMembers: Record<string, StoredCircleMember[]> = {
   "circle-1": [
-    { id: "m1", circleId: "circle-1", userId: "you", firstName: "You", lastName: "", role: "member", joinedAt: "2024-11-05", weeklyPoints: 145 },
+    { id: "m1", circleId: "circle-1", userId: "you", firstName: "You", lastName: "", role: "admin", joinedAt: "2024-11-05", weeklyPoints: 145 },
     { id: "m2", circleId: "circle-1", userId: "u1", firstName: "Sarah", lastName: "M", role: "owner", joinedAt: "2024-11-01", weeklyPoints: 210 },
     { id: "m3", circleId: "circle-1", userId: "u2", firstName: "Lisa", lastName: "K", role: "member", joinedAt: "2024-11-03", weeklyPoints: 180 },
     { id: "m4", circleId: "circle-1", userId: "u3", firstName: "Emma", lastName: "T", role: "admin", joinedAt: "2024-11-02", weeklyPoints: 165 },
@@ -561,6 +665,9 @@ export default function CommunityPage() {
   const [newCircleMessage, setNewCircleMessage] = useState("");
   const [newCirclePost, setNewCirclePost] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
+  
+  // Competition state (must be declared before queries that use it)
+  const [showOpponentLeaderboard, setShowOpponentLeaderboard] = useState<string | null>(null);
 
   // API queries and mutations for non-demo mode
   const postsQuery = useQuery<APICommunityPost[]>({
@@ -1329,11 +1436,10 @@ export default function CommunityPage() {
   const [feedViewFilter, setFeedViewFilter] = useState<"all" | "friends" | "public">("all");
   const [communityTab, setCommunityTab] = useState<"friends" | "circles" | "feed">("friends");
   
-  // Competition state
+  // Competition state (showOpponentLeaderboard declared earlier with other state)
   const [challengeInviteCode, setChallengeInviteCode] = useState("");
   const [challengeTargetPoints, setChallengeTargetPoints] = useState("1000");
   const [challengeName, setChallengeName] = useState("");
-  const [showOpponentLeaderboard, setShowOpponentLeaderboard] = useState<string | null>(null);
   const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
   const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
   const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
@@ -6118,17 +6224,268 @@ export default function CommunityPage() {
 
                 <TabsContent value="compete" className="space-y-4 mt-4">
                   {isDemo ? (
-                    <Card>
-                      <CardContent className="py-8 text-center">
-                        <Swords className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-muted-foreground mb-4">
-                          Circle vs Circle competitions let you challenge other groups and race to reach a points goal first.
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Sign in to challenge another circle!
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <div className="space-y-4">
+                      {(() => {
+                        const demoIsOwnerOrAdmin = selectedCircle.createdBy === "you" || 
+                          demoCircleMembers[selectedCircle.id]?.find(m => m.userId === "you")?.role === "admin";
+                        const demoCircleCompetitions = demoCompetitions[selectedCircle.id] || [];
+                        const demoCircleInvites = demoCompetitionInvites[selectedCircle.id] || [];
+                        
+                        return (
+                          <>
+                            {demoIsOwnerOrAdmin && (
+                              <>
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                      <Copy className="w-5 h-5" />
+                                      Your Circle's Invite Code
+                                    </CardTitle>
+                                    <CardDescription>
+                                      Share this code with other circles to receive competition challenges
+                                    </CardDescription>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="flex items-center gap-2">
+                                      <code className="flex-1 bg-muted px-4 py-2 rounded-md font-mono text-lg" data-testid="text-demo-invite-code">
+                                        {selectedCircle.inviteCode}
+                                      </code>
+                                      <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                          toast({ title: "Demo Mode", description: "Sign in to copy invite codes" });
+                                        }}
+                                        data-testid="button-demo-copy-invite-code"
+                                      >
+                                        <Copy className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <Card>
+                                  <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                      <Swords className="w-5 h-5" />
+                                      Challenge Another Circle
+                                    </CardTitle>
+                                    <CardDescription>
+                                      Enter another circle's invite code to send them a competition challenge
+                                    </CardDescription>
+                                  </CardHeader>
+                                  <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Opponent's Invite Code</Label>
+                                      <Input
+                                        placeholder="Enter their invite code"
+                                        disabled
+                                        data-testid="input-demo-challenge-invite-code"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Target Points (first to reach wins)</Label>
+                                      <Input
+                                        type="number"
+                                        placeholder="e.g., 1000"
+                                        disabled
+                                        data-testid="input-demo-challenge-target-points"
+                                      />
+                                    </div>
+                                    <Button
+                                      onClick={() => {
+                                        toast({ title: "Demo Mode", description: "Sign in to challenge other circles" });
+                                      }}
+                                      data-testid="button-demo-send-challenge"
+                                    >
+                                      <Send className="w-4 h-4 mr-2" />
+                                      Send Challenge
+                                    </Button>
+                                  </CardContent>
+                                </Card>
+                              </>
+                            )}
+
+                            {demoCircleInvites.length > 0 && (
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="flex items-center gap-2">
+                                    <Mail className="w-5 h-5" />
+                                    Pending Challenges
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                  {demoCircleInvites.map((invite) => (
+                                    <div key={invite.id} className="p-4 rounded-md border">
+                                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                                        <div>
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <Badge variant={invite.isIncoming ? "default" : "secondary"}>
+                                              {invite.isIncoming ? "INCOMING" : "SENT"}
+                                            </Badge>
+                                            {invite.name && <span className="font-medium">{invite.name}</span>}
+                                          </div>
+                                          <p className="text-sm text-muted-foreground">
+                                            {invite.isIncoming
+                                              ? `From: ${invite.inviterCircle.name}`
+                                              : `To: ${invite.inviteeCircle.name}`}
+                                          </p>
+                                          <p className="text-sm">
+                                            <Target className="w-3 h-3 inline mr-1" />
+                                            Race to {invite.targetPoints.toLocaleString()} points
+                                          </p>
+                                        </div>
+                                        {invite.isIncoming && demoIsOwnerOrAdmin && (
+                                          <div className="flex gap-2">
+                                            <Button
+                                              size="sm"
+                                              onClick={() => {
+                                                toast({ title: "Demo Mode", description: "Sign in to accept challenges" });
+                                              }}
+                                              data-testid={`button-demo-accept-invite-${invite.id}`}
+                                            >
+                                              <Check className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                toast({ title: "Demo Mode", description: "Sign in to decline challenges" });
+                                              }}
+                                              data-testid={`button-demo-decline-invite-${invite.id}`}
+                                            >
+                                              <X className="w-4 h-4" />
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </CardContent>
+                              </Card>
+                            )}
+
+                            <Card>
+                              <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                  <Trophy className="w-5 h-5" />
+                                  Active Competitions
+                                </CardTitle>
+                                <CardDescription>
+                                  Race to the target points before your opponent
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                {demoCircleCompetitions.filter(c => c.status === "active").length === 0 ? (
+                                  <div className="text-center py-8 text-muted-foreground">
+                                    <Swords className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                    <p>No active competitions</p>
+                                    <p className="text-sm mt-1">Challenge another circle to start competing!</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    {demoCircleCompetitions.filter(c => c.status === "active").map((competition) => {
+                                      const myProgress = (competition.myPoints / competition.targetPoints) * 100;
+                                      const opponentProgress = (competition.opponentPoints / competition.targetPoints) * 100;
+                                      const opponentMembers = demoOpponentMembers[competition.opponentCircle.id] || [];
+                                      return (
+                                        <div key={competition.id} className="p-4 rounded-md border space-y-3">
+                                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                                            <div>
+                                              <p className="font-medium">{competition.name || "Competition"}</p>
+                                              <p className="text-sm text-muted-foreground">
+                                                vs {competition.opponentCircle.name}
+                                              </p>
+                                            </div>
+                                            <Badge variant="outline">
+                                              <Target className="w-3 h-3 mr-1" />
+                                              {competition.targetPoints.toLocaleString()} pts
+                                            </Badge>
+                                          </div>
+                                          <div className="space-y-2">
+                                            <div className="flex items-center justify-between gap-2 text-sm">
+                                              <span className="font-medium">{competition.myCircle.name}</span>
+                                              <span>{competition.myPoints.toLocaleString()}</span>
+                                            </div>
+                                            <Progress value={Math.min(myProgress, 100)} className="h-2" />
+                                          </div>
+                                          <div className="space-y-2">
+                                            <div className="flex items-center justify-between gap-2 text-sm">
+                                              <span className="text-muted-foreground">{competition.opponentCircle.name}</span>
+                                              <span className="text-muted-foreground">{competition.opponentPoints.toLocaleString()}</span>
+                                            </div>
+                                            <Progress value={Math.min(opponentProgress, 100)} className="h-2" />
+                                          </div>
+                                          {opponentMembers.length > 0 && (
+                                            <div className="mt-2 p-3 bg-muted rounded-md">
+                                              <p className="text-sm font-medium mb-2">{competition.opponentCircle.name} Members</p>
+                                              <div className="space-y-1">
+                                                {opponentMembers.map((member, idx) => (
+                                                  <div key={member.id} className="flex items-center justify-between text-sm">
+                                                    <span className="flex items-center gap-2">
+                                                      <span className="text-muted-foreground">{idx + 1}.</span>
+                                                      {member.firstName} {member.lastName}
+                                                    </span>
+                                                    <span className="font-mono">{member.weeklyPoints}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+
+                            {demoCircleCompetitions.filter(c => c.status === "completed").length > 0 && (
+                              <Card>
+                                <CardHeader>
+                                  <CardTitle className="flex items-center gap-2">
+                                    <Award className="w-5 h-5" />
+                                    Completed Competitions
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                  <div className="space-y-3">
+                                    {demoCircleCompetitions.filter(c => c.status === "completed").map((competition) => {
+                                      const isWinner = competition.winnerId === selectedCircle.id;
+                                      return (
+                                        <div key={competition.id} className="p-4 rounded-md border">
+                                          <div className="flex items-center justify-between gap-4 flex-wrap">
+                                            <div>
+                                              <div className="flex items-center gap-2">
+                                                <p className="font-medium">{competition.name || "Competition"}</p>
+                                                {isWinner ? (
+                                                  <Badge className="bg-green-600">
+                                                    <Trophy className="w-3 h-3 mr-1" />
+                                                    Winner
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="secondary">Lost</Badge>
+                                                )}
+                                              </div>
+                                              <p className="text-sm text-muted-foreground">
+                                                vs {competition.opponentCircle.name}
+                                              </p>
+                                            </div>
+                                            <div className="text-right text-sm">
+                                              <p className="font-mono">{competition.myPoints} - {competition.opponentPoints}</p>
+                                              <p className="text-muted-foreground">Target: {competition.targetPoints}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {isOwnerOrAdmin(selectedCircle.id) && (
