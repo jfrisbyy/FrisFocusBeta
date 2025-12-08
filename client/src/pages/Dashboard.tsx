@@ -390,25 +390,28 @@ export default function Dashboard() {
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
 
   // API queries for tasks, penalties, daily logs, and settings
-  const { data: apiTasks } = useQuery<any[]>({
+  const { data: apiTasks, isFetched: tasksFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/tasks"],
     enabled: !useMockData,
   });
 
-  const { data: apiPenalties } = useQuery<any[]>({
+  const { data: apiPenalties, isFetched: penaltiesFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/penalties"],
     enabled: !useMockData,
   });
 
-  const { data: apiDailyLogs } = useQuery<any[]>({
+  const { data: apiDailyLogs, isFetched: logsFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/logs"],
     enabled: !useMockData,
   });
 
-  const { data: apiSettings } = useQuery<any>({
+  const { data: apiSettings, isFetched: settingsFetched } = useQuery<any>({
     queryKey: ["/api/habit/settings"],
     enabled: !useMockData,
   });
+  
+  // Check if API queries have completed their initial fetch
+  const apiQueriesReady = useMockData || (tasksFetched && penaltiesFetched && logsFetched);
 
   // Mutation for updating settings (weekly goal)
   const updateSettingsMutation = useMutation({
@@ -510,19 +513,21 @@ export default function Dashboard() {
     const storedDueDates = loadDueDatesFromStorage();
     setDueDates(storedDueDates);
 
-    // Load tasks and penalties for point calculations - prefer API if non-empty, fall back to localStorage
-    const tasks = (apiTasks && apiTasks.length > 0) ? apiTasks : loadTasksFromStorage();
-    const penalties = (apiPenalties && apiPenalties.length > 0) ? apiPenalties : loadPenaltiesFromStorage();
+    // Wait for API queries to complete before processing data
+    if (!apiQueriesReady) {
+      return;
+    }
+
+    // Load tasks and penalties for point calculations - use API data if available
+    const tasks = apiTasks || [];
+    const penalties = apiPenalties || [];
     
-    // Build daily logs map from API data or localStorage
-    let dailyLogs: Record<string, { completedTaskIds: string[] }>;
-    if (apiDailyLogs && apiDailyLogs.length > 0) {
-      dailyLogs = {};
+    // Build daily logs map from API data
+    let dailyLogs: Record<string, { completedTaskIds: string[] }> = {};
+    if (apiDailyLogs) {
       apiDailyLogs.forEach((log: any) => {
         dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };
       });
-    } else {
-      dailyLogs = loadDailyLogsFromStorage();
     }
 
     // Calculate current week data from daily logs

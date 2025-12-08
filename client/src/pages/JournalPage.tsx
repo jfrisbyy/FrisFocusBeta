@@ -174,9 +174,15 @@ export default function JournalPage() {
       return;
     }
     
-    // Use API data if user is logged in and API returned data
-    const hasApiData = apiEntries && apiEntries.length > 0;
-    if (user && hasApiData) {
+    // For non-authenticated users, use localStorage
+    if (!user) {
+      const storedEntries = loadJournalFromStorage();
+      setEntries(storedEntries);
+      return;
+    }
+    
+    // For authenticated users, use API data when available (including empty arrays)
+    if (apiEntries !== undefined) {
       const transformed: JournalEntry[] = apiEntries.map((e) => ({
         id: e.id,
         date: e.date,
@@ -185,14 +191,6 @@ export default function JournalPage() {
         createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
       }));
       setEntries(transformed);
-    } else if (!user) {
-      // Not logged in - use localStorage
-      const storedEntries = loadJournalFromStorage();
-      setEntries(storedEntries);
-    } else if (apiEntries && apiEntries.length === 0) {
-      // Logged in but no API data - use localStorage as fallback
-      const storedEntries = loadJournalFromStorage();
-      setEntries(storedEntries);
     }
   }, [isDemo, user, apiEntries]);
 

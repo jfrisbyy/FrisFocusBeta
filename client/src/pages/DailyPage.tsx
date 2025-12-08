@@ -71,26 +71,29 @@ export default function DailyPage() {
   const dateStr = format(date, "yyyy-MM-dd");
 
   // API queries for tasks, penalties, categories
-  const { data: apiTasks } = useQuery<any[]>({
+  const { data: apiTasks, isLoading: loadingTasks, isFetched: tasksFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/tasks"],
     enabled: !isDemo,
   });
 
-  const { data: apiPenalties } = useQuery<any[]>({
+  const { data: apiPenalties, isLoading: loadingPenalties, isFetched: penaltiesFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/penalties"],
     enabled: !isDemo,
   });
 
-  const { data: apiCategories } = useQuery<any[]>({
+  const { data: apiCategories, isFetched: categoriesFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/categories"],
     enabled: !isDemo,
   });
 
   // API query for daily log of selected date
-  const { data: apiDailyLog, refetch: refetchDailyLog } = useQuery<any>({
+  const { data: apiDailyLog, refetch: refetchDailyLog, isFetched: dailyLogFetched } = useQuery<any>({
     queryKey: ["/api/habit/logs", dateStr],
     enabled: !isDemo,
   });
+  
+  // Check if API queries have completed their initial fetch
+  const apiQueriesReady = isDemo || (tasksFetched && penaltiesFetched);
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
@@ -130,11 +133,15 @@ export default function DailyPage() {
       return;
     }
 
-    // If we have API data with actual tasks, use it; otherwise fall back to localStorage
-    const hasApiTasks = apiTasks && apiTasks.length > 0;
-    const hasApiPenalties = apiPenalties && apiPenalties.length > 0;
+    // Wait for API queries to complete before deciding data source
+    if (!apiQueriesReady) {
+      return;
+    }
+
+    // If we have API data (even empty arrays), use it; otherwise fall back to localStorage
+    const hasApiResponse = apiTasks !== undefined || apiPenalties !== undefined;
     
-    if (hasApiTasks || hasApiPenalties) {
+    if (hasApiResponse) {
       const categoryMap = apiCategories ? new Map(apiCategories.map((c: any) => [c.id, c.name])) : new Map();
 
       const taskItems: DisplayTask[] = (apiTasks || []).map((task: any) => ({
@@ -178,28 +185,27 @@ export default function DailyPage() {
 
       setAllTasks([...taskItems, ...penaltyItems]);
     }
-  }, [isDemo, apiTasks, apiPenalties, apiCategories]);
+  }, [isDemo, apiTasks, apiPenalties, apiCategories, apiQueriesReady]);
 
   // Load daily log from API or localStorage when date changes
   useEffect(() => {
     if (isDemo) return;
+
+    // Wait for the daily log query to complete before deciding data source
+    if (!dailyLogFetched) {
+      return;
+    }
 
     // If we have API data for this date, use it
     if (apiDailyLog) {
       setCompletedIds(new Set(apiDailyLog.completedTaskIds || []));
       setNotes(apiDailyLog.notes || "");
     } else {
-      // Fallback to localStorage
-      const log = loadDailyLogFromStorage(dateStr);
-      if (log) {
-        setCompletedIds(new Set(log.completedTaskIds));
-        setNotes(log.notes);
-      } else {
-        setCompletedIds(new Set());
-        setNotes("");
-      }
+      // API returned null (no log for this date) - start fresh
+      setCompletedIds(new Set());
+      setNotes("");
     }
-  }, [dateStr, isDemo, apiDailyLog]);
+  }, [dateStr, isDemo, apiDailyLog, dailyLogFetched]);
 
   // Load todos from localStorage when date changes (todos not in API yet)
   useEffect(() => {
