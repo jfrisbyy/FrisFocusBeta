@@ -1291,6 +1291,30 @@ export default function CommunityPage() {
     },
   });
 
+  // Circle messages query for selected circle
+  const circleMessagesQuery = useQuery<StoredCircleMessage[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'messages'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/messages`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.map((m: any) => ({
+          id: m.id,
+          circleId: m.circleId,
+          senderId: m.senderId,
+          senderName: m.sender ? `${m.sender.firstName || ''} ${m.sender.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+          content: m.content || '',
+          createdAt: m.createdAt,
+          imageUrl: m.imageUrl,
+        })).reverse();
+      } catch {
+        return [];
+      }
+    },
+  });
+
   // Circle posts query for selected circle
   const circlePostsQuery = useQuery<StoredCirclePost[]>({
     queryKey: ['/api/circles', selectedCircle?.id, 'posts'],
@@ -1538,6 +1562,27 @@ export default function CommunityPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to delete award", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Circle message mutation
+  const sendCircleMessageMutation = useMutation({
+    mutationFn: async (data: { circleId: string; content: string; imageUrl?: string }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/messages`, {
+        content: data.content,
+        imageUrl: data.imageUrl,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to send message');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'messages'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send message", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2021,6 +2066,12 @@ export default function CommunityPage() {
     if (isDemo || !selectedCircle || !circlePostsQuery.data) return;
     setCirclePosts(prev => ({ ...prev, [selectedCircle.id]: circlePostsQuery.data }));
   }, [isDemo, selectedCircle?.id, circlePostsQuery.data]);
+
+  // Sync circle messages from API query to local state
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circleMessagesQuery.data) return;
+    setCircleMessages(prev => ({ ...prev, [selectedCircle.id]: circleMessagesQuery.data }));
+  }, [isDemo, selectedCircle?.id, circleMessagesQuery.data]);
 
   // Sync circle task completions from API query to local state
   useEffect(() => {
@@ -3005,6 +3056,20 @@ export default function CommunityPage() {
 
   const handleSendCircleMessage = () => {
     if (!selectedCircle || (!newCircleMessage.trim() && !circleMessageImage)) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      sendCircleMessageMutation.mutate({
+        circleId: selectedCircle.id,
+        content: newCircleMessage.trim(),
+        imageUrl: circleMessageImage || undefined,
+      });
+      setNewCircleMessage("");
+      clearMessageImage();
+      return;
+    }
+    
+    // Demo mode - use local state
     const newMsg: StoredCircleMessage = {
       id: `cm-${Date.now()}`,
       circleId: selectedCircle.id,
@@ -7244,27 +7309,32 @@ export default function CommunityPage() {
                                                   <p className="text-sm font-medium">Competition Chat</p>
                                                   <ScrollArea className="h-48">
                                                     <div className="space-y-3 pr-4">
-                                                      {(competitionMessages[competition.id] || []).length === 0 ? (
-                                                        <p className="text-sm text-muted-foreground text-center py-4">
-                                                          No messages yet. Start the conversation!
-                                                        </p>
-                                                      ) : (
-                                                        (competitionMessages[competition.id] || []).map((msg) => (
-                                                          <div key={msg.id} className="flex gap-2" data-testid={`competition-message-${msg.id}`}>
-                                                            <Avatar className="h-6 w-6 flex-shrink-0">
-                                                              <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
-                                                            </Avatar>
-                                                            <div className="flex-1 min-w-0">
-                                                              <div className="flex items-baseline gap-2 flex-wrap">
-                                                                <span className="font-medium text-sm">{msg.senderName}</span>
-                                                                <Badge variant="outline" className="text-xs py-0">{msg.senderCircleName}</Badge>
-                                                                <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                                                      {(() => {
+                                                        const messages = !isDemo && showCompetitionChat === competition.id
+                                                          ? (competitionMessagesQuery.data || [])
+                                                          : (competitionMessages[competition.id] || []);
+                                                        return messages.length === 0 ? (
+                                                          <p className="text-sm text-muted-foreground text-center py-4">
+                                                            No messages yet. Start the conversation!
+                                                          </p>
+                                                        ) : (
+                                                          messages.map((msg) => (
+                                                            <div key={msg.id} className="flex gap-2" data-testid={`competition-message-${msg.id}`}>
+                                                              <Avatar className="h-6 w-6 flex-shrink-0">
+                                                                <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
+                                                              </Avatar>
+                                                              <div className="flex-1 min-w-0">
+                                                                <div className="flex items-baseline gap-2 flex-wrap">
+                                                                  <span className="font-medium text-sm">{msg.senderName}</span>
+                                                                  <Badge variant="outline" className="text-xs py-0">{msg.senderCircleName}</Badge>
+                                                                  <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                                                                </div>
+                                                                <p className="text-sm mt-0.5">{msg.content}</p>
                                                               </div>
-                                                              <p className="text-sm mt-0.5">{msg.content}</p>
                                                             </div>
-                                                          </div>
-                                                        ))
-                                                      )}
+                                                          ))
+                                                        );
+                                                      })()}
                                                     </div>
                                                   </ScrollArea>
                                                   <div className="flex gap-2">
@@ -7813,29 +7883,34 @@ export default function CommunityPage() {
                                         <p className="text-sm font-medium">Competition Chat</p>
                                         <ScrollArea className="h-48">
                                           <div className="space-y-3 pr-4">
-                                            {(competitionMessages[competition.id] || []).length === 0 ? (
-                                              <p className="text-sm text-muted-foreground text-center py-4">
-                                                No messages yet. Start the conversation!
-                                              </p>
-                                            ) : (
-                                              (competitionMessages[competition.id] || []).map((msg) => (
-                                                <div key={msg.id} className="flex gap-2" data-testid={`competition-message-${msg.id}`}>
-                                                  <Avatar className="h-6 w-6 flex-shrink-0">
-                                                    <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
-                                                  </Avatar>
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="flex items-baseline gap-2 flex-wrap">
-                                                      <span className="font-medium text-sm">{msg.senderName}</span>
-                                                      <Badge variant="outline" className="text-xs py-0">
-                                                        {msg.senderCircleName}
-                                                      </Badge>
-                                                      <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                                            {(() => {
+                                              const messages = !isDemo && showCompetitionChat === competition.id
+                                                ? (competitionMessagesQuery.data || [])
+                                                : (competitionMessages[competition.id] || []);
+                                              return messages.length === 0 ? (
+                                                <p className="text-sm text-muted-foreground text-center py-4">
+                                                  No messages yet. Start the conversation!
+                                                </p>
+                                              ) : (
+                                                messages.map((msg) => (
+                                                  <div key={msg.id} className="flex gap-2" data-testid={`competition-message-${msg.id}`}>
+                                                    <Avatar className="h-6 w-6 flex-shrink-0">
+                                                      <AvatarFallback className="text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1 min-w-0">
+                                                      <div className="flex items-baseline gap-2 flex-wrap">
+                                                        <span className="font-medium text-sm">{msg.senderName}</span>
+                                                        <Badge variant="outline" className="text-xs py-0">
+                                                          {msg.senderCircleName}
+                                                        </Badge>
+                                                        <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                                                      </div>
+                                                      <p className="text-sm mt-0.5">{msg.content}</p>
                                                     </div>
-                                                    <p className="text-sm mt-0.5">{msg.content}</p>
                                                   </div>
-                                                </div>
-                                              ))
-                                            )}
+                                                ))
+                                              );
+                                            })()}
                                           </div>
                                         </ScrollArea>
                                         <div className="flex gap-2">
