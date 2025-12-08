@@ -599,16 +599,20 @@ export default function CommunityPage() {
     staleTime: 0, // Always refetch to get latest friend requests
     refetchOnMount: 'always',
     queryFn: async () => {
-      const [incomingRes, outgoingRes] = await Promise.all([
-        fetch('/api/friends/requests', { credentials: 'include' }),
-        fetch('/api/friends/requests/outgoing', { credentials: 'include' })
-      ]);
-      const incoming = await incomingRes.json();
-      const outgoing = await outgoingRes.json();
-      return [
-        ...incoming.map((r: any) => ({ ...r, direction: 'incoming' as const })),
-        ...outgoing.map((r: any) => ({ ...r, direction: 'outgoing' as const }))
-      ];
+      try {
+        const [incomingRes, outgoingRes] = await Promise.all([
+          apiRequest("GET", '/api/friends/requests'),
+          apiRequest("GET", '/api/friends/requests/outgoing')
+        ]);
+        const incoming = await incomingRes.json();
+        const outgoing = await outgoingRes.json();
+        return [
+          ...incoming.map((r: any) => ({ ...r, direction: 'incoming' as const })),
+          ...outgoing.map((r: any) => ({ ...r, direction: 'outgoing' as const }))
+        ];
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -658,24 +662,27 @@ export default function CommunityPage() {
     queryKey: ['/api/friends'],
     enabled: !isDemo,
     queryFn: async () => {
-      const res = await fetch('/api/friends', { credentials: 'include' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.map((f: any) => ({
-        id: f.id,
-        friendId: f.friendId || f.id,
-        firstName: f.firstName || '',
-        lastName: f.lastName || '',
-        profileImageUrl: f.profileImageUrl,
-        todayPoints: f.todayPoints || 0,
-        weeklyPoints: f.weeklyPoints || 0,
-        totalPoints: f.totalPoints || 0,
-        dayStreak: f.dayStreak || 0,
-        weekStreak: f.weekStreak || 0,
-        totalBadgesEarned: f.totalBadgesEarned || 0,
-        visibilityLevel: f.visibilityLevel || 'full',
-        hiddenTaskIds: f.hiddenTaskIds || [],
-      }));
+      try {
+        const res = await apiRequest("GET", '/api/friends');
+        const data = await res.json();
+        return data.map((f: any) => ({
+          id: f.id,
+          friendId: f.friendId || f.id,
+          firstName: f.firstName || '',
+          lastName: f.lastName || '',
+          profileImageUrl: f.profileImageUrl,
+          todayPoints: f.todayPoints || 0,
+          weeklyPoints: f.weeklyPoints || 0,
+          totalPoints: f.totalPoints || 0,
+          dayStreak: f.dayStreak || 0,
+          weekStreak: f.weekStreak || 0,
+          totalBadgesEarned: f.totalBadgesEarned || 0,
+          visibilityLevel: f.visibilityLevel || 'full',
+          hiddenTaskIds: f.hiddenTaskIds || [],
+        }));
+      } catch {
+        return [];
+      }
     },
   });
 
@@ -684,18 +691,21 @@ export default function CommunityPage() {
     queryKey: ['/api/circles'],
     enabled: !isDemo,
     queryFn: async () => {
-      const res = await fetch('/api/circles', { credentials: 'include' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.map((c: any) => ({
-        id: c.id,
-        name: c.name || '',
-        description: c.description || '',
-        iconColor: c.iconColor || 'hsl(217, 91%, 60%)',
-        createdAt: c.createdAt || new Date().toISOString(),
-        createdBy: c.createdBy || '',
-        memberCount: c.memberCount || 1,
-      }));
+      try {
+        const res = await apiRequest("GET", '/api/circles');
+        const data = await res.json();
+        return data.map((c: any) => ({
+          id: c.id,
+          name: c.name || '',
+          description: c.description || '',
+          iconColor: c.iconColor || 'hsl(217, 91%, 60%)',
+          createdAt: c.createdAt || new Date().toISOString(),
+          createdBy: c.createdBy || '',
+          memberCount: c.memberCount || 1,
+        }));
+      } catch {
+        return [];
+      }
     },
   });
   
