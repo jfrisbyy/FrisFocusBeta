@@ -2155,14 +2155,24 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         if (!conversationPartners.has(partnerId)) {
           conversationPartners.add(partnerId);
           const [partner] = await db.select().from(users).where(eq(users.id, partnerId));
+          const [sender] = await db.select().from(users).where(eq(users.id, msg.senderId));
+          const [recipient] = await db.select().from(users).where(eq(users.id, msg.recipientId));
           
           // Count unread messages from this partner
           const unreadCount = messages.filter(
             m => m.senderId === partnerId && m.recipientId === userId && !m.read
           ).length;
 
+          // Build lastMessage with senderName and recipientName for frontend compatibility
+          const lastMessageWithNames = {
+            ...msg,
+            senderName: sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+            recipientName: recipient ? `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+          };
+
           conversations.push({
             partnerId,
+            partnerName: partner ? `${partner.firstName || ''} ${partner.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
             partner: partner ? {
               id: partner.id,
               firstName: partner.firstName,
@@ -2170,7 +2180,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
               displayName: partner.displayName,
               profileImageUrl: partner.profileImageUrl,
             } : null,
-            lastMessage: msg,
+            lastMessage: lastMessageWithNames,
             unreadCount,
           });
         }
@@ -2207,7 +2217,21 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           )
         );
 
-      res.json(messages);
+      // Get user details for sender/recipient names
+      const [currentUser] = await db.select().from(users).where(eq(users.id, currentUserId));
+      const [partner] = await db.select().from(users).where(eq(users.id, partnerId));
+      
+      const currentUserName = currentUser ? `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || 'Unknown' : 'Unknown';
+      const partnerName = partner ? `${partner.firstName || ''} ${partner.lastName || ''}`.trim() || 'Unknown' : 'Unknown';
+
+      // Add senderName and recipientName to each message
+      const messagesWithNames = messages.map(msg => ({
+        ...msg,
+        senderName: msg.senderId === currentUserId ? currentUserName : partnerName,
+        recipientName: msg.recipientId === currentUserId ? currentUserName : partnerName,
+      }));
+
+      res.json(messagesWithNames);
     } catch (error) {
       console.error("Error fetching messages:", error);
       res.status(500).json({ error: "Failed to fetch messages" });
@@ -2226,6 +2250,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         return res.status(404).json({ error: "Recipient not found" });
       }
 
+      // Get sender details
+      const [sender] = await db.select().from(users).where(eq(users.id, currentUserId));
+
       const parsed = insertDirectMessageSchema.parse({
         ...req.body,
         senderId: currentUserId,
@@ -2233,7 +2260,14 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
       const [message] = await db.insert(directMessages).values(parsed).returning();
 
-      res.json(message);
+      // Return message with sender and recipient names for frontend compatibility
+      const messageWithNames = {
+        ...message,
+        senderName: sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+        recipientName: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Unknown',
+      };
+
+      res.json(messageWithNames);
     } catch (error) {
       console.error("Error sending message:", error);
       res.status(400).json({ error: "Failed to send message" });
