@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import { clearAllFrisFocusData, STORAGE_KEYS } from "@/lib/storage";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { clearAllFrisFocusData } from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
 
 interface OnboardingContextType {
   isOnboarding: boolean;
@@ -9,21 +10,31 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const [hasStartedJourney, setHasStartedJourney] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(STORAGE_KEYS.ONBOARDING) === "true";
-    }
-    return false;
-  });
+function getOnboardingKey(userId: string | undefined): string {
+  return userId ? `frisfocus_started_${userId}` : "frisfocus_started";
+}
 
-  const isOnboarding = !hasStartedJourney;
+export function OnboardingProvider({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated } = useAuth();
+  const [hasStartedJourney, setHasStartedJourney] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && user?.id) {
+      const key = getOnboardingKey(user.id);
+      const started = localStorage.getItem(key) === "true";
+      setHasStartedJourney(started);
+    } else {
+      setHasStartedJourney(false);
+    }
+  }, [user?.id]);
+
+  const isOnboarding = isAuthenticated && !hasStartedJourney;
 
   const startJourney = () => {
-    // Clear all existing data when starting fresh journey
+    if (!user?.id) return;
     clearAllFrisFocusData();
-    // Then mark as started
-    localStorage.setItem(STORAGE_KEYS.ONBOARDING, "true");
+    const key = getOnboardingKey(user.id);
+    localStorage.setItem(key, "true");
     setHasStartedJourney(true);
   };
 

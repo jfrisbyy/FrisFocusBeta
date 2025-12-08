@@ -5,10 +5,12 @@ import { storage } from "./storage";
 
 // Initialize Firebase Admin with project ID only (for ID token verification)
 // Full admin SDK features would require a service account
+const FIREBASE_PROJECT_ID = "frisfocus-f3e5f";
+
 function getFirebaseApp() {
   if (getApps().length === 0) {
     return initializeApp({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      projectId: FIREBASE_PROJECT_ID,
     });
   }
   return getApp();
