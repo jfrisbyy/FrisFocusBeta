@@ -2056,6 +2056,53 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Update member role (owner only)
+  app.put("/api/circles/:id/members/:memberId/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const memberId = req.params.memberId;
+      const { role } = req.body;
+
+      if (!role || !["admin", "member"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'member'" });
+      }
+
+      // Check if current user is the owner
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      if (circle.ownerId !== userId) {
+        return res.status(403).json({ error: "Only the owner can change member roles" });
+      }
+
+      // Get the target member and verify they belong to this circle
+      const [targetMember] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.id, memberId), eq(circleMembers.circleId, circleId))
+      );
+      if (!targetMember) {
+        return res.status(404).json({ error: "Member not found in this circle" });
+      }
+
+      // Can't change owner's role
+      if (targetMember.role === "owner") {
+        return res.status(400).json({ error: "Cannot change owner's role" });
+      }
+
+      // Update the role
+      await db.update(circleMembers)
+        .set({ role })
+        .where(eq(circleMembers.id, memberId));
+
+      res.json({ success: true, role });
+    } catch (error) {
+      console.error("Error updating member role:", error);
+      res.status(500).json({ error: "Failed to update member role" });
+    }
+  });
+
   // Get circle messages
   app.get("/api/circles/:id/messages", isAuthenticated, async (req: any, res) => {
     try {

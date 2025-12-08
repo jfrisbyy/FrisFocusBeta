@@ -1206,13 +1206,15 @@ export default function CommunityPage() {
 
   const isOwnerOrAdmin = (circleId: string) => {
     const members = circleMembers[circleId] || [];
-    const me = members.find(m => m.userId === "you");
+    const currentUserId = isDemo ? "you" : user?.id;
+    const me = members.find(m => m.userId === currentUserId);
     return me?.role === "owner" || me?.role === "admin";
   };
 
   const getUserRole = (circleId: string) => {
     const members = circleMembers[circleId] || [];
-    const me = members.find(m => m.userId === "you");
+    const currentUserId = isDemo ? "you" : user?.id;
+    const me = members.find(m => m.userId === currentUserId);
     return me?.role || "member";
   };
 
@@ -1986,6 +1988,46 @@ export default function CommunityPage() {
     toast({ title: "Request rejected" });
   };
 
+  const handleChangeMemberRole = async (memberId: string, memberUserId: string, newRole: "admin" | "member") => {
+    if (!selectedCircle) return;
+    const currentUserId = isDemo ? "you" : user?.id;
+    
+    // Can't change your own role or owner's role
+    const members = circleMembers[selectedCircle.id] || [];
+    const targetMember = members.find(m => m.id === memberId);
+    if (!targetMember) return;
+    if (targetMember.role === "owner") {
+      toast({ title: "Cannot change owner role", variant: "destructive" });
+      return;
+    }
+    if (targetMember.userId === currentUserId) {
+      toast({ title: "Cannot change your own role", variant: "destructive" });
+      return;
+    }
+    
+    if (!isDemo) {
+      try {
+        const res = await apiRequest("PUT", `/api/circles/${selectedCircle.id}/members/${memberId}/role`, { role: newRole });
+        if (!res.ok) {
+          const err = await res.json();
+          toast({ title: "Failed to update role", description: err.error || "Unknown error", variant: "destructive" });
+          return;
+        }
+      } catch (error) {
+        console.error("Error updating member role:", error);
+        toast({ title: "Failed to update role", variant: "destructive" });
+        return;
+      }
+    }
+    
+    // Update local state
+    const updatedMembers = members.map(m => 
+      m.id === memberId ? { ...m, role: newRole } : m
+    );
+    setCircleMembers({ ...circleMembers, [selectedCircle.id]: updatedMembers });
+    toast({ title: `Role updated to ${newRole}` });
+  };
+
   const handleAddBadge = () => {
     if (!selectedCircle || !newBadgeName.trim()) return;
     const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
@@ -2261,6 +2303,8 @@ export default function CommunityPage() {
   const handleToggleTaskComplete = (circleId: string, taskId: string, task: StoredCircleTask) => {
     const myCompleted = myCompletedTasks[circleId] || [];
     const isCompleted = myCompleted.includes(taskId);
+    const currentUserId = isDemo ? "you" : user?.id;
+    const currentUserName = isDemo ? "You" : (user?.displayName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || "You");
     
     // For circle tasks, only one person can complete per day
     if (task.taskType === "circle_task" && !isCompleted) {
@@ -2275,7 +2319,7 @@ export default function CommunityPage() {
     const updateMemberPoints = (delta: number) => {
       const members = circleMembers[circleId] || [];
       const updatedMembers = members.map(member => 
-        member.userId === "you" 
+        member.userId === currentUserId 
           ? { ...member, weeklyPoints: member.weeklyPoints + delta }
           : member
       );
@@ -2286,7 +2330,7 @@ export default function CommunityPage() {
       // Remove completion
       setMyCompletedTasks({ ...myCompletedTasks, [circleId]: myCompleted.filter(id => id !== taskId) });
       const circleCompletions = circleTaskCompletions[circleId] || {};
-      const taskCompletions = (circleCompletions[taskId] || []).filter(c => c.userId !== "you");
+      const taskCompletions = (circleCompletions[taskId] || []).filter(c => c.userId !== currentUserId);
       setCircleTaskCompletions({ ...circleTaskCompletions, [circleId]: { ...circleCompletions, [taskId]: taskCompletions } });
       updateMemberPoints(-task.value);
     } else {
@@ -2298,7 +2342,7 @@ export default function CommunityPage() {
         ...circleTaskCompletions,
         [circleId]: {
           ...circleCompletions,
-          [taskId]: [...taskCompletions, { userId: "you", userName: "You", completedAt: new Date().toISOString() }]
+          [taskId]: [...taskCompletions, { userId: currentUserId || "you", userName: currentUserName, completedAt: new Date().toISOString() }]
         }
       });
       updateMemberPoints(task.value);
@@ -3649,7 +3693,7 @@ export default function CommunityPage() {
                                     </span>
                                     <ProfileHoverCard 
                                       userId={member.userId}
-                                      showActions={member.userId !== "you"}
+                                      showActions={member.userId !== (isDemo ? "you" : user?.id)}
                                       onMessageClick={(id) => {
                                         toast({ title: "Opening DM", description: `Starting conversation with ${member.firstName}` });
                                       }}
@@ -4597,35 +4641,59 @@ export default function CommunityPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {(circleMembers[selectedCircle.id] || []).map((member) => (
-                          <div
-                            key={member.id}
-                            className="flex items-center justify-between gap-4 p-3 rounded-md border"
-                            data-testid={`member-${member.id}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Avatar>
-                                <AvatarFallback>
-                                  {getInitials(member.firstName, member.lastName)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">
-                                    {member.firstName} {member.lastName}
-                                  </span>
-                                  {getRoleIcon(member.role)}
+                        {(circleMembers[selectedCircle.id] || []).map((member) => {
+                          const currentUserId = isDemo ? "you" : user?.id;
+                          const isCurrentUser = member.userId === currentUserId;
+                          const canManageRoles = getUserRole(selectedCircle.id) === "owner" && member.role !== "owner" && !isCurrentUser;
+                          
+                          return (
+                            <div
+                              key={member.id}
+                              className="flex items-center justify-between gap-4 p-3 rounded-md border"
+                              data-testid={`member-${member.id}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Avatar>
+                                  <AvatarFallback>
+                                    {getInitials(member.firstName, member.lastName)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">
+                                      {member.firstName} {member.lastName}
+                                    </span>
+                                    {getRoleIcon(member.role)}
+                                    {isCurrentUser && <Badge variant="secondary" className="text-xs">You</Badge>}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    Joined {new Date(member.joinedAt).toLocaleDateString()}
+                                  </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground">
-                                  Joined {new Date(member.joinedAt).toLocaleDateString()}
-                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {canManageRoles ? (
+                                  <Select
+                                    value={member.role}
+                                    onValueChange={(value: "admin" | "member") => handleChangeMemberRole(member.id, member.userId, value)}
+                                  >
+                                    <SelectTrigger className="w-28" data-testid={`select-role-${member.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="admin">Admin</SelectItem>
+                                      <SelectItem value="member">Member</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Badge variant="outline" className="capitalize">
+                                    {member.role}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
-                            <Badge variant="outline" className="capitalize">
-                              {member.role}
-                            </Badge>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
