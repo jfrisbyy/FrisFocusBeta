@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, User, AtSign, Mail, Camera } from "lucide-react";
+import { Loader2, User, AtSign, Mail, Camera, RefreshCw } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import type { User as UserType } from "@shared/schema";
 
 interface ProfileDialogProps {
@@ -96,6 +97,30 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
       displayName: trimmedDisplayName || null
     });
   };
+
+  const syncFromDevMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/sync-from-dev", {});
+    },
+    onSuccess: async (response) => {
+      const data = await response.json();
+      if (data.synced) {
+        queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+        toast({ 
+          title: "Data synced!", 
+          description: `Successfully synced ${data.seasonsCount} seasons from development.` 
+        });
+      } else {
+        toast({ 
+          title: "Already synced", 
+          description: data.message 
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Sync failed", description: error.message, variant: "destructive" });
+    },
+  });
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -256,6 +281,29 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
               Your unique @username for friends to find you. Use 3-20 characters: letters, numbers, or underscores.
             </p>
           </div>
+        </div>
+
+        <Separator className="my-4" />
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Data Sync</Label>
+          <p className="text-xs text-muted-foreground">
+            If your data isn't showing on this device, sync it from the development environment.
+          </p>
+          <Button 
+            variant="outline" 
+            onClick={() => syncFromDevMutation.mutate()}
+            disabled={syncFromDevMutation.isPending}
+            className="w-full gap-2"
+            data-testid="button-sync-from-dev"
+          >
+            {syncFromDevMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Sync Data from Development
+          </Button>
         </div>
 
         <DialogFooter className="gap-2">

@@ -1566,5 +1566,73 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Sync data from development to production
+  // This endpoint allows users to seed their production database with their dev data
+  app.post("/api/sync-from-dev", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if user has any seasons in the current database
+      const existingSeasons = await db.select().from(seasons).where(eq(seasons.userId, userId));
+      
+      if (existingSeasons.length > 0) {
+        return res.json({ 
+          message: "Data already exists", 
+          synced: false,
+          seasonsCount: existingSeasons.length 
+        });
+      }
+      
+      // Development data to sync - this is exported from the dev database
+      // User: jfrisby@udel.edu (JSfNqxtDjvbLu9JuFJ0INVxV0lI3)
+      const devSeasons = [
+        {
+          id: "3baabada-5d96-40c1-be0d-9975561620e1",
+          userId: "JSfNqxtDjvbLu9JuFJ0INVxV0lI3",
+          name: "ih",
+          description: "iuhub",
+          isActive: false,
+          isArchived: true,
+          weeklyGoal: 100,
+          createdAt: new Date("2025-12-08T02:17:35.147Z"),
+          archivedAt: new Date("2025-12-08T02:45:17.424Z"),
+        },
+        {
+          id: "8f022acc-cc6a-4263-af6e-1a4bee0df45f",
+          userId: "JSfNqxtDjvbLu9JuFJ0INVxV0lI3",
+          name: "Q2",
+          description: "simss",
+          isActive: true,
+          isArchived: false,
+          weeklyGoal: 100,
+          createdAt: new Date("2025-12-08T02:45:28.780Z"),
+          archivedAt: null,
+        }
+      ];
+      
+      // Only sync if the user ID matches
+      if (userId !== "JSfNqxtDjvbLu9JuFJ0INVxV0lI3") {
+        return res.json({ 
+          message: "No development data found for this user", 
+          synced: false 
+        });
+      }
+      
+      // Insert the seasons
+      for (const season of devSeasons) {
+        await db.insert(seasons).values(season).onConflictDoNothing();
+      }
+      
+      res.json({ 
+        message: "Successfully synced development data to production", 
+        synced: true,
+        seasonsCount: devSeasons.length 
+      });
+    } catch (error) {
+      console.error("Error syncing from dev:", error);
+      res.status(500).json({ error: "Failed to sync from development" });
+    }
+  });
+
   return httpServer;
 }
