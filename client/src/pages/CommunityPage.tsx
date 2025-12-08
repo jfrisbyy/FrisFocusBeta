@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useDemo } from "@/contexts/DemoContext";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,25 @@ interface CircleBadge {
   required: number;
   earned: boolean;
   reward?: CircleBadgeReward;
+}
+
+interface APICommunityPost {
+  id: string;
+  authorId: string;
+  content: string;
+  visibility: "public" | "friends";
+  imageUrl?: string;
+  createdAt: string;
+  likeCount: number;
+  commentCount: number;
+  isLiked: boolean;
+  author: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    displayName?: string;
+    profileImageUrl?: string;
+  } | null;
 }
 
 const demoFriends: StoredFriend[] = [
@@ -538,6 +558,52 @@ export default function CommunityPage() {
   const [newCircleMessage, setNewCircleMessage] = useState("");
   const [newCirclePost, setNewCirclePost] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
+
+  // API queries and mutations for non-demo mode
+  const postsQuery = useQuery<APICommunityPost[]>({
+    queryKey: ['/api/community/posts'],
+    enabled: !isDemo,
+  });
+
+  const createPostMutation = useMutation({
+    mutationFn: async (data: { content: string; visibility: string; imageUrl?: string }) => {
+      const res = await apiRequest("POST", "/api/community/posts", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
+    },
+  });
+
+  const likePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await apiRequest("POST", `/api/community/posts/${postId}/like`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
+    },
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
+      const res = await apiRequest("POST", `/api/community/posts/${postId}/comments`, { content });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
+    },
+  });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      const res = await apiRequest("DELETE", `/api/community/posts/${postId}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
+    },
+  });
   
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -1007,6 +1073,36 @@ export default function CommunityPage() {
     return taskRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
   }, [selectedCircle, taskRequests]);
 
+  // Compute display posts from API data in non-demo mode
+  const displayPosts: StoredCommunityPost[] = useMemo(() => {
+    if (isDemo) {
+      return communityPosts;
+    }
+    
+    if (!postsQuery.data) {
+      return [];
+    }
+    
+    // Convert API posts to StoredCommunityPost format
+    // Store isLiked and likeCount directly from API for accurate state
+    return postsQuery.data.map((post): StoredCommunityPost => ({
+      id: post.id,
+      authorId: post.authorId,
+      authorName: post.author 
+        ? (post.author.displayName || `${post.author.firstName} ${post.author.lastName}`.trim())
+        : "Unknown User",
+      content: post.content,
+      visibility: post.visibility,
+      createdAt: post.createdAt,
+      likes: post.isLiked ? ["you"] : [],
+      comments: [],
+      commentCount: post.commentCount || 0,
+      likeCount: post.likeCount || 0,
+      isLiked: post.isLiked,
+      imageUrl: post.imageUrl,
+    }));
+  }, [isDemo, communityPosts, postsQuery.data]);
+
   // Image upload handler
   const handleImageUpload = async (
     file: File,
@@ -1162,6 +1258,25 @@ export default function CommunityPage() {
 
   const handleCreateFeedPost = () => {
     if (!newPostContent.trim() && !feedPostImage) return;
+    
+    if (!isDemo) {
+      createPostMutation.mutate({
+        content: newPostContent.trim(),
+        visibility: newPostVisibility,
+        imageUrl: feedPostImage || undefined,
+      }, {
+        onSuccess: () => {
+          setNewPostContent("");
+          clearFeedPostImage();
+          toast({ title: "Post shared" });
+        },
+        onError: () => {
+          toast({ title: "Failed to create post", variant: "destructive" });
+        }
+      });
+      return;
+    }
+    
     const newPost: StoredCommunityPost = {
       id: `feed-${Date.now()}`,
       authorId: "you",
@@ -1180,6 +1295,11 @@ export default function CommunityPage() {
   };
 
   const handleLikeFeedPost = (postId: string) => {
+    if (!isDemo) {
+      likePostMutation.mutate(postId);
+      return;
+    }
+    
     setCommunityPosts(communityPosts.map(post => {
       if (post.id !== postId) return post;
       const liked = post.likes.includes("you");
@@ -1195,6 +1315,21 @@ export default function CommunityPage() {
 
   const handleAddComment = (postId: string) => {
     if (!newComment.trim()) return;
+    
+    if (!isDemo) {
+      addCommentMutation.mutate({ postId, content: newComment.trim() }, {
+        onSuccess: () => {
+          setNewComment("");
+          setCommentingPostId(null);
+          toast({ title: "Comment added" });
+        },
+        onError: () => {
+          toast({ title: "Failed to add comment", variant: "destructive" });
+        }
+      });
+      return;
+    }
+    
     setCommunityPosts(communityPosts.map(post => {
       if (post.id !== postId) return post;
       const comment = {
@@ -1230,6 +1365,18 @@ export default function CommunityPage() {
   };
 
   const handleDeletePost = (postId: string) => {
+    if (!isDemo) {
+      deletePostMutation.mutate(postId, {
+        onSuccess: () => {
+          toast({ title: "Post deleted" });
+        },
+        onError: () => {
+          toast({ title: "Failed to delete post", variant: "destructive" });
+        }
+      });
+      return;
+    }
+    
     setCommunityPosts(communityPosts.filter(post => post.id !== postId));
     toast({ title: "Post deleted" });
   };
@@ -4320,7 +4467,23 @@ export default function CommunityPage() {
           </Card>
 
           <div className="space-y-4">
-            {communityPosts.map((post) => (
+            {!isDemo && postsQuery.isLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {!isDemo && postsQuery.isError && (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                  <p>Failed to load posts. Please try again.</p>
+                  <Button variant="outline" className="mt-4" onClick={() => postsQuery.refetch()}>
+                    Retry
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+            {displayPosts.map((post) => (
               <Card key={post.id} data-testid={`feed-post-${post.id}`}>
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-3">
@@ -4369,7 +4532,7 @@ export default function CommunityPage() {
                           data-testid={`button-comment-${post.id}`}
                         >
                           <MessageCircle className="w-4 h-4 mr-1" />
-                          {post.comments.length}
+                          {post.commentCount !== undefined ? post.commentCount : post.comments.length}
                         </Button>
                       </div>
                       

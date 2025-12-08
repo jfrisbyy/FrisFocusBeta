@@ -33,8 +33,28 @@ import {
   insertSeasonTaskSchema,
   insertSeasonCategorySchema,
   insertSeasonPenaltySchema,
+  communityPosts,
+  postLikes,
+  postComments,
+  insertCommunityPostSchema,
+  insertPostLikeSchema,
+  insertPostCommentSchema,
+  circles,
+  circleMembers,
+  circleMessages,
+  circlePosts,
+  circlePostLikes,
+  circlePostComments,
+  insertCircleSchema,
+  insertCircleMemberSchema,
+  insertCircleMessageSchema,
+  insertCirclePostSchema,
+  insertCirclePostLikeSchema,
+  insertCirclePostCommentSchema,
+  directMessages,
+  insertDirectMessageSchema,
 } from "@shared/schema";
-import { and, or } from "drizzle-orm";
+import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
 
 const openai = new OpenAI({
@@ -1631,6 +1651,574 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error syncing from dev:", error);
       res.status(500).json({ error: "Failed to sync from development" });
+    }
+  });
+
+  // ==================== COMMUNITY POSTS API ====================
+
+  // Get all community posts (public + friends' posts)
+  app.get("/api/community/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get user's friend IDs
+      const friendshipsList = await db.select().from(friendships).where(
+        and(
+          eq(friendships.status, "accepted"),
+          or(
+            eq(friendships.requesterId, userId),
+            eq(friendships.addresseeId, userId)
+          )
+        )
+      );
+
+      const friendIds = friendshipsList.map(f => 
+        f.requesterId === userId ? f.addresseeId : f.requesterId
+      );
+
+      // Get all posts: public posts OR posts by friends OR own posts
+      // Build conditions array, filtering out undefined values
+      const conditions = [
+        eq(communityPosts.visibility, "public"),
+        eq(communityPosts.authorId, userId),
+      ];
+      if (friendIds.length > 0) {
+        conditions.push(inArray(communityPosts.authorId, friendIds));
+      }
+      
+      const posts = await db.select().from(communityPosts)
+        .where(or(...conditions))
+        .orderBy(desc(communityPosts.createdAt));
+
+      // Get like counts and user's likes for each post
+      const postsWithData = await Promise.all(
+        posts.map(async (post) => {
+          const likes = await db.select().from(postLikes).where(eq(postLikes.postId, post.id));
+          const commentsList = await db.select().from(postComments).where(eq(postComments.postId, post.id));
+          const [author] = await db.select().from(users).where(eq(users.id, post.authorId));
+
+          return {
+            ...post,
+            likeCount: likes.length,
+            commentCount: commentsList.length,
+            isLiked: likes.some(l => l.userId === userId),
+            author: author ? {
+              id: author.id,
+              firstName: author.firstName,
+              lastName: author.lastName,
+              displayName: author.displayName,
+              profileImageUrl: author.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json(postsWithData);
+    } catch (error) {
+      console.error("Error fetching community posts:", error);
+      res.status(500).json({ error: "Failed to fetch posts" });
+    }
+  });
+
+  // Create a new community post
+  app.post("/api/community/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertCommunityPostSchema.parse({ ...req.body, authorId: userId });
+      const [post] = await db.insert(communityPosts).values(parsed).returning();
+
+      // Get author info for response
+      const [author] = await db.select().from(users).where(eq(users.id, userId));
+
+      res.json({
+        ...post,
+        likeCount: 0,
+        commentCount: 0,
+        isLiked: false,
+        author: author ? {
+          id: author.id,
+          firstName: author.firstName,
+          lastName: author.lastName,
+          displayName: author.displayName,
+          profileImageUrl: author.profileImageUrl,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error creating post:", error);
+      res.status(400).json({ error: "Failed to create post" });
+    }
+  });
+
+  // Toggle like on a post
+  app.post("/api/community/posts/:id/like", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const postId = req.params.id;
+
+      // Check if already liked
+      const [existingLike] = await db.select().from(postLikes).where(
+        and(eq(postLikes.postId, postId), eq(postLikes.userId, userId))
+      );
+
+      if (existingLike) {
+        // Unlike
+        await db.delete(postLikes).where(eq(postLikes.id, existingLike.id));
+        res.json({ liked: false });
+      } else {
+        // Like
+        await db.insert(postLikes).values({ postId, userId });
+        res.json({ liked: true });
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      res.status(500).json({ error: "Failed to toggle like" });
+    }
+  });
+
+  // Get comments for a post
+  app.get("/api/community/posts/:id/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const postId = req.params.id;
+      const comments = await db.select().from(postComments)
+        .where(eq(postComments.postId, postId))
+        .orderBy(desc(postComments.createdAt));
+
+      // Get author info for each comment
+      const commentsWithAuthor = await Promise.all(
+        comments.map(async (comment) => {
+          const [author] = await db.select().from(users).where(eq(users.id, comment.authorId));
+          return {
+            ...comment,
+            author: author ? {
+              id: author.id,
+              firstName: author.firstName,
+              lastName: author.lastName,
+              displayName: author.displayName,
+              profileImageUrl: author.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json(commentsWithAuthor);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Add a comment to a post
+  app.post("/api/community/posts/:id/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const postId = req.params.id;
+      const parsed = insertPostCommentSchema.parse({ ...req.body, postId, authorId: userId });
+      const [comment] = await db.insert(postComments).values(parsed).returning();
+
+      // Get author info for response
+      const [author] = await db.select().from(users).where(eq(users.id, userId));
+
+      res.json({
+        ...comment,
+        author: author ? {
+          id: author.id,
+          firstName: author.firstName,
+          lastName: author.lastName,
+          displayName: author.displayName,
+          profileImageUrl: author.profileImageUrl,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      res.status(400).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // Delete a post (only author can delete)
+  app.delete("/api/community/posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const postId = req.params.id;
+
+      // Check if user is the author
+      const [post] = await db.select().from(communityPosts).where(eq(communityPosts.id, postId));
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      if (post.authorId !== userId) {
+        return res.status(403).json({ error: "You can only delete your own posts" });
+      }
+
+      await db.delete(communityPosts).where(eq(communityPosts.id, postId));
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      res.status(500).json({ error: "Failed to delete post" });
+    }
+  });
+
+  // ==================== CIRCLES API ====================
+
+  // Get all circles the user is a member of (or public circles)
+  app.get("/api/circles", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get circles user is a member of
+      const memberships = await db.select().from(circleMembers).where(eq(circleMembers.userId, userId));
+      const memberCircleIds = memberships.map(m => m.circleId);
+
+      // Get public circles and circles user is in
+      const circleList = await db.select().from(circles).where(
+        or(
+          eq(circles.isPrivate, false),
+          memberCircleIds.length > 0 ? inArray(circles.id, memberCircleIds) : undefined
+        )
+      );
+
+      // Add member count and user's role for each circle
+      const circlesWithData = await Promise.all(
+        circleList.map(async (circle) => {
+          const members = await db.select().from(circleMembers).where(eq(circleMembers.circleId, circle.id));
+          const userMembership = members.find(m => m.userId === userId);
+          const [owner] = await db.select().from(users).where(eq(users.id, circle.ownerId));
+
+          return {
+            ...circle,
+            memberCount: members.length,
+            isMember: !!userMembership,
+            userRole: userMembership?.role || null,
+            owner: owner ? {
+              id: owner.id,
+              firstName: owner.firstName,
+              lastName: owner.lastName,
+              displayName: owner.displayName,
+              profileImageUrl: owner.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json(circlesWithData);
+    } catch (error) {
+      console.error("Error fetching circles:", error);
+      res.status(500).json({ error: "Failed to fetch circles" });
+    }
+  });
+
+  // Create a new circle
+  app.post("/api/circles", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertCircleSchema.parse({ ...req.body, ownerId: userId });
+      const [circle] = await db.insert(circles).values(parsed).returning();
+
+      // Add creator as owner member
+      await db.insert(circleMembers).values({
+        circleId: circle.id,
+        userId: userId,
+        role: "owner",
+      });
+
+      res.json({ ...circle, memberCount: 1, isMember: true, userRole: "owner" });
+    } catch (error) {
+      console.error("Error creating circle:", error);
+      res.status(400).json({ error: "Failed to create circle" });
+    }
+  });
+
+  // Get a specific circle with details
+  app.get("/api/circles/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      const members = await db.select().from(circleMembers).where(eq(circleMembers.circleId, circleId));
+      const userMembership = members.find(m => m.userId === userId);
+
+      // Check access for private circles
+      if (circle.isPrivate && !userMembership) {
+        return res.status(403).json({ error: "Access denied to private circle" });
+      }
+
+      // Get member details
+      const membersWithDetails = await Promise.all(
+        members.map(async (member) => {
+          const [user] = await db.select().from(users).where(eq(users.id, member.userId));
+          return {
+            ...member,
+            user: user ? {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              displayName: user.displayName,
+              profileImageUrl: user.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json({
+        ...circle,
+        members: membersWithDetails,
+        memberCount: members.length,
+        isMember: !!userMembership,
+        userRole: userMembership?.role || null,
+      });
+    } catch (error) {
+      console.error("Error fetching circle:", error);
+      res.status(500).json({ error: "Failed to fetch circle" });
+    }
+  });
+
+  // Join a circle
+  app.post("/api/circles/:id/join", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      if (circle.isPrivate) {
+        return res.status(403).json({ error: "Cannot join private circle without invite" });
+      }
+
+      // Check if already a member
+      const [existing] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (existing) {
+        return res.status(400).json({ error: "Already a member" });
+      }
+
+      await db.insert(circleMembers).values({
+        circleId,
+        userId,
+        role: "member",
+      });
+
+      res.json({ joined: true });
+    } catch (error) {
+      console.error("Error joining circle:", error);
+      res.status(500).json({ error: "Failed to join circle" });
+    }
+  });
+
+  // Leave a circle
+  app.post("/api/circles/:id/leave", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      if (circle.ownerId === userId) {
+        return res.status(400).json({ error: "Owner cannot leave circle. Transfer ownership or delete the circle." });
+      }
+
+      await db.delete(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+
+      res.json({ left: true });
+    } catch (error) {
+      console.error("Error leaving circle:", error);
+      res.status(500).json({ error: "Failed to leave circle" });
+    }
+  });
+
+  // Get circle messages
+  app.get("/api/circles/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view messages" });
+      }
+
+      const messages = await db.select().from(circleMessages)
+        .where(eq(circleMessages.circleId, circleId))
+        .orderBy(desc(circleMessages.createdAt));
+
+      const messagesWithSender = await Promise.all(
+        messages.map(async (msg) => {
+          const [sender] = await db.select().from(users).where(eq(users.id, msg.senderId));
+          return {
+            ...msg,
+            sender: sender ? {
+              id: sender.id,
+              firstName: sender.firstName,
+              lastName: sender.lastName,
+              displayName: sender.displayName,
+              profileImageUrl: sender.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json(messagesWithSender);
+    } catch (error) {
+      console.error("Error fetching circle messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Send a message to a circle
+  app.post("/api/circles/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to send messages" });
+      }
+
+      const parsed = insertCircleMessageSchema.parse({ ...req.body, circleId, senderId: userId });
+      const [message] = await db.insert(circleMessages).values(parsed).returning();
+
+      const [sender] = await db.select().from(users).where(eq(users.id, userId));
+      res.json({
+        ...message,
+        sender: sender ? {
+          id: sender.id,
+          firstName: sender.firstName,
+          lastName: sender.lastName,
+          displayName: sender.displayName,
+          profileImageUrl: sender.profileImageUrl,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(400).json({ error: "Failed to send message" });
+    }
+  });
+
+  // ==================== DIRECT MESSAGES API ====================
+
+  // Get all conversations (unique senders/recipients)
+  app.get("/api/messages/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get all messages involving user
+      const messages = await db.select().from(directMessages).where(
+        or(
+          eq(directMessages.senderId, userId),
+          eq(directMessages.recipientId, userId)
+        )
+      ).orderBy(desc(directMessages.createdAt));
+
+      // Group by conversation partner
+      const conversationPartners = new Set<string>();
+      const conversations: any[] = [];
+
+      for (const msg of messages) {
+        const partnerId = msg.senderId === userId ? msg.recipientId : msg.senderId;
+        if (!conversationPartners.has(partnerId)) {
+          conversationPartners.add(partnerId);
+          const [partner] = await db.select().from(users).where(eq(users.id, partnerId));
+          
+          // Count unread messages from this partner
+          const unreadCount = messages.filter(
+            m => m.senderId === partnerId && m.recipientId === userId && !m.read
+          ).length;
+
+          conversations.push({
+            partnerId,
+            partner: partner ? {
+              id: partner.id,
+              firstName: partner.firstName,
+              lastName: partner.lastName,
+              displayName: partner.displayName,
+              profileImageUrl: partner.profileImageUrl,
+            } : null,
+            lastMessage: msg,
+            unreadCount,
+          });
+        }
+      }
+
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  // Get messages with a specific user
+  app.get("/api/messages/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const partnerId = req.params.userId;
+
+      const messages = await db.select().from(directMessages).where(
+        or(
+          and(eq(directMessages.senderId, currentUserId), eq(directMessages.recipientId, partnerId)),
+          and(eq(directMessages.senderId, partnerId), eq(directMessages.recipientId, currentUserId))
+        )
+      ).orderBy(desc(directMessages.createdAt));
+
+      // Mark messages as read
+      await db.update(directMessages)
+        .set({ read: true })
+        .where(
+          and(
+            eq(directMessages.senderId, partnerId),
+            eq(directMessages.recipientId, currentUserId),
+            eq(directMessages.read, false)
+          )
+        );
+
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Send a direct message
+  app.post("/api/messages/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const recipientId = req.params.userId;
+
+      // Verify recipient exists
+      const [recipient] = await db.select().from(users).where(eq(users.id, recipientId));
+      if (!recipient) {
+        return res.status(404).json({ error: "Recipient not found" });
+      }
+
+      const parsed = insertDirectMessageSchema.parse({
+        ...req.body,
+        senderId: currentUserId,
+        recipientId,
+      });
+      const [message] = await db.insert(directMessages).values(parsed).returning();
+
+      res.json(message);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(400).json({ error: "Failed to send message" });
     }
   });
 

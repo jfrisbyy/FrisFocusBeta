@@ -528,6 +528,9 @@ export interface StoredCommunityPost {
   createdAt: string;
   likes: string[];
   comments: StoredPostComment[];
+  commentCount?: number;
+  likeCount?: number;
+  isLiked?: boolean;
 }
 
 export interface StoredPostComment {
