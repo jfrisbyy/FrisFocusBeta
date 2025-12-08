@@ -1992,7 +1992,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
 
   // ==================== CIRCLES API ====================
 
-  // Get all circles the user is a member of (or public circles)
+  // Get all circles the user is a member of
   app.get("/api/circles", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2001,12 +2001,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const memberships = await db.select().from(circleMembers).where(eq(circleMembers.userId, userId));
       const memberCircleIds = memberships.map(m => m.circleId);
 
-      // Get public circles and circles user is in
+      // Only return circles user is actually a member of
+      if (memberCircleIds.length === 0) {
+        return res.json([]);
+      }
+
       const circleList = await db.select().from(circles).where(
-        or(
-          eq(circles.isPrivate, false),
-          memberCircleIds.length > 0 ? inArray(circles.id, memberCircleIds) : undefined
-        )
+        inArray(circles.id, memberCircleIds)
       );
 
       // Add member count and user's role for each circle
