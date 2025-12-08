@@ -797,6 +797,7 @@ export const userDailyLogs = pgTable("user_daily_logs", {
   date: varchar("date").notNull(), // YYYY-MM-DD format
   completedTaskIds: text("completed_task_ids").array().default([]),
   todoPoints: integer("todo_points").default(0), // Points earned from todo list items
+  penaltyPoints: integer("penalty_points").default(0), // Negative points from penalties (stored as negative)
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

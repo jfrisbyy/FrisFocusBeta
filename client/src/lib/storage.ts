@@ -143,6 +143,7 @@ export interface StoredDailyLog {
   completedTaskIds: string[];
   notes: string;
   todoPoints?: number; // Points earned from daily todo list
+  penaltyPoints?: number; // Negative points from penalties (stored as negative value)
 }
 
 export function loadDailyLogsFromStorage(): Record<string, StoredDailyLog> {
