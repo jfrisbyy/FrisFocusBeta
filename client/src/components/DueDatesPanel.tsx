@@ -70,6 +70,16 @@ export default function DueDatesPanel({
     );
   };
 
+  const handleUncomplete = (id: string) => {
+    onItemsChange(
+      items.map(item =>
+        item.id === id
+          ? { ...item, status: "pending" as const, completedAt: undefined }
+          : item
+      )
+    );
+  };
+
   const handleDelete = (id: string) => {
     onItemsChange(items.filter(item => item.id !== id));
   };
@@ -98,9 +108,15 @@ export default function DueDatesPanel({
         data-testid={`due-date-item-${item.id}`}
       >
         {isCompleted ? (
-          <div className="h-5 w-5 rounded-full bg-chart-1 flex items-center justify-center">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-5 w-5 rounded-full bg-chart-1 hover:bg-chart-1/80 flex items-center justify-center p-0"
+            onClick={() => handleUncomplete(item.id)}
+            data-testid={`button-uncomplete-due-${item.id}`}
+          >
             <Check className="h-3 w-3 text-white" />
-          </div>
+          </Button>
         ) : isMissed ? (
           <AlertTriangle className="h-5 w-5 text-destructive" />
         ) : (
