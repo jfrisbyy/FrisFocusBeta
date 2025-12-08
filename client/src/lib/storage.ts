@@ -367,6 +367,8 @@ export interface StoredTodoItem {
   completed: boolean;
   order: number;
   note?: string; // User note attached to this to-do item
+  penaltyEnabled?: boolean; // Whether this item deducts points if not completed
+  penaltyValue?: number; // Points to deduct if not completed
 }
 
 export interface StoredDailyTodoList {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift, Settings, StickyNote, Pencil } from "lucide-react";
+import { Plus, Trash2, Gift, Settings, StickyNote, Pencil, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,6 +48,8 @@ export default function TodoListPanel({
 }: TodoListPanelProps) {
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("5");
+  const [newPenaltyEnabled, setNewPenaltyEnabled] = useState(false);
+  const [newPenaltyValue, setNewPenaltyValue] = useState("5");
   const [showSettings, setShowSettings] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -55,12 +57,17 @@ export default function TodoListPanel({
   const [tempNote, setTempNote] = useState("");
   const [tempEditTitle, setTempEditTitle] = useState("");
   const [tempEditPoints, setTempEditPoints] = useState("");
+  const [tempEditPenaltyEnabled, setTempEditPenaltyEnabled] = useState(false);
+  const [tempEditPenaltyValue, setTempEditPenaltyValue] = useState("0");
 
   const completedCount = items.filter(item => item.completed).length;
   const allCompleted = items.length > 0 && completedCount === items.length;
   const totalPoints = items
     .filter(item => item.completed)
     .reduce((sum, item) => sum + item.pointValue, 0);
+  const penaltyPoints = items
+    .filter(item => !item.completed && item.penaltyEnabled && item.penaltyValue)
+    .reduce((sum, item) => sum + (item.penaltyValue || 0), 0);
   const effectiveBonus = allCompleted && bonusEnabled ? bonusPoints : 0;
 
   const handleAddItem = () => {
@@ -72,10 +79,14 @@ export default function TodoListPanel({
       pointValue,
       completed: false,
       order: items.length,
+      penaltyEnabled: newPenaltyEnabled,
+      penaltyValue: newPenaltyEnabled ? (parseInt(newPenaltyValue) || 0) : 0,
     };
     onItemsChange([...items, newItem]);
     setNewTitle("");
     setNewPoints("5");
+    setNewPenaltyEnabled(false);
+    setNewPenaltyValue("5");
   };
 
   const handleToggleItem = (id: string) => {
@@ -122,6 +133,8 @@ export default function TodoListPanel({
     setEditingItemId(item.id);
     setTempEditTitle(item.title);
     setTempEditPoints(item.pointValue.toString());
+    setTempEditPenaltyEnabled(item.penaltyEnabled || false);
+    setTempEditPenaltyValue((item.penaltyValue || 0).toString());
     setEditDialogOpen(true);
   };
 
@@ -130,7 +143,13 @@ export default function TodoListPanel({
       onItemsChange(
         items.map(item =>
           item.id === editingItemId
-            ? { ...item, title: tempEditTitle.trim(), pointValue: parseInt(tempEditPoints) || 0 }
+            ? { 
+                ...item, 
+                title: tempEditTitle.trim(), 
+                pointValue: parseInt(tempEditPoints) || 0,
+                penaltyEnabled: tempEditPenaltyEnabled,
+                penaltyValue: tempEditPenaltyEnabled ? (parseInt(tempEditPenaltyValue) || 0) : 0,
+              }
             : item
         )
       );
@@ -139,6 +158,8 @@ export default function TodoListPanel({
     setEditingItemId(null);
     setTempEditTitle("");
     setTempEditPoints("");
+    setTempEditPenaltyEnabled(false);
+    setTempEditPenaltyValue("0");
   };
 
   return (
@@ -200,32 +221,59 @@ export default function TodoListPanel({
         )}
 
         {!readOnly && (
-          <div className="flex gap-2">
-            <Input
-              placeholder="Add a to-do item..."
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={handleKeyPress}
-              className="flex-1"
-              data-testid={`input-${title.toLowerCase().replace(/\s/g, "-")}-new-item`}
-            />
-            <Input
-              type="number"
-              placeholder="Pts"
-              value={newPoints}
-              onChange={(e) => setNewPoints(e.target.value)}
-              className="w-16"
-              min={0}
-              data-testid={`input-${title.toLowerCase().replace(/\s/g, "-")}-new-points`}
-            />
-            <Button
-              size="icon"
-              onClick={handleAddItem}
-              disabled={!newTitle.trim()}
-              data-testid={`button-${title.toLowerCase().replace(/\s/g, "-")}-add`}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add a to-do item..."
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={handleKeyPress}
+                className="flex-1"
+                data-testid={`input-${title.toLowerCase().replace(/\s/g, "-")}-new-item`}
+              />
+              <Input
+                type="number"
+                placeholder="Pts"
+                value={newPoints}
+                onChange={(e) => setNewPoints(e.target.value)}
+                className="w-16"
+                min={0}
+                data-testid={`input-${title.toLowerCase().replace(/\s/g, "-")}-new-points`}
+              />
+              <Button
+                size="icon"
+                onClick={handleAddItem}
+                disabled={!newTitle.trim()}
+                data-testid={`button-${title.toLowerCase().replace(/\s/g, "-")}-add`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`new-penalty-${title}`}
+                  checked={newPenaltyEnabled}
+                  onCheckedChange={(checked) => setNewPenaltyEnabled(checked === true)}
+                  data-testid={`checkbox-${title.toLowerCase().replace(/\s/g, "-")}-new-penalty`}
+                />
+                <Label htmlFor={`new-penalty-${title}`} className="text-xs text-muted-foreground flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Penalty if incomplete
+                </Label>
+              </div>
+              {newPenaltyEnabled && (
+                <Input
+                  type="number"
+                  placeholder="-"
+                  value={newPenaltyValue}
+                  onChange={(e) => setNewPenaltyValue(e.target.value)}
+                  className="w-16"
+                  min={0}
+                  data-testid={`input-${title.toLowerCase().replace(/\s/g, "-")}-new-penalty`}
+                />
+              )}
+            </div>
           </div>
         )}
 
@@ -261,6 +309,11 @@ export default function TodoListPanel({
                 <span className="font-mono text-sm text-muted-foreground">
                   +{item.pointValue}
                 </span>
+                {item.penaltyEnabled && item.penaltyValue && !item.completed && (
+                  <span className="font-mono text-sm text-destructive" data-testid={`penalty-indicator-${item.id}`}>
+                    -{item.penaltyValue}
+                  </span>
+                )}
                 {(!readOnly || isDemo) && (
                   <Button
                     size="icon"
@@ -305,7 +358,7 @@ export default function TodoListPanel({
           </div>
         )}
 
-        {(totalPoints > 0 || effectiveBonus > 0) && (
+        {(totalPoints > 0 || effectiveBonus > 0 || penaltyPoints > 0) && (
           <div className="pt-2 border-t space-y-1">
             {totalPoints > 0 && (
               <div className="flex items-center justify-between text-sm">
@@ -329,10 +382,26 @@ export default function TodoListPanel({
                 </span>
               </div>
             )}
-            {(totalPoints > 0 || effectiveBonus > 0) && (
+            {penaltyPoints > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <AlertTriangle className="h-3 w-3" />
+                  Incomplete penalties
+                </span>
+                <span className="font-mono font-medium text-destructive">
+                  -{penaltyPoints}
+                </span>
+              </div>
+            )}
+            {(totalPoints > 0 || effectiveBonus > 0 || penaltyPoints > 0) && (
               <div className="flex items-center justify-between text-sm font-medium pt-1 border-t">
                 <span>Total</span>
-                <span className="font-mono text-chart-1">+{totalPoints + effectiveBonus}</span>
+                <span className={cn(
+                  "font-mono",
+                  (totalPoints + effectiveBonus - penaltyPoints) >= 0 ? "text-chart-1" : "text-destructive"
+                )}>
+                  {(totalPoints + effectiveBonus - penaltyPoints) >= 0 ? "+" : ""}{totalPoints + effectiveBonus - penaltyPoints}
+                </span>
               </div>
             )}
           </div>
@@ -390,6 +459,33 @@ export default function TodoListPanel({
                 min={0}
                 data-testid={`input-edit-todo-points-${editingItemId}`}
               />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="edit-penalty-enabled"
+                  checked={tempEditPenaltyEnabled}
+                  onCheckedChange={(checked) => setTempEditPenaltyEnabled(checked === true)}
+                  data-testid={`checkbox-edit-todo-penalty-${editingItemId}`}
+                />
+                <Label htmlFor="edit-penalty-enabled" className="text-sm flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Penalty if incomplete
+                </Label>
+              </div>
+              {tempEditPenaltyEnabled && (
+                <div className="flex items-center gap-2 pl-6">
+                  <Label className="text-sm whitespace-nowrap">Penalty points:</Label>
+                  <Input
+                    type="number"
+                    value={tempEditPenaltyValue}
+                    onChange={(e) => setTempEditPenaltyValue(e.target.value)}
+                    className="w-20"
+                    min={0}
+                    data-testid={`input-edit-todo-penalty-value-${editingItemId}`}
+                  />
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
