@@ -2249,14 +2249,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const now = new Date();
       console.log("[CHEERLINES] Fetching cheerlines for user:", userId);
 
+      // Get all cheerlines for this recipient - we filter by expiration in JS
       const receivedCheerlines = await db.select().from(cheerlines).where(
-        and(
-          eq(cheerlines.recipientId, userId),
-          or(
-            eq(cheerlines.expiresAt, null as any),
-            // Filter out expired cheerlines - expiresAt > now
-          )
-        )
+        eq(cheerlines.recipientId, userId)
       ).orderBy(desc(cheerlines.createdAt));
 
       // Filter out expired cheerlines in JS since SQL comparison can be tricky
