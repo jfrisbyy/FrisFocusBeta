@@ -343,6 +343,7 @@ interface DemoCompetition {
   myPoints: number;
   opponentPoints: number;
   winnerId?: string;
+  notes?: string;
 }
 
 interface DemoCompetitionInvite {
@@ -355,6 +356,7 @@ interface DemoCompetitionInvite {
   name: string;
   status: "pending";
   isIncoming: boolean;
+  notes?: string;
 }
 
 interface DemoCircleRecord {
@@ -1598,11 +1600,12 @@ export default function CommunityPage() {
   });
 
   const sendCompetitionInviteMutation = useMutation({
-    mutationFn: async (data: { circleId: string; inviteeInviteCode: string; targetPoints: number; name?: string }) => {
+    mutationFn: async (data: { circleId: string; inviteeInviteCode: string; targetPoints: number; name?: string; notes?: string }) => {
       const res = await apiRequest("POST", `/api/circles/${data.circleId}/competitions/invites`, {
         inviteeInviteCode: data.inviteeInviteCode,
         targetPoints: data.targetPoints,
         name: data.name,
+        notes: data.notes,
       });
       if (!res.ok) {
         const err = await res.json();
@@ -1615,6 +1618,7 @@ export default function CommunityPage() {
       setChallengeInviteCode("");
       setChallengeTargetPoints("1000");
       setChallengeName("");
+      setChallengeNotes("");
       toast({ title: "Challenge sent!" });
     },
     onError: (error: Error) => {
@@ -1689,6 +1693,7 @@ export default function CommunityPage() {
   const [challengeName, setChallengeName] = useState("");
   const [challengeCompetitionType, setChallengeCompetitionType] = useState<CompetitionType>("targetPoints");
   const [challengeEndDate, setChallengeEndDate] = useState<Date | undefined>(undefined);
+  const [challengeNotes, setChallengeNotes] = useState("");
   const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
   const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
   const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
@@ -6618,6 +6623,15 @@ export default function CommunityPage() {
                                         data-testid="input-demo-challenge-name"
                                       />
                                     </div>
+                                    <div className="space-y-2">
+                                      <Label>Notes (optional)</Label>
+                                      <Textarea
+                                        placeholder="Add any rules, context, or details about this competition..."
+                                        disabled
+                                        className="min-h-[80px]"
+                                        data-testid="textarea-demo-challenge-notes"
+                                      />
+                                    </div>
                                     <Button
                                       onClick={() => {
                                         toast({ title: "Demo Mode", description: "Sign in to challenge other circles" });
@@ -7173,6 +7187,17 @@ export default function CommunityPage() {
                                   data-testid="input-challenge-name"
                                 />
                               </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="challengeNotes">Notes (optional)</Label>
+                                <Textarea
+                                  id="challengeNotes"
+                                  placeholder="Add any rules, context, or details about this competition..."
+                                  value={challengeNotes}
+                                  onChange={(e) => setChallengeNotes(e.target.value)}
+                                  className="min-h-[80px]"
+                                  data-testid="textarea-challenge-notes"
+                                />
+                              </div>
                               <Button
                                 onClick={() => {
                                   if (!challengeInviteCode.trim()) {
@@ -7195,6 +7220,7 @@ export default function CommunityPage() {
                                     inviteeInviteCode: challengeInviteCode,
                                     targetPoints: challengeCompetitionType === "targetPoints" ? parseInt(challengeTargetPoints) : 0,
                                     name: challengeName || undefined,
+                                    notes: challengeNotes || undefined,
                                   });
                                 }}
                                 disabled={sendCompetitionInviteMutation.isPending}
@@ -7240,6 +7266,11 @@ export default function CommunityPage() {
                                       <Target className="w-3 h-3 inline mr-1" />
                                       Race to {invite.targetPoints.toLocaleString()} points
                                     </p>
+                                    {invite.notes && (
+                                      <p className="text-sm text-muted-foreground mt-2 italic" data-testid={`text-invite-notes-${invite.id}`}>
+                                        "{invite.notes}"
+                                      </p>
+                                    )}
                                   </div>
                                   {invite.isIncoming && isOwnerOrAdmin(selectedCircle.id) && (
                                     <div className="flex gap-2">
