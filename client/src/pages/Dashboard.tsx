@@ -870,13 +870,14 @@ export default function Dashboard() {
     setWeekStreak(currentWeekStreakCount);
     setLongestWeekStreak(maxWeekStreakCount);
 
-    // Calculate boosters from tasks with boost enabled
+    // Calculate boosters from tasks with boosterRule enabled
     const taskBoosters: UnifiedBooster[] = tasks
-      .filter(t => t.boostEnabled && t.boostThreshold && t.boostPoints)
+      .filter(t => t.boosterRule?.enabled)
       .map(t => {
+        const rule = t.boosterRule!;
         // Count completions in the current period
         let completions = 0;
-        const periodStart = t.boostPeriod === "month" 
+        const periodStart = rule.period === "month" 
           ? subWeeks(new Date(), 4) 
           : startOfWeek(new Date(), { weekStartsOn: 1 });
         
@@ -890,16 +891,47 @@ export default function Dashboard() {
         return {
           id: `boost-${t.id}`,
           name: t.name,
-          description: `Complete ${t.boostThreshold} times per ${t.boostPeriod}`,
-          points: t.boostPoints!,
-          achieved: completions >= (t.boostThreshold || 0),
+          description: `Complete ${rule.timesRequired} times per ${rule.period}`,
+          points: rule.bonusPoints,
+          achieved: completions >= rule.timesRequired,
           progress: completions,
-          required: t.boostThreshold,
-          period: t.boostPeriod,
+          required: rule.timesRequired,
+          period: rule.period,
           isNegative: false,
         };
       });
-    setBoosters(taskBoosters);
+
+    // Calculate negative boosters from penalties with negativeBoostEnabled
+    const negativeBoosters: UnifiedBooster[] = penalties
+      .filter(p => p.negativeBoostEnabled && p.timesThreshold && p.boostPenaltyPoints)
+      .map(p => {
+        // Count occurrences in the current period
+        let occurrences = 0;
+        const periodStart = p.period === "month" 
+          ? subWeeks(new Date(), 4) 
+          : startOfWeek(new Date(), { weekStartsOn: 1 });
+        
+        Object.entries(dailyLogs).forEach(([dateStr, log]) => {
+          const logDate = new Date(dateStr);
+          if (logDate >= periodStart && log.completedTaskIds.includes(p.id)) {
+            occurrences++;
+          }
+        });
+        
+        return {
+          id: `neg-boost-${p.id}`,
+          name: p.name,
+          description: `If done ${p.timesThreshold}+ times per ${p.period}`,
+          points: -p.boostPenaltyPoints!,
+          achieved: occurrences >= p.timesThreshold!,
+          progress: occurrences,
+          required: p.timesThreshold!,
+          period: p.period as "week" | "month",
+          isNegative: true,
+        };
+      });
+
+    setBoosters([...taskBoosters, ...negativeBoosters]);
   }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, activeSeason, activeSeasonData, apiQueriesReady]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
