@@ -1299,6 +1299,30 @@ export default function CommunityPage() {
     setDirectMessages(dmState);
   }, [isDemo, conversationsQuery.data]);
 
+  // Sync circle tasks from API query to local state
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circleTasksQuery.data) return;
+    setCircleTasks(prev => ({ ...prev, [selectedCircle.id]: circleTasksQuery.data }));
+  }, [isDemo, selectedCircle?.id, circleTasksQuery.data]);
+
+  // Sync circle badges from API query to local state
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circleBadgesQuery.data) return;
+    setCircleBadges(prev => ({ ...prev, [selectedCircle.id]: circleBadgesQuery.data }));
+  }, [isDemo, selectedCircle?.id, circleBadgesQuery.data]);
+
+  // Sync circle awards from API query to local state
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circleAwardsQuery.data) return;
+    setCircleAwards(prev => ({ ...prev, [selectedCircle.id]: circleAwardsQuery.data }));
+  }, [isDemo, selectedCircle?.id, circleAwardsQuery.data]);
+
+  // Sync circle posts from API query to local state
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circlePostsQuery.data) return;
+    setCirclePosts(prev => ({ ...prev, [selectedCircle.id]: circlePostsQuery.data }));
+  }, [isDemo, selectedCircle?.id, circlePostsQuery.data]);
+
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
     "circle-1": {
