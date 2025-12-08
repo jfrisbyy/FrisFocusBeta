@@ -4870,7 +4870,7 @@ export default function CommunityPage() {
                                       {leaderboardViewMode === "week" && `${member.weeklyPoints} pts`}
                                       {leaderboardViewMode === "alltime" && `${member.weeklyPoints} pts/wk`}
                                     </Badge>
-                                    {allTimeStats?.goalStreak && allTimeStats.goalStreak > 0 && (
+                                    {isDemo && allTimeStats?.goalStreak && allTimeStats.goalStreak > 0 && (
                                       <div className="flex items-center gap-1 text-orange-500" title={`${allTimeStats.goalStreak} day goal streak`}>
                                         <Flame className="w-4 h-4" />
                                         <span className="text-xs font-medium">{allTimeStats.goalStreak}</span>
