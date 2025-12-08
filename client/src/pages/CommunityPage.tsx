@@ -1450,24 +1450,48 @@ export default function CommunityPage() {
     }
   };
 
-  const handleSendDM = () => {
+  const handleSendDM = async () => {
     if (!dmFriend || (!dmMessage.trim() && !dmImages[dmFriend.friendId])) return;
     const imageUrl = dmImages[dmFriend.friendId] || undefined;
+    const friendId = dmFriend.friendId;
+    const message = dmMessage.trim();
+    
+    // Non-demo mode: call API
+    if (!isDemo && user) {
+      try {
+        const res = await apiRequest("POST", `/api/messages/${friendId}`, {
+          content: message,
+          imageUrl: imageUrl || undefined,
+        });
+        const newMessage = await res.json();
+        const currentDMs = directMessages[friendId] || [];
+        setDirectMessages({ ...directMessages, [friendId]: [...currentDMs, newMessage] });
+        setDmMessage("");
+        clearDmImage(friendId);
+        toast({ title: "Message sent" });
+      } catch (error) {
+        console.error("Error sending message:", error);
+        toast({ title: "Failed to send message", variant: "destructive" });
+      }
+      return;
+    }
+    
+    // Demo mode: local state only
     const newDM: StoredDirectMessage = {
       id: `dm-${Date.now()}`,
       senderId: "you",
       senderName: "You",
-      recipientId: dmFriend.friendId,
+      recipientId: friendId,
       recipientName: getName(dmFriend.firstName, dmFriend.lastName),
-      content: dmMessage.trim(),
+      content: message,
       createdAt: new Date().toISOString(),
       read: true,
       imageUrl,
     };
-    const currentDMs = directMessages[dmFriend.friendId] || [];
-    setDirectMessages({ ...directMessages, [dmFriend.friendId]: [...currentDMs, newDM] });
+    const currentDMs = directMessages[friendId] || [];
+    setDirectMessages({ ...directMessages, [friendId]: [...currentDMs, newDM] });
     setDmMessage("");
-    clearDmImage(dmFriend.friendId);
+    clearDmImage(friendId);
     toast({ title: "Message sent" });
   };
 
