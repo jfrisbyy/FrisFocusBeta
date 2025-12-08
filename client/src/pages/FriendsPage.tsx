@@ -292,6 +292,66 @@ export default function FriendsPage() {
             </CardContent>
           </Card>
 
+          {/* Incoming Friend Requests - shown on Friends tab for visibility */}
+          {displayIncoming.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5" />
+                  Pending Friend Requests
+                  <Badge variant="default">{displayIncoming.length}</Badge>
+                </CardTitle>
+                <CardDescription>People who want to connect with you</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {displayIncoming.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between gap-4" data-testid={`request-incoming-friends-tab-${request.id}`}>
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={request.profileImageUrl ?? undefined} />
+                        <AvatarFallback>{getInitials(request.firstName, request.lastName)}</AvatarFallback>
+                      </Avatar>
+                      <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
+                    </div>
+                    {!isDemo && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => acceptRequestMutation.mutate(request.id)}
+                          disabled={acceptRequestMutation.isPending}
+                          data-testid={`button-accept-friends-tab-${request.id}`}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => declineRequestMutation.mutate(request.id)}
+                          disabled={declineRequestMutation.isPending}
+                          data-testid={`button-decline-friends-tab-${request.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                    {isDemo && (
+                      <div className="flex gap-2">
+                        <Button size="sm" data-testid={`button-accept-friends-tab-${request.id}`}>
+                          <Check className="w-4 h-4 mr-1" />
+                          Accept
+                        </Button>
+                        <Button size="sm" variant="ghost" data-testid={`button-decline-friends-tab-${request.id}`}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {loadingFriends && !isDemo ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
