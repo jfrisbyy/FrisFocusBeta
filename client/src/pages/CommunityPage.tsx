@@ -537,6 +537,52 @@ const demoMemberCompetitionStats: Record<string, Record<string, DemoMemberCompet
       ]},
     ],
   },
+  "comp-2": {
+    "circle-1": [
+      { memberId: "you", memberName: "You", weeklyPoints: 260, taskStats: [
+        { memberId: "you", taskId: "ct1", taskName: "5K Training Run", completionCount: 8, points: 160 },
+        { memberId: "you", taskId: "ct3", taskName: "Stretching Session", completionCount: 5, points: 50 },
+        { memberId: "you", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 1, points: 30 },
+        { memberId: "you", taskId: "ct5", taskName: "Rest Day", completionCount: 4, points: 20 },
+      ]},
+      { memberId: "u1", memberName: "Sarah M", weeklyPoints: 300, taskStats: [
+        { memberId: "u1", taskId: "ct1", taskName: "5K Training Run", completionCount: 10, points: 200 },
+        { memberId: "u1", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 2, points: 60 },
+        { memberId: "u1", taskId: "ct3", taskName: "Stretching Session", completionCount: 4, points: 40 },
+      ]},
+      { memberId: "u2", memberName: "Lisa K", weeklyPoints: 250, taskStats: [
+        { memberId: "u2", taskId: "ct2", taskName: "Strength Training", completionCount: 8, points: 120 },
+        { memberId: "u2", taskId: "ct4", taskName: "Long Run (10K+)", completionCount: 3, points: 90 },
+        { memberId: "u2", taskId: "ct3", taskName: "Stretching Session", completionCount: 4, points: 40 },
+      ]},
+      { memberId: "u3", memberName: "Emma T", weeklyPoints: 190, taskStats: [
+        { memberId: "u3", taskId: "ct1", taskName: "5K Training Run", completionCount: 7, points: 140 },
+        { memberId: "u3", taskId: "ct3", taskName: "Stretching Session", completionCount: 5, points: 50 },
+      ]},
+    ],
+    "circle-ext-2": [
+      { memberId: "opp-rc1", memberName: "Alex R", weeklyPoints: 240, taskStats: [
+        { memberId: "opp-rc1", taskId: "rc1", taskName: "Daily Run", completionCount: 12, points: 180 },
+        { memberId: "opp-rc1", taskId: "rc3", taskName: "Speed Work", completionCount: 2, points: 60 },
+      ]},
+      { memberId: "opp-rc2", memberName: "Jordan P", weeklyPoints: 215, taskStats: [
+        { memberId: "opp-rc2", taskId: "rc1", taskName: "Daily Run", completionCount: 11, points: 165 },
+        { memberId: "opp-rc2", taskId: "rc2", taskName: "Hill Training", completionCount: 2, points: 50 },
+      ]},
+      { memberId: "opp-rc3", memberName: "Casey M", weeklyPoints: 200, taskStats: [
+        { memberId: "opp-rc3", taskId: "rc1", taskName: "Daily Run", completionCount: 10, points: 150 },
+        { memberId: "opp-rc3", taskId: "rc4", taskName: "Recovery Jog", completionCount: 5, points: 50 },
+      ]},
+      { memberId: "opp-rc4", memberName: "Taylor W", weeklyPoints: 120, taskStats: [
+        { memberId: "opp-rc4", taskId: "rc1", taskName: "Daily Run", completionCount: 6, points: 90 },
+        { memberId: "opp-rc4", taskId: "rc4", taskName: "Recovery Jog", completionCount: 3, points: 30 },
+      ]},
+      { memberId: "opp-rc5", memberName: "Sam H", weeklyPoints: 100, taskStats: [
+        { memberId: "opp-rc5", taskId: "rc2", taskName: "Hill Training", completionCount: 2, points: 50 },
+        { memberId: "opp-rc5", taskId: "rc4", taskName: "Recovery Jog", completionCount: 5, points: 50 },
+      ]},
+    ],
+  },
   "comp-3": {
     "circle-2": [
       { memberId: "you", memberName: "You", weeklyPoints: 55, taskStats: [
@@ -666,6 +712,13 @@ const demoOpponentMembers: Record<string, { id: string; firstName: string; lastN
     { id: "opp-2", firstName: "Maria", lastName: "S", weeklyPoints: 85 },
     { id: "opp-3", firstName: "Tyler", lastName: "B", weeklyPoints: 65 },
     { id: "opp-4", firstName: "Jen", lastName: "K", weeklyPoints: 35 },
+  ],
+  "circle-ext-2": [
+    { id: "opp-rc1", firstName: "Alex", lastName: "R", weeklyPoints: 240 },
+    { id: "opp-rc2", firstName: "Jordan", lastName: "P", weeklyPoints: 215 },
+    { id: "opp-rc3", firstName: "Casey", lastName: "M", weeklyPoints: 200 },
+    { id: "opp-rc4", firstName: "Taylor", lastName: "W", weeklyPoints: 120 },
+    { id: "opp-rc5", firstName: "Sam", lastName: "H", weeklyPoints: 100 },
   ],
   "circle-ext-3": [
     { id: "opp-5", firstName: "Mike", lastName: "J", weeklyPoints: 60 },
