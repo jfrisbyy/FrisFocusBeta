@@ -747,6 +747,346 @@ export default function CommunityPage() {
     },
   });
 
+  // Circle tasks query for selected circle
+  const circleTasksQuery = useQuery<StoredCircleTask[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'tasks'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/tasks`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Circle badges query for selected circle
+  const circleBadgesQuery = useQuery<CircleBadge[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'badges'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/badges`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          description: b.description || '',
+          icon: b.icon || 'target',
+          progress: b.progress || 0,
+          required: b.required || 10,
+          earned: b.earned || false,
+          reward: b.reward,
+        }));
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Circle awards query for selected circle
+  const circleAwardsQuery = useQuery<CircleAward[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'awards'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/awards`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          description: a.description || '',
+          type: a.type || 'first_to',
+          target: a.target,
+          category: a.category,
+          winner: a.winner,
+          endDate: a.endDate,
+          reward: a.reward,
+        }));
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Circle posts query for selected circle
+  const circlePostsQuery = useQuery<StoredCirclePost[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'posts'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/posts`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.map((p: any) => ({
+          id: p.id,
+          circleId: p.circleId,
+          authorId: p.authorId,
+          authorName: p.author ? `${p.author.firstName || ''} ${p.author.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+          content: p.content || '',
+          createdAt: p.createdAt,
+          likes: p.likes || [],
+          comments: (p.comments || []).map((c: any) => ({
+            id: c.id,
+            authorId: c.authorId,
+            authorName: c.author ? `${c.author.firstName || ''} ${c.author.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+            content: c.content || '',
+            createdAt: c.createdAt,
+            likes: c.likes || [],
+          })),
+          imageUrl: p.imageUrl,
+        }));
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Circle task completions query for selected circle
+  const circleCompletionsQuery = useQuery<{ taskId: string; userId: string; userName: string; completedAt: string }[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'completions'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/completions`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Circle task mutations
+  const createCircleTaskMutation = useMutation({
+    mutationFn: async (data: { circleId: string; task: { name: string; value: number; taskType: CircleTaskType; category?: string } }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/tasks`, data.task);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create task');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateCircleTaskMutation = useMutation({
+    mutationFn: async (data: { circleId: string; taskId: string; updates: { name?: string; value?: number; taskType?: CircleTaskType } }) => {
+      const res = await apiRequest("PUT", `/api/circles/${data.circleId}/tasks/${data.taskId}`, data.updates);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update task');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCircleTaskMutation = useMutation({
+    mutationFn: async (data: { circleId: string; taskId: string }) => {
+      const res = await apiRequest("DELETE", `/api/circles/${data.circleId}/tasks/${data.taskId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete task');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleCircleTaskCompleteMutation = useMutation({
+    mutationFn: async (data: { circleId: string; taskId: string }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/tasks/${data.taskId}/complete`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to toggle task completion');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'completions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'members'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Circle badge mutations
+  const createCircleBadgeMutation = useMutation({
+    mutationFn: async (data: { circleId: string; badge: { name: string; description: string; icon?: string; required: number; reward?: CircleBadgeReward } }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/badges`, data.badge);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create badge');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'badges'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create badge", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateCircleBadgeMutation = useMutation({
+    mutationFn: async (data: { circleId: string; badgeId: string; updates: { name?: string; description?: string; required?: number; reward?: CircleBadgeReward } }) => {
+      const res = await apiRequest("PUT", `/api/circles/${data.circleId}/badges/${data.badgeId}`, data.updates);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update badge');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'badges'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update badge", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCircleBadgeMutation = useMutation({
+    mutationFn: async (data: { circleId: string; badgeId: string }) => {
+      const res = await apiRequest("DELETE", `/api/circles/${data.circleId}/badges/${data.badgeId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete badge');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'badges'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete badge", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Circle award mutations
+  const createCircleAwardMutation = useMutation({
+    mutationFn: async (data: { circleId: string; award: { name: string; description: string; type: string; target?: number; category?: string; reward?: CircleBadgeReward } }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/awards`, data.award);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create award');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'awards'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create award", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateCircleAwardMutation = useMutation({
+    mutationFn: async (data: { circleId: string; awardId: string; updates: { name?: string; description?: string; type?: string; target?: number; category?: string; reward?: CircleBadgeReward } }) => {
+      const res = await apiRequest("PUT", `/api/circles/${data.circleId}/awards/${data.awardId}`, data.updates);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to update award');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'awards'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update award", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCircleAwardMutation = useMutation({
+    mutationFn: async (data: { circleId: string; awardId: string }) => {
+      const res = await apiRequest("DELETE", `/api/circles/${data.circleId}/awards/${data.awardId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to delete award');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'awards'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete award", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Circle post mutations
+  const createCirclePostMutation = useMutation({
+    mutationFn: async (data: { circleId: string; post: { content: string; imageUrl?: string } }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/posts`, data.post);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create post');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'posts'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create post", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const likeCirclePostMutation = useMutation({
+    mutationFn: async (data: { circleId: string; postId: string }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/posts/${data.postId}/like`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to like post');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'posts'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to like post", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addCirclePostCommentMutation = useMutation({
+    mutationFn: async (data: { circleId: string; postId: string; comment: { content: string } }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/posts/${data.postId}/comments`, data.comment);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to add comment');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'posts'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add comment", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Conversations query for non-demo mode - fetches all DM threads
   const conversationsQuery = useQuery<{
     partnerId: string;
@@ -1817,6 +2157,25 @@ export default function CommunityPage() {
 
   const handleCreateCirclePost = () => {
     if (!selectedCircle || (!newCirclePost.trim() && !circlePostImage)) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      createCirclePostMutation.mutate({
+        circleId: selectedCircle.id,
+        post: {
+          content: newCirclePost.trim(),
+          imageUrl: circlePostImage || undefined,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Post added to board" });
+        }
+      });
+      setNewCirclePost("");
+      clearPostImage();
+      return;
+    }
+    
     const newPost: StoredCirclePost = {
       id: `cp-${Date.now()}`,
       circleId: selectedCircle.id,
@@ -1840,6 +2199,16 @@ export default function CommunityPage() {
 
   const handleLikeCirclePost = (postId: string) => {
     if (!selectedCircle) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      likeCirclePostMutation.mutate({
+        circleId: selectedCircle.id,
+        postId: postId,
+      });
+      return;
+    }
+    
     setCirclePosts({
       ...circlePosts,
       [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).map(post => {
@@ -1855,6 +2224,25 @@ export default function CommunityPage() {
 
   const handleAddCirclePostComment = (postId: string) => {
     if (!selectedCircle || !newCirclePostComment.trim()) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      addCirclePostCommentMutation.mutate({
+        circleId: selectedCircle.id,
+        postId: postId,
+        comment: {
+          content: newCirclePostComment.trim(),
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Comment added" });
+        }
+      });
+      setNewCirclePostComment("");
+      setCirclePostCommentingId(null);
+      return;
+    }
+    
     const comment: StoredCirclePostComment = {
       id: `cpc-${Date.now()}`,
       authorId: "you",
@@ -1920,6 +2308,27 @@ export default function CommunityPage() {
   const handleAddTask = () => {
     if (!selectedCircle || !newTaskName.trim()) return;
     const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      createCircleTaskMutation.mutate({
+        circleId: selectedCircle.id,
+        task: {
+          name: newTaskName.trim(),
+          value: parseInt(newTaskValue) || 10,
+          taskType: newTaskType,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Task added" });
+        }
+      });
+      setShowAddTask(false);
+      setNewTaskName("");
+      setNewTaskValue("10");
+      setNewTaskType("per_person");
+      return;
+    }
     
     if (canApproveInstantly) {
       const newTask: StoredCircleTask = {
@@ -2044,6 +2453,32 @@ export default function CommunityPage() {
       }
     }
 
+    // Use API for non-demo mode
+    if (!isDemo) {
+      createCircleBadgeMutation.mutate({
+        circleId: selectedCircle.id,
+        badge: {
+          name: newBadgeName.trim(),
+          description: newBadgeDescription.trim() || "Complete this challenge",
+          icon: "target",
+          required: parseInt(newBadgeRequired) || 10,
+          reward,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Badge created" });
+        }
+      });
+      setShowAddBadge(false);
+      setNewBadgeName("");
+      setNewBadgeDescription("");
+      setNewBadgeRequired("10");
+      setNewBadgeRewardType("none");
+      setNewBadgeRewardPoints("50");
+      setNewBadgeRewardGift("");
+      return;
+    }
+
     if (canApproveInstantly) {
       const newBadge: CircleBadge = {
         id: `cb-${Date.now()}`,
@@ -2096,6 +2531,35 @@ export default function CommunityPage() {
       if (newAwardRewardType === "gift" || newAwardRewardType === "both") {
         awardReward.gift = newAwardRewardGift.trim() || undefined;
       }
+    }
+
+    // Use API for non-demo mode
+    if (!isDemo) {
+      createCircleAwardMutation.mutate({
+        circleId: selectedCircle.id,
+        award: {
+          name: newAwardName.trim(),
+          description: newAwardDescription.trim() || "Win this challenge",
+          type: newAwardType,
+          target: newAwardType === "first_to" ? parseInt(newAwardTarget) || 100 : undefined,
+          category: newAwardType === "most_in_category" ? newAwardCategory || "General" : undefined,
+          reward: awardReward,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Award created" });
+        }
+      });
+      setShowAddAward(false);
+      setNewAwardName("");
+      setNewAwardDescription("");
+      setNewAwardType("first_to");
+      setNewAwardTarget("100");
+      setNewAwardCategory("");
+      setNewAwardRewardType("none");
+      setNewAwardRewardPoints("50");
+      setNewAwardRewardGift("");
+      return;
     }
 
     if (canApproveInstantly) {
@@ -2186,6 +2650,26 @@ export default function CommunityPage() {
 
   const handleEditTask = () => {
     if (!selectedCircle || !editingTask || !editTaskName.trim()) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      updateCircleTaskMutation.mutate({
+        circleId: selectedCircle.id,
+        taskId: editingTask.id,
+        updates: {
+          name: editTaskName.trim(),
+          value: parseInt(editTaskValue) || 10,
+          taskType: editTaskType,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Task updated" });
+        }
+      });
+      setEditingTask(null);
+      return;
+    }
+    
     const updatedTasks = (circleTasks[selectedCircle.id] || []).map(t =>
       t.id === editingTask.id
         ? { ...t, name: editTaskName.trim(), value: parseInt(editTaskValue) || 10, taskType: editTaskType }
@@ -2198,6 +2682,20 @@ export default function CommunityPage() {
 
   const handleDeleteTask = (taskId: string) => {
     if (!selectedCircle) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      deleteCircleTaskMutation.mutate({
+        circleId: selectedCircle.id,
+        taskId: taskId,
+      }, {
+        onSuccess: () => {
+          toast({ title: "Task deleted" });
+        }
+      });
+      return;
+    }
+    
     const updatedTasks = (circleTasks[selectedCircle.id] || []).filter(t => t.id !== taskId);
     setCircleTasks({ ...circleTasks, [selectedCircle.id]: updatedTasks });
     toast({ title: "Task deleted" });
@@ -2231,6 +2729,27 @@ export default function CommunityPage() {
         reward.gift = editBadgeRewardGift.trim() || undefined;
       }
     }
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      updateCircleBadgeMutation.mutate({
+        circleId: selectedCircle.id,
+        badgeId: editingBadge.id,
+        updates: {
+          name: editBadgeName.trim(),
+          description: editBadgeDescription.trim(),
+          required: parseInt(editBadgeRequired) || 10,
+          reward,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Badge updated" });
+        }
+      });
+      setEditingBadge(null);
+      return;
+    }
+    
     const updatedBadges = (circleBadges[selectedCircle.id] || []).map(b =>
       b.id === editingBadge.id
         ? { ...b, name: editBadgeName.trim(), description: editBadgeDescription.trim(), required: parseInt(editBadgeRequired) || 10, reward }
@@ -2243,6 +2762,20 @@ export default function CommunityPage() {
 
   const handleDeleteBadge = (badgeId: string) => {
     if (!selectedCircle) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      deleteCircleBadgeMutation.mutate({
+        circleId: selectedCircle.id,
+        badgeId: badgeId,
+      }, {
+        onSuccess: () => {
+          toast({ title: "Badge deleted" });
+        }
+      });
+      return;
+    }
+    
     const updatedBadges = (circleBadges[selectedCircle.id] || []).filter(b => b.id !== badgeId);
     setCircleBadges({ ...circleBadges, [selectedCircle.id]: updatedBadges });
     toast({ title: "Badge deleted" });
@@ -2278,6 +2811,29 @@ export default function CommunityPage() {
         reward.gift = editAwardRewardGift.trim() || undefined;
       }
     }
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      updateCircleAwardMutation.mutate({
+        circleId: selectedCircle.id,
+        awardId: editingAward.id,
+        updates: {
+          name: editAwardName.trim(),
+          description: editAwardDescription.trim(),
+          type: editAwardType,
+          target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined,
+          category: editAwardType === "most_in_category" ? editAwardCategory : undefined,
+          reward,
+        }
+      }, {
+        onSuccess: () => {
+          toast({ title: "Award updated" });
+        }
+      });
+      setEditingAward(null);
+      return;
+    }
+    
     const updatedAwards = (circleAwards[selectedCircle.id] || []).map(a =>
       a.id === editingAward.id
         ? { ...a, name: editAwardName.trim(), description: editAwardDescription.trim(), type: editAwardType, target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined, category: editAwardType === "most_in_category" ? editAwardCategory : undefined, reward }
@@ -2290,6 +2846,20 @@ export default function CommunityPage() {
 
   const handleDeleteAward = (awardId: string) => {
     if (!selectedCircle) return;
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      deleteCircleAwardMutation.mutate({
+        circleId: selectedCircle.id,
+        awardId: awardId,
+      }, {
+        onSuccess: () => {
+          toast({ title: "Award deleted" });
+        }
+      });
+      return;
+    }
+    
     const updatedAwards = (circleAwards[selectedCircle.id] || []).filter(a => a.id !== awardId);
     setCircleAwards({ ...circleAwards, [selectedCircle.id]: updatedAwards });
     toast({ title: "Award deleted" });
@@ -2305,6 +2875,30 @@ export default function CommunityPage() {
     const isCompleted = myCompleted.includes(taskId);
     const currentUserId = isDemo ? "you" : user?.id;
     const currentUserName = isDemo ? "You" : (user?.displayName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || "You");
+    
+    // Use API for non-demo mode
+    if (!isDemo) {
+      // For circle tasks, only one person can complete per day - check locally first
+      if (task.taskType === "circle_task" && !isCompleted) {
+        const completions = circleTaskCompletions[circleId]?.[taskId] || [];
+        if (completions.length > 0) {
+          toast({ title: "Already completed", description: "This circle task was already done today" });
+          return;
+        }
+      }
+      
+      toggleCircleTaskCompleteMutation.mutate({
+        circleId: circleId,
+        taskId: taskId,
+      }, {
+        onSuccess: () => {
+          if (!isCompleted) {
+            toast({ title: "Task completed!", description: `+${task.value} points` });
+          }
+        }
+      });
+      return;
+    }
     
     // For circle tasks, only one person can complete per day
     if (task.taskType === "circle_task" && !isCompleted) {

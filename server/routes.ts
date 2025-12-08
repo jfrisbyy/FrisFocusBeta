@@ -52,6 +52,15 @@ import {
   insertCirclePostSchema,
   insertCirclePostLikeSchema,
   insertCirclePostCommentSchema,
+  circleTasks,
+  circleTaskCompletions,
+  circleBadges,
+  circleBadgeProgress,
+  circleAwards,
+  insertCircleTaskSchema,
+  insertCircleTaskCompletionSchema,
+  insertCircleBadgeSchema,
+  insertCircleAwardSchema,
   directMessages,
   insertDirectMessageSchema,
   cheerlines,
@@ -2175,6 +2184,611 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error sending message:", error);
       res.status(400).json({ error: "Failed to send message" });
+    }
+  });
+
+  // ==================== CIRCLE TASKS API ====================
+
+  // Get all tasks for a circle
+  app.get("/api/circles/:id/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view tasks" });
+      }
+
+      const tasks = await db.select().from(circleTasks)
+        .where(eq(circleTasks.circleId, circleId))
+        .orderBy(desc(circleTasks.createdAt));
+
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching circle tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Create a new task for a circle
+  app.post("/api/circles/:id/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to create tasks" });
+      }
+
+      const parsed = insertCircleTaskSchema.parse({
+        ...req.body,
+        circleId,
+        createdById: userId,
+        approvalStatus: membership.role === "owner" || membership.role === "admin" ? "approved" : "pending",
+      });
+      const [task] = await db.insert(circleTasks).values(parsed).returning();
+      res.json(task);
+    } catch (error) {
+      console.error("Error creating circle task:", error);
+      res.status(400).json({ error: "Failed to create task" });
+    }
+  });
+
+  // Update a circle task
+  app.put("/api/circles/:id/tasks/:taskId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, taskId } = req.params;
+
+      // Check membership and role
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to update tasks" });
+      }
+
+      // Get the task to check ownership
+      const [existingTask] = await db.select().from(circleTasks).where(eq(circleTasks.id, taskId));
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Only owner/admin or task creator can update
+      const canUpdate = membership.role === "owner" || membership.role === "admin" || existingTask.createdById === userId;
+      if (!canUpdate) {
+        return res.status(403).json({ error: "Not authorized to update this task" });
+      }
+
+      const { name, value, category, taskType, requiresApproval } = req.body;
+      const [task] = await db.update(circleTasks)
+        .set({ name, value, category, taskType, requiresApproval })
+        .where(eq(circleTasks.id, taskId))
+        .returning();
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating circle task:", error);
+      res.status(400).json({ error: "Failed to update task" });
+    }
+  });
+
+  // Delete a circle task
+  app.delete("/api/circles/:id/tasks/:taskId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, taskId } = req.params;
+
+      // Check membership and role
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to delete tasks" });
+      }
+
+      // Get the task to check ownership
+      const [existingTask] = await db.select().from(circleTasks).where(eq(circleTasks.id, taskId));
+      if (!existingTask) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // Only owner/admin or task creator can delete
+      const canDelete = membership.role === "owner" || membership.role === "admin" || existingTask.createdById === userId;
+      if (!canDelete) {
+        return res.status(403).json({ error: "Not authorized to delete this task" });
+      }
+
+      await db.delete(circleTasks).where(eq(circleTasks.id, taskId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting circle task:", error);
+      res.status(400).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Toggle task completion for a user on a specific date
+  app.post("/api/circles/:id/tasks/:taskId/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, taskId } = req.params;
+      const { date } = req.body; // YYYY-MM-DD format
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to complete tasks" });
+      }
+
+      // Check if already completed
+      const [existing] = await db.select().from(circleTaskCompletions).where(
+        and(
+          eq(circleTaskCompletions.circleId, circleId),
+          eq(circleTaskCompletions.taskId, taskId),
+          eq(circleTaskCompletions.userId, userId),
+          eq(circleTaskCompletions.date, date)
+        )
+      );
+
+      if (existing) {
+        // Toggle off - delete completion
+        await db.delete(circleTaskCompletions).where(eq(circleTaskCompletions.id, existing.id));
+        res.json({ completed: false });
+      } else {
+        // Toggle on - create completion
+        const parsed = insertCircleTaskCompletionSchema.parse({
+          circleId,
+          taskId,
+          userId,
+          date,
+        });
+        await db.insert(circleTaskCompletions).values(parsed);
+        res.json({ completed: true });
+      }
+    } catch (error) {
+      console.error("Error toggling task completion:", error);
+      res.status(400).json({ error: "Failed to toggle task completion" });
+    }
+  });
+
+  // Get task completions for a circle on a date range
+  app.get("/api/circles/:id/completions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const { from, to } = req.query;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view completions" });
+      }
+
+      const completions = await db.select().from(circleTaskCompletions)
+        .where(eq(circleTaskCompletions.circleId, circleId));
+
+      res.json(completions);
+    } catch (error) {
+      console.error("Error fetching completions:", error);
+      res.status(500).json({ error: "Failed to fetch completions" });
+    }
+  });
+
+  // ==================== CIRCLE BADGES API ====================
+
+  // Get all badges for a circle
+  app.get("/api/circles/:id/badges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view badges" });
+      }
+
+      const badges = await db.select().from(circleBadges)
+        .where(eq(circleBadges.circleId, circleId))
+        .orderBy(desc(circleBadges.createdAt));
+
+      res.json(badges);
+    } catch (error) {
+      console.error("Error fetching circle badges:", error);
+      res.status(500).json({ error: "Failed to fetch badges" });
+    }
+  });
+
+  // Create a new badge for a circle
+  app.post("/api/circles/:id/badges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to create badges" });
+      }
+
+      const parsed = insertCircleBadgeSchema.parse({
+        ...req.body,
+        circleId,
+        createdById: userId,
+        approvalStatus: membership.role === "owner" || membership.role === "admin" ? "approved" : "pending",
+      });
+      const [badge] = await db.insert(circleBadges).values(parsed).returning();
+      res.json(badge);
+    } catch (error) {
+      console.error("Error creating circle badge:", error);
+      res.status(400).json({ error: "Failed to create badge" });
+    }
+  });
+
+  // Update a circle badge
+  app.put("/api/circles/:id/badges/:badgeId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, badgeId } = req.params;
+
+      // Check membership and role
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to update badges" });
+      }
+
+      // Only owner/admin can update badges
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return res.status(403).json({ error: "Only owner or admin can update badges" });
+      }
+
+      const { name, description, icon, required, rewardType, rewardPoints, rewardGift } = req.body;
+      const [badge] = await db.update(circleBadges)
+        .set({ name, description, icon, required, rewardType, rewardPoints, rewardGift })
+        .where(eq(circleBadges.id, badgeId))
+        .returning();
+      res.json(badge);
+    } catch (error) {
+      console.error("Error updating circle badge:", error);
+      res.status(400).json({ error: "Failed to update badge" });
+    }
+  });
+
+  // Delete a circle badge
+  app.delete("/api/circles/:id/badges/:badgeId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, badgeId } = req.params;
+
+      // Check membership and role
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to delete badges" });
+      }
+
+      // Only owner/admin can delete badges
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return res.status(403).json({ error: "Only owner or admin can delete badges" });
+      }
+
+      await db.delete(circleBadges).where(eq(circleBadges.id, badgeId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting circle badge:", error);
+      res.status(400).json({ error: "Failed to delete badge" });
+    }
+  });
+
+  // ==================== CIRCLE AWARDS API ====================
+
+  // Get all awards for a circle
+  app.get("/api/circles/:id/awards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view awards" });
+      }
+
+      const awards = await db.select().from(circleAwards)
+        .where(eq(circleAwards.circleId, circleId))
+        .orderBy(desc(circleAwards.createdAt));
+
+      res.json(awards);
+    } catch (error) {
+      console.error("Error fetching circle awards:", error);
+      res.status(500).json({ error: "Failed to fetch awards" });
+    }
+  });
+
+  // Create a new award for a circle
+  app.post("/api/circles/:id/awards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to create awards" });
+      }
+
+      const parsed = insertCircleAwardSchema.parse({
+        ...req.body,
+        circleId,
+        createdById: userId,
+        approvalStatus: membership.role === "owner" || membership.role === "admin" ? "approved" : "pending",
+      });
+      const [award] = await db.insert(circleAwards).values(parsed).returning();
+      res.json(award);
+    } catch (error) {
+      console.error("Error creating circle award:", error);
+      res.status(400).json({ error: "Failed to create award" });
+    }
+  });
+
+  // Update a circle award
+  app.put("/api/circles/:id/awards/:awardId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, awardId } = req.params;
+
+      // Check membership and role
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to update awards" });
+      }
+
+      // Only owner/admin can update awards
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return res.status(403).json({ error: "Only owner or admin can update awards" });
+      }
+
+      const { name, description, type, target, category, rewardType, rewardPoints, rewardGift } = req.body;
+      const [award] = await db.update(circleAwards)
+        .set({ name, description, type, target, category, rewardType, rewardPoints, rewardGift })
+        .where(eq(circleAwards.id, awardId))
+        .returning();
+      res.json(award);
+    } catch (error) {
+      console.error("Error updating circle award:", error);
+      res.status(400).json({ error: "Failed to update award" });
+    }
+  });
+
+  // Delete a circle award
+  app.delete("/api/circles/:id/awards/:awardId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, awardId } = req.params;
+
+      // Check membership and role
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to delete awards" });
+      }
+
+      // Only owner/admin can delete awards
+      if (membership.role !== "owner" && membership.role !== "admin") {
+        return res.status(403).json({ error: "Only owner or admin can delete awards" });
+      }
+
+      await db.delete(circleAwards).where(eq(circleAwards.id, awardId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting circle award:", error);
+      res.status(400).json({ error: "Failed to delete award" });
+    }
+  });
+
+  // ==================== CIRCLE POSTS API ====================
+
+  // Get all posts for a circle
+  app.get("/api/circles/:id/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view posts" });
+      }
+
+      const posts = await db.select().from(circlePosts)
+        .where(eq(circlePosts.circleId, circleId))
+        .orderBy(desc(circlePosts.createdAt));
+
+      // Get author info, likes, and comments for each post
+      const postsWithDetails = await Promise.all(
+        posts.map(async (post) => {
+          const [author] = await db.select().from(users).where(eq(users.id, post.authorId));
+          const likes = await db.select().from(circlePostLikes).where(eq(circlePostLikes.postId, post.id));
+          const comments = await db.select().from(circlePostComments).where(eq(circlePostComments.postId, post.id));
+          
+          // Get comment authors
+          const commentsWithAuthors = await Promise.all(
+            comments.map(async (comment) => {
+              const [commentAuthor] = await db.select().from(users).where(eq(users.id, comment.authorId));
+              return {
+                ...comment,
+                author: commentAuthor ? {
+                  id: commentAuthor.id,
+                  firstName: commentAuthor.firstName,
+                  lastName: commentAuthor.lastName,
+                  displayName: commentAuthor.displayName,
+                  profileImageUrl: commentAuthor.profileImageUrl,
+                } : null,
+              };
+            })
+          );
+
+          return {
+            ...post,
+            author: author ? {
+              id: author.id,
+              firstName: author.firstName,
+              lastName: author.lastName,
+              displayName: author.displayName,
+              profileImageUrl: author.profileImageUrl,
+            } : null,
+            likes: likes.map(l => l.userId),
+            comments: commentsWithAuthors,
+            likedByMe: likes.some(l => l.userId === userId),
+          };
+        })
+      );
+
+      res.json(postsWithDetails);
+    } catch (error) {
+      console.error("Error fetching circle posts:", error);
+      res.status(500).json({ error: "Failed to fetch posts" });
+    }
+  });
+
+  // Create a new post in a circle
+  app.post("/api/circles/:id/posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to create posts" });
+      }
+
+      const parsed = insertCirclePostSchema.parse({
+        ...req.body,
+        circleId,
+        authorId: userId,
+      });
+      const [post] = await db.insert(circlePosts).values(parsed).returning();
+
+      const [author] = await db.select().from(users).where(eq(users.id, userId));
+      res.json({
+        ...post,
+        author: author ? {
+          id: author.id,
+          firstName: author.firstName,
+          lastName: author.lastName,
+          displayName: author.displayName,
+          profileImageUrl: author.profileImageUrl,
+        } : null,
+        likes: [],
+        comments: [],
+        likedByMe: false,
+      });
+    } catch (error) {
+      console.error("Error creating circle post:", error);
+      res.status(400).json({ error: "Failed to create post" });
+    }
+  });
+
+  // Like/unlike a post
+  app.post("/api/circles/:id/posts/:postId/like", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, postId } = req.params;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to like posts" });
+      }
+
+      // Check if already liked
+      const [existing] = await db.select().from(circlePostLikes).where(
+        and(eq(circlePostLikes.postId, postId), eq(circlePostLikes.userId, userId))
+      );
+
+      if (existing) {
+        // Unlike
+        await db.delete(circlePostLikes).where(eq(circlePostLikes.id, existing.id));
+        res.json({ liked: false });
+      } else {
+        // Like
+        const parsed = insertCirclePostLikeSchema.parse({ postId, userId });
+        await db.insert(circlePostLikes).values(parsed);
+        res.json({ liked: true });
+      }
+    } catch (error) {
+      console.error("Error toggling post like:", error);
+      res.status(400).json({ error: "Failed to toggle like" });
+    }
+  });
+
+  // Add a comment to a post
+  app.post("/api/circles/:id/posts/:postId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id: circleId, postId } = req.params;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to comment" });
+      }
+
+      const parsed = insertCirclePostCommentSchema.parse({
+        ...req.body,
+        postId,
+        authorId: userId,
+      });
+      const [comment] = await db.insert(circlePostComments).values(parsed).returning();
+
+      const [author] = await db.select().from(users).where(eq(users.id, userId));
+      res.json({
+        ...comment,
+        author: author ? {
+          id: author.id,
+          firstName: author.firstName,
+          lastName: author.lastName,
+          displayName: author.displayName,
+          profileImageUrl: author.profileImageUrl,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      res.status(400).json({ error: "Failed to add comment" });
     }
   });
 
