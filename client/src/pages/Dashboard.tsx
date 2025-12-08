@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { format, startOfWeek, addDays, subWeeks } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -424,6 +424,28 @@ export default function Dashboard() {
     },
   });
 
+  // Ref to track last synced stats (declared here so mutation can access it)
+  const lastSyncedStatsRef = useRef<string | null>(null);
+
+  // Mutation for syncing user stats to database
+  const syncStatsMutation = useMutation({
+    mutationFn: async (data: { 
+      weeklyPoints?: number; 
+      dayStreak?: number; 
+      weekStreak?: number; 
+      longestDayStreak?: number; 
+      longestWeekStreak?: number;
+      totalBadgesEarned?: number;
+    }) => {
+      const response = await apiRequest("PUT", "/api/habit/stats", data);
+      return response.json();
+    },
+    onError: () => {
+      // Reset ref on error to allow retry
+      lastSyncedStatsRef.current = null;
+    },
+  });
+
   // Load data from localStorage on mount or when API data changes
   useEffect(() => {
     // Use mock data during demo/onboarding, otherwise load from storage
@@ -812,6 +834,37 @@ export default function Dashboard() {
 
   // Final total includes all point sources
   const finalTotal = weekTotal + boosterPoints + weeklyTodoPoints + dueDatePoints;
+
+  // Sync calculated stats to database when they change (with deduplication)
+  useEffect(() => {
+    if (useMockData) return;
+    if (!apiQueriesReady) return;
+    
+    // Calculate total badges earned
+    const totalBadgesEarned = badges.reduce((sum, badge) => {
+      return sum + badge.levels.filter(l => l.earned).length;
+    }, 0);
+    
+    // Create a payload key to detect changes
+    const payload = {
+      weeklyPoints: finalTotal,
+      dayStreak,
+      weekStreak,
+      longestDayStreak,
+      longestWeekStreak,
+      totalBadgesEarned,
+    };
+    const payloadKey = JSON.stringify(payload);
+    
+    // Skip if values haven't changed
+    if (lastSyncedStatsRef.current === payloadKey) {
+      return;
+    }
+    
+    // Update ref and sync
+    lastSyncedStatsRef.current = payloadKey;
+    syncStatsMutation.mutate(payload);
+  }, [useMockData, apiQueriesReady, finalTotal, dayStreak, weekStreak, longestDayStreak, longestWeekStreak, badges]);
 
   const handleDayClick = () => {
     navigate("/daily");

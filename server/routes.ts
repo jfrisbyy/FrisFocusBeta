@@ -6,6 +6,7 @@ import OpenAI from "openai";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { z } from "zod";
 import {
   nutritionLogs,
   bodyComposition,
@@ -2690,6 +2691,83 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error deleting journal entry:", error);
       res.status(500).json({ error: "Failed to delete journal entry" });
+    }
+  });
+
+  // ==================== USER STATS SYNC API ====================
+
+  // Schema for validating stats sync payload
+  // weeklyPoints can be negative when penalties outweigh task points
+  const statsUpdateSchema = z.object({
+    weeklyPoints: z.number().int().min(-100000).max(100000).optional(),
+    dayStreak: z.number().int().min(0).max(10000).optional(),
+    weekStreak: z.number().int().min(0).max(1000).optional(),
+    longestDayStreak: z.number().int().min(0).max(10000).optional(),
+    longestWeekStreak: z.number().int().min(0).max(1000).optional(),
+    totalBadgesEarned: z.number().int().min(0).max(1000).optional(),
+  });
+
+  // Sync calculated user stats (upsert)
+  app.put("/api/habit/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Validate request body
+      const parseResult = statsUpdateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid stats data", details: parseResult.error.issues });
+      }
+      
+      const { weeklyPoints, dayStreak, weekStreak, longestDayStreak, longestWeekStreak, totalBadgesEarned } = parseResult.data;
+
+      // Check if stats exist for this user
+      const [existing] = await db.select().from(userStats).where(eq(userStats.userId, userId));
+
+      if (existing) {
+        // Update existing stats
+        const [stats] = await db.update(userStats)
+          .set({
+            weeklyPoints: weeklyPoints ?? existing.weeklyPoints,
+            dayStreak: dayStreak ?? existing.dayStreak,
+            weekStreak: weekStreak ?? existing.weekStreak,
+            longestDayStreak: longestDayStreak ?? existing.longestDayStreak,
+            longestWeekStreak: longestWeekStreak ?? existing.longestWeekStreak,
+            totalBadgesEarned: totalBadgesEarned ?? existing.totalBadgesEarned,
+            updatedAt: new Date()
+          })
+          .where(eq(userStats.userId, userId))
+          .returning();
+        res.json(stats);
+      } else {
+        // Create new stats record
+        const [stats] = await db.insert(userStats)
+          .values({
+            userId,
+            weeklyPoints: weeklyPoints ?? 0,
+            dayStreak: dayStreak ?? 0,
+            weekStreak: weekStreak ?? 0,
+            longestDayStreak: longestDayStreak ?? 0,
+            longestWeekStreak: longestWeekStreak ?? 0,
+            totalBadgesEarned: totalBadgesEarned ?? 0,
+          })
+          .returning();
+        res.json(stats);
+      }
+    } catch (error) {
+      console.error("Error syncing user stats:", error);
+      res.status(400).json({ error: "Failed to sync user stats" });
+    }
+  });
+
+  // Get user stats
+  app.get("/api/habit/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [stats] = await db.select().from(userStats).where(eq(userStats.userId, userId));
+      res.json(stats || null);
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ error: "Failed to fetch user stats" });
     }
   });
 
