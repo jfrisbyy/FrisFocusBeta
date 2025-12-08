@@ -1,8 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Target, TrendingUp, Award, Calendar } from "lucide-react";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+import { SiGoogle } from "react-icons/si";
 
 export default function LandingPage() {
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login error:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16">
@@ -16,10 +27,12 @@ export default function LandingPage() {
           </p>
           <Button 
             size="lg" 
-            onClick={() => window.location.href = "/api/login"}
+            onClick={handleLogin}
             data-testid="button-login-hero"
+            className="gap-2"
           >
-            Sign In to Get Started
+            <SiGoogle className="h-5 w-5" />
+            Sign In with Google
           </Button>
         </div>
 
@@ -75,7 +88,7 @@ export default function LandingPage() {
 
         <div className="text-center mt-16">
           <p className="text-sm text-muted-foreground">
-            Sign in with Google, GitHub, or email to sync your data across all devices.
+            Sign in with Google to sync your data across all devices.
           </p>
         </div>
       </div>

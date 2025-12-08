@@ -1,9 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
+import { SiGoogle } from "react-icons/si";
 
 export default function DemoBanner() {
-  const handleLogin = () => {
-    window.location.href = "/api/login";
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login error:", error);
+    }
   };
 
   return (
@@ -19,8 +25,8 @@ export default function DemoBanner() {
           data-testid="button-login-banner"
           className="gap-2"
         >
-          <LogIn className="h-4 w-4" />
-          Sign In
+          <SiGoogle className="h-4 w-4" />
+          Sign In with Google
         </Button>
       </div>
     </div>
