@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift, Settings, StickyNote } from "lucide-react";
+import { Plus, Trash2, Gift, Settings, StickyNote, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,8 +50,11 @@ export default function TodoListPanel({
   const [newPoints, setNewPoints] = useState("5");
   const [showSettings, setShowSettings] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [tempNote, setTempNote] = useState("");
+  const [tempEditTitle, setTempEditTitle] = useState("");
+  const [tempEditPoints, setTempEditPoints] = useState("");
 
   const completedCount = items.filter(item => item.completed).length;
   const allCompleted = items.length > 0 && completedCount === items.length;
@@ -112,6 +115,30 @@ export default function TodoListPanel({
     setNoteDialogOpen(false);
     setEditingItemId(null);
     setTempNote("");
+  };
+
+  const handleOpenEditDialog = (item: StoredTodoItem) => {
+    if (readOnly && !isDemo) return;
+    setEditingItemId(item.id);
+    setTempEditTitle(item.title);
+    setTempEditPoints(item.pointValue.toString());
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingItemId && tempEditTitle.trim()) {
+      onItemsChange(
+        items.map(item =>
+          item.id === editingItemId
+            ? { ...item, title: tempEditTitle.trim(), pointValue: parseInt(tempEditPoints) || 0 }
+            : item
+        )
+      );
+    }
+    setEditDialogOpen(false);
+    setEditingItemId(null);
+    setTempEditTitle("");
+    setTempEditPoints("");
   };
 
   return (
@@ -256,6 +283,17 @@ export default function TodoListPanel({
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => handleOpenEditDialog(item)}
+                    data-testid={`button-edit-todo-${item.id}`}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+                {!readOnly && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => handleDeleteItem(item.id)}
                     data-testid={`button-delete-todo-${item.id}`}
                   >
@@ -321,6 +359,49 @@ export default function TodoListPanel({
             </Button>
             <Button onClick={handleSaveNote} data-testid={`button-save-todo-note-${editingItemId}`}>
               Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit To-Do Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={tempEditTitle}
+                onChange={(e) => setTempEditTitle(e.target.value)}
+                placeholder="To-do item title..."
+                data-testid={`input-edit-todo-title-${editingItemId}`}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-points">Point Value</Label>
+              <Input
+                id="edit-points"
+                type="number"
+                value={tempEditPoints}
+                onChange={(e) => setTempEditPoints(e.target.value)}
+                min={0}
+                data-testid={`input-edit-todo-points-${editingItemId}`}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={!tempEditTitle.trim()}
+              data-testid={`button-save-todo-edit-${editingItemId}`}
+            >
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
