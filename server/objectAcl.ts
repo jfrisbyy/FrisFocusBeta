@@ -1,94 +1,38 @@
-// Object ACL (Access Control List) - For managing object access permissions
 import { File } from "@google-cloud/storage";
-
-const ACL_POLICY_METADATA_KEY = "custom:aclPolicy";
-
-// The type of the access group.
-export enum ObjectAccessGroupType {}
-
-// The logic user group that can access the object.
-export interface ObjectAccessGroup {
-  type: ObjectAccessGroupType;
-  id: string;
-}
 
 export enum ObjectPermission {
   READ = "read",
   WRITE = "write",
+  DELETE = "delete",
 }
 
-export interface ObjectAclRule {
-  group: ObjectAccessGroup;
-  permission: ObjectPermission;
-}
-
-// The ACL policy of the object.
 export interface ObjectAclPolicy {
   owner: string;
   visibility: "public" | "private";
-  aclRules?: Array<ObjectAclRule>;
+  allowedUsers?: string[];
 }
 
-// Check if the requested permission is allowed based on the granted permission.
-function isPermissionAllowed(
-  requested: ObjectPermission,
-  granted: ObjectPermission,
-): boolean {
-  if (requested === ObjectPermission.READ) {
-    return [ObjectPermission.READ, ObjectPermission.WRITE].includes(granted);
-  }
-  return granted === ObjectPermission.WRITE;
-}
-
-// The base class for all access groups.
-abstract class BaseObjectAccessGroup implements ObjectAccessGroup {
-  constructor(
-    public readonly type: ObjectAccessGroupType,
-    public readonly id: string,
-  ) {}
-
-  public abstract hasMember(userId: string): Promise<boolean>;
-}
-
-function createObjectAccessGroup(
-  group: ObjectAccessGroup,
-): BaseObjectAccessGroup {
-  switch (group.type) {
-    default:
-      throw new Error(`Unknown access group type: ${group.type}`);
+export async function getObjectAclPolicy(file: File): Promise<ObjectAclPolicy | null> {
+  try {
+    const [metadata] = await file.getMetadata();
+    const aclPolicyStr = metadata.metadata?.aclPolicy;
+    if (!aclPolicyStr) {
+      return null;
+    }
+    return JSON.parse(aclPolicyStr) as ObjectAclPolicy;
+  } catch {
+    return null;
   }
 }
 
-// Sets the ACL policy to the object metadata.
-export async function setObjectAclPolicy(
-  objectFile: File,
-  aclPolicy: ObjectAclPolicy,
-): Promise<void> {
-  const [exists] = await objectFile.exists();
-  if (!exists) {
-    throw new Error(`Object not found: ${objectFile.name}`);
-  }
-
-  await objectFile.setMetadata({
+export async function setObjectAclPolicy(file: File, policy: ObjectAclPolicy): Promise<void> {
+  await file.setMetadata({
     metadata: {
-      [ACL_POLICY_METADATA_KEY]: JSON.stringify(aclPolicy),
+      aclPolicy: JSON.stringify(policy),
     },
   });
 }
 
-// Gets the ACL policy from the object metadata.
-export async function getObjectAclPolicy(
-  objectFile: File,
-): Promise<ObjectAclPolicy | null> {
-  const [metadata] = await objectFile.getMetadata();
-  const aclPolicy = metadata?.metadata?.[ACL_POLICY_METADATA_KEY];
-  if (!aclPolicy) {
-    return null;
-  }
-  return JSON.parse(aclPolicy as string);
-}
-
-// Checks if the user can access the object.
 export async function canAccessObject({
   userId,
   objectFile,
@@ -99,37 +43,25 @@ export async function canAccessObject({
   requestedPermission: ObjectPermission;
 }): Promise<boolean> {
   const aclPolicy = await getObjectAclPolicy(objectFile);
+  
   if (!aclPolicy) {
     return false;
   }
 
-  // Public objects are always accessible for read.
-  if (
-    aclPolicy.visibility === "public" &&
-    requestedPermission === ObjectPermission.READ
-  ) {
+  if (aclPolicy.visibility === "public" && requestedPermission === ObjectPermission.READ) {
     return true;
   }
 
-  // Access control requires the user id.
   if (!userId) {
     return false;
   }
 
-  // The owner of the object can always access it.
   if (aclPolicy.owner === userId) {
     return true;
   }
 
-  // Go through the ACL rules to check if the user has the required permission.
-  for (const rule of aclPolicy.aclRules || []) {
-    const accessGroup = createObjectAccessGroup(rule.group);
-    if (
-      (await accessGroup.hasMember(userId)) &&
-      isPermissionAllowed(requestedPermission, rule.permission)
-    ) {
-      return true;
-    }
+  if (aclPolicy.allowedUsers?.includes(userId)) {
+    return requestedPermission === ObjectPermission.READ;
   }
 
   return false;

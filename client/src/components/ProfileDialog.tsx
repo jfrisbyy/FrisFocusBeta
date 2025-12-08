@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, User, AtSign, Mail, Pencil } from "lucide-react";
+import { Loader2, User, AtSign, Mail, Camera } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 
 interface ProfileDialogProps {
@@ -22,12 +22,16 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
   const [displayName, setDisplayName] = useState(user.displayName || "");
   const [usernameError, setUsernameError] = useState("");
   const [displayNameError, setDisplayNameError] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setUsername(user.username || "");
     setDisplayName(user.displayName || "");
     setUsernameError("");
     setDisplayNameError("");
+    setPreviewUrl(null);
   }, [user.username, user.displayName, open]);
 
   const validateUsername = (value: string): boolean => {
@@ -93,6 +97,61 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
     });
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Please select a JPG, PNG, GIF, or WebP image.", variant: "destructive" });
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ title: "File too large", description: "Please select an image under 5MB.", variant: "destructive" });
+      return;
+    }
+
+    const localPreviewUrl = URL.createObjectURL(file);
+    setPreviewUrl(localPreviewUrl);
+    setIsUploadingImage(true);
+
+    try {
+      const uploadUrlRes = await apiRequest("POST", "/api/media/upload-url", {});
+      const { uploadURL } = await uploadUrlRes.json();
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
+
+      await apiRequest("PUT", "/api/media/profile-image", { imageURL: uploadURL });
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      URL.revokeObjectURL(localPreviewUrl);
+      setPreviewUrl(null);
+      toast({ title: "Profile picture updated", description: "Your new profile picture has been saved." });
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      toast({ title: "Upload failed", description: "Failed to upload profile picture. Please try again.", variant: "destructive" });
+      URL.revokeObjectURL(localPreviewUrl);
+      setPreviewUrl(null);
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
   const getInitials = (firstName?: string | null, lastName?: string | null) => {
     const first = firstName?.charAt(0) || "";
     const last = lastName?.charAt(0) || "";
@@ -100,6 +159,7 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
   };
 
   const fullName = user.displayName || [user.firstName, user.lastName].filter(Boolean).join(" ") || "User";
+  const avatarSrc = previewUrl || user.profileImageUrl || undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,10 +170,34 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 py-4">
-          <Avatar className="h-20 w-20">
-            <AvatarImage src={user.profileImageUrl || undefined} alt={fullName} />
-            <AvatarFallback className="text-2xl">{getInitials(user.firstName, user.lastName)}</AvatarFallback>
-          </Avatar>
+          <div className="relative group">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={avatarSrc} alt={fullName} />
+              <AvatarFallback className="text-2xl">{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImage}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              data-testid="button-change-avatar"
+            >
+              {isUploadingImage ? (
+                <Loader2 className="h-6 w-6 text-white animate-spin" />
+              ) : (
+                <Camera className="h-6 w-6 text-white" />
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              onChange={handleFileSelect}
+              className="hidden"
+              data-testid="input-avatar-file"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">Click the photo to change</p>
 
           <div className="text-center">
             <p className="text-lg font-medium" data-testid="text-profile-name">{fullName}</p>

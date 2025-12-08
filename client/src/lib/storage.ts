@@ -479,6 +479,7 @@ export interface StoredCircleMessage {
   senderId: string;
   senderName: string;
   content: string;
+  imageUrl?: string;
   createdAt: string;
 }
 
@@ -497,6 +498,7 @@ export interface StoredCirclePost {
   authorId: string;
   authorName: string;
   content: string;
+  imageUrl?: string;
   createdAt: string;
   likes: string[];
   comments: StoredCirclePostComment[];
@@ -509,6 +511,7 @@ export interface StoredDirectMessage {
   recipientId: string;
   recipientName: string;
   content: string;
+  imageUrl?: string;
   createdAt: string;
   read: boolean;
 }
@@ -520,6 +523,7 @@ export interface StoredCommunityPost {
   authorId: string;
   authorName: string;
   content: string;
+  imageUrl?: string;
   visibility: PostVisibility;
   createdAt: string;
   likes: string[];

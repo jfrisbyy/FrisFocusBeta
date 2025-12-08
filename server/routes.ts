@@ -199,6 +199,87 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== MEDIA UPLOAD ROUTES (Protected) ====================
+
+  // Get upload URL for media files
+  app.post('/api/media/upload-url', isAuthenticated, async (req: any, res) => {
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ message: "Failed to get upload URL" });
+    }
+  });
+
+  // Update profile image after upload
+  app.put('/api/media/profile-image', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { imageURL } = req.body;
+
+      if (!imageURL) {
+        return res.status(400).json({ message: "imageURL is required" });
+      }
+
+      const { ObjectStorageService } = await import("./objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      
+      // Set ACL policy (public visibility for profile images)
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(imageURL, {
+        owner: userId,
+        visibility: "public",
+      });
+
+      // Update user's profile image URL
+      const [updatedUser] = await db.update(users)
+        .set({ profileImageUrl: objectPath })
+        .where(eq(users.id, userId))
+        .returning();
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({ objectPath, user: updatedUser });
+    } catch (error) {
+      console.error("Error updating profile image:", error);
+      res.status(500).json({ message: "Failed to update profile image" });
+    }
+  });
+
+  // Serve uploaded objects
+  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
+      const { ObjectPermission } = await import("./objectAcl");
+      const objectStorageService = new ObjectStorageService();
+      
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        objectFile,
+        userId: userId,
+        requestedPermission: ObjectPermission.READ,
+      });
+      
+      if (!canAccess) {
+        return res.sendStatus(401);
+      }
+      
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      const { ObjectNotFoundError } = await import("./objectStorage");
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // ==================== FITNESS API ROUTES (Protected) ====================
   
   // Nutrition logs - filtered by user
