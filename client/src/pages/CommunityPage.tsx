@@ -873,6 +873,32 @@ export default function CommunityPage() {
     },
   });
 
+  // Circle leaderboard query - fetches member stats including streaks, totals, and weekly history
+  interface LeaderboardMemberStats {
+    id: string;
+    userId: string;
+    firstName: string;
+    lastName: string;
+    profileImageUrl: string | null;
+    role: string;
+    totalPoints: number;
+    goalStreak: number;
+    longestStreak: number;
+    weeklyHistory: { week: string; points: number }[];
+    taskTotals: { taskName: string; count: number }[];
+  }
+  const circleLeaderboardQuery = useQuery<LeaderboardMemberStats[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'leaderboard'],
+    enabled: !isDemo && !!selectedCircle,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/circles/${selectedCircle!.id}/leaderboard`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch leaderboard');
+      }
+      return await res.json();
+    },
+  });
+
   // Circle task mutations
   const createCircleTaskMutation = useMutation({
     mutationFn: async (data: { circleId: string; task: { name: string; value: number; taskType: CircleTaskType; category?: string } }) => {
@@ -4804,7 +4830,15 @@ export default function CommunityPage() {
                               }, 0);
                             };
                             const getAllTimePoints = (m: StoredCircleMember) => {
-                              return demoMemberAllTimeStats[selectedCircle.id]?.[m.userId]?.totalPoints || m.weeklyPoints;
+                              // Use API data for authenticated users, demo data ONLY for demo mode
+                              if (!isDemo && circleLeaderboardQuery.data) {
+                                const apiStats = circleLeaderboardQuery.data.find(s => s.userId === m.userId);
+                                return apiStats?.totalPoints || m.weeklyPoints;
+                              }
+                              if (isDemo) {
+                                return demoMemberAllTimeStats[selectedCircle.id]?.[m.userId]?.totalPoints || m.weeklyPoints;
+                              }
+                              return m.weeklyPoints;
                             };
                             switch (leaderboardViewMode) {
                               case "day":
@@ -4818,9 +4852,28 @@ export default function CommunityPage() {
                           })
                           .map((member, index) => {
                             const isExpanded = expandedMemberId === member.userId;
-                            const dailyTasks = demoMemberDailyCompletions[selectedCircle.id]?.[member.userId] || [];
-                            const weeklyTasks = demoMemberWeeklyCompletions[selectedCircle.id]?.[member.userId] || [];
-                            const allTimeStats = demoMemberAllTimeStats[selectedCircle.id]?.[member.userId];
+                            
+                            // Use API data for authenticated users, demo data ONLY for demo mode
+                            const apiMemberStats = !isDemo && circleLeaderboardQuery.data
+                              ? circleLeaderboardQuery.data.find(s => s.userId === member.userId)
+                              : null;
+                            const allTimeStats = apiMemberStats || (isDemo ? demoMemberAllTimeStats[selectedCircle.id]?.[member.userId] : null);
+                            
+                            // Get daily completions from API for authenticated users
+                            const dailyTasks = isDemo
+                              ? demoMemberDailyCompletions[selectedCircle.id]?.[member.userId] || []
+                              : (circleCompletionsQuery.data || [])
+                                  .filter(c => c.userId === member.userId)
+                                  .map(c => {
+                                    const task = (circleTasks[selectedCircle.id] || []).find(ct => ct.id === c.taskId);
+                                    return { taskId: c.taskId, taskName: task?.name || 'Unknown', completedAt: c.completedAt };
+                                  });
+                            
+                            // Use API taskTotals for weekly view for authenticated users
+                            const weeklyTasks = isDemo
+                              ? demoMemberWeeklyCompletions[selectedCircle.id]?.[member.userId] || []
+                              : (apiMemberStats?.taskTotals || []);
+                            
                             const todayPoints = dailyTasks.reduce((sum, t) => {
                               const task = (circleTasks[selectedCircle.id] || []).find(ct => ct.id === t.taskId);
                               return sum + (task?.value || 0);
@@ -4868,9 +4921,9 @@ export default function CommunityPage() {
                                     <Badge variant="secondary">
                                       {leaderboardViewMode === "day" && `${todayPoints} pts today`}
                                       {leaderboardViewMode === "week" && `${member.weeklyPoints} pts`}
-                                      {leaderboardViewMode === "alltime" && `${member.weeklyPoints} pts/wk`}
+                                      {leaderboardViewMode === "alltime" && `${allTimeStats?.totalPoints || member.weeklyPoints} pts total`}
                                     </Badge>
-                                    {isDemo && allTimeStats?.goalStreak && allTimeStats.goalStreak > 0 && (
+                                    {allTimeStats?.goalStreak && allTimeStats.goalStreak > 0 && (
                                       <div className="flex items-center gap-1 text-orange-500" title={`${allTimeStats.goalStreak} day goal streak`}>
                                         <Flame className="w-4 h-4" />
                                         <span className="text-xs font-medium">{allTimeStats.goalStreak}</span>
