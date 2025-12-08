@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { format, startOfWeek, addDays, subWeeks } from "date-fns";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useDemo } from "@/contexts/DemoContext";
 import PointsCard from "@/components/PointsCard";
@@ -387,7 +389,39 @@ export default function Dashboard() {
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
 
-  // Load data from localStorage on mount
+  // API queries for tasks, penalties, daily logs, and settings
+  const { data: apiTasks } = useQuery<any[]>({
+    queryKey: ["/api/habit/tasks"],
+    enabled: !useMockData,
+  });
+
+  const { data: apiPenalties } = useQuery<any[]>({
+    queryKey: ["/api/habit/penalties"],
+    enabled: !useMockData,
+  });
+
+  const { data: apiDailyLogs } = useQuery<any[]>({
+    queryKey: ["/api/habit/logs"],
+    enabled: !useMockData,
+  });
+
+  const { data: apiSettings } = useQuery<any>({
+    queryKey: ["/api/habit/settings"],
+    enabled: !useMockData,
+  });
+
+  // Mutation for updating settings (weekly goal)
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: { weeklyGoal: number }) => {
+      const response = await apiRequest("PUT", "/api/habit/settings", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/settings"] });
+    },
+  });
+
+  // Load data from localStorage on mount or when API data changes
   useEffect(() => {
     // Use mock data during demo/onboarding, otherwise load from storage
     if (useMockData) {
@@ -430,8 +464,12 @@ export default function Dashboard() {
     setSavedCustomMessages(profile.savedCustomMessages ?? []);
     setSelectedMessageIndex(profile.selectedMessageIndex ?? -1);
 
-    // Load goals
-    setWeeklyGoal(loadWeeklyGoalFromStorage());
+    // Load goals - prefer API settings, fall back to localStorage
+    if (apiSettings?.weeklyGoal !== undefined) {
+      setWeeklyGoal(apiSettings.weeklyGoal);
+    } else {
+      setWeeklyGoal(loadWeeklyGoalFromStorage());
+    }
 
     // Load milestones
     const storedMilestones = loadMilestonesFromStorage();
@@ -472,10 +510,20 @@ export default function Dashboard() {
     const storedDueDates = loadDueDatesFromStorage();
     setDueDates(storedDueDates);
 
-    // Load tasks and penalties for point calculations
-    const tasks = loadTasksFromStorage();
-    const penalties = loadPenaltiesFromStorage();
-    const dailyLogs = loadDailyLogsFromStorage();
+    // Load tasks and penalties for point calculations - prefer API, fall back to localStorage
+    const tasks = apiTasks || loadTasksFromStorage();
+    const penalties = apiPenalties || loadPenaltiesFromStorage();
+    
+    // Build daily logs map from API data or localStorage
+    let dailyLogs: Record<string, { completedTaskIds: string[] }>;
+    if (apiDailyLogs) {
+      dailyLogs = {};
+      apiDailyLogs.forEach((log: any) => {
+        dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };
+      });
+    } else {
+      dailyLogs = loadDailyLogsFromStorage();
+    }
 
     // Calculate current week data from daily logs
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -544,7 +592,7 @@ export default function Dashboard() {
           weekStart: format(pastWeekStart, "MMM d"),
           weekEnd: format(pastWeekEnd, "MMM d"),
           points: weekTotal,
-          defaultGoal: loadWeeklyGoalFromStorage(),
+          defaultGoal: apiSettings?.weeklyGoal ?? loadWeeklyGoalFromStorage(),
           note: undefined,
           customGoal: undefined,
           days: weekDays,
@@ -601,7 +649,7 @@ export default function Dashboard() {
     setLongestDayStreak(maxDayStreakCount);
 
     // Calculate week streaks (weeks where goal was met)
-    const weeklyGoalValue = loadWeeklyGoalFromStorage();
+    const weeklyGoalValue = apiSettings?.weeklyGoal ?? loadWeeklyGoalFromStorage();
     let currentWeekStreakCount = 0;
     let maxWeekStreakCount = 0;
     let tempWeekStreak = 0;
@@ -679,7 +727,7 @@ export default function Dashboard() {
         };
       });
     setBoosters(taskBoosters);
-  }, [isOnboarding]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -721,7 +769,12 @@ export default function Dashboard() {
   const handleGoalChange = (newGoal: number) => {
     setWeeklyGoal(newGoal);
     if (!useMockData) {
-      saveWeeklyGoalToStorage(newGoal);
+      // Save to API, fall back to localStorage on error
+      updateSettingsMutation.mutate({ weeklyGoal: newGoal }, {
+        onError: () => {
+          saveWeeklyGoalToStorage(newGoal);
+        },
+      });
     }
   };
 
