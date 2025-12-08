@@ -294,6 +294,8 @@ const demoCircles: StoredCircle[] = [
     createdAt: "2024-11-01",
     createdBy: "user-1",
     memberCount: 8,
+    dailyPointGoal: 30,
+    weeklyPointGoal: 150,
   },
   {
     id: "circle-2",
@@ -303,6 +305,8 @@ const demoCircles: StoredCircle[] = [
     createdAt: "2024-10-15",
     createdBy: "you",
     memberCount: 5,
+    dailyPointGoal: 25,
+    weeklyPointGoal: 100,
   },
   {
     id: "circle-3",
@@ -312,6 +316,8 @@ const demoCircles: StoredCircle[] = [
     createdAt: "2024-09-01",
     createdBy: "user-2",
     memberCount: 12,
+    dailyPointGoal: 20,
+    weeklyPointGoal: 80,
   },
 ];
 
@@ -1608,6 +1614,11 @@ export default function CommunityPage() {
   const [editAwardRewardGift, setEditAwardRewardGift] = useState("");
   const [editAwardTaskId, setEditAwardTaskId] = useState<string>("");
 
+  // Circle Settings (goals) state
+  const [showCircleSettings, setShowCircleSettings] = useState(false);
+  const [editDailyGoal, setEditDailyGoal] = useState("");
+  const [editWeeklyGoal, setEditWeeklyGoal] = useState("");
+
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
     const last = lastName?.charAt(0) ?? "";
@@ -1882,6 +1893,35 @@ export default function CommunityPage() {
         setNewCircleDescription("");
       }
     }
+  };
+
+  const openCircleSettings = () => {
+    if (!selectedCircle) return;
+    setEditDailyGoal(selectedCircle.dailyPointGoal?.toString() || "");
+    setEditWeeklyGoal(selectedCircle.weeklyPointGoal?.toString() || "");
+    setShowCircleSettings(true);
+  };
+
+  const handleSaveCircleSettings = () => {
+    if (!selectedCircle) return;
+    
+    const dailyGoal = editDailyGoal ? parseInt(editDailyGoal) : undefined;
+    const weeklyGoal = editWeeklyGoal ? parseInt(editWeeklyGoal) : undefined;
+    
+    const updatedCircle: StoredCircle = {
+      ...selectedCircle,
+      dailyPointGoal: dailyGoal,
+      weeklyPointGoal: weeklyGoal,
+    };
+    
+    setCircles(circles.map(c => c.id === selectedCircle.id ? updatedCircle : c));
+    setSelectedCircle(updatedCircle);
+    setShowCircleSettings(false);
+    
+    toast({
+      title: "Circle settings updated",
+      description: "Point goals have been saved successfully.",
+    });
   };
 
   const handleSendDM = async () => {
@@ -4043,7 +4083,100 @@ export default function CommunityPage() {
                     {pendingRequestsForCircle.length} pending
                   </Badge>
                 )}
+                {isOwnerOrAdmin(selectedCircle.id) && (
+                  <Button variant="ghost" size="icon" onClick={openCircleSettings} data-testid="button-circle-settings">
+                    <Settings className="w-5 h-5" />
+                  </Button>
+                )}
               </div>
+
+              {/* Goal Progress Display */}
+              {(selectedCircle.dailyPointGoal || selectedCircle.weeklyPointGoal) && (
+                <Card className="mb-4">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="w-5 h-5 text-muted-foreground" />
+                      <span className="font-medium">Circle Goals</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedCircle.dailyPointGoal && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Daily Goal</span>
+                            <span className="font-medium">{selectedCircle.dailyPointGoal} pts/member</span>
+                          </div>
+                          <Progress 
+                            value={Math.min(100, ((circleMembers[selectedCircle.id]?.find(m => m.userId === "you")?.weeklyPoints || 0) / 7 / selectedCircle.dailyPointGoal) * 100)} 
+                            className="h-2"
+                          />
+                        </div>
+                      )}
+                      {selectedCircle.weeklyPointGoal && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Weekly Goal</span>
+                            <span className="font-medium">{selectedCircle.weeklyPointGoal} pts/member</span>
+                          </div>
+                          <Progress 
+                            value={Math.min(100, ((circleMembers[selectedCircle.id]?.find(m => m.userId === "you")?.weeklyPoints || 0) / selectedCircle.weeklyPointGoal) * 100)} 
+                            className="h-2"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Circle Settings Dialog */}
+              <Dialog open={showCircleSettings} onOpenChange={setShowCircleSettings}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Circle Settings</DialogTitle>
+                    <DialogDescription>
+                      Configure point goals for circle members. These goals help motivate everyone to stay on track.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dailyGoal">Daily Point Goal (per member)</Label>
+                      <Input
+                        id="dailyGoal"
+                        type="number"
+                        placeholder="e.g., 30"
+                        value={editDailyGoal}
+                        onChange={(e) => setEditDailyGoal(e.target.value)}
+                        data-testid="input-daily-goal"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to disable daily goals
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="weeklyGoal">Weekly Point Goal (per member)</Label>
+                      <Input
+                        id="weeklyGoal"
+                        type="number"
+                        placeholder="e.g., 150"
+                        value={editWeeklyGoal}
+                        onChange={(e) => setEditWeeklyGoal(e.target.value)}
+                        data-testid="input-weekly-goal"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Leave empty to disable weekly goals
+                      </p>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowCircleSettings(false)} data-testid="button-cancel-settings">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveCircleSettings} data-testid="button-save-settings">
+                      Save Goals
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <Tabs value={circleDetailTab} onValueChange={setCircleDetailTab}>
                 <TabsList className="flex w-full overflow-x-auto">

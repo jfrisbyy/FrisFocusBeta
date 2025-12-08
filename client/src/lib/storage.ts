@@ -494,6 +494,8 @@ export interface StoredCircle {
   createdAt: string;
   createdBy: string;
   memberCount: number;
+  dailyPointGoal?: number;
+  weeklyPointGoal?: number;
 }
 
 export interface StoredCircleMember {
