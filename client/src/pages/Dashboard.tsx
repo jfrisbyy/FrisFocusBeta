@@ -595,8 +595,8 @@ export default function Dashboard() {
     }
     
     // Build daily logs map from API data or localStorage fallback
-    // Include todoPoints and penaltyPoints for complete daily summary calculations
-    let dailyLogs: Record<string, { completedTaskIds: string[]; todoPoints: number; penaltyPoints: number }> = {};
+    // Include todoPoints, penaltyPoints, and taskPoints for complete daily summary calculations
+    let dailyLogs: Record<string, { completedTaskIds: string[]; todoPoints: number; penaltyPoints: number; taskPoints?: number }> = {};
     const hasApiLogs = apiDailyLogs && apiDailyLogs.length > 0;
     
     if (hasApiLogs) {
@@ -604,7 +604,8 @@ export default function Dashboard() {
         dailyLogs[log.date] = { 
           completedTaskIds: log.completedTaskIds || [],
           todoPoints: log.todoPoints || 0,
-          penaltyPoints: log.penaltyPoints || 0
+          penaltyPoints: log.penaltyPoints || 0,
+          taskPoints: log.taskPoints
         };
       });
     } else {
@@ -628,8 +629,8 @@ export default function Dashboard() {
       
       let points: number | null = null;
       if (log) {
-        // Calculate task points (only positive tasks, penalties are tracked separately via penaltyPoints)
-        const taskPoints = log.completedTaskIds.reduce((sum, taskId) => {
+        // Use stored taskPoints if available (frozen at save time), otherwise calculate from completedTaskIds
+        const taskPoints = log.taskPoints !== undefined ? log.taskPoints : log.completedTaskIds.reduce((sum, taskId) => {
           const task = tasks.find(t => t.id === taskId);
           if (task && task.value > 0) return sum + task.value;
           return sum;
@@ -663,8 +664,8 @@ export default function Dashboard() {
         let dayPoints: number | null = null;
         if (log) {
           weekHasLogs = true;
-          // Calculate task points (only positive tasks, penalties are tracked separately via penaltyPoints)
-          const taskPoints = log.completedTaskIds.reduce((sum, taskId) => {
+          // Use stored taskPoints if available (frozen at save time), otherwise calculate from completedTaskIds
+          const taskPoints = log.taskPoints !== undefined ? log.taskPoints : log.completedTaskIds.reduce((sum, taskId) => {
             const task = tasks.find(t => t.id === taskId);
             if (task && task.value > 0) return sum + task.value;
             return sum;

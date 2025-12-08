@@ -127,12 +127,14 @@ export default function DailyPage() {
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
-    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number }) => {
+    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number; taskPoints: number; seasonId: string | null }) => {
       const response = await apiRequest("PUT", `/api/habit/logs/${data.date}`, {
         completedTaskIds: data.completedTaskIds,
         notes: data.notes,
         todoPoints: data.todoPoints,
         penaltyPoints: data.penaltyPoints,
+        taskPoints: data.taskPoints,
+        seasonId: data.seasonId,
       });
       return response.json();
     },
@@ -405,13 +407,18 @@ export default function DailyPage() {
     }
     
     try {
-      // Save via API (include todoPoints and penaltyPoints for daily summary calculations)
+      // Compute task points (positive points only) to freeze at save time
+      const computedTaskPoints = positivePoints;
+      
+      // Save via API (include taskPoints and seasonId for frozen point calculations)
       await saveDailyLogMutation.mutateAsync({
         date: dateStr,
         completedTaskIds: Array.from(completedIds),
         notes: "", // Clear notes from daily log since it's saved to journal
         todoPoints: totalTodoPoints,
         penaltyPoints: Math.abs(negativePoints),
+        taskPoints: computedTaskPoints,
+        seasonId: activeSeason?.id || null,
       });
 
       // Also save to localStorage as backup (include todoPoints and penaltyPoints)
