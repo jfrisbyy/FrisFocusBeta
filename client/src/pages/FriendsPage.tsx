@@ -318,39 +318,38 @@ export default function FriendsPage() {
                       </Avatar>
                       <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
                     </div>
-                    {!isDemo && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => acceptRequestMutation.mutate(request.id)}
-                          disabled={acceptRequestMutation.isPending}
-                          data-testid={`button-accept-friends-tab-${request.id}`}
-                        >
-                          <Check className="w-4 h-4 mr-1" />
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => declineRequestMutation.mutate(request.id)}
-                          disabled={declineRequestMutation.isPending}
-                          data-testid={`button-decline-friends-tab-${request.id}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                    {isDemo && (
-                      <div className="flex gap-2">
-                        <Button size="sm" data-testid={`button-accept-friends-tab-${request.id}`}>
-                          <Check className="w-4 h-4 mr-1" />
-                          Accept
-                        </Button>
-                        <Button size="sm" variant="ghost" data-testid={`button-decline-friends-tab-${request.id}`}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (isDemo) {
+                            toast({ title: "Demo Mode", description: "Sign in to accept friend requests" });
+                          } else {
+                            acceptRequestMutation.mutate(request.id);
+                          }
+                        }}
+                        disabled={!isDemo && acceptRequestMutation.isPending}
+                        data-testid={`button-accept-friends-tab-${request.id}`}
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (isDemo) {
+                            toast({ title: "Demo Mode", description: "Sign in to manage friend requests" });
+                          } else {
+                            declineRequestMutation.mutate(request.id);
+                          }
+                        }}
+                        disabled={!isDemo && declineRequestMutation.isPending}
+                        data-testid={`button-decline-friends-tab-${request.id}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>
@@ -441,37 +440,37 @@ export default function FriendsPage() {
                       </Avatar>
                       <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
                     </div>
-                    {!isDemo && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => acceptRequestMutation.mutate(request.id)}
-                          disabled={acceptRequestMutation.isPending}
-                          data-testid={`button-accept-${request.id}`}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => declineRequestMutation.mutate(request.id)}
-                          disabled={declineRequestMutation.isPending}
-                          data-testid={`button-decline-${request.id}`}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
-                    {isDemo && (
-                      <div className="flex gap-2">
-                        <Button size="sm" data-testid={`button-accept-${request.id}`}>
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" data-testid={`button-decline-${request.id}`}>
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (isDemo) {
+                            toast({ title: "Demo Mode", description: "Sign in to accept friend requests" });
+                          } else {
+                            acceptRequestMutation.mutate(request.id);
+                          }
+                        }}
+                        disabled={!isDemo && acceptRequestMutation.isPending}
+                        data-testid={`button-accept-${request.id}`}
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (isDemo) {
+                            toast({ title: "Demo Mode", description: "Sign in to manage friend requests" });
+                          } else {
+                            declineRequestMutation.mutate(request.id);
+                          }
+                        }}
+                        disabled={!isDemo && declineRequestMutation.isPending}
+                        data-testid={`button-decline-${request.id}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>

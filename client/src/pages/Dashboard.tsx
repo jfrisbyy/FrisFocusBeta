@@ -518,9 +518,20 @@ export default function Dashboard() {
       return;
     }
 
-    // Load tasks and penalties for point calculations - use API data if available
-    const tasks = apiTasks || [];
-    const penalties = apiPenalties || [];
+    // Load tasks and penalties for point calculations - use API data if available, fallback to localStorage
+    const hasApiData = (apiTasks && apiTasks.length > 0) || (apiPenalties && apiPenalties.length > 0);
+    
+    let tasks: any[];
+    let penalties: any[];
+    
+    if (hasApiData) {
+      tasks = apiTasks || [];
+      penalties = apiPenalties || [];
+    } else {
+      // Fallback to localStorage when API returns empty
+      tasks = loadTasksFromStorage();
+      penalties = loadPenaltiesFromStorage();
+    }
     
     // Build daily logs map from API data
     let dailyLogs: Record<string, { completedTaskIds: string[] }> = {};

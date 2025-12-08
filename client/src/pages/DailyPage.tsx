@@ -138,10 +138,10 @@ export default function DailyPage() {
       return;
     }
 
-    // If we have API data (even empty arrays), use it; otherwise fall back to localStorage
-    const hasApiResponse = apiTasks !== undefined || apiPenalties !== undefined;
+    // If API returned data with actual items, use it; otherwise fall back to localStorage
+    const hasApiData = (apiTasks && apiTasks.length > 0) || (apiPenalties && apiPenalties.length > 0);
     
-    if (hasApiResponse) {
+    if (hasApiData) {
       const categoryMap = apiCategories ? new Map(apiCategories.map((c: any) => [c.id, c.name])) : new Map();
 
       const taskItems: DisplayTask[] = (apiTasks || []).map((task: any) => ({
