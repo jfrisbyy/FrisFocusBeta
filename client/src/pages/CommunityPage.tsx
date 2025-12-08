@@ -518,10 +518,23 @@ const demoMemberCompetitionStats: Record<string, Record<string, DemoMemberCompet
       ]},
     ],
     "circle-ext-1": [
-      { memberId: "opp-1", memberName: "Jake M", weeklyPoints: 95, taskStats: [] },
-      { memberId: "opp-2", memberName: "Maria S", weeklyPoints: 85, taskStats: [] },
-      { memberId: "opp-3", memberName: "Tyler B", weeklyPoints: 65, taskStats: [] },
-      { memberId: "opp-4", memberName: "Jen K", weeklyPoints: 35, taskStats: [] },
+      { memberId: "opp-1", memberName: "Jake M", weeklyPoints: 95, taskStats: [
+        { memberId: "opp-1", taskId: "ff1", taskName: "Morning Workout", completionCount: 5, points: 50 },
+        { memberId: "opp-1", taskId: "ff2", taskName: "HIIT Session", completionCount: 3, points: 45 },
+      ]},
+      { memberId: "opp-2", memberName: "Maria S", weeklyPoints: 85, taskStats: [
+        { memberId: "opp-2", taskId: "ff1", taskName: "Morning Workout", completionCount: 4, points: 40 },
+        { memberId: "opp-2", taskId: "ff3", taskName: "Yoga Class", completionCount: 3, points: 30 },
+        { memberId: "opp-2", taskId: "ff4", taskName: "Meal Prep", completionCount: 1, points: 15 },
+      ]},
+      { memberId: "opp-3", memberName: "Tyler B", weeklyPoints: 65, taskStats: [
+        { memberId: "opp-3", taskId: "ff2", taskName: "HIIT Session", completionCount: 2, points: 30 },
+        { memberId: "opp-3", taskId: "ff5", taskName: "Protein Shake", completionCount: 7, points: 35 },
+      ]},
+      { memberId: "opp-4", memberName: "Jen K", weeklyPoints: 35, taskStats: [
+        { memberId: "opp-4", taskId: "ff3", taskName: "Yoga Class", completionCount: 2, points: 20 },
+        { memberId: "opp-4", taskId: "ff4", taskName: "Meal Prep", completionCount: 1, points: 15 },
+      ]},
     ],
   },
   "comp-3": {
@@ -4674,112 +4687,6 @@ export default function CommunityPage() {
                   ))}
                 </div>
               )}
-
-              {/* Circle vs Circle Competition Rankings */}
-              {circles.length >= 2 && (
-                <Card className="mt-6">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-yellow-500" />
-                      <CardTitle>Circle Competition</CardTitle>
-                    </div>
-                    <CardDescription>
-                      See how your circles rank against each other by total weekly points
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {(() => {
-                        const circleRankings = circles.map(circle => {
-                          const members = circleMembers[circle.id] || [];
-                          const memberPoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
-                          
-                          const awards = circleAwards[circle.id] || [];
-                          const awardBonusPoints = awards.reduce((sum, award) => {
-                            if (award.winner && award.reward && (award.reward.type === "points" || award.reward.type === "both") && award.reward.points) {
-                              return sum + award.reward.points;
-                            }
-                            return sum;
-                          }, 0);
-                          
-                          const totalPoints = memberPoints + awardBonusPoints;
-                          const memberCount = members.length;
-                          const avgPoints = memberCount > 0 ? Math.round(memberPoints / memberCount) : 0;
-                          return {
-                            ...circle,
-                            totalPoints,
-                            memberPoints,
-                            awardBonusPoints,
-                            memberCount: members.length || circle.memberCount,
-                            avgPoints,
-                          };
-                        }).sort((a, b) => b.totalPoints - a.totalPoints);
-
-                        return circleRankings.map((circle, index) => {
-                          const rank = index + 1;
-                          const getMedalColor = (r: number) => {
-                            if (r === 1) return "text-yellow-500";
-                            if (r === 2) return "text-gray-400";
-                            if (r === 3) return "text-amber-600";
-                            return "text-muted-foreground";
-                          };
-
-                          return (
-                            <div
-                              key={circle.id}
-                              className="flex items-center gap-3 p-3 rounded-md bg-muted/50 hover-elevate cursor-pointer"
-                              onClick={() => { setSelectedCircle(circle); setCircleDetailTab("leaderboard"); }}
-                              data-testid={`ranking-circle-${circle.id}`}
-                            >
-                              <div className="flex items-center justify-center w-8">
-                                {rank <= 3 ? (
-                                  <Trophy className={`w-5 h-5 ${getMedalColor(rank)}`} />
-                                ) : (
-                                  <span className="text-sm font-medium text-muted-foreground">#{rank}</span>
-                                )}
-                              </div>
-                              <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                                style={{ backgroundColor: circle.iconColor }}
-                              >
-                                <CircleDot className="w-5 h-5 text-white" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium truncate">{circle.name}</span>
-                                  {circle.createdBy === "you" && (
-                                    <Crown className="w-3 h-3 text-yellow-500 flex-shrink-0" />
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Users className="w-3 h-3" />
-                                    {circle.memberCount}
-                                  </span>
-                                  <span>Avg: {circle.avgPoints} pts/member</span>
-                                </div>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <div className="text-lg font-bold text-primary" data-testid={`text-competition-points-${circle.id}`}>
-                                  {circle.totalPoints}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {circle.awardBonusPoints > 0 ? (
-                                    <span><span className="text-green-500">+{circle.awardBonusPoints}</span> bonus</span>
-                                  ) : (
-                                    "total pts"
-                                  )}
-                                </div>
-                              </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </>
           ) : (
             <div className="space-y-6">
@@ -7115,30 +7022,124 @@ export default function CommunityPage() {
                                   <div className="space-y-3">
                                     {demoCircleCompetitions.filter(c => c.status === "completed").map((competition) => {
                                       const isWinner = competition.winnerId === selectedCircle.id;
+                                      const isExpanded = expandedCompetition === competition.id;
+                                      const myCircleStats = demoMemberCompetitionStats[competition.id]?.[competition.myCircle.id] || [];
+                                      const opponentCircleStats = demoMemberCompetitionStats[competition.id]?.[competition.opponentCircle.id] || [];
                                       return (
-                                        <div key={competition.id} className="p-4 rounded-md border">
-                                          <div className="flex items-center justify-between gap-4 flex-wrap">
-                                            <div>
-                                              <div className="flex items-center gap-2">
-                                                <p className="font-medium">{competition.name || "Competition"}</p>
-                                                {isWinner ? (
-                                                  <Badge className="bg-green-600">
-                                                    <Trophy className="w-3 h-3 mr-1" />
-                                                    Winner
-                                                  </Badge>
-                                                ) : (
-                                                  <Badge variant="secondary">Lost</Badge>
-                                                )}
+                                        <div key={competition.id} className="rounded-md border overflow-visible">
+                                          <div
+                                            role="button"
+                                            tabIndex={0}
+                                            className="w-full p-4 text-left hover-elevate active-elevate-2 cursor-pointer"
+                                            onClick={() => setExpandedCompetition(isExpanded ? null : competition.id)}
+                                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setExpandedCompetition(isExpanded ? null : competition.id); }}
+                                            data-testid={`button-expand-completed-competition-${competition.id}`}
+                                          >
+                                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                                              <div>
+                                                <div className="flex items-center gap-2">
+                                                  <p className="font-medium">{competition.name || "Competition"}</p>
+                                                  {isWinner ? (
+                                                    <Badge className="bg-green-600">
+                                                      <Trophy className="w-3 h-3 mr-1" />
+                                                      Winner
+                                                    </Badge>
+                                                  ) : (
+                                                    <Badge variant="secondary">Lost</Badge>
+                                                  )}
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">
+                                                  vs {competition.opponentCircle.name}
+                                                </p>
                                               </div>
-                                              <p className="text-sm text-muted-foreground">
-                                                vs {competition.opponentCircle.name}
-                                              </p>
-                                            </div>
-                                            <div className="text-right text-sm">
-                                              <p className="font-mono">{competition.myPoints} - {competition.opponentPoints}</p>
-                                              <p className="text-muted-foreground">Target: {competition.targetPoints}</p>
+                                              <div className="flex items-center gap-4">
+                                                <div className="text-right text-sm">
+                                                  <p className="font-mono">{competition.myPoints} - {competition.opponentPoints}</p>
+                                                  <p className="text-muted-foreground">Target: {competition.targetPoints}</p>
+                                                </div>
+                                                {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                              </div>
                                             </div>
                                           </div>
+                                          {isExpanded && (
+                                            <div className="p-4 pt-0 space-y-4">
+                                              <Separator />
+                                              <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                  <p className="font-medium text-sm mb-2 flex items-center gap-2">
+                                                    {competition.myCircle.name}
+                                                    {isWinner && <Trophy className="w-3 h-3 text-yellow-500" />}
+                                                  </p>
+                                                  <div className="space-y-2">
+                                                    {myCircleStats.map((member) => {
+                                                      const isMemberExpanded = expandedMember === member.memberId;
+                                                      return (
+                                                        <div
+                                                          key={member.memberId}
+                                                          className="p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer"
+                                                          onClick={(e) => { e.stopPropagation(); setExpandedMember(isMemberExpanded ? null : member.memberId); }}
+                                                        >
+                                                          <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-sm">{member.memberName}</span>
+                                                            <div className="flex items-center gap-1">
+                                                              <span className="text-sm font-mono">{member.weeklyPoints} pts</span>
+                                                              {member.taskStats.length > 0 && (isMemberExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                                                            </div>
+                                                          </div>
+                                                          {isMemberExpanded && member.taskStats.length > 0 && (
+                                                            <div className="mt-2 pt-2 border-t space-y-1">
+                                                              {member.taskStats.map((stat, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between text-xs text-muted-foreground">
+                                                                  <span>{stat.taskName} x{stat.completionCount}</span>
+                                                                  <span>{stat.points} pts</span>
+                                                                </div>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <p className="font-medium text-sm mb-2 flex items-center gap-2">
+                                                    {competition.opponentCircle.name}
+                                                    {!isWinner && <Trophy className="w-3 h-3 text-yellow-500" />}
+                                                  </p>
+                                                  <div className="space-y-2">
+                                                    {opponentCircleStats.map((member) => {
+                                                      const isMemberExpanded = expandedOpponentMember === member.memberId;
+                                                      return (
+                                                        <div
+                                                          key={member.memberId}
+                                                          className="p-2 rounded-md bg-muted/50 hover-elevate cursor-pointer"
+                                                          onClick={(e) => { e.stopPropagation(); setExpandedOpponentMember(isMemberExpanded ? null : member.memberId); }}
+                                                        >
+                                                          <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-sm">{member.memberName}</span>
+                                                            <div className="flex items-center gap-1">
+                                                              <span className="text-sm font-mono">{member.weeklyPoints} pts</span>
+                                                              {member.taskStats.length > 0 && (isMemberExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                                                            </div>
+                                                          </div>
+                                                          {isMemberExpanded && member.taskStats.length > 0 && (
+                                                            <div className="mt-2 pt-2 border-t space-y-1">
+                                                              {member.taskStats.map((stat, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between text-xs text-muted-foreground">
+                                                                  <span>{stat.taskName} x{stat.completionCount}</span>
+                                                                  <span>{stat.points} pts</span>
+                                                                </div>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
                                       );
                                     })}
