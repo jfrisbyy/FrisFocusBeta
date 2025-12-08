@@ -577,3 +577,148 @@ export const seasonWithDataSchema = z.object({
   })),
 });
 export type SeasonWithData = z.infer<typeof seasonWithDataSchema>;
+
+// ==================== COMMUNITY SOCIAL FEATURES ====================
+
+// Community posts - visible to all users or friends only
+export const communityPosts = pgTable("community_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  imageUrl: text("image_url"),
+  visibility: varchar("visibility").notNull().default("public"), // "public" or "friends"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit({ id: true, createdAt: true });
+export type InsertCommunityPost = z.infer<typeof insertCommunityPostSchema>;
+export type CommunityPost = typeof communityPosts.$inferSelect;
+
+// Post likes - tracks who liked a post
+export const postLikes = pgTable("post_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPostLikeSchema = createInsertSchema(postLikes).omit({ id: true, createdAt: true });
+export type InsertPostLike = z.infer<typeof insertPostLikeSchema>;
+export type PostLike = typeof postLikes.$inferSelect;
+
+// Post comments
+export const postComments = pgTable("post_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPostCommentSchema = createInsertSchema(postComments).omit({ id: true, createdAt: true });
+export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
+export type PostComment = typeof postComments.$inferSelect;
+
+// Comment likes
+export const commentLikes = pgTable("comment_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull().references(() => postComments.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCommentLikeSchema = createInsertSchema(commentLikes).omit({ id: true, createdAt: true });
+export type InsertCommentLike = z.infer<typeof insertCommentLikeSchema>;
+export type CommentLike = typeof commentLikes.$inferSelect;
+
+// Direct messages between users
+export const directMessages = pgTable("direct_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  recipientId: varchar("recipient_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  read: boolean("read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDirectMessageSchema = createInsertSchema(directMessages).omit({ id: true, createdAt: true });
+export type InsertDirectMessage = z.infer<typeof insertDirectMessageSchema>;
+export type DirectMessage = typeof directMessages.$inferSelect;
+
+// Circles (groups)
+export const circles = pgTable("circles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  isPrivate: boolean("is_private").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleSchema = createInsertSchema(circles).omit({ id: true, createdAt: true });
+export type InsertCircle = z.infer<typeof insertCircleSchema>;
+export type Circle = typeof circles.$inferSelect;
+
+// Circle members
+export const circleMembers = pgTable("circle_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: varchar("role").notNull().default("member"), // "owner", "admin", "member"
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const insertCircleMemberSchema = createInsertSchema(circleMembers).omit({ id: true, joinedAt: true });
+export type InsertCircleMember = z.infer<typeof insertCircleMemberSchema>;
+export type CircleMember = typeof circleMembers.$inferSelect;
+
+// Circle messages (chat)
+export const circleMessages = pgTable("circle_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleMessageSchema = createInsertSchema(circleMessages).omit({ id: true, createdAt: true });
+export type InsertCircleMessage = z.infer<typeof insertCircleMessageSchema>;
+export type CircleMessage = typeof circleMessages.$inferSelect;
+
+// Circle posts (announcements/updates within a circle)
+export const circlePosts = pgTable("circle_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCirclePostSchema = createInsertSchema(circlePosts).omit({ id: true, createdAt: true });
+export type InsertCirclePost = z.infer<typeof insertCirclePostSchema>;
+export type CirclePost = typeof circlePosts.$inferSelect;
+
+// Circle post likes
+export const circlePostLikes = pgTable("circle_post_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => circlePosts.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCirclePostLikeSchema = createInsertSchema(circlePostLikes).omit({ id: true, createdAt: true });
+export type InsertCirclePostLike = z.infer<typeof insertCirclePostLikeSchema>;
+export type CirclePostLike = typeof circlePostLikes.$inferSelect;
+
+// Circle post comments
+export const circlePostComments = pgTable("circle_post_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => circlePosts.id, { onDelete: "cascade" }),
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCirclePostCommentSchema = createInsertSchema(circlePostComments).omit({ id: true, createdAt: true });
+export type InsertCirclePostComment = z.infer<typeof insertCirclePostCommentSchema>;
+export type CirclePostComment = typeof circlePostComments.$inferSelect;
