@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ProfileHoverCard from "@/components/ProfileHoverCard";
 import {
   Users,
@@ -27,7 +29,7 @@ import {
   X,
   Trophy,
   Flame,
-  Calendar,
+  Calendar as CalendarIcon,
   Star,
   Eye,
   EyeOff,
@@ -3145,7 +3147,7 @@ export default function CommunityPage() {
                 {activity && (
                   <div>
                     <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
+                      <CalendarIcon className="w-4 h-4" />
                       This Week
                     </h4>
                     <div className="flex items-end gap-1" style={{ height: '80px' }}>
@@ -4067,11 +4069,37 @@ export default function CommunityPage() {
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </Button>
-                          <div className="text-sm font-medium min-w-[120px] text-center">
-                            {selectedTaskDate === new Date().toISOString().split('T')[0] 
-                              ? "Today" 
-                              : new Date(selectedTaskDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="min-w-[140px] justify-center gap-2"
+                                data-testid="button-date-picker"
+                              >
+                                <CalendarIcon className="w-4 h-4" />
+                                {selectedTaskDate === new Date().toISOString().split('T')[0] 
+                                  ? "Today" 
+                                  : new Date(selectedTaskDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="center">
+                              <CalendarComponent
+                                mode="single"
+                                selected={new Date(selectedTaskDate + 'T12:00:00')}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    const dateStr = date.toISOString().split('T')[0];
+                                    const today = new Date().toISOString().split('T')[0];
+                                    if (dateStr <= today) {
+                                      setSelectedTaskDate(dateStr);
+                                    }
+                                  }
+                                }}
+                                disabled={(date) => date > new Date()}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                           <Button
                             size="icon"
                             variant="outline"
