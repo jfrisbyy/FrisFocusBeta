@@ -101,8 +101,21 @@ export default function DailyPage() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Invalidate both the list query and the date-specific query
       queryClient.invalidateQueries({ queryKey: ["/api/habit/logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/logs", variables.date] });
+    },
+  });
+
+  // Mutation for creating journal entry via API
+  const createJournalEntryMutation = useMutation({
+    mutationFn: async (data: { date: string; title: string; content: string }) => {
+      const response = await apiRequest("POST", "/api/habit/journal", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
     },
   });
 
@@ -304,19 +317,30 @@ export default function DailyPage() {
     const now = new Date();
     const hasNotes = notes.trim().length > 0;
     
-    // If there are notes, create a journal entry with time-based title (still localStorage for now)
+    // If there are notes, create a journal entry with time-based title
     if (hasNotes) {
       const timeTitle = format(now, "h:mm a") + " Note";
-      const newJournalEntry: StoredJournalEntry = {
-        id: `entry-${Date.now()}`,
-        date: format(now, "yyyy-MM-dd"),
-        title: timeTitle,
-        content: notes.trim(),
-        createdAt: now.toISOString(),
-      };
+      const journalDate = format(now, "yyyy-MM-dd");
       
-      const existingEntries = loadJournalFromStorage();
-      saveJournalToStorage([newJournalEntry, ...existingEntries]);
+      try {
+        // Save via API for authenticated users
+        await createJournalEntryMutation.mutateAsync({
+          date: journalDate,
+          title: timeTitle,
+          content: notes.trim(),
+        });
+      } catch (error) {
+        // Fallback to localStorage if API fails
+        const newJournalEntry: StoredJournalEntry = {
+          id: `entry-${Date.now()}`,
+          date: journalDate,
+          title: timeTitle,
+          content: notes.trim(),
+          createdAt: now.toISOString(),
+        };
+        const existingEntries = loadJournalFromStorage();
+        saveJournalToStorage([newJournalEntry, ...existingEntries]);
+      }
     }
     
     try {
