@@ -1,11 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import DatePicker from "@/components/DatePicker";
 import TaskGroup from "@/components/TaskGroup";
 import DailySummary from "@/components/DailySummary";
 import TodoListPanel from "@/components/TodoListPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   loadTasksFromStorage,
   loadPenaltiesFromStorage,
@@ -20,7 +22,6 @@ import {
   type StoredPenalty,
   type StoredJournalEntry,
   type StoredTodoItem,
-  type StoredDailyTodoList,
 } from "@/lib/storage";
 
 interface DisplayTask {
@@ -67,7 +68,45 @@ export default function DailyPage() {
   const [todoBonusPoints, setTodoBonusPoints] = useState(10);
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
 
-  // Load tasks and penalties from localStorage on mount
+  const dateStr = format(date, "yyyy-MM-dd");
+
+  // API queries for tasks, penalties, categories
+  const { data: apiTasks } = useQuery<any[]>({
+    queryKey: ["/api/habit/tasks"],
+    enabled: !isDemo,
+  });
+
+  const { data: apiPenalties } = useQuery<any[]>({
+    queryKey: ["/api/habit/penalties"],
+    enabled: !isDemo,
+  });
+
+  const { data: apiCategories } = useQuery<any[]>({
+    queryKey: ["/api/habit/categories"],
+    enabled: !isDemo,
+  });
+
+  // API query for daily log of selected date
+  const { data: apiDailyLog, refetch: refetchDailyLog } = useQuery<any>({
+    queryKey: ["/api/habit/logs", dateStr],
+    enabled: !isDemo,
+  });
+
+  // Mutation for saving daily log
+  const saveDailyLogMutation = useMutation({
+    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string }) => {
+      const response = await apiRequest("PUT", `/api/habit/logs/${data.date}`, {
+        completedTaskIds: data.completedTaskIds,
+        notes: data.notes,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/logs"] });
+    },
+  });
+
+  // Load tasks and penalties from API or localStorage
   useEffect(() => {
     if (isDemo) {
       setAllTasks(sampleTasks);
@@ -77,48 +116,79 @@ export default function DailyPage() {
       setTodoBonusPoints(15);
       return;
     }
-    
-    const storedTasks = loadTasksFromStorage();
-    const storedPenalties = loadPenaltiesFromStorage();
-    const storedCategories = loadCategoriesFromStorage();
 
-    // Create a map of category IDs to names
-    const categoryMap = new Map(storedCategories.map(c => [c.id, c.name]));
+    // If we have API data, use it
+    if (apiTasks && apiPenalties && apiCategories) {
+      const categoryMap = new Map(apiCategories.map((c: any) => [c.id, c.name]));
 
-    // Convert tasks to display format
-    const taskItems: DisplayTask[] = storedTasks.map((task: StoredTask) => ({
-      id: task.id,
-      name: task.name,
-      value: task.value,
-      category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
-      isBooster: task.boostEnabled,
-    }));
+      const taskItems: DisplayTask[] = apiTasks.map((task: any) => ({
+        id: task.id,
+        name: task.name,
+        value: task.value,
+        category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
+        isBooster: task.boostEnabled,
+      }));
 
-    // Convert penalties to display format (always in Penalties category)
-    const penaltyItems: DisplayTask[] = storedPenalties.map((penalty: StoredPenalty) => ({
-      id: penalty.id,
-      name: penalty.name,
-      value: -Math.abs(penalty.value), // Ensure negative
-      category: "Penalties",
-    }));
+      const penaltyItems: DisplayTask[] = apiPenalties.map((penalty: any) => ({
+        id: penalty.id,
+        name: penalty.name,
+        value: -Math.abs(penalty.value),
+        category: "Penalties",
+      }));
 
-    setAllTasks([...taskItems, ...penaltyItems]);
-  }, [isDemo]);
+      setAllTasks([...taskItems, ...penaltyItems]);
+    } else {
+      // Fallback to localStorage
+      const storedTasks = loadTasksFromStorage();
+      const storedPenalties = loadPenaltiesFromStorage();
+      const storedCategories = loadCategoriesFromStorage();
 
-  // Load daily log and todos when date changes
+      const categoryMap = new Map(storedCategories.map(c => [c.id, c.name]));
+
+      const taskItems: DisplayTask[] = storedTasks.map((task: StoredTask) => ({
+        id: task.id,
+        name: task.name,
+        value: task.value,
+        category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
+        isBooster: task.boostEnabled,
+      }));
+
+      const penaltyItems: DisplayTask[] = storedPenalties.map((penalty: StoredPenalty) => ({
+        id: penalty.id,
+        name: penalty.name,
+        value: -Math.abs(penalty.value),
+        category: "Penalties",
+      }));
+
+      setAllTasks([...taskItems, ...penaltyItems]);
+    }
+  }, [isDemo, apiTasks, apiPenalties, apiCategories]);
+
+  // Load daily log from API or localStorage when date changes
+  useEffect(() => {
+    if (isDemo) return;
+
+    // If we have API data for this date, use it
+    if (apiDailyLog) {
+      setCompletedIds(new Set(apiDailyLog.completedTaskIds || []));
+      setNotes(apiDailyLog.notes || "");
+    } else {
+      // Fallback to localStorage
+      const log = loadDailyLogFromStorage(dateStr);
+      if (log) {
+        setCompletedIds(new Set(log.completedTaskIds));
+        setNotes(log.notes);
+      } else {
+        setCompletedIds(new Set());
+        setNotes("");
+      }
+    }
+  }, [dateStr, isDemo, apiDailyLog]);
+
+  // Load todos from localStorage when date changes (todos not in API yet)
   useEffect(() => {
     if (isDemo) return;
     
-    const dateStr = format(date, "yyyy-MM-dd");
-    const log = loadDailyLogFromStorage(dateStr);
-    if (log) {
-      setCompletedIds(new Set(log.completedTaskIds));
-      setNotes(log.notes);
-    } else {
-      setCompletedIds(new Set());
-      setNotes("");
-    }
-
     const todoList = loadDailyTodoListFromStorage(dateStr);
     if (todoList) {
       setTodoItems(todoList.items);
@@ -131,7 +201,7 @@ export default function DailyPage() {
       setTodoBonusPoints(10);
       setTodoBonusAwarded(false);
     }
-  }, [date, isDemo]);
+  }, [dateStr, isDemo]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allTasks.map(t => t.category)));
@@ -180,7 +250,6 @@ export default function DailyPage() {
   const handleTodoItemsChange = (items: StoredTodoItem[]) => {
     setTodoItems(items);
     if (!isDemo) {
-      const dateStr = format(date, "yyyy-MM-dd");
       const allCompleted = items.length > 0 && items.every(item => item.completed);
       const bonusAwarded = allCompleted && todoBonusEnabled;
       saveDailyTodoListToStorage({
@@ -196,7 +265,6 @@ export default function DailyPage() {
   const handleTodoBonusEnabledChange = (enabled: boolean) => {
     setTodoBonusEnabled(enabled);
     if (!isDemo) {
-      const dateStr = format(date, "yyyy-MM-dd");
       saveDailyTodoListToStorage({
         date: dateStr,
         items: todoItems,
@@ -210,7 +278,6 @@ export default function DailyPage() {
   const handleTodoBonusPointsChange = (points: number) => {
     setTodoBonusPoints(points);
     if (!isDemo) {
-      const dateStr = format(date, "yyyy-MM-dd");
       saveDailyTodoListToStorage({
         date: dateStr,
         items: todoItems,
@@ -221,7 +288,7 @@ export default function DailyPage() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isDemo) {
       toast({
         title: "Demo Mode",
@@ -231,11 +298,11 @@ export default function DailyPage() {
     }
     
     setIsSaving(true);
-    const dateStr = format(date, "yyyy-MM-dd");
     const now = new Date();
+    const hasNotes = notes.trim().length > 0;
     
-    // If there are notes, create a journal entry with time-based title
-    if (notes.trim()) {
+    // If there are notes, create a journal entry with time-based title (still localStorage for now)
+    if (hasNotes) {
       const timeTitle = format(now, "h:mm a") + " Note";
       const newJournalEntry: StoredJournalEntry = {
         id: `entry-${Date.now()}`,
@@ -249,26 +316,45 @@ export default function DailyPage() {
       saveJournalToStorage([newJournalEntry, ...existingEntries]);
     }
     
-    // Save the daily log (without notes since it's now in journal)
-    saveDailyLogToStorage({
-      date: dateStr,
-      completedTaskIds: Array.from(completedIds),
-      notes: "", // Clear notes from daily log since it's saved to journal
-    });
+    try {
+      // Save via API
+      await saveDailyLogMutation.mutateAsync({
+        date: dateStr,
+        completedTaskIds: Array.from(completedIds),
+        notes: "", // Clear notes from daily log since it's saved to journal
+      });
 
-    // Reset the notes field for next entry
-    setNotes("");
+      // Also save to localStorage as backup
+      saveDailyLogToStorage({
+        date: dateStr,
+        completedTaskIds: Array.from(completedIds),
+        notes: "",
+      });
 
-    setTimeout(() => {
-      setIsSaving(false);
-      const hasNotes = notes.trim().length > 0;
+      // Reset the notes field for next entry
+      setNotes("");
+
       toast({
         title: "Day saved",
         description: hasNotes 
           ? `Logged ${completedIds.size} tasks and added journal entry`
           : `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
       });
-    }, 300);
+    } catch (error) {
+      // Fallback to localStorage only
+      saveDailyLogToStorage({
+        date: dateStr,
+        completedTaskIds: Array.from(completedIds),
+        notes: "",
+      });
+      setNotes("");
+      toast({
+        title: "Saved locally",
+        description: "Data saved to this device. Sign in to sync across devices.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Show empty state if no tasks
@@ -306,12 +392,14 @@ export default function DailyPage() {
         <div className="space-y-4">
           <TodoListPanel
             title="Today's To-Do List"
+            prompt="Add a task for today"
             items={todoItems}
             onItemsChange={handleTodoItemsChange}
             bonusEnabled={todoBonusEnabled}
             onBonusEnabledChange={handleTodoBonusEnabledChange}
             bonusPoints={todoBonusPoints}
             onBonusPointsChange={handleTodoBonusPointsChange}
+            bonusAwarded={todoBonusAwarded}
             data-testid="panel-daily-todos"
           />
           {categories.map((category) => (

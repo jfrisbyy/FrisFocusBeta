@@ -5,21 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  loadTasksFromStorage,
-  saveTasksToStorage,
-  loadCategoriesFromStorage,
-  saveCategoriesToStorage,
-  loadPenaltiesFromStorage,
-  savePenaltiesToStorage,
-  loadPenaltyBoostFromStorage,
-  savePenaltyBoostToStorage,
-  loadDailyGoalFromStorage,
-  saveDailyGoalToStorage,
-  type StoredTask,
-  type StoredCategory,
-  type StoredPenalty,
-} from "@/lib/storage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,51 +80,60 @@ const samplePenalties: PenaltyItem[] = [
   { id: "p4", name: "Too much screen time", value: -5, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 4, period: "week", boostPenaltyPoints: 20, currentCount: 2, triggered: false },
 ];
 
+// API response types for habit data
+interface ApiTask {
+  id: string;
+  userId: string;
+  name: string;
+  value: number;
+  category: string;
+  priority: string;
+  boostEnabled: boolean | null;
+  boostThreshold: number | null;
+  boostPeriod: string | null;
+  boostPoints: number | null;
+}
+
+interface ApiCategory {
+  id: string;
+  userId: string;
+  name: string;
+  color: string | null;
+}
+
+interface ApiPenalty {
+  id: string;
+  userId: string;
+  name: string;
+  value: number;
+}
+
+interface ApiSettings {
+  id: string;
+  userId: string;
+  dailyGoal: number;
+  weeklyGoal: number;
+  userName: string | null;
+  encouragementMessage: string | null;
+  penaltyBoostEnabled: boolean | null;
+  penaltyBoostThreshold: number | null;
+  penaltyBoostPeriod: string | null;
+  penaltyBoostPoints: number | null;
+}
+
 export default function TasksPage() {
   const { toast } = useToast();
   const { isOnboarding } = useOnboarding();
   const { isDemo } = useDemo();
   const useMockData = isDemo || isOnboarding;
   
-  // Initialize state from localStorage or use sample data during demo/onboarding
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    if (useMockData) return sampleTasks;
-    const stored = loadTasksFromStorage();
-    return stored.length > 0 ? stored.map(t => ({
-      id: t.id,
-      name: t.name,
-      value: t.value,
-      category: t.category || "General",
-      priority: (t.priority || "shouldDo") as TaskPriority,
-      boosterRule: t.boostEnabled ? {
-        enabled: true,
-        timesRequired: t.boostThreshold || 3,
-        period: t.boostPeriod || "week",
-        bonusPoints: t.boostPoints || 10,
-      } : undefined,
-    })) : [];
-  });
-  
-  const [dailyGoal, setDailyGoal] = useState(() => {
-    if (useMockData) return 50;
-    return loadDailyGoalFromStorage();
-  });
+  // Initialize state - will be populated from API or sample data
+  const [tasks, setTasks] = useState<Task[]>(() => useMockData ? sampleTasks : []);
+  const [dailyGoal, setDailyGoal] = useState(() => useMockData ? 50 : 50);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   
-  const [penalties, setPenalties] = useState<PenaltyItem[]>(() => {
-    if (useMockData) return samplePenalties;
-    const stored = loadPenaltiesFromStorage();
-    return stored.map(p => ({
-      id: p.id,
-      name: p.name,
-      value: p.value,
-      category: "Penalties",
-      negativeBoostEnabled: false,
-      currentCount: 0,
-      triggered: false,
-    }));
-  });
+  const [penalties, setPenalties] = useState<PenaltyItem[]>(() => useMockData ? samplePenalties : []);
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false);
   const [editingPenalty, setEditingPenalty] = useState<PenaltyItem | null>(null);
   const [penaltyName, setPenaltyName] = useState("");
@@ -151,11 +145,7 @@ export default function TasksPage() {
   const [penaltyBoostPeriod, setPenaltyBoostPeriod] = useState<"week" | "month">("week");
   const [penaltyBoostPoints, setPenaltyBoostPoints] = useState("10");
 
-  const [categories, setCategories] = useState<Category[]>(() => {
-    if (useMockData) return sampleCategories;
-    const stored = loadCategoriesFromStorage();
-    return stored.length > 0 ? stored : [];
-  });
+  const [categories, setCategories] = useState<Category[]>(() => useMockData ? sampleCategories : []);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState("");
@@ -403,49 +393,198 @@ export default function TasksPage() {
     }
   };
 
-  // Persist tasks to localStorage whenever they change (skip during demo/onboarding)
+  // Fetch tasks from API (when no active season)
+  const { data: apiTasks = [], isLoading: apiTasksLoading } = useQuery<ApiTask[]>({
+    queryKey: ["/api/habit/tasks"],
+    enabled: !useMockData && !activeSeason,
+  });
+
+  // Fetch categories from API (when no active season)
+  const { data: apiCategories = [], isLoading: apiCategoriesLoading } = useQuery<ApiCategory[]>({
+    queryKey: ["/api/habit/categories"],
+    enabled: !useMockData && !activeSeason,
+  });
+
+  // Fetch penalties from API (when no active season)
+  const { data: apiPenalties = [], isLoading: apiPenaltiesLoading } = useQuery<ApiPenalty[]>({
+    queryKey: ["/api/habit/penalties"],
+    enabled: !useMockData && !activeSeason,
+  });
+
+  // Fetch settings from API (for daily goal)
+  const { data: apiSettings, isLoading: apiSettingsLoading } = useQuery<ApiSettings>({
+    queryKey: ["/api/habit/settings"],
+    enabled: !useMockData && !activeSeason,
+  });
+
+  // API mutations for tasks (when no active season)
+  const createTaskMutation = useMutation({
+    mutationFn: async (task: Omit<Task, "id">) => {
+      const res = await apiRequest("POST", "/api/habit/tasks", {
+        name: task.name,
+        value: task.value,
+        category: task.category,
+        priority: task.priority,
+        boostEnabled: task.boosterRule?.enabled || false,
+        boostThreshold: task.boosterRule?.timesRequired || null,
+        boostPeriod: task.boosterRule?.period || null,
+        boostPoints: task.boosterRule?.bonusPoints || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
+    },
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, task }: { id: string; task: Omit<Task, "id"> }) => {
+      const res = await apiRequest("PUT", `/api/habit/tasks/${id}`, {
+        name: task.name,
+        value: task.value,
+        category: task.category,
+        priority: task.priority,
+        boostEnabled: task.boosterRule?.enabled || false,
+        boostThreshold: task.boosterRule?.timesRequired || null,
+        boostPeriod: task.boosterRule?.period || null,
+        boostPoints: task.boosterRule?.bonusPoints || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/habit/tasks/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
+    },
+  });
+
+  // API mutations for categories (when no active season)
+  const createCategoryMutation = useMutation({
+    mutationFn: async (category: { name: string }) => {
+      const res = await apiRequest("POST", "/api/habit/categories", category);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/categories"] });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await apiRequest("PUT", `/api/habit/categories/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/categories"] });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/habit/categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/categories"] });
+    },
+  });
+
+  // API mutations for penalties (when no active season)
+  const createPenaltyMutation = useMutation({
+    mutationFn: async (penalty: { name: string; value: number }) => {
+      const res = await apiRequest("POST", "/api/habit/penalties", penalty);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
+    },
+  });
+
+  const updatePenaltyMutation = useMutation({
+    mutationFn: async ({ id, name, value }: { id: string; name: string; value: number }) => {
+      const res = await apiRequest("PUT", `/api/habit/penalties/${id}`, { name, value });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
+    },
+  });
+
+  const deletePenaltyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/habit/penalties/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
+    },
+  });
+
+  // API mutation for settings (daily goal)
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (settings: { dailyGoal?: number; weeklyGoal?: number }) => {
+      const res = await apiRequest("PUT", "/api/habit/settings", settings);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/settings"] });
+    },
+  });
+
+  // Load data from API when no active season (sync API data to local state)
   useEffect(() => {
-    if (useMockData) return;
-    const storedTasks: StoredTask[] = tasks.map(t => ({
+    if (useMockData || activeSeason || apiTasksLoading) return;
+    
+    const tasksFromApi: Task[] = apiTasks.map(t => ({
       id: t.id,
       name: t.name,
       value: t.value,
       category: t.category,
-      priority: t.priority,
-      boostEnabled: t.boosterRule?.enabled,
-      boostThreshold: t.boosterRule?.timesRequired,
-      boostPeriod: t.boosterRule?.period,
-      boostPoints: t.boosterRule?.bonusPoints,
+      priority: t.priority as TaskPriority,
+      boosterRule: t.boostEnabled ? {
+        enabled: true,
+        timesRequired: t.boostThreshold || 1,
+        period: (t.boostPeriod as "week" | "month") || "week",
+        bonusPoints: t.boostPoints || 0,
+      } : undefined,
     }));
-    saveTasksToStorage(storedTasks);
-  }, [tasks, useMockData]);
+    setTasks(tasksFromApi);
+  }, [apiTasks, apiTasksLoading, activeSeason, useMockData]);
 
-  // Persist categories to localStorage whenever they change (skip during demo/onboarding)
   useEffect(() => {
-    if (useMockData) return;
-    const storedCategories: StoredCategory[] = categories.map(c => ({
+    if (useMockData || activeSeason || apiCategoriesLoading) return;
+    
+    const categoriesFromApi: Category[] = apiCategories.map(c => ({
       id: c.id,
       name: c.name,
     }));
-    saveCategoriesToStorage(storedCategories);
-  }, [categories, useMockData]);
+    setCategories(categoriesFromApi);
+  }, [apiCategories, apiCategoriesLoading, activeSeason, useMockData]);
 
-  // Persist penalties to localStorage whenever they change (skip during demo/onboarding)
   useEffect(() => {
-    if (useMockData) return;
-    const storedPenalties: StoredPenalty[] = penalties.map(p => ({
+    if (useMockData || activeSeason || apiPenaltiesLoading) return;
+    
+    const penaltiesFromApi: PenaltyItem[] = apiPenalties.map(p => ({
       id: p.id,
       name: p.name,
       value: p.value,
+      category: "Penalties",
+      negativeBoostEnabled: false,
+      currentCount: 0,
+      triggered: false,
     }));
-    savePenaltiesToStorage(storedPenalties);
-  }, [penalties, useMockData]);
+    setPenalties(penaltiesFromApi);
+  }, [apiPenalties, apiPenaltiesLoading, activeSeason, useMockData]);
 
-  // Persist daily goal to localStorage whenever it changes (skip during demo/onboarding)
   useEffect(() => {
-    if (useMockData) return;
-    saveDailyGoalToStorage(dailyGoal);
-  }, [dailyGoal, useMockData]);
+    if (useMockData || activeSeason || apiSettingsLoading || !apiSettings) return;
+    setDailyGoal(apiSettings.dailyGoal || 50);
+  }, [apiSettings, apiSettingsLoading, activeSeason, useMockData]);
 
   // Load tasks/categories/penalties from active season when it changes
   useEffect(() => {
@@ -542,9 +681,17 @@ export default function TasksPage() {
 
   const handleAdd = (task: Omit<Task, "id">) => {
     if (isActiveSeasonArchived) return;
-    hasUserModifiedDataRef.current = true;
-    const id = String(Date.now());
-    setTasks([...tasks, { ...task, id }]);
+    
+    if (activeSeason) {
+      hasUserModifiedDataRef.current = true;
+      const id = String(Date.now());
+      setTasks([...tasks, { ...task, id }]);
+    } else if (!useMockData) {
+      createTaskMutation.mutate(task);
+    } else {
+      const id = String(Date.now());
+      setTasks([...tasks, { ...task, id }]);
+    }
     toast({
       title: "Task added",
       description: `"${task.name}" has been added as ${task.priority.replace(/([A-Z])/g, " $1").toLowerCase()}`,
@@ -553,8 +700,15 @@ export default function TasksPage() {
 
   const handleEdit = (id: string, task: Omit<Task, "id">) => {
     if (isActiveSeasonArchived) return;
-    hasUserModifiedDataRef.current = true;
-    setTasks(tasks.map((t) => (t.id === id ? { ...task, id } : t)));
+    
+    if (activeSeason) {
+      hasUserModifiedDataRef.current = true;
+      setTasks(tasks.map((t) => (t.id === id ? { ...task, id } : t)));
+    } else if (!useMockData) {
+      updateTaskMutation.mutate({ id, task });
+    } else {
+      setTasks(tasks.map((t) => (t.id === id ? { ...task, id } : t)));
+    }
     toast({
       title: "Task updated",
       description: `"${task.name}" has been updated`,
@@ -563,9 +717,16 @@ export default function TasksPage() {
 
   const handleDelete = (id: string) => {
     if (isActiveSeasonArchived) return;
-    hasUserModifiedDataRef.current = true;
     const task = tasks.find(t => t.id === id);
-    setTasks(tasks.filter((t) => t.id !== id));
+    
+    if (activeSeason) {
+      hasUserModifiedDataRef.current = true;
+      setTasks(tasks.filter((t) => t.id !== id));
+    } else if (!useMockData) {
+      deleteTaskMutation.mutate(id);
+    } else {
+      setTasks(tasks.filter((t) => t.id !== id));
+    }
     toast({
       title: "Task deleted",
       description: task ? `"${task.name}" has been removed` : "Task removed",
@@ -581,6 +742,9 @@ export default function TasksPage() {
     const newGoal = parseInt(goalInput, 10);
     if (!isNaN(newGoal) && newGoal > 0) {
       setDailyGoal(newGoal);
+      if (!activeSeason && !useMockData) {
+        updateSettingsMutation.mutate({ dailyGoal: newGoal, weeklyGoal: newGoal * 7 });
+      }
       toast({
         title: "Daily goal updated",
         description: `Your daily goal is now ${newGoal} points`,
@@ -622,41 +786,67 @@ export default function TasksPage() {
 
   const handleSavePenalty = () => {
     if (isActiveSeasonArchived) return;
-    hasUserModifiedDataRef.current = true;
     const value = parseInt(penaltyValue, 10);
     const finalValue = value > 0 ? -value : value;
     const threshold = parseInt(penaltyBoostThreshold, 10) || 3;
     const boostPoints = parseInt(penaltyBoostPoints, 10) || 10;
 
     if (editingPenalty) {
-      setPenalties(penalties.map(p =>
-        p.id === editingPenalty.id
-          ? {
-              ...p,
-              name: penaltyName,
-              value: finalValue,
-              negativeBoostEnabled: penaltyBoostEnabled,
-              timesThreshold: penaltyBoostEnabled ? threshold : undefined,
-              period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
-              boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
-            }
-          : p
-      ));
+      if (activeSeason) {
+        hasUserModifiedDataRef.current = true;
+        setPenalties(penalties.map(p =>
+          p.id === editingPenalty.id
+            ? {
+                ...p,
+                name: penaltyName,
+                value: finalValue,
+                negativeBoostEnabled: penaltyBoostEnabled,
+                timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+                period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+                boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+              }
+            : p
+        ));
+      } else if (!useMockData) {
+        updatePenaltyMutation.mutate({ id: editingPenalty.id, name: penaltyName, value: finalValue });
+      } else {
+        setPenalties(penalties.map(p =>
+          p.id === editingPenalty.id
+            ? { ...p, name: penaltyName, value: finalValue }
+            : p
+        ));
+      }
       toast({ title: "Penalty updated", description: `"${penaltyName}" has been updated` });
     } else {
-      const newPenalty: PenaltyItem = {
-        id: `p${Date.now()}`,
-        name: penaltyName,
-        value: finalValue,
-        category: "Penalties",
-        negativeBoostEnabled: penaltyBoostEnabled,
-        timesThreshold: penaltyBoostEnabled ? threshold : undefined,
-        period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
-        boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
-        currentCount: 0,
-        triggered: false,
-      };
-      setPenalties([...penalties, newPenalty]);
+      if (activeSeason) {
+        hasUserModifiedDataRef.current = true;
+        const newPenalty: PenaltyItem = {
+          id: `p${Date.now()}`,
+          name: penaltyName,
+          value: finalValue,
+          category: "Penalties",
+          negativeBoostEnabled: penaltyBoostEnabled,
+          timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+          period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+          boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+          currentCount: 0,
+          triggered: false,
+        };
+        setPenalties([...penalties, newPenalty]);
+      } else if (!useMockData) {
+        createPenaltyMutation.mutate({ name: penaltyName, value: finalValue });
+      } else {
+        const newPenalty: PenaltyItem = {
+          id: `p${Date.now()}`,
+          name: penaltyName,
+          value: finalValue,
+          category: "Penalties",
+          negativeBoostEnabled: false,
+          currentCount: 0,
+          triggered: false,
+        };
+        setPenalties([...penalties, newPenalty]);
+      }
       toast({ title: "Penalty added", description: `"${penaltyName}" has been added` });
     }
 
@@ -668,9 +858,16 @@ export default function TasksPage() {
   const handleDeletePenalty = () => {
     if (isActiveSeasonArchived) return;
     if (deletePenaltyId) {
-      hasUserModifiedDataRef.current = true;
       const penalty = penalties.find(p => p.id === deletePenaltyId);
-      setPenalties(penalties.filter(p => p.id !== deletePenaltyId));
+      
+      if (activeSeason) {
+        hasUserModifiedDataRef.current = true;
+        setPenalties(penalties.filter(p => p.id !== deletePenaltyId));
+      } else if (!useMockData) {
+        deletePenaltyMutation.mutate(deletePenaltyId);
+      } else {
+        setPenalties(penalties.filter(p => p.id !== deletePenaltyId));
+      }
       toast({ title: "Penalty deleted", description: penalty ? `"${penalty.name}" has been removed` : "Penalty removed" });
       setDeletePenaltyId(null);
     }
@@ -694,24 +891,45 @@ export default function TasksPage() {
 
   const handleSaveCategory = () => {
     if (isActiveSeasonArchived) return;
-    hasUserModifiedDataRef.current = true;
+    
     if (editingCategory) {
       const oldName = editingCategory.name;
-      setCategories(categories.map(c =>
-        c.id === editingCategory.id ? { ...c, name: categoryName } : c
-      ));
-      if (oldName !== categoryName) {
-        setTasks(tasks.map(t =>
-          t.category === oldName ? { ...t, category: categoryName } : t
+      
+      if (activeSeason) {
+        hasUserModifiedDataRef.current = true;
+        setCategories(categories.map(c =>
+          c.id === editingCategory.id ? { ...c, name: categoryName } : c
+        ));
+        if (oldName !== categoryName) {
+          setTasks(tasks.map(t =>
+            t.category === oldName ? { ...t, category: categoryName } : t
+          ));
+        }
+      } else if (!useMockData) {
+        updateCategoryMutation.mutate({ id: editingCategory.id, name: categoryName });
+      } else {
+        setCategories(categories.map(c =>
+          c.id === editingCategory.id ? { ...c, name: categoryName } : c
         ));
       }
       toast({ title: "Category updated", description: `"${categoryName}" has been updated` });
     } else {
-      const newCategory: Category = {
-        id: `c${Date.now()}`,
-        name: categoryName,
-      };
-      setCategories([...categories, newCategory]);
+      if (activeSeason) {
+        hasUserModifiedDataRef.current = true;
+        const newCategory: Category = {
+          id: `c${Date.now()}`,
+          name: categoryName,
+        };
+        setCategories([...categories, newCategory]);
+      } else if (!useMockData) {
+        createCategoryMutation.mutate({ name: categoryName });
+      } else {
+        const newCategory: Category = {
+          id: `c${Date.now()}`,
+          name: categoryName,
+        };
+        setCategories([...categories, newCategory]);
+      }
       toast({ title: "Category added", description: `"${categoryName}" has been added` });
     }
 
@@ -723,9 +941,16 @@ export default function TasksPage() {
   const handleDeleteCategory = () => {
     if (isActiveSeasonArchived) return;
     if (deleteCategoryId) {
-      hasUserModifiedDataRef.current = true;
       const category = categories.find(c => c.id === deleteCategoryId);
-      setCategories(categories.filter(c => c.id !== deleteCategoryId));
+      
+      if (activeSeason) {
+        hasUserModifiedDataRef.current = true;
+        setCategories(categories.filter(c => c.id !== deleteCategoryId));
+      } else if (!useMockData) {
+        deleteCategoryMutation.mutate(deleteCategoryId);
+      } else {
+        setCategories(categories.filter(c => c.id !== deleteCategoryId));
+      }
       toast({ title: "Category deleted", description: category ? `"${category.name}" has been removed` : "Category removed" });
       setDeleteCategoryId(null);
     }
