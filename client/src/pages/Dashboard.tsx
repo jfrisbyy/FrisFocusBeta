@@ -389,15 +389,47 @@ export default function Dashboard() {
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
 
+  // Season interfaces
+  interface Season {
+    id: string;
+    name: string;
+    isActive: boolean;
+    isArchived: boolean;
+    weeklyGoal?: number;
+  }
+
+  interface SeasonWithData {
+    id: string;
+    name: string;
+    tasks: any[];
+    categories: any[];
+    penalties: any[];
+    weeklyGoal?: number;
+  }
+
+  // Fetch seasons to check for active season
+  const { data: seasons = [] } = useQuery<Season[]>({
+    queryKey: ["/api/seasons"],
+    enabled: !useMockData,
+  });
+
+  const activeSeason = seasons.find((s) => s.isActive && !s.isArchived);
+
+  // Fetch active season data (tasks/categories/penalties) when a season is active
+  const { data: activeSeasonData, isFetched: activeSeasonDataFetched } = useQuery<SeasonWithData>({
+    queryKey: ["/api/seasons", activeSeason?.id, "data"],
+    enabled: !useMockData && !!activeSeason?.id,
+  });
+
   // API queries for tasks, penalties, daily logs, and settings
   const { data: apiTasks, isFetched: tasksFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/tasks"],
-    enabled: !useMockData,
+    enabled: !useMockData && !activeSeason,
   });
 
   const { data: apiPenalties, isFetched: penaltiesFetched } = useQuery<any[]>({
     queryKey: ["/api/habit/penalties"],
-    enabled: !useMockData,
+    enabled: !useMockData && !activeSeason,
   });
 
   const { data: apiDailyLogs, isFetched: logsFetched } = useQuery<any[]>({
@@ -411,7 +443,7 @@ export default function Dashboard() {
   });
   
   // Check if API queries have completed their initial fetch
-  const apiQueriesReady = useMockData || (tasksFetched && penaltiesFetched && logsFetched);
+  const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched));
 
   // Mutation for updating settings (weekly goal)
   const updateSettingsMutation = useMutation({
@@ -540,19 +572,26 @@ export default function Dashboard() {
       return;
     }
 
-    // Load tasks and penalties for point calculations - use API data if available, fallback to localStorage
-    const hasApiData = (apiTasks && apiTasks.length > 0) || (apiPenalties && apiPenalties.length > 0);
-    
+    // Load tasks and penalties for point calculations
+    // Priority: active season data > regular API data > localStorage
     let tasks: any[];
     let penalties: any[];
     
-    if (hasApiData) {
-      tasks = apiTasks || [];
-      penalties = apiPenalties || [];
+    if (activeSeason && activeSeasonData) {
+      // Use season-specific tasks and penalties when an active season exists
+      tasks = activeSeasonData.tasks || [];
+      penalties = activeSeasonData.penalties || [];
     } else {
-      // Fallback to localStorage when API returns empty
-      tasks = loadTasksFromStorage();
-      penalties = loadPenaltiesFromStorage();
+      // Fall back to regular API data or localStorage
+      const hasApiData = (apiTasks && apiTasks.length > 0) || (apiPenalties && apiPenalties.length > 0);
+      if (hasApiData) {
+        tasks = apiTasks || [];
+        penalties = apiPenalties || [];
+      } else {
+        // Fallback to localStorage when API returns empty
+        tasks = loadTasksFromStorage();
+        penalties = loadPenaltiesFromStorage();
+      }
     }
     
     // Build daily logs map from API data or localStorage fallback
@@ -800,7 +839,7 @@ export default function Dashboard() {
         };
       });
     setBoosters(taskBoosters);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, activeSeason, activeSeasonData, apiQueriesReady]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
