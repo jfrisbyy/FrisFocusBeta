@@ -1323,6 +1323,36 @@ export default function CommunityPage() {
     setCirclePosts(prev => ({ ...prev, [selectedCircle.id]: circlePostsQuery.data }));
   }, [isDemo, selectedCircle?.id, circlePostsQuery.data]);
 
+  // Sync circle task completions from API query to local state
+  useEffect(() => {
+    if (isDemo || !selectedCircle || !circleCompletionsQuery.data) return;
+    const circleId = selectedCircle.id;
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Filter to today's completions and group by taskId
+    const todaysCompletions = circleCompletionsQuery.data.filter((c: any) => c.date === today);
+    const completionsByTask: Record<string, { userId: string; userName: string; completedAt: string }[]> = {};
+    const myTaskIds: string[] = [];
+    const currentUserId = user?.id;
+    
+    todaysCompletions.forEach((c: any) => {
+      if (!completionsByTask[c.taskId]) {
+        completionsByTask[c.taskId] = [];
+      }
+      completionsByTask[c.taskId].push({
+        userId: c.userId,
+        userName: c.userName || 'Unknown',
+        completedAt: c.completedAt || c.createdAt || new Date().toISOString(),
+      });
+      if (c.userId === currentUserId) {
+        myTaskIds.push(c.taskId);
+      }
+    });
+    
+    setCircleTaskCompletions(prev => ({ ...prev, [circleId]: completionsByTask }));
+    setMyCompletedTasks(prev => ({ ...prev, [circleId]: myTaskIds }));
+  }, [isDemo, selectedCircle?.id, circleCompletionsQuery.data, user?.id]);
+
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
     "circle-1": {

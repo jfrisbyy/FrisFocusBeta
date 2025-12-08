@@ -2375,10 +2375,35 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         return res.status(403).json({ error: "Must be a member to view completions" });
       }
 
-      const completions = await db.select().from(circleTaskCompletions)
+      const completions = await db.select({
+        id: circleTaskCompletions.id,
+        circleId: circleTaskCompletions.circleId,
+        taskId: circleTaskCompletions.taskId,
+        userId: circleTaskCompletions.userId,
+        date: circleTaskCompletions.date,
+        createdAt: circleTaskCompletions.createdAt,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          displayName: users.displayName,
+        },
+      }).from(circleTaskCompletions)
+        .leftJoin(users, eq(circleTaskCompletions.userId, users.id))
         .where(eq(circleTaskCompletions.circleId, circleId));
 
-      res.json(completions);
+      // Transform to include userName
+      const completionsWithUserName = completions.map(c => ({
+        id: c.id,
+        circleId: c.circleId,
+        taskId: c.taskId,
+        userId: c.userId,
+        date: c.date,
+        completedAt: c.createdAt,
+        userName: c.user ? `${c.user.firstName || ''} ${c.user.lastName || ''}`.trim() || c.user.displayName || 'Unknown' : 'Unknown',
+      }));
+
+      res.json(completionsWithUserName);
     } catch (error) {
       console.error("Error fetching completions:", error);
       res.status(500).json({ error: "Failed to fetch completions" });
