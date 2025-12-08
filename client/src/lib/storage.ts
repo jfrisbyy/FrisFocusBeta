@@ -312,6 +312,7 @@ export interface StoredFriendWelcomeMessage {
   message: string;
   createdAt: string;
   expiresAt?: string; // For Cheerlines - expires after 3 days
+  cheerlineId?: string; // Database ID for API cheerlines (used for dismiss)
 }
 
 export interface StoredUserProfile {

@@ -659,6 +659,24 @@ export default function CommunityPage() {
     },
   });
 
+  const sendCheerlineMutation = useMutation({
+    mutationFn: async ({ userId, message }: { userId: string; message: string }) => {
+      const res = await apiRequest("POST", `/api/cheerlines/${userId}`, { message });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to send cheerline');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cheerlines'] });
+      toast({ title: "Cheerline sent!", description: "Your encouraging message was sent!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send cheerline", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Create circle mutation for non-demo mode
   const createCircleMutation = useMutation({
     mutationFn: async (data: { name: string; description?: string; iconColor?: string }) => {
@@ -2420,10 +2438,14 @@ export default function CommunityPage() {
         return;
       }
       
-      toast({ 
-        title: "Cheerline sent!", 
-        description: `Your encouraging message was sent to ${cheerlineFriend.firstName}. It will appear on their dashboard for 3 days.` 
-      });
+      if (isDemo) {
+        toast({ 
+          title: "Cheerline sent!", 
+          description: `Your encouraging message was sent to ${cheerlineFriend.firstName}. It will appear on their dashboard for 3 days.` 
+        });
+      } else {
+        sendCheerlineMutation.mutate({ userId: cheerlineFriend.friendId, message: cheerlineMessage.trim() });
+      }
       setCheerlineMessage("");
       setCheerlineFriend(null);
     };

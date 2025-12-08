@@ -449,6 +449,11 @@ export default function Dashboard() {
     queryKey: ["/api/habit/settings"],
     enabled: !useMockData,
   });
+
+  const { data: apiCheerlines } = useQuery<any[]>({
+    queryKey: ["/api/cheerlines"],
+    enabled: !useMockData,
+  });
   
   // Check if API queries have completed their initial fetch
   const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched));
@@ -566,7 +571,19 @@ export default function Dashboard() {
     setUserName(profile.userName);
     setEncouragementMessage(profile.encouragementMessage);
     setUseCustomMessage(profile.useCustomMessage ?? false);
-    setFriendWelcomeMessages(profile.friendWelcomeMessages ?? []);
+    // Use API cheerlines if available, otherwise fall back to localStorage
+    if (apiCheerlines && apiCheerlines.length > 0) {
+      setFriendWelcomeMessages(apiCheerlines.map((c: any) => ({
+        friendId: c.senderId || c.sender?.id || c.id,
+        friendName: c.sender?.firstName ? `${c.sender.firstName} ${c.sender.lastName || ''}`.trim() : 'Friend',
+        message: c.message,
+        createdAt: c.createdAt,
+        expiresAt: c.expiresAt,
+        cheerlineId: c.id,
+      })));
+    } else {
+      setFriendWelcomeMessages(profile.friendWelcomeMessages ?? []);
+    }
     setSavedCustomMessages(profile.savedCustomMessages ?? []);
     setSelectedMessageIndex(profile.selectedMessageIndex ?? -1);
 
@@ -932,7 +949,7 @@ export default function Dashboard() {
       });
 
     setBoosters([...taskBoosters, ...negativeBoosters]);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, activeSeason, activeSeasonData, apiQueriesReady]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, activeSeason, activeSeasonData, apiQueriesReady]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -1044,15 +1061,35 @@ export default function Dashboard() {
     }
   };
 
-  const handleDismissFriendMessage = (friendId: string) => {
-    const updated = friendWelcomeMessages.filter(m => m.friendId !== friendId);
+  const handleDismissFriendMessage = async (friendIdOrCheerlineId: string) => {
+    // Find the message - could be keyed by friendId (demo) or cheerlineId (API)
+    const messageToRemove = friendWelcomeMessages.find(m => 
+      m.cheerlineId === friendIdOrCheerlineId || m.friendId === friendIdOrCheerlineId
+    );
+    const updated = friendWelcomeMessages.filter(m => 
+      m.cheerlineId !== friendIdOrCheerlineId && m.friendId !== friendIdOrCheerlineId
+    );
     setFriendWelcomeMessages(updated);
     if (!useMockData) {
-      const profile = loadUserProfileFromStorage();
-      saveUserProfileToStorage({
-        ...profile,
-        friendWelcomeMessages: updated,
-      });
+      if (messageToRemove?.cheerlineId) {
+        // API-based cheerline - delete from server
+        try {
+          await apiRequest("DELETE", `/api/cheerlines/${messageToRemove.cheerlineId}`, {});
+          queryClient.invalidateQueries({ queryKey: ["/api/cheerlines"] });
+        } catch (error) {
+          console.error("Failed to dismiss cheerline:", error);
+        }
+      } else {
+        // localStorage-based message - persist the updated list
+        saveUserProfileToStorage({ 
+          userName, 
+          encouragementMessage,
+          useCustomMessage,
+          friendWelcomeMessages: updated,
+          savedCustomMessages,
+          selectedMessageIndex,
+        });
+      }
     }
   };
 
