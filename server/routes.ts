@@ -27,6 +27,12 @@ import {
   insertSharingSettingsSchema,
   seasons,
   insertSeasonSchema,
+  seasonTasks,
+  seasonCategories,
+  seasonPenalties,
+  insertSeasonTaskSchema,
+  insertSeasonCategorySchema,
+  insertSeasonPenaltySchema,
 } from "@shared/schema";
 import { and, or } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -1270,6 +1276,293 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error deleting season:", error);
       res.status(500).json({ error: "Failed to delete season" });
+    }
+  });
+
+  // Get season with all data (tasks, categories, penalties)
+  app.get("/api/seasons/:id/data", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Verify season belongs to user
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+
+      // Get all associated data
+      const tasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, id));
+      const categories = await db.select().from(seasonCategories).where(eq(seasonCategories.seasonId, id));
+      const penalties = await db.select().from(seasonPenalties).where(eq(seasonPenalties.seasonId, id));
+
+      res.json({
+        ...season,
+        tasks,
+        categories,
+        penalties,
+      });
+    } catch (error) {
+      console.error("Error fetching season data:", error);
+      res.status(500).json({ error: "Failed to fetch season data" });
+    }
+  });
+
+  // Save season tasks (replaces all tasks for a season)
+  app.put("/api/seasons/:id/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { tasks } = req.body;
+
+      // Verify season belongs to user and is not archived
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      if (season.isArchived) {
+        return res.status(400).json({ error: "Cannot modify an archived season" });
+      }
+
+      // Delete existing tasks and insert new ones
+      await db.delete(seasonTasks).where(eq(seasonTasks.seasonId, id));
+      
+      if (tasks && tasks.length > 0) {
+        const taskValues = tasks.map((t: any) => ({
+          seasonId: id,
+          name: t.name,
+          value: t.value,
+          category: t.category || "General",
+          priority: t.priority || "shouldDo",
+          boosterRule: t.boosterRule || null,
+          penaltyRule: t.penaltyRule || null,
+        }));
+        await db.insert(seasonTasks).values(taskValues);
+      }
+
+      const updatedTasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, id));
+      res.json(updatedTasks);
+    } catch (error) {
+      console.error("Error saving season tasks:", error);
+      res.status(500).json({ error: "Failed to save season tasks" });
+    }
+  });
+
+  // Save season categories (replaces all categories for a season)
+  app.put("/api/seasons/:id/categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { categories } = req.body;
+
+      // Verify season belongs to user and is not archived
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      if (season.isArchived) {
+        return res.status(400).json({ error: "Cannot modify an archived season" });
+      }
+
+      // Delete existing categories and insert new ones
+      await db.delete(seasonCategories).where(eq(seasonCategories.seasonId, id));
+      
+      if (categories && categories.length > 0) {
+        const categoryValues = categories.map((c: any) => ({
+          seasonId: id,
+          name: c.name,
+        }));
+        await db.insert(seasonCategories).values(categoryValues);
+      }
+
+      const updatedCategories = await db.select().from(seasonCategories).where(eq(seasonCategories.seasonId, id));
+      res.json(updatedCategories);
+    } catch (error) {
+      console.error("Error saving season categories:", error);
+      res.status(500).json({ error: "Failed to save season categories" });
+    }
+  });
+
+  // Save season penalties (replaces all penalties for a season)
+  app.put("/api/seasons/:id/penalties", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { penalties } = req.body;
+
+      // Verify season belongs to user and is not archived
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      if (season.isArchived) {
+        return res.status(400).json({ error: "Cannot modify an archived season" });
+      }
+
+      // Delete existing penalties and insert new ones
+      await db.delete(seasonPenalties).where(eq(seasonPenalties.seasonId, id));
+      
+      if (penalties && penalties.length > 0) {
+        const penaltyValues = penalties.map((p: any) => ({
+          seasonId: id,
+          name: p.name,
+          value: p.value,
+          negativeBoostEnabled: p.negativeBoostEnabled || false,
+          timesThreshold: p.timesThreshold || null,
+          period: p.period || null,
+          boostPenaltyPoints: p.boostPenaltyPoints || null,
+        }));
+        await db.insert(seasonPenalties).values(penaltyValues);
+      }
+
+      const updatedPenalties = await db.select().from(seasonPenalties).where(eq(seasonPenalties.seasonId, id));
+      res.json(updatedPenalties);
+    } catch (error) {
+      console.error("Error saving season penalties:", error);
+      res.status(500).json({ error: "Failed to save season penalties" });
+    }
+  });
+
+  // Update season settings (weekly goal, etc.)
+  app.put("/api/seasons/:id/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { weeklyGoal } = req.body;
+
+      // Verify season belongs to user and is not archived
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      if (season.isArchived) {
+        return res.status(400).json({ error: "Cannot modify an archived season" });
+      }
+
+      const [updated] = await db.update(seasons)
+        .set({ weeklyGoal })
+        .where(eq(seasons.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating season settings:", error);
+      res.status(500).json({ error: "Failed to update season settings" });
+    }
+  });
+
+  // Archive a season
+  app.put("/api/seasons/:id/archive", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Verify season belongs to user
+      const [season] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+
+      const [updated] = await db.update(seasons)
+        .set({ isArchived: true, isActive: false, archivedAt: new Date() })
+        .where(eq(seasons.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error archiving season:", error);
+      res.status(500).json({ error: "Failed to archive season" });
+    }
+  });
+
+  // Import tasks from another season
+  app.post("/api/seasons/:id/import", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { sourceSeasonId, taskIds, categoryNames } = req.body;
+
+      // Verify target season belongs to user and is not archived
+      const [targetSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.id, id), eq(seasons.userId, userId))
+      );
+      if (!targetSeason) {
+        return res.status(404).json({ error: "Target season not found" });
+      }
+      if (targetSeason.isArchived) {
+        return res.status(400).json({ error: "Cannot modify an archived season" });
+      }
+
+      // Verify source season belongs to user
+      const [sourceSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.id, sourceSeasonId), eq(seasons.userId, userId))
+      );
+      if (!sourceSeason) {
+        return res.status(404).json({ error: "Source season not found" });
+      }
+
+      // Get source tasks and categories
+      const sourceTasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, sourceSeasonId));
+      const sourceCategories = await db.select().from(seasonCategories).where(eq(seasonCategories.seasonId, sourceSeasonId));
+
+      // Filter and import selected tasks
+      const tasksToImport = taskIds 
+        ? sourceTasks.filter(t => taskIds.includes(t.id))
+        : sourceTasks;
+
+      if (tasksToImport.length > 0) {
+        const taskValues = tasksToImport.map(t => ({
+          seasonId: id,
+          name: t.name,
+          value: t.value,
+          category: t.category,
+          priority: t.priority,
+          boosterRule: t.boosterRule,
+          penaltyRule: t.penaltyRule,
+        }));
+        await db.insert(seasonTasks).values(taskValues);
+      }
+
+      // Filter and import selected categories
+      const categoriesToImport = categoryNames
+        ? sourceCategories.filter(c => categoryNames.includes(c.name))
+        : sourceCategories;
+
+      if (categoriesToImport.length > 0) {
+        // Get existing categories in target season to avoid duplicates
+        const existingCategories = await db.select().from(seasonCategories).where(eq(seasonCategories.seasonId, id));
+        const existingNames = new Set(existingCategories.map(c => c.name));
+        
+        const newCategories = categoriesToImport.filter(c => !existingNames.has(c.name));
+        if (newCategories.length > 0) {
+          const categoryValues = newCategories.map(c => ({
+            seasonId: id,
+            name: c.name,
+          }));
+          await db.insert(seasonCategories).values(categoryValues);
+        }
+      }
+
+      // Return updated data
+      const updatedTasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, id));
+      const updatedCategories = await db.select().from(seasonCategories).where(eq(seasonCategories.seasonId, id));
+
+      res.json({ tasks: updatedTasks, categories: updatedCategories });
+    } catch (error) {
+      console.error("Error importing from season:", error);
+      res.status(500).json({ error: "Failed to import from season" });
     }
   });
 

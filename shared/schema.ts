@@ -486,9 +486,94 @@ export const seasons = pgTable("seasons", {
   name: varchar("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(false),
+  isArchived: boolean("is_archived").default(false),
+  weeklyGoal: integer("weekly_goal").default(100),
+  createdAt: timestamp("created_at").defaultNow(),
+  archivedAt: timestamp("archived_at"),
+});
+
+export const insertSeasonSchema = createInsertSchema(seasons).omit({ id: true, createdAt: true, archivedAt: true });
+export type InsertSeason = z.infer<typeof insertSeasonSchema>;
+export type Season = typeof seasons.$inferSelect;
+
+// Season tasks table - stores tasks for each season
+export const seasonTasks = pgTable("season_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seasonId: varchar("season_id").notNull().references(() => seasons.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  value: integer("value").notNull().default(10),
+  category: varchar("category").notNull().default("General"),
+  priority: varchar("priority").notNull().default("shouldDo"),
+  boosterRule: jsonb("booster_rule"),
+  penaltyRule: jsonb("penalty_rule"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertSeasonSchema = createInsertSchema(seasons).omit({ id: true, createdAt: true });
-export type InsertSeason = z.infer<typeof insertSeasonSchema>;
-export type Season = typeof seasons.$inferSelect;
+export const insertSeasonTaskSchema = createInsertSchema(seasonTasks).omit({ id: true, createdAt: true });
+export type InsertSeasonTask = z.infer<typeof insertSeasonTaskSchema>;
+export type SeasonTask = typeof seasonTasks.$inferSelect;
+
+// Season categories table - stores categories for each season
+export const seasonCategories = pgTable("season_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seasonId: varchar("season_id").notNull().references(() => seasons.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSeasonCategorySchema = createInsertSchema(seasonCategories).omit({ id: true, createdAt: true });
+export type InsertSeasonCategory = z.infer<typeof insertSeasonCategorySchema>;
+export type SeasonCategory = typeof seasonCategories.$inferSelect;
+
+// Season penalties table - stores penalties for each season
+export const seasonPenalties = pgTable("season_penalties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seasonId: varchar("season_id").notNull().references(() => seasons.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  value: integer("value").notNull().default(-5),
+  negativeBoostEnabled: boolean("negative_boost_enabled").default(false),
+  timesThreshold: integer("times_threshold"),
+  period: varchar("period"),
+  boostPenaltyPoints: integer("boost_penalty_points"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSeasonPenaltySchema = createInsertSchema(seasonPenalties).omit({ id: true, createdAt: true });
+export type InsertSeasonPenalty = z.infer<typeof insertSeasonPenaltySchema>;
+export type SeasonPenalty = typeof seasonPenalties.$inferSelect;
+
+// Full season data type for API responses
+export const seasonWithDataSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  isActive: z.boolean().nullable(),
+  isArchived: z.boolean().nullable(),
+  weeklyGoal: z.number().nullable(),
+  createdAt: z.date().nullable(),
+  archivedAt: z.date().nullable(),
+  tasks: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    value: z.number(),
+    category: z.string(),
+    priority: z.string(),
+    boosterRule: z.any().nullable(),
+    penaltyRule: z.any().nullable(),
+  })),
+  categories: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+  })),
+  penalties: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    value: z.number(),
+    negativeBoostEnabled: z.boolean().nullable(),
+    timesThreshold: z.number().nullable(),
+    period: z.string().nullable(),
+    boostPenaltyPoints: z.number().nullable(),
+  })),
+});
+export type SeasonWithData = z.infer<typeof seasonWithDataSchema>;
