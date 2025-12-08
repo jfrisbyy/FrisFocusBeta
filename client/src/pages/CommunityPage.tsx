@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useDemo } from "@/contexts/DemoContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -66,6 +66,20 @@ import type {
   StoredCircleTaskAdjustmentRequest,
   StoredFriendActivity,
   CircleTaskType,
+} from "@/lib/storage";
+import {
+  loadFriendsFromStorage,
+  saveFriendsToStorage,
+  loadCirclesFromStorage,
+  saveCirclesToStorage,
+  loadCommunityPostsFromStorage,
+  saveCommunityPostsToStorage,
+  loadDirectMessagesFromStorage,
+  saveDirectMessagesToStorage,
+  loadCircleMessagesFromStorage,
+  saveCircleMessagesToStorage,
+  loadCirclePostsFromStorage,
+  saveCirclePostsToStorage,
 } from "@/lib/storage";
 
 interface FriendRequest {
@@ -500,9 +514,9 @@ export default function CommunityPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
-  const [friends, setFriends] = useState<StoredFriend[]>(demoFriends);
-  const [requests, setRequests] = useState<FriendRequest[]>(demoRequests);
-  const [circles, setCircles] = useState<StoredCircle[]>(demoCircles);
+  const [friends, setFriends] = useState<StoredFriend[]>([]);
+  const [requests, setRequests] = useState<FriendRequest[]>([]);
+  const [circles, setCircles] = useState<StoredCircle[]>([]);
   const [selectedCircle, setSelectedCircle] = useState<StoredCircle | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingFriend, setEditingFriend] = useState<StoredFriend | null>(null);
@@ -514,63 +528,34 @@ export default function CommunityPage() {
   const [dmMessage, setDmMessage] = useState("");
   const [cheerlineFriend, setCheerlineFriend] = useState<StoredFriend | null>(null);
   const [cheerlineMessage, setCheerlineMessage] = useState("");
-  const [directMessages, setDirectMessages] = useState<Record<string, StoredDirectMessage[]>>(demoDirectMessages);
-  const [communityPosts, setCommunityPosts] = useState<StoredCommunityPost[]>(demoCommunityPosts);
+  const [directMessages, setDirectMessages] = useState<Record<string, StoredDirectMessage[]>>({});
+  const [communityPosts, setCommunityPosts] = useState<StoredCommunityPost[]>([]);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostVisibility, setNewPostVisibility] = useState<"public" | "friends">("friends");
-  const [circleMessages, setCircleMessages] = useState<Record<string, StoredCircleMessage[]>>(demoCircleMessages);
-  const [circlePosts, setCirclePosts] = useState<Record<string, StoredCirclePost[]>>(demoCirclePosts);
-  const [circleMembers, setCircleMembers] = useState<Record<string, StoredCircleMember[]>>(demoCircleMembers);
+  const [circleMessages, setCircleMessages] = useState<Record<string, StoredCircleMessage[]>>({});
+  const [circlePosts, setCirclePosts] = useState<Record<string, StoredCirclePost[]>>({});
+  const [circleMembers, setCircleMembers] = useState<Record<string, StoredCircleMember[]>>({});
   const [newCircleMessage, setNewCircleMessage] = useState("");
   const [newCirclePost, setNewCirclePost] = useState("");
+  const [dataLoaded, setDataLoaded] = useState(false);
   
-  const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>(demoTaskRequests);
+  const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskValue, setNewTaskValue] = useState("10");
   const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
-  const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>(demoCircleTasks);
+  const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>({});
   const [circleDetailTab, setCircleDetailTab] = useState("tasks");
   
   // Circle badges and awards state (mutable versions of demo data)
-  const [circleBadges, setCircleBadges] = useState<Record<string, CircleBadge[]>>(demoCircleBadges);
-  const [circleAwards, setCircleAwards] = useState<Record<string, CircleAward[]>>(demoCircleAwards);
+  const [circleBadges, setCircleBadges] = useState<Record<string, CircleBadge[]>>({});
+  const [circleAwards, setCircleAwards] = useState<Record<string, CircleAward[]>>({});
   
   // Task completion tracking - who completed what tasks today
-  const [myCompletedTasks, setMyCompletedTasks] = useState<Record<string, string[]>>({
-    "circle-1": ["ct1", "ct3"],
-    "circle-2": ["ct6", "ct7"],
-  });
+  const [myCompletedTasks, setMyCompletedTasks] = useState<Record<string, string[]>>({});
   
-  // Demo data: who completed which tasks today
-  const [circleTaskCompletions, setCircleTaskCompletions] = useState<Record<string, Record<string, { userId: string; userName: string; completedAt: string }[]>>>({
-    "circle-1": {
-      "ct1": [
-        { userId: "u1", userName: "Sarah M", completedAt: new Date(Date.now() - 7200000).toISOString() },
-        { userId: "u2", userName: "Lisa K", completedAt: new Date(Date.now() - 3600000).toISOString() },
-        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 1800000).toISOString() },
-      ],
-      "ct2": [
-        { userId: "u3", userName: "Emma T", completedAt: new Date(Date.now() - 5400000).toISOString() },
-      ],
-      "ct3": [
-        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 900000).toISOString() },
-        { userId: "u1", userName: "Sarah M", completedAt: new Date(Date.now() - 600000).toISOString() },
-      ],
-    },
-    "circle-2": {
-      "ct6": [
-        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 3600000).toISOString() },
-        { userId: "u5", userName: "Tommy", completedAt: new Date(Date.now() - 1800000).toISOString() },
-      ],
-      "ct7": [
-        { userId: "you", userName: "You", completedAt: new Date(Date.now() - 7200000).toISOString() },
-      ],
-      "ct9": [
-        { userId: "u4", userName: "Dad", completedAt: new Date(Date.now() - 86400000).toISOString() },
-      ],
-    },
-  });
+  // Data: who completed which tasks today
+  const [circleTaskCompletions, setCircleTaskCompletions] = useState<Record<string, Record<string, { userId: string; userName: string; completedAt: string }[]>>>({});
   
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   
@@ -600,7 +585,142 @@ export default function CommunityPage() {
   const circlePostFileRef = useRef<HTMLInputElement>(null);
   const feedPostFileRef = useRef<HTMLInputElement>(null);
   const dmFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  
+
+  // Load data based on demo mode
+  useEffect(() => {
+    if (isDemo) {
+      // Load demo data
+      setFriends(demoFriends);
+      setRequests(demoRequests);
+      setCircles(demoCircles);
+      setCircleMembers(demoCircleMembers);
+      setCircleTasks(demoCircleTasks);
+      setCircleMessages(demoCircleMessages);
+      setCirclePosts(demoCirclePosts);
+      setCommunityPosts(demoCommunityPosts);
+      setDirectMessages(demoDirectMessages);
+      setCircleBadges(demoCircleBadges);
+      setCircleAwards(demoCircleAwards);
+      setTaskRequests(demoTaskRequests);
+      setMyCompletedTasks({
+        "circle-1": ["ct1", "ct3"],
+        "circle-2": ["ct6", "ct7"],
+      });
+      setCircleTaskCompletions({
+        "circle-1": {
+          "ct1": [
+            { userId: "u1", userName: "Sarah M", completedAt: new Date(Date.now() - 7200000).toISOString() },
+            { userId: "u2", userName: "Lisa K", completedAt: new Date(Date.now() - 3600000).toISOString() },
+            { userId: "you", userName: "You", completedAt: new Date(Date.now() - 1800000).toISOString() },
+          ],
+          "ct2": [
+            { userId: "u3", userName: "Emma T", completedAt: new Date(Date.now() - 5400000).toISOString() },
+          ],
+          "ct3": [
+            { userId: "you", userName: "You", completedAt: new Date(Date.now() - 900000).toISOString() },
+            { userId: "u1", userName: "Sarah M", completedAt: new Date(Date.now() - 600000).toISOString() },
+          ],
+        },
+        "circle-2": {
+          "ct6": [
+            { userId: "you", userName: "You", completedAt: new Date(Date.now() - 3600000).toISOString() },
+            { userId: "u5", userName: "Tommy", completedAt: new Date(Date.now() - 1800000).toISOString() },
+          ],
+          "ct7": [
+            { userId: "you", userName: "You", completedAt: new Date(Date.now() - 7200000).toISOString() },
+          ],
+          "ct9": [
+            { userId: "u4", userName: "Dad", completedAt: new Date(Date.now() - 86400000).toISOString() },
+          ],
+        },
+      });
+    } else {
+      // Load real data from storage
+      setFriends(loadFriendsFromStorage());
+      setCircles(loadCirclesFromStorage());
+      setCommunityPosts(loadCommunityPostsFromStorage());
+      // Convert flat array to grouped by friend for direct messages
+      const storedDMs = loadDirectMessagesFromStorage();
+      const groupedDMs: Record<string, StoredDirectMessage[]> = {};
+      storedDMs.forEach(dm => {
+        const key = dm.senderId === "you" ? dm.recipientId : dm.senderId;
+        if (!groupedDMs[key]) groupedDMs[key] = [];
+        groupedDMs[key].push(dm);
+      });
+      setDirectMessages(groupedDMs);
+      // Load circle messages and posts (convert flat to grouped)
+      const storedCircleMessages = loadCircleMessagesFromStorage();
+      const groupedCircleMessages: Record<string, StoredCircleMessage[]> = {};
+      storedCircleMessages.forEach(msg => {
+        if (!groupedCircleMessages[msg.circleId]) groupedCircleMessages[msg.circleId] = [];
+        groupedCircleMessages[msg.circleId].push(msg);
+      });
+      setCircleMessages(groupedCircleMessages);
+      const storedCirclePosts = loadCirclePostsFromStorage();
+      const groupedCirclePosts: Record<string, StoredCirclePost[]> = {};
+      storedCirclePosts.forEach(post => {
+        if (!groupedCirclePosts[post.circleId]) groupedCirclePosts[post.circleId] = [];
+        groupedCirclePosts[post.circleId].push(post);
+      });
+      setCirclePosts(groupedCirclePosts);
+      // Clear demo-specific state
+      setRequests([]);
+      setCircleMembers({});
+      setCircleTasks({});
+      setCircleBadges({});
+      setCircleAwards({});
+      setTaskRequests([]);
+      setMyCompletedTasks({});
+      setCircleTaskCompletions({});
+    }
+    setDataLoaded(true);
+  }, [isDemo]);
+
+  // Save community posts to storage when changed (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && dataLoaded) {
+      saveCommunityPostsToStorage(communityPosts);
+    }
+  }, [communityPosts, isDemo, dataLoaded]);
+
+  // Save friends to storage when changed (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && dataLoaded) {
+      saveFriendsToStorage(friends);
+    }
+  }, [friends, isDemo, dataLoaded]);
+
+  // Save circles to storage when changed (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && dataLoaded) {
+      saveCirclesToStorage(circles);
+    }
+  }, [circles, isDemo, dataLoaded]);
+
+  // Save direct messages to storage when changed (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && dataLoaded) {
+      const allDMs: StoredDirectMessage[] = Object.values(directMessages).flat();
+      saveDirectMessagesToStorage(allDMs);
+    }
+  }, [directMessages, isDemo, dataLoaded]);
+
+  // Save circle messages to storage when changed (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && dataLoaded) {
+      const allMessages: StoredCircleMessage[] = Object.values(circleMessages).flat();
+      saveCircleMessagesToStorage(allMessages);
+    }
+  }, [circleMessages, isDemo, dataLoaded]);
+
+  // Save circle posts to storage when changed (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && dataLoaded) {
+      const allPosts: StoredCirclePost[] = Object.values(circlePosts).flat();
+      saveCirclePostsToStorage(allPosts);
+    }
+  }, [circlePosts, isDemo, dataLoaded]);
+
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
     "circle-1": {
