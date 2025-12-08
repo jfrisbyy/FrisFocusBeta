@@ -54,6 +54,8 @@ import {
   insertCirclePostCommentSchema,
   directMessages,
   insertDirectMessageSchema,
+  cheerlines,
+  insertCheerlineSchema,
   userTasks,
   userCategories,
   userPenalties,
@@ -2235,6 +2237,141 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error sending message:", error);
       res.status(400).json({ error: "Failed to send message" });
+    }
+  });
+
+  // ==================== CHEERLINES API ROUTES ====================
+
+  // Get cheerlines received by the current user (not expired)
+  app.get("/api/cheerlines", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const now = new Date();
+
+      const receivedCheerlines = await db.select().from(cheerlines).where(
+        and(
+          eq(cheerlines.recipientId, userId),
+          or(
+            eq(cheerlines.expiresAt, null as any),
+            // Filter out expired cheerlines - expiresAt > now
+          )
+        )
+      ).orderBy(desc(cheerlines.createdAt));
+
+      // Filter out expired cheerlines in JS since SQL comparison can be tricky
+      const validCheerlines = receivedCheerlines.filter(c => 
+        !c.expiresAt || new Date(c.expiresAt) > now
+      );
+
+      // Get sender details for each cheerline
+      const cheerlinesWithSender = await Promise.all(
+        validCheerlines.map(async (cheerline) => {
+          const [sender] = await db.select().from(users).where(eq(users.id, cheerline.senderId));
+          return {
+            ...cheerline,
+            sender: sender ? {
+              id: sender.id,
+              firstName: sender.firstName,
+              lastName: sender.lastName,
+              displayName: sender.displayName,
+              profileImageUrl: sender.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json(cheerlinesWithSender);
+    } catch (error) {
+      console.error("Error fetching cheerlines:", error);
+      res.status(500).json({ error: "Failed to fetch cheerlines" });
+    }
+  });
+
+  // Send a cheerline to a friend
+  app.post("/api/cheerlines/:userId", isAuthenticated, async (req: any, res) => {
+    try {
+      const senderId = req.user.claims.sub;
+      const recipientId = req.params.userId;
+
+      // Verify recipient exists
+      const [recipient] = await db.select().from(users).where(eq(users.id, recipientId));
+      if (!recipient) {
+        return res.status(404).json({ error: "Recipient not found" });
+      }
+
+      // Verify they are friends (both directions)
+      const [friendship] = await db.select().from(friendships).where(
+        or(
+          and(eq(friendships.userId, senderId), eq(friendships.friendId, recipientId), eq(friendships.status, "accepted")),
+          and(eq(friendships.userId, recipientId), eq(friendships.friendId, senderId), eq(friendships.status, "accepted"))
+        )
+      );
+
+      if (!friendship) {
+        return res.status(403).json({ error: "You can only send cheerlines to friends" });
+      }
+
+      // Calculate expiration date (3 days from now)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      const parsed = insertCheerlineSchema.parse({
+        senderId,
+        recipientId,
+        message: req.body.message,
+        expiresAt,
+        read: false,
+      });
+
+      const [cheerline] = await db.insert(cheerlines).values(parsed).returning();
+
+      res.json(cheerline);
+    } catch (error) {
+      console.error("Error sending cheerline:", error);
+      res.status(400).json({ error: "Failed to send cheerline" });
+    }
+  });
+
+  // Mark a cheerline as read
+  app.put("/api/cheerlines/:id/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cheerlineId = req.params.id;
+
+      const [updated] = await db.update(cheerlines)
+        .set({ read: true })
+        .where(and(eq(cheerlines.id, cheerlineId), eq(cheerlines.recipientId, userId)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Cheerline not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error marking cheerline as read:", error);
+      res.status(400).json({ error: "Failed to update cheerline" });
+    }
+  });
+
+  // Dismiss/delete a cheerline
+  app.delete("/api/cheerlines/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cheerlineId = req.params.id;
+
+      const [deleted] = await db.delete(cheerlines)
+        .where(and(eq(cheerlines.id, cheerlineId), eq(cheerlines.recipientId, userId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Cheerline not found" });
+      }
+
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting cheerline:", error);
+      res.status(400).json({ error: "Failed to delete cheerline" });
     }
   });
 

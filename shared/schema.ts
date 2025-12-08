@@ -724,6 +724,21 @@ export const insertCirclePostCommentSchema = createInsertSchema(circlePostCommen
 export type InsertCirclePostComment = z.infer<typeof insertCirclePostCommentSchema>;
 export type CirclePostComment = typeof circlePostComments.$inferSelect;
 
+// Cheerlines - encouraging messages sent from one user to another
+export const cheerlines = pgTable("cheerlines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  recipientId: varchar("recipient_id").notNull().references(() => users.id),
+  message: text("message").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  read: boolean("read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCheerlineSchema = createInsertSchema(cheerlines).omit({ id: true, createdAt: true });
+export type InsertCheerline = z.infer<typeof insertCheerlineSchema>;
+export type Cheerline = typeof cheerlines.$inferSelect;
+
 // ==================== USER HABIT DATA TABLES (Cross-Device Sync) ====================
 
 // User tasks - personal task definitions that sync across devices
