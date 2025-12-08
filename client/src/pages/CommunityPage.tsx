@@ -2071,6 +2071,14 @@ export default function CommunityPage() {
                         : "bg-muted"
                     }`}
                   >
+                    {msg.imageUrl && (
+                      <img 
+                        src={msg.imageUrl} 
+                        alt="Shared image" 
+                        className="max-w-full rounded-md mb-2"
+                        style={{ maxHeight: "150px" }}
+                      />
+                    )}
                     <p className="text-sm">{msg.content}</p>
                     <p className={`text-xs mt-1 ${msg.senderId === "you" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                       {formatTime(msg.createdAt)}
@@ -2081,7 +2089,51 @@ export default function CommunityPage() {
             </div>
           </ScrollArea>
           
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={(el) => { dmFileRefs.current[dmFriend.friendId] = el; }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleDmImageUpload(dmFriend.friendId, file);
+            }}
+            data-testid="input-dm-dialog-image"
+          />
+          
+          {dmImagePreviews[dmFriend.friendId] && (
+            <div className="relative inline-block mb-2">
+              <img 
+                src={dmImagePreviews[dmFriend.friendId]!} 
+                alt="Preview" 
+                className="max-h-20 rounded-md"
+              />
+              <Button
+                size="icon"
+                variant="destructive"
+                className="absolute -top-2 -right-2 h-5 w-5"
+                onClick={() => clearDmImage(dmFriend.friendId)}
+                data-testid="button-clear-dm-dialog-image"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+          
           <div className="flex gap-2 mt-4">
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={() => dmFileRefs.current[dmFriend.friendId]?.click()}
+              disabled={dmUploading[dmFriend.friendId]}
+              data-testid="button-attach-dm-dialog-image"
+            >
+              {dmUploading[dmFriend.friendId] ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ImagePlus className="w-4 h-4" />
+              )}
+            </Button>
             <Input
               placeholder="Type a message..."
               value={dmMessage}
@@ -2277,12 +2329,62 @@ export default function CommunityPage() {
                             {msgs.map((msg) => (
                               <div key={msg.id} className={`flex mb-2 ${msg.senderId === "you" ? "justify-end" : "justify-start"}`}>
                                 <div className={`max-w-[80%] p-2 rounded-md text-sm ${msg.senderId === "you" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                                  {msg.imageUrl && (
+                                    <img 
+                                      src={msg.imageUrl} 
+                                      alt="Shared image" 
+                                      className="max-w-full rounded-md mb-1"
+                                      style={{ maxHeight: "150px" }}
+                                    />
+                                  )}
                                   {msg.content}
                                 </div>
                               </div>
                             ))}
                           </ScrollArea>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            ref={(el) => { dmFileRefs.current[friendId] = el; }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleDmImageUpload(friendId, file);
+                            }}
+                            data-testid={`input-dm-image-${friendId}`}
+                          />
+                          {dmImagePreviews[friendId] && (
+                            <div className="relative inline-block mb-2">
+                              <img 
+                                src={dmImagePreviews[friendId]!} 
+                                alt="Preview" 
+                                className="max-h-20 rounded-md"
+                              />
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                className="absolute -top-2 -right-2 h-5 w-5"
+                                onClick={() => clearDmImage(friendId)}
+                                data-testid={`button-clear-dm-image-${friendId}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                           <div className="flex gap-2 mt-2">
+                            <Button 
+                              size="icon" 
+                              variant="ghost"
+                              onClick={() => dmFileRefs.current[friendId]?.click()}
+                              disabled={dmUploading[friendId]}
+                              data-testid={`button-attach-dm-image-${friendId}`}
+                            >
+                              {dmUploading[friendId] ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ImagePlus className="w-4 h-4" />
+                              )}
+                            </Button>
                             <Input
                               placeholder="Type a message..."
                               value={dmMessages[friendId] || ""}
