@@ -263,6 +263,98 @@ export async function registerRoutes(
     }
   });
 
+  // Search users for friend discovery (excludes current user and any existing friendship)
+  app.get('/api/users/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const { q = '', page = '1', limit = '10' } = req.query;
+      const searchTerm = (q as string).trim();
+      
+      // Require a search term of at least 2 characters to prevent enumeration
+      if (searchTerm.length < 2) {
+        return res.json({
+          users: [],
+          pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        });
+      }
+      
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(parseInt(limit as string) || 10, 20);
+      const offset = (pageNum - 1) * limitNum;
+      const searchPattern = `%${searchTerm.toLowerCase()}%`;
+      
+      // Get user IDs to exclude (current user + any existing relationship)
+      const existingRelationships = await db.select({
+        requesterId: friendships.requesterId,
+        addresseeId: friendships.addresseeId,
+      }).from(friendships).where(
+        or(
+          eq(friendships.requesterId, currentUserId),
+          eq(friendships.addresseeId, currentUserId)
+        )
+      );
+      
+      const excludedIds = new Set<string>([currentUserId]);
+      existingRelationships.forEach(f => {
+        excludedIds.add(f.requesterId);
+        excludedIds.add(f.addresseeId);
+      });
+      const excludedArray = Array.from(excludedIds);
+      
+      // Use raw SQL for ILIKE search with pagination at DB level
+      const { sql } = await import("drizzle-orm");
+      
+      // Get matching users with DB-level filtering and pagination
+      const searchResults = await db.execute(sql`
+        SELECT id, username, display_name, first_name, last_name, profile_image_url
+        FROM users
+        WHERE id NOT IN (${sql.raw(excludedArray.map(id => `'${id.replace(/'/g, "''")}'`).join(','))})
+          AND (
+            LOWER(COALESCE(display_name, '')) LIKE ${searchPattern}
+            OR LOWER(COALESCE(username, '')) LIKE ${searchPattern}
+            OR LOWER(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) LIKE ${searchPattern}
+          )
+        ORDER BY COALESCE(display_name, first_name, username) ASC
+        LIMIT ${limitNum} OFFSET ${offset}
+      `);
+      
+      // Get total count for pagination
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as total
+        FROM users
+        WHERE id NOT IN (${sql.raw(excludedArray.map(id => `'${id.replace(/'/g, "''")}'`).join(','))})
+          AND (
+            LOWER(COALESCE(display_name, '')) LIKE ${searchPattern}
+            OR LOWER(COALESCE(username, '')) LIKE ${searchPattern}
+            OR LOWER(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))) LIKE ${searchPattern}
+          )
+      `);
+      
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+      const paginatedUsers = (searchResults.rows as any[]).map(row => ({
+        id: row.id,
+        username: row.username,
+        displayName: row.display_name,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        profileImageUrl: row.profile_image_url,
+      }));
+      
+      res.json({
+        users: paginatedUsers,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        }
+      });
+    } catch (error) {
+      console.error("Error searching users:", error);
+      res.status(500).json({ message: "Failed to search users" });
+    }
+  });
+
   // ==================== MEDIA UPLOAD ROUTES (Protected) ====================
 
   // Get upload URL for media files

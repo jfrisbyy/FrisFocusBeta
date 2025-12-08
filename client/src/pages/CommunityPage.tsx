@@ -1078,6 +1078,24 @@ export default function CommunityPage() {
     },
   });
 
+  // User search query for discovering users (non-demo mode)
+  interface SearchUser {
+    id: string;
+    username: string | null;
+    displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    profileImageUrl: string | null;
+  }
+  interface UserSearchResponse {
+    users: SearchUser[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }
+  const userSearchQuery = useQuery<UserSearchResponse>({
+    queryKey: [`/api/users/search?q=${encodeURIComponent(directorySearch)}&page=${directoryPage}&limit=${USERS_PER_PAGE}`],
+    enabled: !isDemo && directorySearch.length >= 2,
+  });
+
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (emailOrUsername: string) => {
       const res = await apiRequest("POST", "/api/friends/request", { emailOrUsername });
@@ -4245,18 +4263,41 @@ export default function CommunityPage() {
                   </Button>
                 </form>
                 
-                {isDemo && (() => {
-                  const availableUsers = getAvailableUsers();
-                  const filteredUsers = availableUsers.filter(user => {
-                    const searchLower = directorySearch.toLowerCase();
-                    return user.displayName.toLowerCase().includes(searchLower) ||
-                           user.username.toLowerCase().includes(searchLower);
-                  });
-                  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
-                  const paginatedUsers = filteredUsers.slice(
-                    (directoryPage - 1) * USERS_PER_PAGE,
-                    directoryPage * USERS_PER_PAGE
-                  );
+                {(() => {
+                  // Get users from demo data or API query
+                  let displayUsers: { id: string; displayName: string; username: string; firstName: string; lastName: string; profileImageUrl: string | null }[] = [];
+                  let totalPages = 1;
+                  
+                  if (isDemo) {
+                    const availableUsers = getAvailableUsers();
+                    const filteredUsers = availableUsers.filter(u => {
+                      const searchLower = directorySearch.toLowerCase();
+                      return u.displayName.toLowerCase().includes(searchLower) ||
+                             u.username.toLowerCase().includes(searchLower);
+                    });
+                    totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+                    displayUsers = filteredUsers.slice(
+                      (directoryPage - 1) * USERS_PER_PAGE,
+                      directoryPage * USERS_PER_PAGE
+                    ).map(u => ({
+                      id: u.id,
+                      displayName: u.displayName,
+                      username: u.username,
+                      firstName: u.firstName,
+                      lastName: u.lastName,
+                      profileImageUrl: u.profileImageUrl,
+                    }));
+                  } else if (userSearchQuery.data) {
+                    displayUsers = userSearchQuery.data.users.map(u => ({
+                      id: u.id,
+                      displayName: u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Unknown',
+                      username: u.username || '',
+                      firstName: u.firstName || '',
+                      lastName: u.lastName || '',
+                      profileImageUrl: u.profileImageUrl,
+                    }));
+                    totalPages = userSearchQuery.data.pagination.totalPages;
+                  }
                   
                   return (
                     <div className="space-y-3 pt-2 border-t">
@@ -4278,60 +4319,75 @@ export default function CommunityPage() {
                       </div>
                       
                       <div className="space-y-2">
-                        {paginatedUsers.map((demoUser) => (
-                          <div
-                            key={demoUser.id}
-                            className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
-                            data-testid={`directory-user-${demoUser.id}`}
-                          >
-                            <ProfileHoverCard userId={demoUser.id}>
-                              <div className="flex items-center gap-2 cursor-pointer">
-                                <Avatar className="h-8 w-8">
-                                  {demoUser.profileImageUrl ? (
-                                    <AvatarImage src={demoUser.profileImageUrl} alt={demoUser.displayName} />
-                                  ) : null}
-                                  <AvatarFallback className="text-xs">
-                                    {demoUser.firstName[0]}{demoUser.lastName[0]}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-medium">{demoUser.displayName}</span>
-                                  <span className="text-xs text-muted-foreground">@{demoUser.username}</span>
+                        {!isDemo && directorySearch.length < 2 ? (
+                          <p className="text-sm text-muted-foreground text-center py-2">Enter at least 2 characters to search</p>
+                        ) : !isDemo && userSearchQuery.isLoading ? (
+                          <p className="text-sm text-muted-foreground text-center py-2">Loading...</p>
+                        ) : displayUsers.length > 0 ? (
+                          displayUsers.map((u) => (
+                            <div
+                              key={u.id}
+                              className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                              data-testid={`directory-user-${u.id}`}
+                            >
+                              <ProfileHoverCard userId={u.id}>
+                                <div className="flex items-center gap-2 cursor-pointer">
+                                  <Avatar className="h-8 w-8">
+                                    {u.profileImageUrl ? (
+                                      <AvatarImage src={u.profileImageUrl} alt={u.displayName} />
+                                    ) : null}
+                                    <AvatarFallback className="text-xs">
+                                      {(u.firstName?.[0] || u.displayName?.[0] || '?')}{(u.lastName?.[0] || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">{u.displayName}</span>
+                                    {u.username && <span className="text-xs text-muted-foreground">@{u.username}</span>}
+                                  </div>
                                 </div>
+                              </ProfileHoverCard>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    if (isDemo) {
+                                      toast({
+                                        title: "Demo Mode",
+                                        description: `Friend request would be sent to ${u.displayName}`,
+                                      });
+                                    } else {
+                                      sendFriendRequestMutation.mutate(u.username || u.id);
+                                    }
+                                  }}
+                                  data-testid={`button-add-friend-${u.id}`}
+                                >
+                                  <UserPlus className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    if (isDemo) {
+                                      toast({
+                                        title: "Demo Mode",
+                                        description: `Message would open to ${u.displayName}`,
+                                      });
+                                    } else {
+                                      toast({
+                                        title: "Coming soon",
+                                        description: "Direct messaging will be available soon",
+                                      });
+                                    }
+                                  }}
+                                  data-testid={`button-message-${u.id}`}
+                                >
+                                  <MessageCircle className="w-4 h-4" />
+                                </Button>
                               </div>
-                            </ProfileHoverCard>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  toast({
-                                    title: "Demo Mode",
-                                    description: `Friend request would be sent to ${demoUser.displayName}`,
-                                  });
-                                }}
-                                data-testid={`button-add-friend-${demoUser.id}`}
-                              >
-                                <UserPlus className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  toast({
-                                    title: "Demo Mode",
-                                    description: `Message would open to ${demoUser.displayName}`,
-                                  });
-                                }}
-                                data-testid={`button-message-${demoUser.id}`}
-                              >
-                                <MessageCircle className="w-4 h-4" />
-                              </Button>
                             </div>
-                          </div>
-                        ))}
-                        
-                        {filteredUsers.length === 0 && (
+                          ))
+                        ) : (
                           <p className="text-sm text-muted-foreground text-center py-2">No users found</p>
                         )}
                       </div>
@@ -4958,13 +5014,12 @@ export default function CommunityPage() {
                 const currentUserId = isDemo ? "you" : user?.id;
                 const yourWeeklyPoints = circleMembers[selectedCircle.id]?.find(m => m.userId === currentUserId)?.weeklyPoints || 0;
                 
-                // Calculate actual daily points from today's completions
-                const yourDailyCompletions = isDemo
-                  ? demoMemberDailyCompletions[selectedCircle.id]?.[currentUserId || ""] || []
-                  : (circleCompletionsQuery.data || []).filter(c => c.userId === currentUserId);
+                // Calculate actual daily points from today's completions using dynamic state
+                const myCompleted = myCompletedTasks[selectedCircle.id] || [];
+                const circleTasksList = circleTasks[selectedCircle.id] || [];
                 
-                const yourDailyPoints = yourDailyCompletions.reduce((sum, t) => {
-                  const task = (circleTasks[selectedCircle.id] || []).find(ct => ct.id === t.taskId);
+                const yourDailyPoints = myCompleted.reduce((sum, taskId) => {
+                  const task = circleTasksList.find(ct => ct.id === taskId);
                   return sum + (task?.value || 0);
                 }, 0);
                 
