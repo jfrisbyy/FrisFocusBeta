@@ -164,10 +164,10 @@ export default function TasksPage() {
   const [seasonName, setSeasonName] = useState("");
   const [seasonDescription, setSeasonDescription] = useState("");
 
-  // Fetch seasons from API
+  // Fetch seasons from API (available to all authenticated users)
   const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Season[]>({
     queryKey: ["/api/seasons"],
-    enabled: !useMockData,
+    enabled: !isDemo,
   });
 
   const activeSeason = seasons.find((s) => s.isActive);
@@ -576,14 +576,16 @@ export default function TasksPage() {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 Season
               </div>
-              <Button size="sm" variant="ghost" onClick={handleOpenCreateSeason} data-testid="button-add-season">
-                <Plus className="h-4 w-4" />
-              </Button>
+              {!isDemo && (
+                <Button size="sm" variant="ghost" onClick={handleOpenCreateSeason} data-testid="button-add-season">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {useMockData ? (
-              <span className="text-sm text-muted-foreground">Seasons not available in demo</span>
+            {isDemo ? (
+              <span className="text-sm text-muted-foreground">Sign in to use seasons</span>
             ) : seasonsLoading ? (
               <span className="text-sm text-muted-foreground">Loading...</span>
             ) : (

@@ -1020,7 +1020,8 @@ export default function CommunityPage() {
   };
 
   const handleSendDM = () => {
-    if (!dmFriend || !dmMessage.trim()) return;
+    if (!dmFriend || (!dmMessage.trim() && !dmImages[dmFriend.friendId])) return;
+    const imageUrl = dmImages[dmFriend.friendId] || undefined;
     const newDM: StoredDirectMessage = {
       id: `dm-${Date.now()}`,
       senderId: "you",
@@ -1030,10 +1031,12 @@ export default function CommunityPage() {
       content: dmMessage.trim(),
       createdAt: new Date().toISOString(),
       read: true,
+      imageUrl,
     };
     const currentDMs = directMessages[dmFriend.friendId] || [];
     setDirectMessages({ ...directMessages, [dmFriend.friendId]: [...currentDMs, newDM] });
     setDmMessage("");
+    clearDmImage(dmFriend.friendId);
     toast({ title: "Message sent" });
   };
 
