@@ -131,25 +131,28 @@ export default function FriendsPage() {
   const { toast } = useToast();
   const [emailOrUsername, setEmailOrUsername] = useState("");
 
-  const { data: friends = [], isLoading: loadingFriends } = useQuery<Friend[]>({
+  const { data: friends = [], isLoading: loadingFriends, isFetched: friendsFetched } = useQuery<Friend[]>({
     queryKey: ["/api/friends"],
     enabled: isAuthenticated,
   });
 
-  const { data: incomingRequests = [], isLoading: loadingIncoming } = useQuery<FriendRequest[]>({
+  const { data: incomingRequests = [], isLoading: loadingIncoming, isFetched: incomingFetched } = useQuery<FriendRequest[]>({
     queryKey: ["/api/friends/requests"],
     enabled: isAuthenticated,
   });
 
-  const { data: outgoingRequests = [], isLoading: loadingOutgoing } = useQuery<FriendRequest[]>({
+  const { data: outgoingRequests = [], isLoading: loadingOutgoing, isFetched: outgoingFetched } = useQuery<FriendRequest[]>({
     queryKey: ["/api/friends/requests/outgoing"],
     enabled: isAuthenticated,
   });
 
-  const { data: settings } = useQuery<SharingSettings>({
+  const { data: settings, isFetched: settingsFetched } = useQuery<SharingSettings>({
     queryKey: ["/api/friends/settings"],
     enabled: isAuthenticated,
   });
+
+  // Wait for API queries to be fetched before showing API data instead of demo data
+  const apiQueriesReady = isDemo || (friendsFetched && incomingFetched && outgoingFetched && settingsFetched);
 
   const sendRequestMutation = useMutation({
     mutationFn: async (emailOrUsername: string) => {
@@ -238,10 +241,12 @@ export default function FriendsPage() {
     return "Unknown User";
   };
 
-  const displayFriends = isDemo ? demoFriends : friends;
-  const displayIncoming = isDemo ? demoIncomingRequests : incomingRequests;
-  const displayOutgoing = isDemo ? demoOutgoingRequests : outgoingRequests;
-  const displaySettings = isDemo ? demoSettings : settings;
+  // Use demo data if in demo mode, or if API queries haven't finished loading yet
+  const useDemoData = isDemo || !apiQueriesReady;
+  const displayFriends = useDemoData ? demoFriends : friends;
+  const displayIncoming = useDemoData ? demoIncomingRequests : incomingRequests;
+  const displayOutgoing = useDemoData ? demoOutgoingRequests : outgoingRequests;
+  const displaySettings = useDemoData ? demoSettings : settings;
 
   return (
     <div className="container max-w-4xl mx-auto p-6 space-y-6">
