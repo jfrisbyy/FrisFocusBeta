@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, CalendarCheck, ListTodo, Award, BookOpen, Sparkles, Dumbbell, Users, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { SiGoogle } from "react-icons/si";
+import ProfileDialog from "@/components/ProfileDialog";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -21,6 +23,7 @@ const navItems = [
 export default function Navigation() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogin = async () => {
     try {
@@ -69,13 +72,19 @@ export default function Navigation() {
         
         {user ? (
           <div className="flex items-center gap-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
-              <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
-            </Avatar>
-            <span className="hidden md:inline text-sm text-muted-foreground">
-              {user.firstName || user.email?.split("@")[0] || "User"}
-            </span>
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="flex items-center gap-2 rounded-md hover-elevate active-elevate-2 p-1 -m-1"
+              data-testid="button-open-profile"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
+                <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+              </Avatar>
+              <span className="hidden md:inline text-sm text-muted-foreground">
+                {user.firstName || user.email?.split("@")[0] || "User"}
+              </span>
+            </button>
             <Button
               variant="ghost"
               size="icon"
@@ -85,6 +94,7 @@ export default function Navigation() {
             >
               <LogOut className="h-4 w-4" />
             </Button>
+            <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} user={user} />
           </div>
         ) : (
           <Button

@@ -129,7 +129,7 @@ export default function FriendsPage() {
   const { isAuthenticated } = useAuth();
   const { isDemo } = useDemo();
   const { toast } = useToast();
-  const [email, setEmail] = useState("");
+  const [emailOrUsername, setEmailOrUsername] = useState("");
 
   const { data: friends = [], isLoading: loadingFriends } = useQuery<Friend[]>({
     queryKey: ["/api/friends"],
@@ -152,12 +152,12 @@ export default function FriendsPage() {
   });
 
   const sendRequestMutation = useMutation({
-    mutationFn: async (email: string) => {
-      return apiRequest("POST", "/api/friends/request", { email });
+    mutationFn: async (emailOrUsername: string) => {
+      return apiRequest("POST", "/api/friends/request", { emailOrUsername });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/friends/requests/outgoing"] });
-      setEmail("");
+      setEmailOrUsername("");
       toast({ title: "Friend request sent", description: "Your friend request has been sent." });
     },
     onError: (error: Error) => {
@@ -220,8 +220,8 @@ export default function FriendsPage() {
 
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
-      sendRequestMutation.mutate(email.trim());
+    if (emailOrUsername.trim()) {
+      sendRequestMutation.mutate(emailOrUsername.trim());
     }
   };
 
@@ -273,15 +273,15 @@ export default function FriendsPage() {
                 <UserPlus className="w-5 h-5" />
                 Add Friend
               </CardTitle>
-              <CardDescription>Send a friend request by email</CardDescription>
+              <CardDescription>Send a friend request by email or username</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSendRequest} className="flex gap-2">
                 <Input
-                  type="email"
-                  placeholder="friend@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  placeholder="email@example.com or username"
+                  value={emailOrUsername}
+                  onChange={(e) => setEmailOrUsername(e.target.value)}
                   data-testid="input-friend-email"
                 />
                 <Button type="submit" disabled={sendRequestMutation.isPending} data-testid="button-send-request">

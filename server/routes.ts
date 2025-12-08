@@ -82,6 +82,56 @@ export async function registerRoutes(
     }
   });
 
+  // Update user profile (username)
+  app.put('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { username } = req.body;
+
+      // Validate username format if provided
+      if (username !== null && username !== undefined) {
+        if (typeof username !== "string") {
+          return res.status(400).json({ message: "Invalid username format" });
+        }
+        if (username.length > 0) {
+          if (username.length < 3) {
+            return res.status(400).json({ message: "Username must be at least 3 characters" });
+          }
+          if (username.length > 20) {
+            return res.status(400).json({ message: "Username must be 20 characters or less" });
+          }
+          if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            return res.status(400).json({ message: "Username can only contain letters, numbers, and underscores" });
+          }
+
+          // Check if username is already taken by another user
+          const [existingUser] = await db.select().from(users).where(eq(users.username, username.toLowerCase()));
+          if (existingUser && existingUser.id !== userId) {
+            return res.status(400).json({ message: "Username is already taken" });
+          }
+        }
+      }
+
+      // Update user
+      const [updatedUser] = await db.update(users)
+        .set({ 
+          username: username ? username.toLowerCase() : null,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId))
+        .returning();
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
   // Firebase auth endpoint - create/update user from Firebase token
   app.post('/api/auth/firebase', isAuthenticated, async (req: any, res) => {
     try {
@@ -402,20 +452,35 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
-  // Send friend request (by email)
+  // Send friend request (by email or username)
   app.post("/api/friends/request", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { email } = req.body;
+      const { email, emailOrUsername } = req.body;
 
-      if (!email) {
-        return res.status(400).json({ error: "Email is required" });
+      // Support both old 'email' field and new 'emailOrUsername' field
+      const searchValue = emailOrUsername || email;
+
+      if (!searchValue) {
+        return res.status(400).json({ error: "Email or username is required" });
       }
 
-      // Find user by email
-      const [targetUser] = await db.select().from(users).where(eq(users.email, email));
+      // Determine if input looks like an email
+      const isEmail = searchValue.includes("@");
+      
+      // Find user by email or username
+      let targetUser;
+      if (isEmail) {
+        const [user] = await db.select().from(users).where(eq(users.email, searchValue));
+        targetUser = user;
+      } else {
+        // Search by username (case-insensitive by using lowercase)
+        const [user] = await db.select().from(users).where(eq(users.username, searchValue.toLowerCase()));
+        targetUser = user;
+      }
+      
       if (!targetUser) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: isEmail ? "User not found with that email" : "User not found with that username" });
       }
 
       if (targetUser.id === userId) {
