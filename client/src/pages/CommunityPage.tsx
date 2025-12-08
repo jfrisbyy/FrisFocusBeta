@@ -21,8 +21,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ProfileHoverCard from "@/components/ProfileHoverCard";
+import { getAvailableUsers, type DemoUser } from "@/lib/demoUsers";
 import {
   Users,
+  Search,
   UserPlus,
   Mail,
   Check,
@@ -977,6 +979,11 @@ export default function CommunityPage() {
   const [newCircleMessage, setNewCircleMessage] = useState("");
   const [newCirclePost, setNewCirclePost] = useState("");
   const [dataLoaded, setDataLoaded] = useState(false);
+  
+  // User directory state
+  const [directoryPage, setDirectoryPage] = useState(1);
+  const [directorySearch, setDirectorySearch] = useState("");
+  const USERS_PER_PAGE = 4;
   
   // Competition state (must be declared before queries that use it)
   const [showOpponentLeaderboard, setShowOpponentLeaderboard] = useState<string | null>(null);
@@ -4221,9 +4228,9 @@ export default function CommunityPage() {
                   <UserPlus className="w-5 h-5" />
                   Add Friend
                 </CardTitle>
-                <CardDescription>Send a friend request by email</CardDescription>
+                <CardDescription>Send a friend request by email or discover users</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <form onSubmit={handleSendRequest} className="flex gap-2">
                   <Input
                     type="email"
@@ -4237,6 +4244,126 @@ export default function CommunityPage() {
                     Send
                   </Button>
                 </form>
+                
+                {isDemo && (() => {
+                  const availableUsers = getAvailableUsers();
+                  const filteredUsers = availableUsers.filter(user => {
+                    const searchLower = directorySearch.toLowerCase();
+                    return user.displayName.toLowerCase().includes(searchLower) ||
+                           user.username.toLowerCase().includes(searchLower);
+                  });
+                  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+                  const paginatedUsers = filteredUsers.slice(
+                    (directoryPage - 1) * USERS_PER_PAGE,
+                    directoryPage * USERS_PER_PAGE
+                  );
+                  
+                  return (
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-sm font-medium text-muted-foreground">Discover Users</h4>
+                        <div className="relative flex-1 max-w-[200px]">
+                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search users..."
+                            value={directorySearch}
+                            onChange={(e) => {
+                              setDirectorySearch(e.target.value);
+                              setDirectoryPage(1);
+                            }}
+                            className="pl-8 h-8 text-sm"
+                            data-testid="input-directory-search"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {paginatedUsers.map((demoUser) => (
+                          <div
+                            key={demoUser.id}
+                            className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                            data-testid={`directory-user-${demoUser.id}`}
+                          >
+                            <ProfileHoverCard userId={demoUser.id}>
+                              <div className="flex items-center gap-2 cursor-pointer">
+                                <Avatar className="h-8 w-8">
+                                  {demoUser.profileImageUrl ? (
+                                    <AvatarImage src={demoUser.profileImageUrl} alt={demoUser.displayName} />
+                                  ) : null}
+                                  <AvatarFallback className="text-xs">
+                                    {demoUser.firstName[0]}{demoUser.lastName[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">{demoUser.displayName}</span>
+                                  <span className="text-xs text-muted-foreground">@{demoUser.username}</span>
+                                </div>
+                              </div>
+                            </ProfileHoverCard>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  toast({
+                                    title: "Demo Mode",
+                                    description: `Friend request would be sent to ${demoUser.displayName}`,
+                                  });
+                                }}
+                                data-testid={`button-add-friend-${demoUser.id}`}
+                              >
+                                <UserPlus className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  toast({
+                                    title: "Demo Mode",
+                                    description: `Message would open to ${demoUser.displayName}`,
+                                  });
+                                }}
+                                data-testid={`button-message-${demoUser.id}`}
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {filteredUsers.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-2">No users found</p>
+                        )}
+                      </div>
+                      
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDirectoryPage(p => Math.max(1, p - 1))}
+                            disabled={directoryPage === 1}
+                            data-testid="button-directory-prev"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <span className="text-sm text-muted-foreground" data-testid="text-directory-page">
+                            Page {directoryPage} of {totalPages}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDirectoryPage(p => Math.min(totalPages, p + 1))}
+                            disabled={directoryPage === totalPages}
+                            data-testid="button-directory-next"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
