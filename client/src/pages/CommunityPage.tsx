@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useDemo } from "@/contexts/DemoContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,8 @@ import {
   Pencil,
   Trash2,
   Gift,
+  ImagePlus,
+  Loader2,
 } from "lucide-react";
 import type { 
   StoredFriend, 
@@ -520,6 +523,7 @@ export default function CommunityPage() {
   const [circleMembers, setCircleMembers] = useState<Record<string, StoredCircleMember[]>>(demoCircleMembers);
   const [newCircleMessage, setNewCircleMessage] = useState("");
   const [newCirclePost, setNewCirclePost] = useState("");
+  
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>(demoTaskRequests);
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
@@ -576,6 +580,26 @@ export default function CommunityPage() {
   const [expandedDMFriend, setExpandedDMFriend] = useState<string | null>(null);
   const [dmMessages, setDmMessages] = useState<Record<string, string>>({});
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  
+  // Image upload state for messages and posts
+  const [circleMessageImage, setCircleMessageImage] = useState<string | null>(null);
+  const [circleMessageImagePreview, setCircleMessageImagePreview] = useState<string | null>(null);
+  const [circleMessageUploading, setCircleMessageUploading] = useState(false);
+  const [circlePostImage, setCirclePostImage] = useState<string | null>(null);
+  const [circlePostImagePreview, setCirclePostImagePreview] = useState<string | null>(null);
+  const [circlePostUploading, setCirclePostUploading] = useState(false);
+  const [feedPostImage, setFeedPostImage] = useState<string | null>(null);
+  const [feedPostImagePreview, setFeedPostImagePreview] = useState<string | null>(null);
+  const [feedPostUploading, setFeedPostUploading] = useState(false);
+  const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
+  const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
+  const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
+  
+  // File input refs for image uploads
+  const circleMessageFileRef = useRef<HTMLInputElement>(null);
+  const circlePostFileRef = useRef<HTMLInputElement>(null);
+  const feedPostFileRef = useRef<HTMLInputElement>(null);
+  const dmFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
@@ -863,6 +887,56 @@ export default function CommunityPage() {
     return taskRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
   }, [selectedCircle, taskRequests]);
 
+  // Image upload handler
+  const handleImageUpload = async (
+    file: File,
+    setImageUrl: (url: string | null) => void,
+    setPreview: (url: string | null) => void,
+    setUploading: (uploading: boolean) => void
+  ): Promise<string | null> => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Please select a JPG, PNG, GIF, or WebP image.", variant: "destructive" });
+      return null;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ title: "File too large", description: "Please select an image under 5MB.", variant: "destructive" });
+      return null;
+    }
+
+    const localPreviewUrl = URL.createObjectURL(file);
+    setPreview(localPreviewUrl);
+    setUploading(true);
+
+    try {
+      const uploadUrlRes = await apiRequest("POST", "/api/media/upload-url", {});
+      const { uploadURL } = await uploadUrlRes.json();
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
+
+      setImageUrl(uploadURL);
+      return uploadURL;
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast({ title: "Upload failed", description: "Failed to upload image. Please try again.", variant: "destructive" });
+      URL.revokeObjectURL(localPreviewUrl);
+      setPreview(null);
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (email.trim()) {
@@ -964,7 +1038,7 @@ export default function CommunityPage() {
   };
 
   const handleCreateFeedPost = () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() && !feedPostImage) return;
     const newPost: StoredCommunityPost = {
       id: `feed-${Date.now()}`,
       authorId: "you",
@@ -974,9 +1048,11 @@ export default function CommunityPage() {
       createdAt: new Date().toISOString(),
       likes: [],
       comments: [],
+      imageUrl: feedPostImage || undefined,
     };
     setCommunityPosts([newPost, ...communityPosts]);
     setNewPostContent("");
+    clearFeedPostImage();
     toast({ title: "Post shared" });
   };
 
@@ -1045,7 +1121,8 @@ export default function CommunityPage() {
 
   const handleSendDirectMessage = (friendId: string, friendName: string) => {
     const message = dmMessages[friendId] || "";
-    if (!message.trim()) return;
+    const imageUrl = dmImages[friendId] || null;
+    if (!message.trim() && !imageUrl) return;
     const msg: StoredDirectMessage = {
       id: `dm-${Date.now()}`,
       senderId: "you",
@@ -1055,15 +1132,132 @@ export default function CommunityPage() {
       content: message.trim(),
       createdAt: new Date().toISOString(),
       read: true,
+      imageUrl: imageUrl || undefined,
     };
     const currentMsgs = directMessages[friendId] || [];
     setDirectMessages({ ...directMessages, [friendId]: [...currentMsgs, msg] });
     setDmMessages({ ...dmMessages, [friendId]: "" });
+    clearDmImage(friendId);
     toast({ title: "Message sent" });
   };
 
+  // Image upload handler for circle messages and posts
+  const handleCircleImageUpload = async (
+    file: File,
+    type: "message" | "post"
+  ) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Please select a JPG, PNG, GIF, or WebP image.", variant: "destructive" });
+      return;
+    }
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ title: "File too large", description: "Please select an image under 5MB.", variant: "destructive" });
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    if (type === "message") {
+      setCircleMessageImagePreview(previewUrl);
+      setCircleMessageUploading(true);
+    } else {
+      setCirclePostImagePreview(previewUrl);
+      setCirclePostUploading(true);
+    }
+
+    try {
+      const uploadUrlRes = await apiRequest("POST", "/api/media/upload-url", {});
+      const { uploadURL } = await uploadUrlRes.json();
+
+      const uploadResponse = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
+
+      if (type === "message") {
+        setCircleMessageImage(uploadURL);
+      } else {
+        setCirclePostImage(uploadURL);
+      }
+      toast({ title: "Image uploaded", description: "Image attached successfully." });
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast({ title: "Upload failed", description: "Failed to upload image. Please try again.", variant: "destructive" });
+      URL.revokeObjectURL(previewUrl);
+      if (type === "message") {
+        setCircleMessageImagePreview(null);
+      } else {
+        setCirclePostImagePreview(null);
+      }
+    } finally {
+      if (type === "message") {
+        setCircleMessageUploading(false);
+        if (circleMessageFileRef.current) circleMessageFileRef.current.value = "";
+      } else {
+        setCirclePostUploading(false);
+        if (circlePostFileRef.current) circlePostFileRef.current.value = "";
+      }
+    }
+  };
+
+  const clearMessageImage = () => {
+    if (circleMessageImagePreview) URL.revokeObjectURL(circleMessageImagePreview);
+    setCircleMessageImage(null);
+    setCircleMessageImagePreview(null);
+    if (circleMessageFileRef.current) circleMessageFileRef.current.value = "";
+  };
+
+  const clearPostImage = () => {
+    if (circlePostImagePreview) URL.revokeObjectURL(circlePostImagePreview);
+    setCirclePostImage(null);
+    setCirclePostImagePreview(null);
+    if (circlePostFileRef.current) circlePostFileRef.current.value = "";
+  };
+
+  const clearFeedPostImage = () => {
+    if (feedPostImagePreview) URL.revokeObjectURL(feedPostImagePreview);
+    setFeedPostImage(null);
+    setFeedPostImagePreview(null);
+    if (feedPostFileRef.current) feedPostFileRef.current.value = "";
+  };
+
+  const clearDmImage = (friendId: string) => {
+    if (dmImagePreviews[friendId]) URL.revokeObjectURL(dmImagePreviews[friendId]!);
+    setDmImages({ ...dmImages, [friendId]: null });
+    setDmImagePreviews({ ...dmImagePreviews, [friendId]: null });
+    const ref = dmFileRefs.current[friendId];
+    if (ref) ref.value = "";
+  };
+
+  const handleFeedImageUpload = async (file: File) => {
+    await handleImageUpload(
+      file,
+      setFeedPostImage,
+      setFeedPostImagePreview,
+      setFeedPostUploading
+    );
+    if (feedPostFileRef.current) feedPostFileRef.current.value = "";
+  };
+
+  const handleDmImageUpload = async (friendId: string, file: File) => {
+    await handleImageUpload(
+      file,
+      (url) => setDmImages({ ...dmImages, [friendId]: url }),
+      (url) => setDmImagePreviews({ ...dmImagePreviews, [friendId]: url }),
+      (uploading) => setDmUploading({ ...dmUploading, [friendId]: uploading })
+    );
+    const ref = dmFileRefs.current[friendId];
+    if (ref) ref.value = "";
+  };
+
   const handleSendCircleMessage = () => {
-    if (!selectedCircle || !newCircleMessage.trim()) return;
+    if (!selectedCircle || (!newCircleMessage.trim() && !circleMessageImage)) return;
     const newMsg: StoredCircleMessage = {
       id: `cm-${Date.now()}`,
       circleId: selectedCircle.id,
@@ -1071,14 +1265,16 @@ export default function CommunityPage() {
       senderName: "You",
       content: newCircleMessage.trim(),
       createdAt: new Date().toISOString(),
+      imageUrl: circleMessageImage || undefined,
     };
     const current = circleMessages[selectedCircle.id] || [];
     setCircleMessages({ ...circleMessages, [selectedCircle.id]: [...current, newMsg] });
     setNewCircleMessage("");
+    clearMessageImage();
   };
 
   const handleCreateCirclePost = () => {
-    if (!selectedCircle || !newCirclePost.trim()) return;
+    if (!selectedCircle || (!newCirclePost.trim() && !circlePostImage)) return;
     const newPost: StoredCirclePost = {
       id: `cp-${Date.now()}`,
       circleId: selectedCircle.id,
@@ -1088,10 +1284,12 @@ export default function CommunityPage() {
       createdAt: new Date().toISOString(),
       likes: [],
       comments: [],
+      imageUrl: circlePostImage || undefined,
     };
     const current = circlePosts[selectedCircle.id] || [];
     setCirclePosts({ ...circlePosts, [selectedCircle.id]: [newPost, ...current] });
     setNewCirclePost("");
+    clearPostImage();
     toast({ title: "Post added to board" });
   };
 
@@ -3471,12 +3669,54 @@ export default function CommunityPage() {
                                   <span className="text-xs text-muted-foreground">{formatTime(msg.createdAt)}</span>
                                 </div>
                                 <p className="text-sm">{msg.content}</p>
+                                {msg.imageUrl && (
+                                  <img 
+                                    src={msg.imageUrl} 
+                                    alt="Attached" 
+                                    className="mt-2 max-w-xs rounded-md border" 
+                                    data-testid={`img-circle-message-${msg.id}`}
+                                  />
+                                )}
                               </div>
                             </div>
                           ))}
                         </div>
                       </ScrollArea>
+                      {circleMessageImagePreview && (
+                        <div className="mb-2 relative inline-block">
+                          <img src={circleMessageImagePreview} alt="Preview" className="max-h-24 rounded-md border" />
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            className="absolute -top-2 -right-2 h-6 w-6"
+                            onClick={clearMessageImage}
+                            data-testid="button-clear-circle-message-image"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
                       <div className="flex gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={circleMessageFileRef}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleCircleImageUpload(file, "message");
+                          }}
+                          data-testid="input-circle-message-file"
+                        />
+                        <Button 
+                          size="icon" 
+                          variant="outline"
+                          onClick={() => circleMessageFileRef.current?.click()}
+                          disabled={circleMessageUploading}
+                          data-testid="button-attach-circle-message-image"
+                        >
+                          {circleMessageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                        </Button>
                         <Input
                           placeholder="Type a message..."
                           value={newCircleMessage}
@@ -3499,7 +3739,7 @@ export default function CommunityPage() {
                       <CardDescription>Share updates and announcements with the circle</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="flex gap-2">
+                      <div className="space-y-2">
                         <Textarea
                           placeholder="Share something with the circle..."
                           value={newCirclePost}
@@ -3507,10 +3747,46 @@ export default function CommunityPage() {
                           className="min-h-[80px]"
                           data-testid="input-circle-post"
                         />
+                        {circlePostImagePreview && (
+                          <div className="relative inline-block">
+                            <img src={circlePostImagePreview} alt="Preview" className="max-h-32 rounded-md border" />
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              className="absolute -top-2 -right-2 h-6 w-6"
+                              onClick={clearPostImage}
+                              data-testid="button-clear-circle-post-image"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          ref={circlePostFileRef}
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleCircleImageUpload(file, "post");
+                          }}
+                          data-testid="input-circle-post-file"
+                        />
                       </div>
-                      <Button onClick={handleCreateCirclePost} className="w-full" data-testid="button-create-circle-post">
-                        Post to Board
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline"
+                          onClick={() => circlePostFileRef.current?.click()}
+                          disabled={circlePostUploading}
+                          data-testid="button-attach-circle-post-image"
+                        >
+                          {circlePostUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ImagePlus className="w-4 h-4 mr-2" />}
+                          Add Image
+                        </Button>
+                        <Button onClick={handleCreateCirclePost} className="flex-1" data-testid="button-create-circle-post">
+                          Post to Board
+                        </Button>
+                      </div>
                       
                       <Separator />
                       
@@ -3534,6 +3810,14 @@ export default function CommunityPage() {
                                   <span className="text-sm text-muted-foreground">{formatTime(post.createdAt)}</span>
                                 </div>
                                 <p className="mt-2">{post.content}</p>
+                                {post.imageUrl && (
+                                  <img 
+                                    src={post.imageUrl} 
+                                    alt="Post image" 
+                                    className="mt-2 max-w-md rounded-md border" 
+                                    data-testid={`img-circle-post-${post.id}`}
+                                  />
+                                )}
                                 <div className="flex items-center gap-4 mt-3">
                                   <Button 
                                     variant="ghost" 
@@ -3757,8 +4041,41 @@ export default function CommunityPage() {
                 className="min-h-[100px]"
                 data-testid="input-feed-post"
               />
+              {feedPostImagePreview && (
+                <div className="relative inline-block">
+                  <img src={feedPostImagePreview} alt="Preview" className="max-w-xs rounded-md" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-1 right-1 bg-background/80"
+                    onClick={clearFeedPostImage}
+                    data-testid="button-clear-feed-image"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                ref={feedPostFileRef}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFeedImageUpload(file);
+                }}
+              />
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => feedPostFileRef.current?.click()}
+                    disabled={feedPostUploading}
+                    data-testid="button-attach-feed-image"
+                  >
+                    {feedPostUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                  </Button>
                   <Label className="text-sm">Visibility:</Label>
                   <Select value={newPostVisibility} onValueChange={(v) => setNewPostVisibility(v as "public" | "friends")}>
                     <SelectTrigger className="w-[160px]" data-testid="select-post-visibility">
@@ -3807,6 +4124,9 @@ export default function CommunityPage() {
                         )}
                       </div>
                       <p className="mt-2">{post.content}</p>
+                      {post.imageUrl && (
+                        <img src={post.imageUrl} alt="Post attachment" className="mt-2 max-w-md rounded-md" />
+                      )}
                       <div className="flex items-center gap-4 mt-4">
                         <Button 
                           variant="ghost" 
