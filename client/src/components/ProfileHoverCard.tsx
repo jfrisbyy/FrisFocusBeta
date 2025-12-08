@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useDemo } from "@/contexts/DemoContext";
+import { getDemoUser } from "@/lib/demoUsers";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, MessageCircle, UserPlus, AtSign } from "lucide-react";
+import { Calendar, MessageCircle, UserPlus, AtSign, Trophy, Flame } from "lucide-react";
 import { format } from "date-fns";
 
 interface UserSummary {
@@ -15,6 +17,9 @@ interface UserSummary {
   lastName: string | null;
   profileImageUrl: string | null;
   createdAt: string | null;
+  weeklyPoints?: number;
+  dayStreak?: number;
+  bio?: string;
 }
 
 interface ProfileHoverCardProps {
@@ -37,11 +42,31 @@ export default function ProfileHoverCard({
   align = "center",
 }: ProfileHoverCardProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { isDemo } = useDemo();
 
-  const { data: userSummary, isLoading, isError } = useQuery<UserSummary>({
+  const { data: apiUserSummary, isLoading: apiLoading, isError: apiError } = useQuery<UserSummary>({
     queryKey: ['/api/users', userId, 'summary'],
-    enabled: isOpen && !!userId,
+    enabled: isOpen && !!userId && !isDemo,
   });
+
+  const demoUser = isDemo ? getDemoUser(userId) : null;
+  const userSummary: UserSummary | undefined = isDemo 
+    ? (demoUser ? {
+        id: demoUser.id,
+        username: demoUser.username,
+        displayName: demoUser.displayName,
+        firstName: demoUser.firstName,
+        lastName: demoUser.lastName,
+        profileImageUrl: demoUser.profileImageUrl,
+        createdAt: demoUser.createdAt,
+        weeklyPoints: demoUser.weeklyPoints,
+        dayStreak: demoUser.dayStreak,
+        bio: demoUser.bio,
+      } : undefined)
+    : apiUserSummary;
+
+  const isLoading = isDemo ? false : apiLoading;
+  const isError = isDemo ? !demoUser : apiError;
 
   const getInitials = (firstName?: string | null, lastName?: string | null, displayName?: string | null) => {
     if (displayName) {
@@ -111,10 +136,35 @@ export default function ProfileHoverCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={`text-hover-joined-${userId}`}>
-              <Calendar className="h-3.5 w-3.5" />
-              <span>Joined {formatJoinDate(userSummary.createdAt)}</span>
+            {userSummary.bio && (
+              <p className="text-sm text-muted-foreground" data-testid={`text-hover-bio-${userId}`}>
+                {userSummary.bio}
+              </p>
+            )}
+
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2" data-testid={`text-hover-joined-${userId}`}>
+                <Calendar className="h-3.5 w-3.5" />
+                <span>Joined {formatJoinDate(userSummary.createdAt)}</span>
+              </div>
             </div>
+
+            {(userSummary.weeklyPoints !== undefined || userSummary.dayStreak !== undefined) && (
+              <div className="flex items-center gap-4 text-sm">
+                {userSummary.weeklyPoints !== undefined && (
+                  <div className="flex items-center gap-1" data-testid={`text-hover-points-${userId}`}>
+                    <Trophy className="h-3.5 w-3.5 text-amber-500" />
+                    <span>{userSummary.weeklyPoints} pts/wk</span>
+                  </div>
+                )}
+                {userSummary.dayStreak !== undefined && (
+                  <div className="flex items-center gap-1" data-testid={`text-hover-streak-${userId}`}>
+                    <Flame className="h-3.5 w-3.5 text-orange-500" />
+                    <span>{userSummary.dayStreak} day streak</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {showActions && (
               <div className="flex gap-2 pt-1">
