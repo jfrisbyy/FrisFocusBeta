@@ -914,8 +914,10 @@ export default function CommunityPage() {
   });
 
   const toggleCircleTaskCompleteMutation = useMutation({
-    mutationFn: async (data: { circleId: string; taskId: string }) => {
-      const res = await apiRequest("POST", `/api/circles/${data.circleId}/tasks/${data.taskId}/complete`);
+    mutationFn: async (data: { circleId: string; taskId: string; date?: string }) => {
+      // Use today's date in YYYY-MM-DD format if not provided
+      const dateToUse = data.date || new Date().toISOString().split('T')[0];
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/tasks/${data.taskId}/complete`, { date: dateToUse });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to toggle task completion');
