@@ -604,6 +604,65 @@ export default function CommunityPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
     },
   });
+
+  // Friend request queries and mutations
+  const friendRequestsQuery = useQuery<FriendRequest[]>({
+    queryKey: ['/api/friends/requests'],
+    enabled: !isDemo,
+    queryFn: async () => {
+      const [incomingRes, outgoingRes] = await Promise.all([
+        fetch('/api/friends/requests', { credentials: 'include' }),
+        fetch('/api/friends/requests/outgoing', { credentials: 'include' })
+      ]);
+      const incoming = await incomingRes.json();
+      const outgoing = await outgoingRes.json();
+      return [
+        ...incoming.map((r: any) => ({ ...r, direction: 'incoming' as const })),
+        ...outgoing.map((r: any) => ({ ...r, direction: 'outgoing' as const }))
+      ];
+    },
+  });
+
+  const sendFriendRequestMutation = useMutation({
+    mutationFn: async (emailOrUsername: string) => {
+      const res = await apiRequest("POST", "/api/friends/request", { emailOrUsername });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to send friend request');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
+      toast({ title: "Friend request sent!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send request", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const acceptFriendRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const res = await apiRequest("POST", `/api/friends/accept/${requestId}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/friends'] });
+      toast({ title: "Friend request accepted!" });
+    },
+  });
+
+  const declineFriendRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const res = await apiRequest("POST", `/api/friends/decline/${requestId}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
+      toast({ title: "Friend request declined" });
+    },
+  });
   
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -787,6 +846,13 @@ export default function CommunityPage() {
       saveCirclePostsToStorage(allPosts);
     }
   }, [circlePosts, isDemo, dataLoaded]);
+
+  // Sync friend requests from API query to state (not in demo mode)
+  useEffect(() => {
+    if (!isDemo && friendRequestsQuery.data) {
+      setRequests(friendRequestsQuery.data);
+    }
+  }, [isDemo, friendRequestsQuery.data]);
 
   // Demo data for member daily completions (today)
   const demoMemberDailyCompletions: Record<string, Record<string, { taskId: string; taskName: string; completedAt: string }[]>> = {
@@ -1165,37 +1231,50 @@ export default function CommunityPage() {
   const handleSendRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (email.trim()) {
-      toast({ title: "Friend request sent", description: `Request sent to ${email}` });
-      setEmail("");
+      if (isDemo) {
+        toast({ title: "Friend request sent", description: `Request sent to ${email}` });
+        setEmail("");
+      } else {
+        sendFriendRequestMutation.mutate(email.trim());
+        setEmail("");
+      }
     }
   };
 
   const handleAcceptRequest = (id: string) => {
-    const request = requests.find((r) => r.id === id);
-    if (request) {
-      const newFriend: StoredFriend = {
-        id: `friend-${Date.now()}`,
-        friendId: id,
-        firstName: request.firstName,
-        lastName: request.lastName,
-        todayPoints: Math.floor(Math.random() * 50),
-        weeklyPoints: Math.floor(Math.random() * 300) + 100,
-        totalPoints: Math.floor(Math.random() * 2000) + 500,
-        dayStreak: Math.floor(Math.random() * 10),
-        weekStreak: Math.floor(Math.random() * 4),
-        totalBadgesEarned: Math.floor(Math.random() * 5),
-        visibilityLevel: "full",
-        hiddenTaskIds: [],
-      };
-      setFriends([...friends, newFriend]);
-      setRequests(requests.filter((r) => r.id !== id));
-      toast({ title: "Request accepted", description: "You are now friends!" });
+    if (isDemo) {
+      const request = requests.find((r) => r.id === id);
+      if (request) {
+        const newFriend: StoredFriend = {
+          id: `friend-${Date.now()}`,
+          friendId: id,
+          firstName: request.firstName,
+          lastName: request.lastName,
+          todayPoints: Math.floor(Math.random() * 50),
+          weeklyPoints: Math.floor(Math.random() * 300) + 100,
+          totalPoints: Math.floor(Math.random() * 2000) + 500,
+          dayStreak: Math.floor(Math.random() * 10),
+          weekStreak: Math.floor(Math.random() * 4),
+          totalBadgesEarned: Math.floor(Math.random() * 5),
+          visibilityLevel: "full",
+          hiddenTaskIds: [],
+        };
+        setFriends([...friends, newFriend]);
+        setRequests(requests.filter((r) => r.id !== id));
+        toast({ title: "Request accepted", description: "You are now friends!" });
+      }
+    } else {
+      acceptFriendRequestMutation.mutate(id);
     }
   };
 
   const handleDeclineRequest = (id: string) => {
-    setRequests(requests.filter((r) => r.id !== id));
-    toast({ title: "Request declined" });
+    if (isDemo) {
+      setRequests(requests.filter((r) => r.id !== id));
+      toast({ title: "Request declined" });
+    } else {
+      declineFriendRequestMutation.mutate(id);
+    }
   };
 
   const handleRemoveFriend = (id: string) => {
