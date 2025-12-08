@@ -56,6 +56,8 @@ import {
   Gift,
   ImagePlus,
   Loader2,
+  Copy,
+  Swords,
 } from "lucide-react";
 import type { 
   StoredFriend, 
@@ -1146,6 +1148,146 @@ export default function CommunityPage() {
       }
     },
   });
+
+  // Competition queries and mutations
+  const competitionInvitesQuery = useQuery<{
+    id: string;
+    inviterCircleId: string;
+    inviteeCircleId: string;
+    targetPoints: number;
+    name?: string;
+    description?: string;
+    status: string;
+    createdAt: string;
+    inviterCircle?: { id: string; name: string };
+    inviteeCircle?: { id: string; name: string };
+    isIncoming: boolean;
+  }[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'competitions', 'invites'],
+    enabled: !isDemo && !!selectedCircle?.id,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle?.id}/competitions/invites`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const competitionsQuery = useQuery<{
+    id: string;
+    name?: string;
+    description?: string;
+    startDate: string;
+    endDate?: string;
+    targetPoints: number;
+    status: string;
+    myCircle: { id: string; name: string };
+    opponentCircle: { id: string; name: string };
+    myPoints: number;
+    opponentPoints: number;
+    winnerId?: string;
+  }[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'competitions'],
+    enabled: !isDemo && !!selectedCircle?.id,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle?.id}/competitions`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const opponentLeaderboardQuery = useQuery<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    weeklyPoints: number;
+  }[]>({
+    queryKey: ['/api/circles', selectedCircle?.id, 'competitions', showOpponentLeaderboard, 'opponent-leaderboard'],
+    enabled: !isDemo && !!selectedCircle?.id && !!showOpponentLeaderboard,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/circles/${selectedCircle?.id}/competitions/${showOpponentLeaderboard}/opponent-leaderboard`);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const generateInviteCodeMutation = useMutation({
+    mutationFn: async (circleId: string) => {
+      const res = await apiRequest("PUT", `/api/circles/${circleId}/invite-code`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to generate invite code');
+      }
+      return res.json();
+    },
+    onSuccess: (data: { inviteCode: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      if (selectedCircle) {
+        setSelectedCircle({ ...selectedCircle, inviteCode: data.inviteCode });
+      }
+      toast({ title: "Invite code generated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to generate invite code", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendCompetitionInviteMutation = useMutation({
+    mutationFn: async (data: { circleId: string; inviteeInviteCode: string; targetPoints: number; name?: string }) => {
+      const res = await apiRequest("POST", `/api/circles/${data.circleId}/competitions/invites`, {
+        inviteeInviteCode: data.inviteeInviteCode,
+        targetPoints: data.targetPoints,
+        name: data.name,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to send challenge');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'competitions', 'invites'] });
+      setChallengeInviteCode("");
+      setChallengeTargetPoints("1000");
+      setChallengeName("");
+      toast({ title: "Challenge sent!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send challenge", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const respondToInviteMutation = useMutation({
+    mutationFn: async (data: { circleId: string; inviteId: string; action: "accept" | "decline" }) => {
+      const res = await apiRequest("PUT", `/api/circles/${data.circleId}/competitions/invites/${data.inviteId}`, {
+        action: data.action,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to respond to invite');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { circleId }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'competitions', 'invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'competitions'] });
+      toast({ title: "Response sent" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to respond", description: error.message, variant: "destructive" });
+    },
+  });
   
   const [taskRequests, setTaskRequests] = useState<StoredCircleTaskAdjustmentRequest[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -1186,6 +1328,12 @@ export default function CommunityPage() {
   const [feedPostUploading, setFeedPostUploading] = useState(false);
   const [feedViewFilter, setFeedViewFilter] = useState<"all" | "friends" | "public">("all");
   const [communityTab, setCommunityTab] = useState<"friends" | "circles" | "feed">("friends");
+  
+  // Competition state
+  const [challengeInviteCode, setChallengeInviteCode] = useState("");
+  const [challengeTargetPoints, setChallengeTargetPoints] = useState("1000");
+  const [challengeName, setChallengeName] = useState("");
+  const [showOpponentLeaderboard, setShowOpponentLeaderboard] = useState<string | null>(null);
   const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
   const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
   const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
@@ -4426,6 +4574,10 @@ export default function CommunityPage() {
                   <TabsTrigger value="messages">Chat</TabsTrigger>
                   <TabsTrigger value="posts">Board</TabsTrigger>
                   <TabsTrigger value="members">Members</TabsTrigger>
+                  <TabsTrigger value="compete" data-testid="tab-compete">
+                    <Swords className="w-4 h-4 mr-1" />
+                    Compete
+                  </TabsTrigger>
                   {isOwnerOrAdmin(selectedCircle.id) && (
                     <TabsTrigger value="approvals">
                       Approvals
@@ -5962,6 +6114,347 @@ export default function CommunityPage() {
                       </div>
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                <TabsContent value="compete" className="space-y-4 mt-4">
+                  {isDemo ? (
+                    <Card>
+                      <CardContent className="py-8 text-center">
+                        <Swords className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground mb-4">
+                          Circle vs Circle competitions let you challenge other groups and race to reach a points goal first.
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Sign in to challenge another circle!
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {isOwnerOrAdmin(selectedCircle.id) && (
+                        <>
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="flex items-center gap-2">
+                                <Copy className="w-5 h-5" />
+                                Your Circle's Invite Code
+                              </CardTitle>
+                              <CardDescription>
+                                Share this code with other circles to receive competition challenges
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              {selectedCircle.inviteCode ? (
+                                <div className="flex items-center gap-2">
+                                  <code className="flex-1 bg-muted px-4 py-2 rounded-md font-mono text-lg" data-testid="text-invite-code">
+                                    {selectedCircle.inviteCode}
+                                  </code>
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(selectedCircle.inviteCode || "");
+                                      toast({ title: "Copied to clipboard" });
+                                    }}
+                                    data-testid="button-copy-invite-code"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  onClick={() => generateInviteCodeMutation.mutate(selectedCircle.id)}
+                                  disabled={generateInviteCodeMutation.isPending}
+                                  data-testid="button-generate-invite-code"
+                                >
+                                  {generateInviteCodeMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  ) : null}
+                                  Generate Invite Code
+                                </Button>
+                              )}
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="flex items-center gap-2">
+                                <Swords className="w-5 h-5" />
+                                Challenge Another Circle
+                              </CardTitle>
+                              <CardDescription>
+                                Enter another circle's invite code to send them a competition challenge
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="challengeInviteCode">Opponent's Invite Code</Label>
+                                <Input
+                                  id="challengeInviteCode"
+                                  placeholder="Enter their invite code"
+                                  value={challengeInviteCode}
+                                  onChange={(e) => setChallengeInviteCode(e.target.value)}
+                                  data-testid="input-challenge-invite-code"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="challengeTargetPoints">Target Points (first to reach wins)</Label>
+                                <Input
+                                  id="challengeTargetPoints"
+                                  type="number"
+                                  placeholder="e.g., 1000"
+                                  value={challengeTargetPoints}
+                                  onChange={(e) => setChallengeTargetPoints(e.target.value)}
+                                  data-testid="input-challenge-target-points"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="challengeName">Competition Name (optional)</Label>
+                                <Input
+                                  id="challengeName"
+                                  placeholder="e.g., Weekly Showdown"
+                                  value={challengeName}
+                                  onChange={(e) => setChallengeName(e.target.value)}
+                                  data-testid="input-challenge-name"
+                                />
+                              </div>
+                              <Button
+                                onClick={() => {
+                                  if (!challengeInviteCode.trim()) {
+                                    toast({ title: "Please enter an invite code", variant: "destructive" });
+                                    return;
+                                  }
+                                  const targetPoints = parseInt(challengeTargetPoints);
+                                  if (!targetPoints || targetPoints <= 0) {
+                                    toast({ title: "Please enter a valid target points value", variant: "destructive" });
+                                    return;
+                                  }
+                                  sendCompetitionInviteMutation.mutate({
+                                    circleId: selectedCircle.id,
+                                    inviteeInviteCode: challengeInviteCode,
+                                    targetPoints,
+                                    name: challengeName || undefined,
+                                  });
+                                }}
+                                disabled={sendCompetitionInviteMutation.isPending}
+                                data-testid="button-send-challenge"
+                              >
+                                {sendCompetitionInviteMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Send className="w-4 h-4 mr-2" />
+                                )}
+                                Send Challenge
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </>
+                      )}
+
+                      {(competitionInvitesQuery.data?.length || 0) > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Mail className="w-5 h-5" />
+                              Pending Challenges
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            {competitionInvitesQuery.data?.map((invite) => (
+                              <div key={invite.id} className="p-4 rounded-md border">
+                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Badge variant={invite.isIncoming ? "default" : "secondary"}>
+                                        {invite.isIncoming ? "INCOMING" : "SENT"}
+                                      </Badge>
+                                      {invite.name && <span className="font-medium">{invite.name}</span>}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                      {invite.isIncoming
+                                        ? `From: ${invite.inviterCircle?.name || "Unknown"}`
+                                        : `To: ${invite.inviteeCircle?.name || "Unknown"}`}
+                                    </p>
+                                    <p className="text-sm">
+                                      <Target className="w-3 h-3 inline mr-1" />
+                                      Race to {invite.targetPoints.toLocaleString()} points
+                                    </p>
+                                  </div>
+                                  {invite.isIncoming && isOwnerOrAdmin(selectedCircle.id) && (
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => respondToInviteMutation.mutate({
+                                          circleId: selectedCircle.id,
+                                          inviteId: invite.id,
+                                          action: "accept",
+                                        })}
+                                        disabled={respondToInviteMutation.isPending}
+                                        data-testid={`button-accept-invite-${invite.id}`}
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => respondToInviteMutation.mutate({
+                                          circleId: selectedCircle.id,
+                                          inviteId: invite.id,
+                                          action: "decline",
+                                        })}
+                                        disabled={respondToInviteMutation.isPending}
+                                        data-testid={`button-decline-invite-${invite.id}`}
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Trophy className="w-5 h-5" />
+                            Active Competitions
+                          </CardTitle>
+                          <CardDescription>
+                            Race to the target points before your opponent
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {competitionsQuery.isLoading ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : (competitionsQuery.data?.filter(c => c.status === "active").length || 0) === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <Swords className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                              <p>No active competitions</p>
+                              <p className="text-sm mt-1">Challenge another circle to start competing!</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {competitionsQuery.data?.filter(c => c.status === "active").map((competition) => {
+                                const myProgress = (competition.myPoints / competition.targetPoints) * 100;
+                                const opponentProgress = (competition.opponentPoints / competition.targetPoints) * 100;
+                                return (
+                                  <div key={competition.id} className="p-4 rounded-md border space-y-3">
+                                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                                      <div>
+                                        <p className="font-medium">{competition.name || "Competition"}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          vs {competition.opponentCircle.name}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline">
+                                        <Target className="w-3 h-3 mr-1" />
+                                        {competition.targetPoints.toLocaleString()} pts
+                                      </Badge>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between gap-2 text-sm">
+                                        <span className="font-medium">{competition.myCircle.name}</span>
+                                        <span>{competition.myPoints.toLocaleString()}</span>
+                                      </div>
+                                      <Progress value={Math.min(myProgress, 100)} className="h-2" />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between gap-2 text-sm">
+                                        <span className="text-muted-foreground">{competition.opponentCircle.name}</span>
+                                        <span className="text-muted-foreground">{competition.opponentPoints.toLocaleString()}</span>
+                                      </div>
+                                      <Progress value={Math.min(opponentProgress, 100)} className="h-2" />
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setShowOpponentLeaderboard(
+                                        showOpponentLeaderboard === competition.id ? null : competition.id
+                                      )}
+                                      data-testid={`button-view-opponent-${competition.id}`}
+                                    >
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      {showOpponentLeaderboard === competition.id ? "Hide" : "View"} Opponent Leaderboard
+                                    </Button>
+                                    {showOpponentLeaderboard === competition.id && (
+                                      <div className="mt-2 p-3 bg-muted rounded-md">
+                                        <p className="text-sm font-medium mb-2">{competition.opponentCircle.name} Members</p>
+                                        {opponentLeaderboardQuery.isLoading ? (
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (opponentLeaderboardQuery.data?.length || 0) === 0 ? (
+                                          <p className="text-sm text-muted-foreground">No members found</p>
+                                        ) : (
+                                          <div className="space-y-1">
+                                            {opponentLeaderboardQuery.data?.map((member, idx) => (
+                                              <div key={member.id} className="flex items-center justify-between text-sm">
+                                                <span className="flex items-center gap-2">
+                                                  <span className="text-muted-foreground">{idx + 1}.</span>
+                                                  {member.firstName} {member.lastName}
+                                                </span>
+                                                <span className="font-mono">{member.weeklyPoints}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {(competitionsQuery.data?.filter(c => c.status === "completed").length || 0) > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Award className="w-5 h-5" />
+                              Completed Competitions
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3">
+                              {competitionsQuery.data?.filter(c => c.status === "completed").map((competition) => {
+                                const isWinner = competition.winnerId === selectedCircle.id;
+                                return (
+                                  <div key={competition.id} className="p-4 rounded-md border">
+                                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-medium">{competition.name || "Competition"}</p>
+                                          {isWinner ? (
+                                            <Badge className="bg-green-600">
+                                              <Trophy className="w-3 h-3 mr-1" />
+                                              Winner
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="secondary">Lost</Badge>
+                                          )}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                          vs {competition.opponentCircle.name}
+                                        </p>
+                                      </div>
+                                      <div className="text-right text-sm">
+                                        <p className="font-mono">{competition.myPoints} - {competition.opponentPoints}</p>
+                                        <p className="text-muted-foreground">Target: {competition.targetPoints}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
 
                 {isOwnerOrAdmin(selectedCircle.id) && (
