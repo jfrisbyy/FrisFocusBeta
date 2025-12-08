@@ -82,11 +82,11 @@ export async function registerRoutes(
     }
   });
 
-  // Update user profile (username)
+  // Update user profile (username, displayName, profileImageUrl)
   app.put('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { username } = req.body;
+      const { username, displayName, profileImageUrl } = req.body;
 
       // Validate username format if provided
       if (username !== null && username !== undefined) {
@@ -112,12 +112,39 @@ export async function registerRoutes(
         }
       }
 
+      // Validate displayName if provided
+      if (displayName !== null && displayName !== undefined) {
+        if (typeof displayName !== "string") {
+          return res.status(400).json({ message: "Invalid display name format" });
+        }
+        if (displayName.length > 50) {
+          return res.status(400).json({ message: "Display name must be 50 characters or less" });
+        }
+      }
+
+      // Validate profileImageUrl if provided
+      if (profileImageUrl !== null && profileImageUrl !== undefined) {
+        if (typeof profileImageUrl !== "string") {
+          return res.status(400).json({ message: "Invalid profile image URL format" });
+        }
+      }
+
+      // Build update object with only provided fields
+      const updateData: Record<string, any> = { updatedAt: new Date() };
+      
+      if (username !== undefined) {
+        updateData.username = username ? username.toLowerCase() : null;
+      }
+      if (displayName !== undefined) {
+        updateData.displayName = displayName || null;
+      }
+      if (profileImageUrl !== undefined) {
+        updateData.profileImageUrl = profileImageUrl || null;
+      }
+
       // Update user
       const [updatedUser] = await db.update(users)
-        .set({ 
-          username: username ? username.toLowerCase() : null,
-          updatedAt: new Date()
-        })
+        .set(updateData)
         .where(eq(users.id, userId))
         .returning();
 
@@ -141,6 +168,32 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error upserting Firebase user:", error);
       res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Get user summary for profile cards (public info only)
+  app.get('/api/users/:userId/summary', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Return public profile info only
+      res.json({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error("Error fetching user summary:", error);
+      res.status(500).json({ message: "Failed to fetch user summary" });
     }
   });
 
