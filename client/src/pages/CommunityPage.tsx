@@ -914,6 +914,7 @@ export default function CommunityPage() {
   const [showOpponentLeaderboard, setShowOpponentLeaderboard] = useState<string | null>(null);
   const [expandedCompetition, setExpandedCompetition] = useState<string | null>(null);
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [expandedOpponentMember, setExpandedOpponentMember] = useState<string | null>(null);
 
   // API queries and mutations for non-demo mode
   const postsQuery = useQuery<APICommunityPost[]>({
@@ -6805,8 +6806,8 @@ export default function CommunityPage() {
                                             role="button"
                                             tabIndex={0}
                                             className="w-full p-4 text-left hover-elevate active-elevate-2 cursor-pointer"
-                                            onClick={() => setExpandedCompetition(isExpanded ? null : competition.id)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedCompetition(isExpanded ? null : competition.id); }}
+                                            onClick={() => { setExpandedCompetition(isExpanded ? null : competition.id); setExpandedMember(null); setExpandedOpponentMember(null); }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setExpandedCompetition(isExpanded ? null : competition.id); setExpandedMember(null); setExpandedOpponentMember(null); } }}
                                             data-testid={`button-expand-competition-${competition.id}`}
                                           >
                                             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -6870,10 +6871,7 @@ export default function CommunityPage() {
                                                           <button
                                                             type="button"
                                                             className="w-full flex items-center justify-between text-sm py-1 hover-elevate rounded px-1"
-                                                            onClick={(e) => {
-                                                              e.stopPropagation();
-                                                              setExpandedMember(expandedMember === memberStat.memberId ? null : memberStat.memberId);
-                                                            }}
+                                                            onClick={() => setExpandedMember(expandedMember === memberStat.memberId ? null : memberStat.memberId)}
                                                             data-testid={`button-expand-member-${memberStat.memberId}`}
                                                           >
                                                             <span className="flex items-center gap-2">
@@ -6914,9 +6912,33 @@ export default function CommunityPage() {
                                                   {opponentCircleStats.length > 0 ? (
                                                     <div className="space-y-2">
                                                       {opponentCircleStats.map((memberStat) => (
-                                                        <div key={memberStat.memberId} className="flex items-center justify-between text-sm py-1">
-                                                          <span>{memberStat.memberName}</span>
-                                                          <span className="font-mono">{memberStat.weeklyPoints}</span>
+                                                        <div key={memberStat.memberId}>
+                                                          <button
+                                                            type="button"
+                                                            className="w-full flex items-center justify-between text-sm py-1 hover-elevate rounded px-1"
+                                                            onClick={() => setExpandedOpponentMember(expandedOpponentMember === memberStat.memberId ? null : memberStat.memberId)}
+                                                            data-testid={`button-expand-opponent-member-${memberStat.memberId}`}
+                                                          >
+                                                            <span className="flex items-center gap-2">
+                                                              {memberStat.memberName}
+                                                              {memberStat.taskStats.length > 0 && (
+                                                                expandedOpponentMember === memberStat.memberId 
+                                                                  ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                                                  : <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                                                              )}
+                                                            </span>
+                                                            <span className="font-mono">{memberStat.weeklyPoints}</span>
+                                                          </button>
+                                                          {expandedOpponentMember === memberStat.memberId && memberStat.taskStats.length > 0 && (
+                                                            <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground">
+                                                              {memberStat.taskStats.map((task) => (
+                                                                <div key={task.taskId} className="flex items-center justify-between gap-2">
+                                                                  <span>{task.taskName} ({task.completionCount}x)</span>
+                                                                  <span className="font-mono">+{task.points}</span>
+                                                                </div>
+                                                              ))}
+                                                            </div>
+                                                          )}
                                                         </div>
                                                       ))}
                                                     </div>
