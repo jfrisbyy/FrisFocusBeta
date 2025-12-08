@@ -642,6 +642,7 @@ export default function CommunityPage() {
   const [feedPostImage, setFeedPostImage] = useState<string | null>(null);
   const [feedPostImagePreview, setFeedPostImagePreview] = useState<string | null>(null);
   const [feedPostUploading, setFeedPostUploading] = useState(false);
+  const [feedViewFilter, setFeedViewFilter] = useState<"all" | "friends" | "public">("all");
   const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
   const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
   const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
@@ -1075,33 +1076,41 @@ export default function CommunityPage() {
 
   // Compute display posts from API data in non-demo mode
   const displayPosts: StoredCommunityPost[] = useMemo(() => {
+    let posts: StoredCommunityPost[];
+    
     if (isDemo) {
-      return communityPosts;
+      posts = communityPosts;
+    } else if (!postsQuery.data) {
+      posts = [];
+    } else {
+      // Convert API posts to StoredCommunityPost format
+      // Store isLiked and likeCount directly from API for accurate state
+      posts = postsQuery.data.map((post): StoredCommunityPost => ({
+        id: post.id,
+        authorId: post.authorId,
+        authorName: post.author 
+          ? (post.author.displayName || `${post.author.firstName} ${post.author.lastName}`.trim())
+          : "Unknown User",
+        content: post.content,
+        visibility: post.visibility,
+        createdAt: post.createdAt,
+        likes: post.isLiked ? ["you"] : [],
+        comments: [],
+        commentCount: post.commentCount || 0,
+        likeCount: post.likeCount || 0,
+        isLiked: post.isLiked,
+        imageUrl: post.imageUrl,
+      }));
     }
     
-    if (!postsQuery.data) {
-      return [];
+    // Apply visibility filter
+    if (feedViewFilter === "friends") {
+      return posts.filter(post => post.visibility === "friends");
+    } else if (feedViewFilter === "public") {
+      return posts.filter(post => post.visibility === "public");
     }
-    
-    // Convert API posts to StoredCommunityPost format
-    // Store isLiked and likeCount directly from API for accurate state
-    return postsQuery.data.map((post): StoredCommunityPost => ({
-      id: post.id,
-      authorId: post.authorId,
-      authorName: post.author 
-        ? (post.author.displayName || `${post.author.firstName} ${post.author.lastName}`.trim())
-        : "Unknown User",
-      content: post.content,
-      visibility: post.visibility,
-      createdAt: post.createdAt,
-      likes: post.isLiked ? ["you"] : [],
-      comments: [],
-      commentCount: post.commentCount || 0,
-      likeCount: post.likeCount || 0,
-      isLiked: post.isLiked,
-      imageUrl: post.imageUrl,
-    }));
-  }, [isDemo, communityPosts, postsQuery.data]);
+    return posts;
+  }, [isDemo, communityPosts, postsQuery.data, feedViewFilter]);
 
   // Image upload handler
   const handleImageUpload = async (
@@ -4465,6 +4474,38 @@ export default function CommunityPage() {
               </div>
             </CardContent>
           </Card>
+
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-sm text-muted-foreground">Filter posts:</span>
+            <div className="flex gap-1">
+              <Button
+                variant={feedViewFilter === "all" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setFeedViewFilter("all")}
+                data-testid="button-feed-filter-all"
+              >
+                All
+              </Button>
+              <Button
+                variant={feedViewFilter === "friends" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setFeedViewFilter("friends")}
+                data-testid="button-feed-filter-friends"
+              >
+                <Lock className="w-3 h-3 mr-1" />
+                Friends
+              </Button>
+              <Button
+                variant={feedViewFilter === "public" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setFeedViewFilter("public")}
+                data-testid="button-feed-filter-public"
+              >
+                <Globe className="w-3 h-3 mr-1" />
+                Public
+              </Button>
+            </div>
+          </div>
 
           <div className="space-y-4">
             {!isDemo && postsQuery.isLoading && (
