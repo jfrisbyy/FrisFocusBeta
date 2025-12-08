@@ -82,7 +82,7 @@ export default function Navigation() {
             onClick={handleLogin}
             data-testid="button-login"
           >
-            Login
+            Sign in with Replit
           </Button>
         )}
       </div>
