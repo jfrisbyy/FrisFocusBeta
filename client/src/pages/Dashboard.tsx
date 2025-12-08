@@ -510,13 +510,13 @@ export default function Dashboard() {
     const storedDueDates = loadDueDatesFromStorage();
     setDueDates(storedDueDates);
 
-    // Load tasks and penalties for point calculations - prefer API, fall back to localStorage
-    const tasks = apiTasks || loadTasksFromStorage();
-    const penalties = apiPenalties || loadPenaltiesFromStorage();
+    // Load tasks and penalties for point calculations - prefer API if non-empty, fall back to localStorage
+    const tasks = (apiTasks && apiTasks.length > 0) ? apiTasks : loadTasksFromStorage();
+    const penalties = (apiPenalties && apiPenalties.length > 0) ? apiPenalties : loadPenaltiesFromStorage();
     
     // Build daily logs map from API data or localStorage
     let dailyLogs: Record<string, { completedTaskIds: string[] }>;
-    if (apiDailyLogs) {
+    if (apiDailyLogs && apiDailyLogs.length > 0) {
       dailyLogs = {};
       apiDailyLogs.forEach((log: any) => {
         dailyLogs[log.date] = { completedTaskIds: log.completedTaskIds || [] };

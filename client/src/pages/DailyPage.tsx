@@ -117,11 +117,14 @@ export default function DailyPage() {
       return;
     }
 
-    // If we have API data, use it
-    if (apiTasks && apiPenalties && apiCategories) {
-      const categoryMap = new Map(apiCategories.map((c: any) => [c.id, c.name]));
+    // If we have API data with actual tasks, use it; otherwise fall back to localStorage
+    const hasApiTasks = apiTasks && apiTasks.length > 0;
+    const hasApiPenalties = apiPenalties && apiPenalties.length > 0;
+    
+    if (hasApiTasks || hasApiPenalties) {
+      const categoryMap = apiCategories ? new Map(apiCategories.map((c: any) => [c.id, c.name])) : new Map();
 
-      const taskItems: DisplayTask[] = apiTasks.map((task: any) => ({
+      const taskItems: DisplayTask[] = (apiTasks || []).map((task: any) => ({
         id: task.id,
         name: task.name,
         value: task.value,
@@ -129,7 +132,7 @@ export default function DailyPage() {
         isBooster: task.boostEnabled,
       }));
 
-      const penaltyItems: DisplayTask[] = apiPenalties.map((penalty: any) => ({
+      const penaltyItems: DisplayTask[] = (apiPenalties || []).map((penalty: any) => ({
         id: penalty.id,
         name: penalty.name,
         value: -Math.abs(penalty.value),
