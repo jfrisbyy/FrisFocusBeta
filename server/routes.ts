@@ -78,6 +78,10 @@ import {
   userJournalEntries,
   insertUserJournalEntrySchema,
   circleMemberStats,
+  circleCompetitions,
+  circleCompetitionInvites,
+  insertCircleCompetitionSchema,
+  insertCircleCompetitionInviteSchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -2962,6 +2966,437 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error fetching circle leaderboard:", error);
       res.status(500).json({ error: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // ==================== CIRCLE COMPETITION API ====================
+
+  // Generate or get invite code for a circle
+  app.put("/api/circles/:id/invite-code", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check if user is owner or admin
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+        return res.status(403).json({ error: "Only owner or admin can generate invite code" });
+      }
+
+      // Check if circle already has invite code
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      if (circle.inviteCode) {
+        return res.json({ inviteCode: circle.inviteCode });
+      }
+
+      // Generate unique 8-character invite code
+      let inviteCode: string;
+      let attempts = 0;
+      do {
+        inviteCode = randomBytes(4).toString("hex").toUpperCase();
+        const [existing] = await db.select().from(circles).where(eq(circles.inviteCode, inviteCode));
+        if (!existing) break;
+        attempts++;
+      } while (attempts < 10);
+
+      // Update circle with invite code
+      const [updated] = await db.update(circles)
+        .set({ inviteCode })
+        .where(eq(circles.id, circleId))
+        .returning();
+
+      res.json({ inviteCode: updated.inviteCode });
+    } catch (error) {
+      console.error("Error generating invite code:", error);
+      res.status(500).json({ error: "Failed to generate invite code" });
+    }
+  });
+
+  // Find circle by invite code
+  app.get("/api/circles/by-invite-code/:code", isAuthenticated, async (req: any, res) => {
+    try {
+      const code = req.params.code.toUpperCase();
+
+      const [circle] = await db.select().from(circles).where(eq(circles.inviteCode, code));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found with that invite code" });
+      }
+
+      // Return basic circle info
+      res.json({
+        id: circle.id,
+        name: circle.name,
+        description: circle.description,
+      });
+    } catch (error) {
+      console.error("Error finding circle by invite code:", error);
+      res.status(500).json({ error: "Failed to find circle" });
+    }
+  });
+
+  // Send competition invite to another circle
+  app.post("/api/circles/:id/competitions/invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const inviterCircleId = req.params.id;
+      const { inviteeInviteCode, targetPoints, name, description } = req.body;
+
+      // Check if user is owner or admin of the inviter circle
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, inviterCircleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+        return res.status(403).json({ error: "Only owner or admin can send competition invites" });
+      }
+
+      // Find invitee circle by invite code
+      const [inviteeCircle] = await db.select().from(circles).where(eq(circles.inviteCode, inviteeInviteCode.toUpperCase()));
+      if (!inviteeCircle) {
+        return res.status(404).json({ error: "Circle not found with that invite code" });
+      }
+
+      // Can't invite yourself
+      if (inviteeCircle.id === inviterCircleId) {
+        return res.status(400).json({ error: "Cannot invite your own circle" });
+      }
+
+      // Check if there's already a pending invite between these circles
+      const [existingInvite] = await db.select().from(circleCompetitionInvites).where(
+        and(
+          or(
+            and(eq(circleCompetitionInvites.inviterCircleId, inviterCircleId), eq(circleCompetitionInvites.inviteeCircleId, inviteeCircle.id)),
+            and(eq(circleCompetitionInvites.inviterCircleId, inviteeCircle.id), eq(circleCompetitionInvites.inviteeCircleId, inviterCircleId))
+          ),
+          eq(circleCompetitionInvites.status, "pending")
+        )
+      );
+      if (existingInvite) {
+        return res.status(400).json({ error: "There's already a pending invite between these circles" });
+      }
+
+      // Create the invite
+      const [invite] = await db.insert(circleCompetitionInvites).values({
+        inviterCircleId,
+        inviteeCircleId: inviteeCircle.id,
+        targetPoints: targetPoints || 1000,
+        name: name || "Circle Competition",
+        description,
+        createdById: userId,
+        status: "pending",
+      }).returning();
+
+      // Get inviter circle info for response
+      const [inviterCircle] = await db.select().from(circles).where(eq(circles.id, inviterCircleId));
+
+      res.json({
+        ...invite,
+        inviterCircle: {
+          id: inviterCircle?.id,
+          name: inviterCircle?.name,
+        },
+        inviteeCircle: {
+          id: inviteeCircle.id,
+          name: inviteeCircle.name,
+        },
+      });
+    } catch (error) {
+      console.error("Error sending competition invite:", error);
+      res.status(500).json({ error: "Failed to send competition invite" });
+    }
+  });
+
+  // Get pending competition invites for a circle (both sent and received)
+  app.get("/api/circles/:id/competitions/invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view invites" });
+      }
+
+      // Get invites where this circle is inviter or invitee
+      const invites = await db.select().from(circleCompetitionInvites).where(
+        and(
+          or(
+            eq(circleCompetitionInvites.inviterCircleId, circleId),
+            eq(circleCompetitionInvites.inviteeCircleId, circleId)
+          ),
+          eq(circleCompetitionInvites.status, "pending")
+        )
+      );
+
+      // Enrich with circle info
+      const invitesWithCircleInfo = await Promise.all(invites.map(async (invite) => {
+        const [inviterCircle] = await db.select().from(circles).where(eq(circles.id, invite.inviterCircleId));
+        const [inviteeCircle] = await db.select().from(circles).where(eq(circles.id, invite.inviteeCircleId));
+        return {
+          ...invite,
+          inviterCircle: inviterCircle ? { id: inviterCircle.id, name: inviterCircle.name } : null,
+          inviteeCircle: inviteeCircle ? { id: inviteeCircle.id, name: inviteeCircle.name } : null,
+          isIncoming: invite.inviteeCircleId === circleId,
+        };
+      }));
+
+      res.json(invitesWithCircleInfo);
+    } catch (error) {
+      console.error("Error fetching competition invites:", error);
+      res.status(500).json({ error: "Failed to fetch competition invites" });
+    }
+  });
+
+  // Accept or decline competition invite
+  app.put("/api/circles/:id/competitions/invites/:inviteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const inviteId = req.params.inviteId;
+      const { action } = req.body; // "accept" or "decline"
+
+      if (!action || (action !== "accept" && action !== "decline")) {
+        return res.status(400).json({ error: "Action must be 'accept' or 'decline'" });
+      }
+
+      // Check if user is owner or admin
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership || (membership.role !== "owner" && membership.role !== "admin")) {
+        return res.status(403).json({ error: "Only owner or admin can respond to invites" });
+      }
+
+      // Get the invite
+      const [invite] = await db.select().from(circleCompetitionInvites).where(
+        and(
+          eq(circleCompetitionInvites.id, inviteId),
+          eq(circleCompetitionInvites.inviteeCircleId, circleId), // Can only respond to invites sent to your circle
+          eq(circleCompetitionInvites.status, "pending")
+        )
+      );
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found or already processed" });
+      }
+
+      if (action === "decline") {
+        // Update invite status
+        await db.update(circleCompetitionInvites)
+          .set({ status: "declined" })
+          .where(eq(circleCompetitionInvites.id, inviteId));
+        return res.json({ message: "Invite declined" });
+      }
+
+      // Accept: create competition
+      const today = new Date().toISOString().split('T')[0];
+      const [competition] = await db.insert(circleCompetitions).values({
+        name: invite.name || "Circle Competition",
+        description: invite.description,
+        circleOneId: invite.inviterCircleId,
+        circleTwoId: invite.inviteeCircleId,
+        startDate: today,
+        targetPoints: invite.targetPoints,
+        circleOnePoints: 0,
+        circleTwoPoints: 0,
+        status: "active",
+        createdById: invite.createdById,
+      }).returning();
+
+      // Update invite status
+      await db.update(circleCompetitionInvites)
+        .set({ status: "accepted" })
+        .where(eq(circleCompetitionInvites.id, inviteId));
+
+      // Get circle info for response
+      const [circleOne] = await db.select().from(circles).where(eq(circles.id, competition.circleOneId));
+      const [circleTwo] = await db.select().from(circles).where(eq(circles.id, competition.circleTwoId));
+
+      res.json({
+        ...competition,
+        circleOne: circleOne ? { id: circleOne.id, name: circleOne.name } : null,
+        circleTwo: circleTwo ? { id: circleTwo.id, name: circleTwo.name } : null,
+      });
+    } catch (error) {
+      console.error("Error responding to competition invite:", error);
+      res.status(500).json({ error: "Failed to respond to invite" });
+    }
+  });
+
+  // Get all competitions for a circle
+  app.get("/api/circles/:id/competitions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check membership
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view competitions" });
+      }
+
+      // Get competitions where this circle is involved
+      const competitions = await db.select().from(circleCompetitions).where(
+        or(
+          eq(circleCompetitions.circleOneId, circleId),
+          eq(circleCompetitions.circleTwoId, circleId)
+        )
+      ).orderBy(desc(circleCompetitions.createdAt));
+
+      // Enrich with circle info and calculate live points
+      const competitionsWithInfo = await Promise.all(competitions.map(async (comp) => {
+        const [circleOne] = await db.select().from(circles).where(eq(circles.id, comp.circleOneId));
+        const [circleTwo] = await db.select().from(circles).where(eq(circles.id, comp.circleTwoId));
+        
+        // Calculate live points from task completions since start date
+        const circleOneCompletions = await db.select().from(circleTaskCompletions).where(
+          and(
+            eq(circleTaskCompletions.circleId, comp.circleOneId),
+            // Only include completions after start date
+          )
+        );
+        const circleTwoCompletions = await db.select().from(circleTaskCompletions).where(
+          and(
+            eq(circleTaskCompletions.circleId, comp.circleTwoId),
+          )
+        );
+
+        // Get task values
+        const circleOneTasks = await db.select().from(circleTasks).where(eq(circleTasks.circleId, comp.circleOneId));
+        const circleTwoTasks = await db.select().from(circleTasks).where(eq(circleTasks.circleId, comp.circleTwoId));
+        const taskOneMap = new Map(circleOneTasks.map(t => [t.id, t.value || 0]));
+        const taskTwoMap = new Map(circleTwoTasks.map(t => [t.id, t.value || 0]));
+
+        // Calculate points from completions after start date
+        let circleOnePoints = 0;
+        for (const c of circleOneCompletions) {
+          if (c.date >= comp.startDate) {
+            circleOnePoints += taskOneMap.get(c.taskId) || 0;
+          }
+        }
+        let circleTwoPoints = 0;
+        for (const c of circleTwoCompletions) {
+          if (c.date >= comp.startDate) {
+            circleTwoPoints += taskTwoMap.get(c.taskId) || 0;
+          }
+        }
+
+        // Determine if my circle
+        const isCircleOne = comp.circleOneId === circleId;
+        const myCircle = isCircleOne ? circleOne : circleTwo;
+        const opponentCircle = isCircleOne ? circleTwo : circleOne;
+        const myPoints = isCircleOne ? circleOnePoints : circleTwoPoints;
+        const opponentPoints = isCircleOne ? circleTwoPoints : circleOnePoints;
+
+        return {
+          ...comp,
+          circleOne: circleOne ? { id: circleOne.id, name: circleOne.name } : null,
+          circleTwo: circleTwo ? { id: circleTwo.id, name: circleTwo.name } : null,
+          circleOnePoints,
+          circleTwoPoints,
+          myCircle: myCircle ? { id: myCircle.id, name: myCircle.name } : null,
+          opponentCircle: opponentCircle ? { id: opponentCircle.id, name: opponentCircle.name } : null,
+          myPoints,
+          opponentPoints,
+          isCircleOne,
+        };
+      }));
+
+      res.json(competitionsWithInfo);
+    } catch (error) {
+      console.error("Error fetching competitions:", error);
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
+  // Get opponent circle's leaderboard for a competition
+  app.get("/api/circles/:id/competitions/:competitionId/opponent-leaderboard", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const competitionId = req.params.competitionId;
+
+      // Check membership in requesting circle
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view opponent leaderboard" });
+      }
+
+      // Get competition
+      const [competition] = await db.select().from(circleCompetitions).where(eq(circleCompetitions.id, competitionId));
+      if (!competition) {
+        return res.status(404).json({ error: "Competition not found" });
+      }
+
+      // Verify this circle is in the competition
+      if (competition.circleOneId !== circleId && competition.circleTwoId !== circleId) {
+        return res.status(403).json({ error: "Your circle is not part of this competition" });
+      }
+
+      // Get opponent circle ID
+      const opponentCircleId = competition.circleOneId === circleId ? competition.circleTwoId : competition.circleOneId;
+
+      // Get opponent circle
+      const [opponentCircle] = await db.select().from(circles).where(eq(circles.id, opponentCircleId));
+      const dailyGoal = opponentCircle?.dailyPointGoal || 30;
+
+      // Get all members of opponent circle
+      const members = await db.select().from(circleMembers).where(eq(circleMembers.circleId, opponentCircleId));
+
+      // Get all completions for opponent circle since competition start
+      const completions = await db.select().from(circleTaskCompletions).where(eq(circleTaskCompletions.circleId, opponentCircleId));
+      
+      // Get all tasks for point values
+      const tasks = await db.select().from(circleTasks).where(eq(circleTasks.circleId, opponentCircleId));
+      const taskMap = new Map(tasks.map(t => [t.id, t]));
+
+      // Calculate stats for each member
+      const memberStats = await Promise.all(members.map(async (member) => {
+        const [user] = await db.select().from(users).where(eq(users.id, member.userId));
+        
+        // Filter completions for this member since competition start
+        const memberCompletions = completions.filter(c => c.userId === member.userId && c.date >= competition.startDate);
+        
+        // Calculate total points
+        let totalPoints = 0;
+        for (const comp of memberCompletions) {
+          const task = taskMap.get(comp.taskId);
+          if (task) {
+            totalPoints += task.value || 0;
+          }
+        }
+
+        return {
+          userId: member.userId,
+          firstName: user?.firstName || 'Unknown',
+          lastName: user?.lastName || '',
+          profileImageUrl: user?.profileImageUrl,
+          role: member.role,
+          totalPoints,
+        };
+      }));
+
+      // Sort by total points descending
+      memberStats.sort((a, b) => b.totalPoints - a.totalPoints);
+
+      res.json({
+        circle: opponentCircle ? { id: opponentCircle.id, name: opponentCircle.name } : null,
+        leaderboard: memberStats,
+      });
+    } catch (error) {
+      console.error("Error fetching opponent leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch opponent leaderboard" });
     }
   });
 

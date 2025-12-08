@@ -656,6 +656,7 @@ export const circles = pgTable("circles", {
   dailyPointGoal: integer("daily_point_goal"),
   weeklyPointGoal: integer("weekly_point_goal"),
   totalCirclePoints: integer("total_circle_points").default(0),
+  inviteCode: varchar("invite_code").unique(), // Unique code for joining circle competitions
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -858,7 +859,8 @@ export const circleCompetitions = pgTable("circle_competitions", {
   circleOneId: varchar("circle_one_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
   circleTwoId: varchar("circle_two_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
   startDate: varchar("start_date").notNull(), // YYYY-MM-DD format
-  endDate: varchar("end_date").notNull(), // YYYY-MM-DD format
+  endDate: varchar("end_date"), // YYYY-MM-DD format (optional for target-based competitions)
+  targetPoints: integer("target_points"), // Target points to win (race-to-points mode)
   circleOnePoints: integer("circle_one_points").default(0),
   circleTwoPoints: integer("circle_two_points").default(0),
   winnerId: varchar("winner_id"),
@@ -870,6 +872,23 @@ export const circleCompetitions = pgTable("circle_competitions", {
 export const insertCircleCompetitionSchema = createInsertSchema(circleCompetitions).omit({ id: true, createdAt: true });
 export type InsertCircleCompetition = z.infer<typeof insertCircleCompetitionSchema>;
 export type CircleCompetition = typeof circleCompetitions.$inferSelect;
+
+// Circle competition invites - pending invitations to compete
+export const circleCompetitionInvites = pgTable("circle_competition_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inviterCircleId: varchar("inviter_circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  inviteeCircleId: varchar("invitee_circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  targetPoints: integer("target_points").notNull(),
+  name: varchar("name"),
+  description: text("description"),
+  status: varchar("status").notNull().default("pending"), // "pending", "accepted", "declined"
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleCompetitionInviteSchema = createInsertSchema(circleCompetitionInvites).omit({ id: true, createdAt: true });
+export type InsertCircleCompetitionInvite = z.infer<typeof insertCircleCompetitionInviteSchema>;
+export type CircleCompetitionInvite = typeof circleCompetitionInvites.$inferSelect;
 
 // Cheerlines - encouraging messages sent from one user to another
 export const cheerlines = pgTable("cheerlines", {
