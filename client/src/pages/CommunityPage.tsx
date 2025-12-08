@@ -2062,28 +2062,22 @@ export default function CommunityPage() {
   }, [isDemo, selectedCircle?.id, circleAwardsQuery.data]);
 
   // Sync leaderboard data to circleMembers for points on initial load
+  // This effect must also depend on circleMembers to re-run after members are loaded
+  const currentCircleMembers = selectedCircle ? circleMembers[selectedCircle.id] : undefined;
   useEffect(() => {
     if (isDemo || !selectedCircle || !circleLeaderboardQuery.data) return;
     const circleId = selectedCircle.id;
+    const existingMembers = circleMembers[circleId] || [];
     
-    setCircleMembers(prev => {
-      const existingMembers = prev[circleId] || [];
-      if (existingMembers.length === 0) {
-        // If no members yet, create from leaderboard data
-        const membersFromLeaderboard: StoredCircleMember[] = circleLeaderboardQuery.data.map((stat: any) => ({
-          id: stat.id || stat.userId,
-          circleId: circleId,
-          userId: stat.userId,
-          firstName: stat.firstName || 'Unknown',
-          lastName: stat.lastName || '',
-          role: stat.role || 'member',
-          joinedAt: new Date().toISOString(),
-          weeklyPoints: stat.totalPoints || 0,
-          profileImageUrl: stat.profileImageUrl,
-        }));
-        return { ...prev, [circleId]: membersFromLeaderboard };
-      } else {
-        // Update existing members with leaderboard points
+    // Only update if we have members but their points haven't been set from leaderboard yet
+    if (existingMembers.length > 0) {
+      // Check if any member has points that differ from leaderboard - avoid infinite loop
+      const needsUpdate = existingMembers.some(m => {
+        const leaderboardStat = circleLeaderboardQuery.data.find((s: any) => s.userId === m.userId);
+        return leaderboardStat && m.weeklyPoints !== (leaderboardStat.totalPoints || 0);
+      });
+      
+      if (needsUpdate) {
         const updatedMembers = existingMembers.map(m => {
           const leaderboardStat = circleLeaderboardQuery.data.find((s: any) => s.userId === m.userId);
           return {
@@ -2091,10 +2085,24 @@ export default function CommunityPage() {
             weeklyPoints: leaderboardStat?.totalPoints ?? m.weeklyPoints ?? 0,
           };
         });
-        return { ...prev, [circleId]: updatedMembers };
+        setCircleMembers(prev => ({ ...prev, [circleId]: updatedMembers }));
       }
-    });
-  }, [isDemo, selectedCircle?.id, circleLeaderboardQuery.data]);
+    } else if (circleLeaderboardQuery.data.length > 0) {
+      // If no members yet, create from leaderboard data
+      const membersFromLeaderboard: StoredCircleMember[] = circleLeaderboardQuery.data.map((stat: any) => ({
+        id: stat.id || stat.userId,
+        circleId: circleId,
+        userId: stat.userId,
+        firstName: stat.firstName || 'Unknown',
+        lastName: stat.lastName || '',
+        role: stat.role || 'member',
+        joinedAt: new Date().toISOString(),
+        weeklyPoints: stat.totalPoints || 0,
+        profileImageUrl: stat.profileImageUrl,
+      }));
+      setCircleMembers(prev => ({ ...prev, [circleId]: membersFromLeaderboard }));
+    }
+  }, [isDemo, selectedCircle?.id, circleLeaderboardQuery.data, currentCircleMembers]);
 
   // Sync circle posts from API query to local state
   useEffect(() => {
