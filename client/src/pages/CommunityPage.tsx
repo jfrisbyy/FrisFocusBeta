@@ -1583,6 +1583,8 @@ export default function CommunityPage() {
   const [challengeInviteCode, setChallengeInviteCode] = useState("");
   const [challengeTargetPoints, setChallengeTargetPoints] = useState("1000");
   const [challengeName, setChallengeName] = useState("");
+  const [challengeCompetitionType, setChallengeCompetitionType] = useState<CompetitionType>("targetPoints");
+  const [challengeEndDate, setChallengeEndDate] = useState<Date | undefined>(undefined);
   const [dmImages, setDmImages] = useState<Record<string, string | null>>({});
   const [dmImagePreviews, setDmImagePreviews] = useState<Record<string, string | null>>({});
   const [dmUploading, setDmUploading] = useState<Record<string, boolean>>({});
@@ -6426,12 +6428,80 @@ export default function CommunityPage() {
                                       />
                                     </div>
                                     <div className="space-y-2">
-                                      <Label>Target Points (first to reach wins)</Label>
+                                      <Label>Competition Type</Label>
+                                      <Select
+                                        value={challengeCompetitionType}
+                                        onValueChange={(value) => setChallengeCompetitionType(value as CompetitionType)}
+                                        data-testid="select-demo-competition-type"
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select competition type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="targetPoints">
+                                            <div className="flex items-center gap-2">
+                                              <Target className="w-3 h-3" />
+                                              Target Points - First to reach wins
+                                            </div>
+                                          </SelectItem>
+                                          <SelectItem value="timed">
+                                            <div className="flex items-center gap-2">
+                                              <Clock className="w-3 h-3" />
+                                              Timed - Most points by end date wins
+                                            </div>
+                                          </SelectItem>
+                                          <SelectItem value="ongoing">
+                                            <div className="flex items-center gap-2">
+                                              <Flame className="w-3 h-3" />
+                                              Ongoing - Continuous competition
+                                            </div>
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    {challengeCompetitionType === "targetPoints" && (
+                                      <div className="space-y-2">
+                                        <Label>Target Points</Label>
+                                        <Input
+                                          type="number"
+                                          placeholder="e.g., 1000"
+                                          disabled
+                                          data-testid="input-demo-challenge-target-points"
+                                        />
+                                      </div>
+                                    )}
+                                    {challengeCompetitionType === "timed" && (
+                                      <div className="space-y-2">
+                                        <Label>End Date</Label>
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              className="w-full justify-start text-left font-normal"
+                                              disabled
+                                              data-testid="button-demo-end-date"
+                                            >
+                                              <CalendarIcon className="mr-2 h-4 w-4" />
+                                              {challengeEndDate ? challengeEndDate.toLocaleDateString() : "Pick an end date"}
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0" align="start">
+                                            <CalendarComponent
+                                              mode="single"
+                                              selected={challengeEndDate}
+                                              onSelect={setChallengeEndDate}
+                                              disabled={(date) => date < new Date()}
+                                            />
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
+                                    )}
+                                    <div className="space-y-2">
+                                      <Label>Competition Name (optional)</Label>
                                       <Input
-                                        type="number"
-                                        placeholder="e.g., 1000"
+                                        placeholder="e.g., Weekly Showdown"
                                         disabled
-                                        data-testid="input-demo-challenge-target-points"
+                                        data-testid="input-demo-challenge-name"
                                       />
                                     </div>
                                     <Button
@@ -6572,51 +6642,198 @@ export default function CommunityPage() {
                                 ) : (
                                   <div className="space-y-4">
                                     {demoCircleCompetitions.filter(c => c.status === "active").map((competition) => {
-                                      const myProgress = (competition.myPoints / competition.targetPoints) * 100;
-                                      const opponentProgress = (competition.opponentPoints / competition.targetPoints) * 100;
-                                      const opponentMembers = demoOpponentMembers[competition.opponentCircle.id] || [];
+                                      const isTargetPoints = competition.competitionType === "targetPoints";
+                                      const myProgress = isTargetPoints 
+                                        ? (competition.myPoints / competition.targetPoints) * 100
+                                        : 50;
+                                      const opponentProgress = isTargetPoints
+                                        ? (competition.opponentPoints / competition.targetPoints) * 100
+                                        : 50;
+                                      const isExpanded = expandedCompetition === competition.id;
+                                      const myCircleStats = demoMemberCompetitionStats[competition.id]?.[competition.myCircle.id] || [];
+                                      const opponentCircleStats = demoMemberCompetitionStats[competition.id]?.[competition.opponentCircle.id] || [];
+                                      
+                                      const getCompetitionTypeBadge = () => {
+                                        switch (competition.competitionType) {
+                                          case "targetPoints":
+                                            return (
+                                              <Badge variant="outline">
+                                                <Target className="w-3 h-3 mr-1" />
+                                                {competition.targetPoints.toLocaleString()} pts goal
+                                              </Badge>
+                                            );
+                                          case "timed":
+                                            return (
+                                              <Badge variant="outline">
+                                                <Clock className="w-3 h-3 mr-1" />
+                                                {competition.endDate ? `Ends ${new Date(competition.endDate).toLocaleDateString()}` : "Timed"}
+                                              </Badge>
+                                            );
+                                          case "ongoing":
+                                            return (
+                                              <Badge variant="outline">
+                                                <Flame className="w-3 h-3 mr-1" />
+                                                Ongoing rivalry
+                                              </Badge>
+                                            );
+                                          default:
+                                            return (
+                                              <Badge variant="outline">
+                                                <Trophy className="w-3 h-3 mr-1" />
+                                                Competition
+                                              </Badge>
+                                            );
+                                        }
+                                      };
+                                      
                                       return (
-                                        <div key={competition.id} className="p-4 rounded-md border space-y-3">
-                                          <div className="flex items-center justify-between gap-4 flex-wrap">
-                                            <div>
-                                              <p className="font-medium">{competition.name || "Competition"}</p>
-                                              <p className="text-sm text-muted-foreground">
-                                                vs {competition.opponentCircle.name}
-                                              </p>
-                                            </div>
-                                            <Badge variant="outline">
-                                              <Target className="w-3 h-3 mr-1" />
-                                              {competition.targetPoints.toLocaleString()} pts
-                                            </Badge>
-                                          </div>
-                                          <div className="space-y-2">
-                                            <div className="flex items-center justify-between gap-2 text-sm">
-                                              <span className="font-medium">{competition.myCircle.name}</span>
-                                              <span>{competition.myPoints.toLocaleString()}</span>
-                                            </div>
-                                            <Progress value={Math.min(myProgress, 100)} className="h-2" />
-                                          </div>
-                                          <div className="space-y-2">
-                                            <div className="flex items-center justify-between gap-2 text-sm">
-                                              <span className="text-muted-foreground">{competition.opponentCircle.name}</span>
-                                              <span className="text-muted-foreground">{competition.opponentPoints.toLocaleString()}</span>
-                                            </div>
-                                            <Progress value={Math.min(opponentProgress, 100)} className="h-2" />
-                                          </div>
-                                          {opponentMembers.length > 0 && (
-                                            <div className="mt-2 p-3 bg-muted rounded-md">
-                                              <p className="text-sm font-medium mb-2">{competition.opponentCircle.name} Members</p>
-                                              <div className="space-y-1">
-                                                {opponentMembers.map((member, idx) => (
-                                                  <div key={member.id} className="flex items-center justify-between text-sm">
-                                                    <span className="flex items-center gap-2">
-                                                      <span className="text-muted-foreground">{idx + 1}.</span>
-                                                      {member.firstName} {member.lastName}
-                                                    </span>
-                                                    <span className="font-mono">{member.weeklyPoints}</span>
-                                                  </div>
-                                                ))}
+                                        <div key={competition.id} className="rounded-md border overflow-visible">
+                                          <div
+                                            role="button"
+                                            tabIndex={0}
+                                            className="w-full p-4 text-left hover-elevate active-elevate-2 cursor-pointer"
+                                            onClick={() => setExpandedCompetition(isExpanded ? null : competition.id)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpandedCompetition(isExpanded ? null : competition.id); }}
+                                            data-testid={`button-expand-competition-${competition.id}`}
+                                          >
+                                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                                              <div className="flex items-center gap-3 flex-wrap">
+                                                <div>
+                                                  <p className="font-medium">{competition.name || "Competition"}</p>
+                                                  <p className="text-sm text-muted-foreground">
+                                                    vs {competition.opponentCircle.name}
+                                                  </p>
+                                                </div>
+                                                {getCompetitionTypeBadge()}
                                               </div>
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-mono text-sm">
+                                                  {competition.myPoints} - {competition.opponentPoints}
+                                                </span>
+                                                {isExpanded ? (
+                                                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                                ) : (
+                                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            {!isExpanded && isTargetPoints && (
+                                              <div className="mt-3 space-y-2">
+                                                <div className="space-y-1">
+                                                  <div className="flex items-center justify-between gap-2 text-sm">
+                                                    <span className="font-medium">{competition.myCircle.name}</span>
+                                                    <span>{competition.myPoints.toLocaleString()}</span>
+                                                  </div>
+                                                  <Progress value={Math.min(myProgress, 100)} className="h-2" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <div className="flex items-center justify-between gap-2 text-sm">
+                                                    <span className="text-muted-foreground">{competition.opponentCircle.name}</span>
+                                                    <span className="text-muted-foreground">{competition.opponentPoints.toLocaleString()}</span>
+                                                  </div>
+                                                  <Progress value={Math.min(opponentProgress, 100)} className="h-2" />
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          {isExpanded && (
+                                            <div className="px-4 pb-4 space-y-4">
+                                              <Separator />
+                                              
+                                              <div className="grid gap-4 md:grid-cols-2">
+                                                <div className="p-3 bg-muted/50 rounded-md">
+                                                  <div className="flex items-center justify-between gap-2 mb-3">
+                                                    <p className="font-medium text-sm">{competition.myCircle.name}</p>
+                                                    <Badge variant="secondary" className="font-mono">
+                                                      {competition.myPoints} pts
+                                                    </Badge>
+                                                  </div>
+                                                  {myCircleStats.length > 0 ? (
+                                                    <div className="space-y-2">
+                                                      {myCircleStats.map((memberStat) => (
+                                                        <div key={memberStat.memberId}>
+                                                          <button
+                                                            type="button"
+                                                            className="w-full flex items-center justify-between text-sm py-1 hover-elevate rounded px-1"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              setExpandedMember(expandedMember === memberStat.memberId ? null : memberStat.memberId);
+                                                            }}
+                                                            data-testid={`button-expand-member-${memberStat.memberId}`}
+                                                          >
+                                                            <span className="flex items-center gap-2">
+                                                              {memberStat.memberName}
+                                                              {memberStat.taskStats.length > 0 && (
+                                                                expandedMember === memberStat.memberId 
+                                                                  ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                                                  : <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                                                              )}
+                                                            </span>
+                                                            <span className="font-mono">{memberStat.weeklyPoints}</span>
+                                                          </button>
+                                                          {expandedMember === memberStat.memberId && memberStat.taskStats.length > 0 && (
+                                                            <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground">
+                                                              {memberStat.taskStats.map((task) => (
+                                                                <div key={task.taskId} className="flex items-center justify-between gap-2">
+                                                                  <span>{task.taskName} ({task.completionCount}x)</span>
+                                                                  <span className="font-mono">+{task.points}</span>
+                                                                </div>
+                                                              ))}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-sm text-muted-foreground">No member data available</p>
+                                                  )}
+                                                </div>
+                                                
+                                                <div className="p-3 bg-muted/50 rounded-md">
+                                                  <div className="flex items-center justify-between gap-2 mb-3">
+                                                    <p className="font-medium text-sm">{competition.opponentCircle.name}</p>
+                                                    <Badge variant="secondary" className="font-mono">
+                                                      {competition.opponentPoints} pts
+                                                    </Badge>
+                                                  </div>
+                                                  {opponentCircleStats.length > 0 ? (
+                                                    <div className="space-y-2">
+                                                      {opponentCircleStats.map((memberStat) => (
+                                                        <div key={memberStat.memberId} className="flex items-center justify-between text-sm py-1">
+                                                          <span>{memberStat.memberName}</span>
+                                                          <span className="font-mono">{memberStat.weeklyPoints}</span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ) : (
+                                                    <p className="text-sm text-muted-foreground">No member data available</p>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              
+                                              {isTargetPoints && (
+                                                <div className="space-y-2">
+                                                  <div className="flex items-center justify-between gap-2 text-sm">
+                                                    <span>Progress to {competition.targetPoints.toLocaleString()} pts</span>
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                    <div className="flex items-center justify-between gap-2 text-xs">
+                                                      <span>{competition.myCircle.name}</span>
+                                                      <span>{Math.round(myProgress)}%</span>
+                                                    </div>
+                                                    <Progress value={Math.min(myProgress, 100)} className="h-2" />
+                                                  </div>
+                                                  <div className="space-y-1">
+                                                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                                      <span>{competition.opponentCircle.name}</span>
+                                                      <span>{Math.round(opponentProgress)}%</span>
+                                                    </div>
+                                                    <Progress value={Math.min(opponentProgress, 100)} className="h-2" />
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
                                           )}
                                         </div>
@@ -6742,16 +6959,75 @@ export default function CommunityPage() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="challengeTargetPoints">Target Points (first to reach wins)</Label>
-                                <Input
-                                  id="challengeTargetPoints"
-                                  type="number"
-                                  placeholder="e.g., 1000"
-                                  value={challengeTargetPoints}
-                                  onChange={(e) => setChallengeTargetPoints(e.target.value)}
-                                  data-testid="input-challenge-target-points"
-                                />
+                                <Label>Competition Type</Label>
+                                <Select
+                                  value={challengeCompetitionType}
+                                  onValueChange={(value) => setChallengeCompetitionType(value as CompetitionType)}
+                                  data-testid="select-competition-type"
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select competition type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="targetPoints">
+                                      <div className="flex items-center gap-2">
+                                        <Target className="w-3 h-3" />
+                                        Target Points - First to reach wins
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="timed">
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="w-3 h-3" />
+                                        Timed - Most points by end date wins
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="ongoing">
+                                      <div className="flex items-center gap-2">
+                                        <Flame className="w-3 h-3" />
+                                        Ongoing - Continuous competition
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
                               </div>
+                              {challengeCompetitionType === "targetPoints" && (
+                                <div className="space-y-2">
+                                  <Label htmlFor="challengeTargetPoints">Target Points</Label>
+                                  <Input
+                                    id="challengeTargetPoints"
+                                    type="number"
+                                    placeholder="e.g., 1000"
+                                    value={challengeTargetPoints}
+                                    onChange={(e) => setChallengeTargetPoints(e.target.value)}
+                                    data-testid="input-challenge-target-points"
+                                  />
+                                </div>
+                              )}
+                              {challengeCompetitionType === "timed" && (
+                                <div className="space-y-2">
+                                  <Label>End Date</Label>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        className="w-full justify-start text-left font-normal"
+                                        data-testid="button-challenge-end-date"
+                                      >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {challengeEndDate ? challengeEndDate.toLocaleDateString() : "Pick an end date"}
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                      <CalendarComponent
+                                        mode="single"
+                                        selected={challengeEndDate}
+                                        onSelect={setChallengeEndDate}
+                                        disabled={(date) => date < new Date()}
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              )}
                               <div className="space-y-2">
                                 <Label htmlFor="challengeName">Competition Name (optional)</Label>
                                 <Input
@@ -6768,15 +7044,21 @@ export default function CommunityPage() {
                                     toast({ title: "Please enter an invite code", variant: "destructive" });
                                     return;
                                   }
-                                  const targetPoints = parseInt(challengeTargetPoints);
-                                  if (!targetPoints || targetPoints <= 0) {
-                                    toast({ title: "Please enter a valid target points value", variant: "destructive" });
+                                  if (challengeCompetitionType === "targetPoints") {
+                                    const targetPoints = parseInt(challengeTargetPoints);
+                                    if (!targetPoints || targetPoints <= 0) {
+                                      toast({ title: "Please enter a valid target points value", variant: "destructive" });
+                                      return;
+                                    }
+                                  }
+                                  if (challengeCompetitionType === "timed" && !challengeEndDate) {
+                                    toast({ title: "Please select an end date", variant: "destructive" });
                                     return;
                                   }
                                   sendCompetitionInviteMutation.mutate({
                                     circleId: selectedCircle.id,
                                     inviteeInviteCode: challengeInviteCode,
-                                    targetPoints,
+                                    targetPoints: challengeCompetitionType === "targetPoints" ? parseInt(challengeTargetPoints) : 0,
                                     name: challengeName || undefined,
                                   });
                                 }}
