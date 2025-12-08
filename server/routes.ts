@@ -2247,6 +2247,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     try {
       const userId = req.user.claims.sub;
       const now = new Date();
+      console.log("[CHEERLINES] Fetching cheerlines for user:", userId);
 
       const receivedCheerlines = await db.select().from(cheerlines).where(
         and(
@@ -2262,6 +2263,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const validCheerlines = receivedCheerlines.filter(c => 
         !c.expiresAt || new Date(c.expiresAt) > now
       );
+      console.log("[CHEERLINES] Found", receivedCheerlines.length, "total,", validCheerlines.length, "valid for user:", userId);
 
       // Get sender details for each cheerline
       const cheerlinesWithSender = await Promise.all(
