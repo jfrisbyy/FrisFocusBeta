@@ -724,6 +724,127 @@ export const insertCirclePostCommentSchema = createInsertSchema(circlePostCommen
 export type InsertCirclePostComment = z.infer<typeof insertCirclePostCommentSchema>;
 export type CirclePostComment = typeof circlePostComments.$inferSelect;
 
+// Circle post comment likes
+export const circlePostCommentLikes = pgTable("circle_post_comment_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull().references(() => circlePostComments.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCirclePostCommentLikeSchema = createInsertSchema(circlePostCommentLikes).omit({ id: true, createdAt: true });
+export type InsertCirclePostCommentLike = z.infer<typeof insertCirclePostCommentLikeSchema>;
+export type CirclePostCommentLike = typeof circlePostCommentLikes.$inferSelect;
+
+// Circle tasks - tasks that belong to a circle
+export const circleTasks = pgTable("circle_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  value: integer("value").notNull().default(10),
+  category: varchar("category"),
+  taskType: varchar("task_type").notNull().default("per_person"), // "per_person" or "circle_task"
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  requiresApproval: boolean("requires_approval").default(false),
+  approvalStatus: varchar("approval_status").notNull().default("approved"), // "approved", "pending", "rejected"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleTaskSchema = createInsertSchema(circleTasks).omit({ id: true, createdAt: true });
+export type InsertCircleTask = z.infer<typeof insertCircleTaskSchema>;
+export type CircleTask = typeof circleTasks.$inferSelect;
+
+// Circle task completions - tracks who completed which task on which day
+export const circleTaskCompletions = pgTable("circle_task_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull().references(() => circleTasks.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleTaskCompletionSchema = createInsertSchema(circleTaskCompletions).omit({ id: true, createdAt: true });
+export type InsertCircleTaskCompletion = z.infer<typeof insertCircleTaskCompletionSchema>;
+export type CircleTaskCompletion = typeof circleTaskCompletions.$inferSelect;
+
+// Circle task requests - pending requests to add/edit/delete tasks
+export const circleTaskRequests = pgTable("circle_task_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  requesterId: varchar("requester_id").notNull().references(() => users.id),
+  type: varchar("type").notNull(), // "add", "edit", "delete"
+  taskData: jsonb("task_data").notNull(), // Partial task data for the request
+  existingTaskId: varchar("existing_task_id"),
+  status: varchar("status").notNull().default("pending"), // "pending", "approved", "rejected"
+  reviewedById: varchar("reviewed_by_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleTaskRequestSchema = createInsertSchema(circleTaskRequests).omit({ id: true, createdAt: true, reviewedAt: true });
+export type InsertCircleTaskRequest = z.infer<typeof insertCircleTaskRequestSchema>;
+export type CircleTaskRequest = typeof circleTaskRequests.$inferSelect;
+
+// Circle badges - achievement badges for circles
+export const circleBadges = pgTable("circle_badges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  icon: varchar("icon").default("star"),
+  progress: integer("progress").default(0),
+  required: integer("required").notNull().default(1),
+  rewardType: varchar("reward_type"), // "points", "gift", "both"
+  rewardPoints: integer("reward_points"),
+  rewardGift: text("reward_gift"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  approvalStatus: varchar("approval_status").notNull().default("approved"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleBadgeSchema = createInsertSchema(circleBadges).omit({ id: true, createdAt: true });
+export type InsertCircleBadge = z.infer<typeof insertCircleBadgeSchema>;
+export type CircleBadge = typeof circleBadges.$inferSelect;
+
+// Circle badge progress per user
+export const circleBadgeProgress = pgTable("circle_badge_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  badgeId: varchar("badge_id").notNull().references(() => circleBadges.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  progress: integer("progress").default(0),
+  earned: boolean("earned").default(false),
+  earnedAt: timestamp("earned_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleBadgeProgressSchema = createInsertSchema(circleBadgeProgress).omit({ id: true, createdAt: true });
+export type InsertCircleBadgeProgress = z.infer<typeof insertCircleBadgeProgressSchema>;
+export type CircleBadgeProgress = typeof circleBadgeProgress.$inferSelect;
+
+// Circle awards - competitive awards for circles
+export const circleAwards = pgTable("circle_awards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  type: varchar("type").notNull(), // "first_to", "most_in_category", "weekly_champion"
+  target: integer("target"), // For "first_to" type
+  category: varchar("category"), // For "most_in_category" type
+  winnerId: varchar("winner_id").references(() => users.id),
+  winnerAchievedAt: timestamp("winner_achieved_at"),
+  rewardType: varchar("reward_type"), // "points", "gift", "both"
+  rewardPoints: integer("reward_points"),
+  rewardGift: text("reward_gift"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  approvalStatus: varchar("approval_status").notNull().default("approved"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleAwardSchema = createInsertSchema(circleAwards).omit({ id: true, createdAt: true });
+export type InsertCircleAward = z.infer<typeof insertCircleAwardSchema>;
+export type CircleAward = typeof circleAwards.$inferSelect;
+
 // Cheerlines - encouraging messages sent from one user to another
 export const cheerlines = pgTable("cheerlines", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
