@@ -2301,9 +2301,12 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
 
       // Verify they are friends (both directions)
       const [friendship] = await db.select().from(friendships).where(
-        or(
-          and(eq(friendships.userId, senderId), eq(friendships.friendId, recipientId), eq(friendships.status, "accepted")),
-          and(eq(friendships.userId, recipientId), eq(friendships.friendId, senderId), eq(friendships.status, "accepted"))
+        and(
+          eq(friendships.status, "accepted"),
+          or(
+            and(eq(friendships.requesterId, senderId), eq(friendships.addresseeId, recipientId)),
+            and(eq(friendships.requesterId, recipientId), eq(friendships.addresseeId, senderId))
+          )
         )
       );
 
