@@ -53,6 +53,16 @@ import {
   insertCirclePostCommentSchema,
   directMessages,
   insertDirectMessageSchema,
+  userTasks,
+  userCategories,
+  userPenalties,
+  userHabitSettings,
+  userDailyLogs,
+  insertUserTaskSchema,
+  insertUserCategorySchema,
+  insertUserPenaltySchema,
+  insertUserHabitSettingsSchema,
+  insertUserDailyLogSchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -2219,6 +2229,361 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error sending message:", error);
       res.status(400).json({ error: "Failed to send message" });
+    }
+  });
+
+  // ==================== USER HABIT SYNC API ROUTES ====================
+
+  // Get all user tasks
+  app.get("/api/habit/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tasks = await db.select().from(userTasks).where(eq(userTasks.userId, userId));
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching user tasks:", error);
+      res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // Create a new user task
+  app.post("/api/habit/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertUserTaskSchema.parse({ ...req.body, userId });
+      const [task] = await db.insert(userTasks).values(parsed).returning();
+      res.json(task);
+    } catch (error) {
+      console.error("Error creating user task:", error);
+      res.status(400).json({ error: "Failed to create task" });
+    }
+  });
+
+  // Update a user task
+  app.put("/api/habit/tasks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const taskId = req.params.id;
+      const { name, value, category, priority, boostEnabled, boostThreshold, boostPeriod, boostPoints } = req.body;
+
+      const [task] = await db.update(userTasks)
+        .set({ 
+          name, 
+          value, 
+          category, 
+          priority, 
+          boostEnabled, 
+          boostThreshold, 
+          boostPeriod, 
+          boostPoints,
+          updatedAt: new Date() 
+        })
+        .where(and(eq(userTasks.id, taskId), eq(userTasks.userId, userId)))
+        .returning();
+
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating user task:", error);
+      res.status(400).json({ error: "Failed to update task" });
+    }
+  });
+
+  // Delete a user task
+  app.delete("/api/habit/tasks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const taskId = req.params.id;
+
+      const [deleted] = await db.delete(userTasks)
+        .where(and(eq(userTasks.id, taskId), eq(userTasks.userId, userId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user task:", error);
+      res.status(400).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // Get all user categories
+  app.get("/api/habit/categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const categories = await db.select().from(userCategories).where(eq(userCategories.userId, userId));
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching user categories:", error);
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  // Create a new user category
+  app.post("/api/habit/categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertUserCategorySchema.parse({ ...req.body, userId });
+      const [category] = await db.insert(userCategories).values(parsed).returning();
+      res.json(category);
+    } catch (error) {
+      console.error("Error creating user category:", error);
+      res.status(400).json({ error: "Failed to create category" });
+    }
+  });
+
+  // Update a user category
+  app.put("/api/habit/categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const categoryId = req.params.id;
+      const { name, color } = req.body;
+
+      const [category] = await db.update(userCategories)
+        .set({ name, color })
+        .where(and(eq(userCategories.id, categoryId), eq(userCategories.userId, userId)))
+        .returning();
+
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating user category:", error);
+      res.status(400).json({ error: "Failed to update category" });
+    }
+  });
+
+  // Delete a user category
+  app.delete("/api/habit/categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const categoryId = req.params.id;
+
+      const [deleted] = await db.delete(userCategories)
+        .where(and(eq(userCategories.id, categoryId), eq(userCategories.userId, userId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user category:", error);
+      res.status(400).json({ error: "Failed to delete category" });
+    }
+  });
+
+  // Get all user penalties
+  app.get("/api/habit/penalties", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const penalties = await db.select().from(userPenalties).where(eq(userPenalties.userId, userId));
+      res.json(penalties);
+    } catch (error) {
+      console.error("Error fetching user penalties:", error);
+      res.status(500).json({ error: "Failed to fetch penalties" });
+    }
+  });
+
+  // Create a new user penalty
+  app.post("/api/habit/penalties", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertUserPenaltySchema.parse({ ...req.body, userId });
+      const [penalty] = await db.insert(userPenalties).values(parsed).returning();
+      res.json(penalty);
+    } catch (error) {
+      console.error("Error creating user penalty:", error);
+      res.status(400).json({ error: "Failed to create penalty" });
+    }
+  });
+
+  // Update a user penalty
+  app.put("/api/habit/penalties/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const penaltyId = req.params.id;
+      const { name, value } = req.body;
+
+      const [penalty] = await db.update(userPenalties)
+        .set({ name, value })
+        .where(and(eq(userPenalties.id, penaltyId), eq(userPenalties.userId, userId)))
+        .returning();
+
+      if (!penalty) {
+        return res.status(404).json({ error: "Penalty not found" });
+      }
+      res.json(penalty);
+    } catch (error) {
+      console.error("Error updating user penalty:", error);
+      res.status(400).json({ error: "Failed to update penalty" });
+    }
+  });
+
+  // Delete a user penalty
+  app.delete("/api/habit/penalties/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const penaltyId = req.params.id;
+
+      const [deleted] = await db.delete(userPenalties)
+        .where(and(eq(userPenalties.id, penaltyId), eq(userPenalties.userId, userId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Penalty not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user penalty:", error);
+      res.status(400).json({ error: "Failed to delete penalty" });
+    }
+  });
+
+  // Get user habit settings
+  app.get("/api/habit/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [settings] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
+      res.json(settings || null);
+    } catch (error) {
+      console.error("Error fetching user settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // Create or update user habit settings (upsert)
+  app.put("/api/habit/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { dailyGoal, weeklyGoal, userName, encouragementMessage, penaltyBoostEnabled, penaltyBoostThreshold, penaltyBoostPeriod, penaltyBoostPoints } = req.body;
+
+      // Check if settings exist
+      const [existing] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
+
+      if (existing) {
+        // Update existing settings
+        const [settings] = await db.update(userHabitSettings)
+          .set({
+            dailyGoal,
+            weeklyGoal,
+            userName,
+            encouragementMessage,
+            penaltyBoostEnabled,
+            penaltyBoostThreshold,
+            penaltyBoostPeriod,
+            penaltyBoostPoints,
+            updatedAt: new Date()
+          })
+          .where(eq(userHabitSettings.userId, userId))
+          .returning();
+        res.json(settings);
+      } else {
+        // Create new settings
+        const parsed = insertUserHabitSettingsSchema.parse({
+          userId,
+          dailyGoal,
+          weeklyGoal,
+          userName,
+          encouragementMessage,
+          penaltyBoostEnabled,
+          penaltyBoostThreshold,
+          penaltyBoostPeriod,
+          penaltyBoostPoints
+        });
+        const [settings] = await db.insert(userHabitSettings).values(parsed).returning();
+        res.json(settings);
+      }
+    } catch (error) {
+      console.error("Error updating user settings:", error);
+      res.status(400).json({ error: "Failed to update settings" });
+    }
+  });
+
+  // Get daily logs for a date range
+  app.get("/api/habit/logs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { from, to } = req.query;
+      
+      let logs;
+      if (from && to) {
+        // Filter by date range
+        logs = await db.select().from(userDailyLogs)
+          .where(and(
+            eq(userDailyLogs.userId, userId),
+            // Date is stored as YYYY-MM-DD string, so we can use string comparison
+          ));
+        // Filter in memory for date range (more flexible)
+        logs = logs.filter(log => log.date >= from && log.date <= to);
+      } else {
+        logs = await db.select().from(userDailyLogs).where(eq(userDailyLogs.userId, userId));
+      }
+      
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching daily logs:", error);
+      res.status(500).json({ error: "Failed to fetch daily logs" });
+    }
+  });
+
+  // Get daily log for a specific date
+  app.get("/api/habit/logs/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+
+      const [log] = await db.select().from(userDailyLogs)
+        .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)));
+      
+      res.json(log || null);
+    } catch (error) {
+      console.error("Error fetching daily log:", error);
+      res.status(500).json({ error: "Failed to fetch daily log" });
+    }
+  });
+
+  // Create or update daily log for a specific date (upsert)
+  app.put("/api/habit/logs/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+      const { completedTaskIds, notes } = req.body;
+
+      // Check if log exists for this date
+      const [existing] = await db.select().from(userDailyLogs)
+        .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)));
+
+      if (existing) {
+        // Update existing log
+        const [log] = await db.update(userDailyLogs)
+          .set({
+            completedTaskIds: completedTaskIds || [],
+            notes,
+            updatedAt: new Date()
+          })
+          .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)))
+          .returning();
+        res.json(log);
+      } else {
+        // Create new log
+        const parsed = insertUserDailyLogSchema.parse({
+          userId,
+          date,
+          completedTaskIds: completedTaskIds || [],
+          notes
+        });
+        const [log] = await db.insert(userDailyLogs).values(parsed).returning();
+        res.json(log);
+      }
+    } catch (error) {
+      console.error("Error updating daily log:", error);
+      res.status(400).json({ error: "Failed to update daily log" });
     }
   });
 
