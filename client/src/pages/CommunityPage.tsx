@@ -4090,43 +4090,87 @@ export default function CommunityPage() {
                 )}
               </div>
 
+              {/* Circle Points Summary */}
+              {(() => {
+                const currentUserId = isDemo ? "you" : user?.id;
+                const members = circleMembers[selectedCircle.id] || [];
+                const totalCirclePoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                const memberCount = members.length;
+                const avgPointsPerMember = memberCount > 0 ? Math.round(totalCirclePoints / memberCount) : 0;
+                const yourPoints = members.find(m => m.userId === currentUserId)?.weeklyPoints || 0;
+                
+                return (
+                  <Card className="mb-4">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Trophy className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">Circle Points Summary</span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center p-3 rounded-md bg-muted/50">
+                          <div className="text-2xl font-bold text-primary" data-testid="text-total-circle-points">{totalCirclePoints}</div>
+                          <div className="text-xs text-muted-foreground">Total Circle Points</div>
+                        </div>
+                        <div className="text-center p-3 rounded-md bg-muted/50">
+                          <div className="text-2xl font-bold" data-testid="text-member-count">{memberCount}</div>
+                          <div className="text-xs text-muted-foreground">Members</div>
+                        </div>
+                        <div className="text-center p-3 rounded-md bg-muted/50">
+                          <div className="text-2xl font-bold" data-testid="text-avg-points">{avgPointsPerMember}</div>
+                          <div className="text-xs text-muted-foreground">Avg per Member</div>
+                        </div>
+                        <div className="text-center p-3 rounded-md bg-muted/50">
+                          <div className="text-2xl font-bold" data-testid="text-your-points">{yourPoints}</div>
+                          <div className="text-xs text-muted-foreground">Your Points</div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
               {/* Goal Progress Display */}
-              {(selectedCircle.dailyPointGoal || selectedCircle.weeklyPointGoal) && (
-                <Card className="mb-4">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Target className="w-5 h-5 text-muted-foreground" />
-                      <span className="font-medium">Circle Goals</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedCircle.dailyPointGoal && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Daily Goal</span>
-                            <span className="font-medium">{selectedCircle.dailyPointGoal} pts/member</span>
+              {(selectedCircle.dailyPointGoal || selectedCircle.weeklyPointGoal) && (() => {
+                const currentUserId = isDemo ? "you" : user?.id;
+                const yourWeeklyPoints = circleMembers[selectedCircle.id]?.find(m => m.userId === currentUserId)?.weeklyPoints || 0;
+                
+                return (
+                  <Card className="mb-4">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">Your Goal Progress</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedCircle.dailyPointGoal && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Daily Goal</span>
+                              <span className="font-medium">{Math.round(yourWeeklyPoints / 7)} / {selectedCircle.dailyPointGoal} pts</span>
+                            </div>
+                            <Progress 
+                              value={Math.min(100, (yourWeeklyPoints / 7 / selectedCircle.dailyPointGoal) * 100)} 
+                              className="h-2"
+                            />
                           </div>
-                          <Progress 
-                            value={Math.min(100, ((circleMembers[selectedCircle.id]?.find(m => m.userId === "you")?.weeklyPoints || 0) / 7 / selectedCircle.dailyPointGoal) * 100)} 
-                            className="h-2"
-                          />
-                        </div>
-                      )}
-                      {selectedCircle.weeklyPointGoal && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Weekly Goal</span>
-                            <span className="font-medium">{selectedCircle.weeklyPointGoal} pts/member</span>
+                        )}
+                        {selectedCircle.weeklyPointGoal && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Weekly Goal</span>
+                              <span className="font-medium">{yourWeeklyPoints} / {selectedCircle.weeklyPointGoal} pts</span>
+                            </div>
+                            <Progress 
+                              value={Math.min(100, (yourWeeklyPoints / selectedCircle.weeklyPointGoal) * 100)} 
+                              className="h-2"
+                            />
                           </div>
-                          <Progress 
-                            value={Math.min(100, ((circleMembers[selectedCircle.id]?.find(m => m.userId === "you")?.weeklyPoints || 0) / selectedCircle.weeklyPointGoal) * 100)} 
-                            className="h-2"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Circle Settings Dialog */}
               <Dialog open={showCircleSettings} onOpenChange={setShowCircleSettings}>
@@ -4551,6 +4595,22 @@ export default function CommunityPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
+                      {/* Total Points Banner */}
+                      {(() => {
+                        const members = circleMembers[selectedCircle.id] || [];
+                        const totalCirclePoints = members.reduce((sum, m) => sum + (m.weeklyPoints || 0), 0);
+                        return (
+                          <div className="flex items-center justify-between p-3 mb-4 rounded-md bg-primary/10 border border-primary/20">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-5 h-5 text-primary" />
+                              <span className="font-medium">Combined Circle Total</span>
+                            </div>
+                            <div className="text-xl font-bold text-primary" data-testid="text-leaderboard-total-points">
+                              {totalCirclePoints} pts
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <div className="space-y-2">
                         {(circleMembers[selectedCircle.id] || [])
                           .sort((a, b) => {
