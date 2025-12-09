@@ -389,6 +389,8 @@ export default function Dashboard() {
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [weekStartDate, setWeekStartDate] = useState("");
+  const [weekEndDate, setWeekEndDate] = useState("");
 
   // Season interfaces
   interface Season {
@@ -638,8 +640,15 @@ export default function Dashboard() {
       });
     }
 
-    // Calculate current week data from daily logs
-    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    // Calculate current week data from daily logs (using weekOffset for navigation)
+    const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const weekStart = weekOffset === 0 ? baseWeekStart : addDays(baseWeekStart, weekOffset * 7);
+    const weekEnd = addDays(weekStart, 6);
+    
+    // Set ISO date strings for WeeklyTable
+    setWeekStartDate(format(weekStart, "yyyy-MM-dd"));
+    setWeekEndDate(format(weekEnd, "yyyy-MM-dd"));
+    
     const currentWeekDays = Array.from({ length: 7 }, (_, i) => {
       const date = addDays(weekStart, i);
       const dateKey = format(date, "yyyy-MM-dd");
@@ -901,7 +910,7 @@ export default function Dashboard() {
       });
 
     setBoosters([...taskBoosters, ...negativeBoosters]);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, activeSeason, activeSeasonData, apiQueriesReady]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, activeSeason, activeSeasonData, apiQueriesReady, weekOffset]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -1211,6 +1220,8 @@ export default function Dashboard() {
             onDayClick={handleDayClick} 
             weekOffset={weekOffset}
             onWeekChange={setWeekOffset}
+            weekStartDate={weekStartDate}
+            weekEndDate={weekEndDate}
           />
           <AlertsPanel alerts={alerts} />
         </div>

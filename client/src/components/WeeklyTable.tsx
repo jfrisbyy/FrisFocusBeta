@@ -34,6 +34,8 @@ interface WeeklyTableProps {
   onDayClick?: (date: string) => void;
   weekOffset?: number;
   onWeekChange?: (offset: number) => void;
+  weekStartDate?: string; // ISO format YYYY-MM-DD
+  weekEndDate?: string;   // ISO format YYYY-MM-DD
 }
 
 function getDayStatus(points: number | null) {
@@ -50,30 +52,13 @@ function formatTimeDisplay(time: string): string {
   return `${displayHour}:${minutes.toString().padStart(2, "0")} ${ampm}`;
 }
 
-function getDateKey(dateStr: string, weekOffset: number): string {
-  // Parse date like "Dec 9" to YYYY-MM-DD format
-  const now = new Date();
-  const weekStart = weekOffset === 0 
-    ? startOfWeek(now, { weekStartsOn: 1 })
-    : addWeeks(startOfWeek(now, { weekStartsOn: 1 }), weekOffset);
-  
-  // Find the day in the current week that matches
-  for (let i = 0; i < 7; i++) {
-    const day = addDays(weekStart, i);
-    if (format(day, "MMM d") === dateStr) {
-      return format(day, "yyyy-MM-dd");
-    }
-  }
-  // Fallback - try to parse directly
-  try {
-    const parsed = parse(dateStr, "MMM d", now);
-    return format(parsed, "yyyy-MM-dd");
-  } catch {
-    return dateStr;
-  }
+function getDateKeyByIndex(index: number, firstDayDate: Date): string {
+  // Calculate date by adding index offset to firstDayDate - handles year boundaries correctly
+  const targetDate = addDays(firstDayDate, index);
+  return format(targetDate, "yyyy-MM-dd");
 }
 
-export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekChange }: WeeklyTableProps) {
+export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekChange, weekStartDate, weekEndDate }: WeeklyTableProps) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
@@ -84,18 +69,23 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
     description: "",
   });
 
-  // Calculate week date range for API query
+  // Use explicit ISO dates - these are required for correct year boundary handling
   const now = new Date();
-  const weekStart = weekOffset === 0 
-    ? startOfWeek(now, { weekStartsOn: 1 })
-    : addWeeks(startOfWeek(now, { weekStartsOn: 1 }), weekOffset);
-  const weekEnd = addDays(weekStart, 6);
-  const startDateStr = format(weekStart, "yyyy-MM-dd");
-  const endDateStr = format(weekEnd, "yyyy-MM-dd");
+  // When props not provided, derive from weekOffset to preserve week navigation
+  const baseWeekStart = addWeeks(startOfWeek(now, { weekStartsOn: 1 }), weekOffset);
+  const startDateStr = weekStartDate || format(baseWeekStart, "yyyy-MM-dd");
+  const endDateStr = weekEndDate || format(addDays(baseWeekStart, 6), "yyyy-MM-dd");
+  const firstDayDate = parse(startDateStr, "yyyy-MM-dd", now);
+  const lastDayDate = parse(endDateStr, "yyyy-MM-dd", now);
 
   // Fetch appointments for the current week
   const { data: appointments = [] } = useQuery<Appointment[]>({
     queryKey: ["/api/appointments", startDateStr, endDateStr],
+    queryFn: async () => {
+      const response = await fetch(`/api/appointments?startDate=${startDateStr}&endDate=${endDateStr}`);
+      if (!response.ok) throw new Error("Failed to fetch appointments");
+      return response.json();
+    },
   });
 
   // Create appointment mutation
@@ -122,13 +112,13 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
     },
   });
 
-  const handleDayExpand = (date: string) => {
-    const dateKey = getDateKey(date, weekOffset);
+  const handleDayExpand = (index: number) => {
+    const dateKey = getDateKeyByIndex(index, firstDayDate);
     setExpandedDate(expandedDate === dateKey ? null : dateKey);
   };
 
-  const handleAddAppointment = (date: string) => {
-    const dateKey = getDateKey(date, weekOffset);
+  const handleAddAppointment = (index: number) => {
+    const dateKey = getDateKeyByIndex(index, firstDayDate);
     setSelectedDate(dateKey);
     setDialogOpen(true);
   };
@@ -144,12 +134,12 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
     });
   };
 
-  const getAppointmentsForDate = (date: string): Appointment[] => {
-    const dateKey = getDateKey(date, weekOffset);
+  const getAppointmentsForDate = (index: number): Appointment[] => {
+    const dateKey = getDateKeyByIndex(index, firstDayDate);
     return appointments.filter(apt => apt.date === dateKey);
   };
 
-  const weekLabel = `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d, yyyy")}`;
+  const weekLabel = `${format(firstDayDate, "MMM d")} - ${format(lastDayDate, "MMM d, yyyy")}`;
 
   return (
     <>
@@ -183,15 +173,15 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">
-            {days.map((day) => {
+            {days.map((day, index) => {
               const status = getDayStatus(day.points);
-              const dateKey = getDateKey(day.date, weekOffset);
+              const dateKey = getDateKeyByIndex(index, firstDayDate);
               const isExpanded = expandedDate === dateKey;
-              const dayAppointments = getAppointmentsForDate(day.date);
+              const dayAppointments = getAppointmentsForDate(index);
               const hasAppointments = dayAppointments.length > 0;
 
               return (
-                <Collapsible key={day.date} open={isExpanded} onOpenChange={() => handleDayExpand(day.date)}>
+                <Collapsible key={day.date} open={isExpanded} onOpenChange={() => handleDayExpand(index)}>
                   <div className="flex flex-col">
                     <div className="flex items-center">
                       <CollapsibleTrigger asChild>
@@ -261,7 +251,7 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
                           variant="outline"
                           size="sm"
                           className="w-full"
-                          onClick={() => handleAddAppointment(day.date)}
+                          onClick={() => handleAddAppointment(index)}
                           data-testid={`button-add-appointment-${day.date}`}
                         >
                           <Plus className="h-3 w-3 mr-1" />
