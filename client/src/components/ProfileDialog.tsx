@@ -183,8 +183,14 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
     return (first + last).toUpperCase() || "U";
   };
 
+  const getProfileImageUrl = () => {
+    if (!user?.profileImageUrl) return undefined;
+    const timestamp = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now();
+    return `${user.profileImageUrl}?v=${timestamp}`;
+  };
+
   const fullName = user.displayName || [user.firstName, user.lastName].filter(Boolean).join(" ") || "User";
-  const avatarSrc = previewUrl || user.profileImageUrl || undefined;
+  const avatarSrc = previewUrl || getProfileImageUrl();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

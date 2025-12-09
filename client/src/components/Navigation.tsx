@@ -47,6 +47,12 @@ export default function Navigation() {
     return (first + last).toUpperCase() || "U";
   };
 
+  const getProfileImageUrl = () => {
+    if (!user?.profileImageUrl) return undefined;
+    const timestamp = user.updatedAt ? new Date(user.updatedAt).getTime() : Date.now();
+    return `${user.profileImageUrl}?v=${timestamp}`;
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-6">
@@ -78,7 +84,7 @@ export default function Navigation() {
               data-testid="button-open-profile"
             >
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
+                <AvatarImage src={getProfileImageUrl()} alt={user.firstName || "User"} />
                 <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
               </Avatar>
               <span className="hidden md:inline text-sm text-muted-foreground">
