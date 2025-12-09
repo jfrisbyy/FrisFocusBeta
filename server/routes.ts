@@ -941,6 +941,19 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         status: "pending",
       }).returning();
 
+      // Create notification for the addressee
+      const [requester] = await db.select().from(users).where(eq(users.id, userId));
+      const requesterName = requester?.displayName || `${requester?.firstName || ''} ${requester?.lastName || ''}`.trim() || "Someone";
+      await storage.createNotification({
+        userId: targetUser.id,
+        type: "friend_request",
+        title: "New Friend Request",
+        message: `${requesterName} sent you a friend request`,
+        actorId: userId,
+        resourceId: friendship.id,
+        resourceType: "friendship",
+      });
+
       res.json(friendship);
     } catch (error) {
       console.error("Error sending friend request:", error);
@@ -975,6 +988,19 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         .set({ status: "accepted", updatedAt: new Date() })
         .where(eq(friendships.id, id))
         .returning();
+
+      // Create notification for the original requester
+      const [accepter] = await db.select().from(users).where(eq(users.id, userId));
+      const accepterName = accepter?.displayName || `${accepter?.firstName || ''} ${accepter?.lastName || ''}`.trim() || "Someone";
+      await storage.createNotification({
+        userId: friendship.requesterId,
+        type: "friend_accepted",
+        title: "Friend Request Accepted",
+        message: `${accepterName} accepted your friend request`,
+        actorId: userId,
+        resourceId: friendship.id,
+        resourceType: "friendship",
+      });
 
       res.json(updated);
     } catch (error) {
@@ -2177,6 +2203,23 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       } else {
         // Like
         await db.insert(postLikes).values({ postId, userId });
+
+        // Create notification for post author (but not if liking own post)
+        const [post] = await db.select().from(communityPosts).where(eq(communityPosts.id, postId));
+        if (post && post.authorId !== userId) {
+          const [liker] = await db.select().from(users).where(eq(users.id, userId));
+          const likerName = liker?.displayName || `${liker?.firstName || ''} ${liker?.lastName || ''}`.trim() || "Someone";
+          await storage.createNotification({
+            userId: post.authorId,
+            type: "post_like",
+            title: "New Like",
+            message: `${likerName} liked your post`,
+            actorId: userId,
+            resourceId: postId,
+            resourceType: "post",
+          });
+        }
+
         res.json({ liked: true });
       }
     } catch (error) {
@@ -2224,6 +2267,22 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const postId = req.params.id;
       const parsed = insertPostCommentSchema.parse({ ...req.body, postId, authorId: userId });
       const [comment] = await db.insert(postComments).values(parsed).returning();
+
+      // Create notification for post author (but not if commenting on own post)
+      const [post] = await db.select().from(communityPosts).where(eq(communityPosts.id, postId));
+      if (post && post.authorId !== userId) {
+        const [commenter] = await db.select().from(users).where(eq(users.id, userId));
+        const commenterName = commenter?.displayName || `${commenter?.firstName || ''} ${commenter?.lastName || ''}`.trim() || "Someone";
+        await storage.createNotification({
+          userId: post.authorId,
+          type: "post_comment",
+          title: "New Comment",
+          message: `${commenterName} commented on your post`,
+          actorId: userId,
+          resourceId: postId,
+          resourceType: "post",
+        });
+      }
 
       // Get author info for response
       const [author] = await db.select().from(users).where(eq(users.id, userId));
@@ -2544,6 +2603,21 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         inviteeId,
         status: "pending",
       }).returning();
+
+      // Create notification for the invitee
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      const [inviter] = await db.select().from(users).where(eq(users.id, userId));
+      const inviterName = inviter?.displayName || `${inviter?.firstName || ''} ${inviter?.lastName || ''}`.trim() || "Someone";
+      const circleName = circle?.name || "a circle";
+      await storage.createNotification({
+        userId: inviteeId,
+        type: "circle_invitation",
+        title: "Circle Invitation",
+        message: `${inviterName} invited you to join ${circleName}`,
+        actorId: userId,
+        resourceId: circleId,
+        resourceType: "circle",
+      });
 
       res.json(invite);
     } catch (error) {
@@ -4214,6 +4288,18 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         recipientId,
       });
       const [message] = await db.insert(directMessages).values(parsed).returning();
+
+      // Create notification for the recipient
+      const senderName = sender?.displayName || `${sender?.firstName || ''} ${sender?.lastName || ''}`.trim() || "Someone";
+      await storage.createNotification({
+        userId: recipientId,
+        type: "instant_message",
+        title: "New Message",
+        message: `${senderName} sent you a message`,
+        actorId: currentUserId,
+        resourceId: message.id,
+        resourceType: "message",
+      });
 
       // Return message with sender and recipient names for frontend compatibility
       const messageWithNames = {
