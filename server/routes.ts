@@ -240,6 +240,26 @@ export async function registerRoutes(
     try {
       const decodedToken = req.user.decodedToken;
       const user = await upsertFirebaseUser(decodedToken);
+      
+      // Mark any pending email invitations as accepted when user registers
+      if (user.email) {
+        try {
+          await db.update(emailInvitations)
+            .set({ 
+              status: "accepted",
+              acceptedAt: new Date()
+            })
+            .where(
+              and(
+                eq(emailInvitations.invitedEmail, user.email),
+                eq(emailInvitations.status, "pending")
+              )
+            );
+        } catch (inviteError) {
+          console.error("Error updating email invitations:", inviteError);
+        }
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error upserting Firebase user:", error);
