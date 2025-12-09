@@ -285,19 +285,33 @@ export async function registerRoutes(
       const offset = (pageNum - 1) * limitNum;
       const searchPattern = `%${searchTerm.toLowerCase()}%`;
       
-      // Get user IDs to exclude (current user + any existing relationship)
-      const existingRelationships = await db.select({
+      // Get user IDs to exclude:
+      // - Accepted friends (both directions)
+      // - Incoming pending requests (user is addressee - they appear in requests section)
+      // BUT KEEP visible: outgoing pending requests (so green button can show)
+      const excludeRelationships = await db.select({
         requesterId: friendships.requesterId,
         addresseeId: friendships.addresseeId,
       }).from(friendships).where(
         or(
-          eq(friendships.requesterId, currentUserId),
-          eq(friendships.addresseeId, currentUserId)
+          // Exclude accepted friends (both directions)
+          and(
+            eq(friendships.status, "accepted"),
+            or(
+              eq(friendships.requesterId, currentUserId),
+              eq(friendships.addresseeId, currentUserId)
+            )
+          ),
+          // Exclude incoming pending requests (user is addressee)
+          and(
+            eq(friendships.status, "pending"),
+            eq(friendships.addresseeId, currentUserId)
+          )
         )
       );
       
       const excludedIds = new Set<string>([currentUserId]);
-      existingRelationships.forEach(f => {
+      excludeRelationships.forEach(f => {
         excludedIds.add(f.requesterId);
         excludedIds.add(f.addresseeId);
       });
@@ -367,19 +381,33 @@ export async function registerRoutes(
       const limitNum = Math.min(parseInt(limit as string) || 10, 20);
       const offset = (pageNum - 1) * limitNum;
       
-      // Get user IDs to exclude (current user + any existing relationship)
-      const existingRelationships = await db.select({
+      // Get user IDs to exclude:
+      // - Accepted friends (both directions)
+      // - Incoming pending requests (user is addressee - they appear in requests section)
+      // BUT KEEP visible: outgoing pending requests (so green button can show)
+      const excludeRelationships = await db.select({
         requesterId: friendships.requesterId,
         addresseeId: friendships.addresseeId,
       }).from(friendships).where(
         or(
-          eq(friendships.requesterId, currentUserId),
-          eq(friendships.addresseeId, currentUserId)
+          // Exclude accepted friends (both directions)
+          and(
+            eq(friendships.status, "accepted"),
+            or(
+              eq(friendships.requesterId, currentUserId),
+              eq(friendships.addresseeId, currentUserId)
+            )
+          ),
+          // Exclude incoming pending requests (user is addressee)
+          and(
+            eq(friendships.status, "pending"),
+            eq(friendships.addresseeId, currentUserId)
+          )
         )
       );
       
       const excludedIds = new Set<string>([currentUserId]);
-      existingRelationships.forEach(f => {
+      excludeRelationships.forEach(f => {
         excludedIds.add(f.requesterId);
         excludedIds.add(f.addresseeId);
       });
