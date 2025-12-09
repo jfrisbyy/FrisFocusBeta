@@ -2924,7 +2924,17 @@ export default function CommunityPage() {
     if (isDemo || fetchedComments[postId]) return;
     try {
       const res = await apiRequest("GET", `/api/community/posts/${postId}/comments`);
-      const comments = await res.json();
+      const rawComments = await res.json();
+      const comments = rawComments.map((c: any) => ({
+        id: c.id,
+        authorId: c.authorId,
+        authorName: c.author 
+          ? (c.author.displayName || `${c.author.firstName} ${c.author.lastName}`.trim())
+          : "Unknown User",
+        content: c.content,
+        createdAt: c.createdAt,
+        likes: [],
+      }));
       setFetchedComments(prev => ({ ...prev, [postId]: comments }));
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -2936,12 +2946,22 @@ export default function CommunityPage() {
     
     if (!isDemo) {
       addCommentMutation.mutate({ postId, content: newComment.trim() }, {
-        onSuccess: (newCommentData) => {
+        onSuccess: (rawComment: any) => {
+          const transformedComment = {
+            id: rawComment.id,
+            authorId: rawComment.authorId,
+            authorName: rawComment.author 
+              ? (rawComment.author.displayName || `${rawComment.author.firstName} ${rawComment.author.lastName}`.trim())
+              : "You",
+            content: rawComment.content,
+            createdAt: rawComment.createdAt,
+            likes: [],
+          };
           setNewComment("");
           setCommentingPostId(null);
           setFetchedComments(prev => ({
             ...prev,
-            [postId]: [...(prev[postId] || []), newCommentData]
+            [postId]: [...(prev[postId] || []), transformedComment]
           }));
           queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
           toast({ title: "Comment added" });
