@@ -5539,12 +5539,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
   app.get("/api/fp/leaderboard", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { type = "all", limit = "20" } = req.query;
+      const { type = "all", limit = "20", period = "allTime" } = req.query;
       const { getFpLeaderboard } = await import("./fpService");
       const leaderboard = await getFpLeaderboard(
         type as "all" | "friends",
         userId,
-        parseInt(limit as string)
+        parseInt(limit as string),
+        period as "weekly" | "monthly" | "allTime"
       );
       res.json(leaderboard);
     } catch (error) {

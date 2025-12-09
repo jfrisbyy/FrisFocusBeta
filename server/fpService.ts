@@ -142,7 +142,8 @@ export async function getUserFpActivity(
 export async function getFpLeaderboard(
   type: "all" | "friends",
   userId?: string,
-  limit: number = 20
+  limit: number = 20,
+  period: "weekly" | "monthly" | "allTime" = "allTime"
 ): Promise<Array<{
   userId: string;
   displayName: string | null;
@@ -174,30 +175,91 @@ export async function getFpLeaderboard(
     });
   }
   
-  const baseQuery = db.select({
+  if (period === "allTime") {
+    const baseQuery = db.select({
+      userId: users.id,
+      displayName: users.displayName,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      profileImageUrl: users.profileImageUrl,
+      fpTotal: users.fpTotal,
+    }).from(users);
+    
+    let results;
+    if (userIds && userIds.length > 0) {
+      results = await baseQuery
+        .where(sql`${users.id} IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`)
+        .orderBy(sql`COALESCE(${users.fpTotal}, 0) DESC`)
+        .limit(limit);
+    } else {
+      results = await baseQuery
+        .orderBy(sql`COALESCE(${users.fpTotal}, 0) DESC`)
+        .limit(limit);
+    }
+    
+    return results.map((r, index) => ({
+      ...r,
+      fpTotal: r.fpTotal || 0,
+      rank: index + 1,
+    }));
+  }
+  
+  const now = new Date();
+  let startDate: Date;
+  
+  if (period === "weekly") {
+    startDate = new Date(now);
+    const dayOfWeek = startDate.getDay();
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    startDate.setDate(startDate.getDate() + diff);
+    startDate.setHours(0, 0, 0, 0);
+  } else {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    startDate.setHours(0, 0, 0, 0);
+  }
+  
+  let userFilter = sql`1=1`;
+  if (userIds && userIds.length > 0) {
+    userFilter = sql`${fpActivityLog.userId} IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`;
+  }
+  
+  const periodTotals = await db.select({
+    odUserId: fpActivityLog.userId,
+    periodFp: sql<number>`COALESCE(SUM(${fpActivityLog.fpAmount}), 0)`.as("periodFp"),
+  })
+    .from(fpActivityLog)
+    .where(and(
+      gte(fpActivityLog.createdAt, startDate),
+      userFilter
+    ))
+    .groupBy(fpActivityLog.userId)
+    .orderBy(sql`COALESCE(SUM(${fpActivityLog.fpAmount}), 0) DESC`)
+    .limit(limit);
+  
+  if (periodTotals.length === 0) {
+    return [];
+  }
+  
+  const userDetails = await db.select({
     userId: users.id,
     displayName: users.displayName,
     firstName: users.firstName,
     lastName: users.lastName,
     profileImageUrl: users.profileImageUrl,
-    fpTotal: users.fpTotal,
-  }).from(users);
+  }).from(users).where(sql`${users.id} IN (${sql.join(periodTotals.map(p => sql`${p.odUserId}`), sql`, `)})`);
   
-  let results;
-  if (userIds && userIds.length > 0) {
-    results = await baseQuery
-      .where(sql`${users.id} IN (${sql.join(userIds.map(id => sql`${id}`), sql`, `)})`)
-      .orderBy(sql`COALESCE(${users.fpTotal}, 0) DESC`)
-      .limit(limit);
-  } else {
-    results = await baseQuery
-      .orderBy(sql`COALESCE(${users.fpTotal}, 0) DESC`)
-      .limit(limit);
-  }
+  const userMap = new Map(userDetails.map(u => [u.userId, u]));
   
-  return results.map((r, index) => ({
-    ...r,
-    fpTotal: r.fpTotal || 0,
-    rank: index + 1,
-  }));
+  return periodTotals.map((p, index) => {
+    const user = userMap.get(p.odUserId);
+    return {
+      userId: p.odUserId,
+      displayName: user?.displayName || null,
+      firstName: user?.firstName || null,
+      lastName: user?.lastName || null,
+      profileImageUrl: user?.profileImageUrl || null,
+      fpTotal: Number(p.periodFp),
+      rank: index + 1,
+    };
+  });
 }

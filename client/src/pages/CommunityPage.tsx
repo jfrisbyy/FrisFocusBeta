@@ -1174,6 +1174,7 @@ export default function CommunityPage() {
 
   // FP Leaderboard state (must be declared before the query that uses it)
   const [fpLeaderboardScope, setFpLeaderboardScope] = useState<"friends" | "all">("friends");
+  const [fpLeaderboardPeriod, setFpLeaderboardPeriod] = useState<"weekly" | "monthly" | "allTime">("allTime");
 
   // Reset FP leaderboard scope when entering demo mode
   useEffect(() => {
@@ -1193,10 +1194,10 @@ export default function CommunityPage() {
     rank: number;
   }
   const fpLeaderboardQuery = useQuery<FpLeaderboardEntry[]>({
-    queryKey: ['/api/fp/leaderboard', fpLeaderboardScope],
+    queryKey: ['/api/fp/leaderboard', fpLeaderboardScope, fpLeaderboardPeriod],
     enabled: !isDemo,
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/fp/leaderboard?type=${fpLeaderboardScope}`);
+      const res = await apiRequest("GET", `/api/fp/leaderboard?type=${fpLeaderboardScope}&period=${fpLeaderboardPeriod}`);
       return res.json();
     },
   });
@@ -5605,23 +5606,51 @@ export default function CommunityPage() {
                     FP Leaderboard
                   </CardTitle>
                   {!isDemo && (
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant={fpLeaderboardScope === "friends" ? "default" : "ghost"}
-                        onClick={() => setFpLeaderboardScope("friends")}
-                        data-testid="button-fp-leaderboard-friends"
-                      >
-                        Friends
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={fpLeaderboardScope === "all" ? "default" : "ghost"}
-                        onClick={() => setFpLeaderboardScope("all")}
-                        data-testid="button-fp-leaderboard-all"
-                      >
-                        Everyone
-                      </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant={fpLeaderboardScope === "friends" ? "default" : "ghost"}
+                          onClick={() => setFpLeaderboardScope("friends")}
+                          data-testid="button-fp-leaderboard-friends"
+                        >
+                          Friends
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={fpLeaderboardScope === "all" ? "default" : "ghost"}
+                          onClick={() => setFpLeaderboardScope("all")}
+                          data-testid="button-fp-leaderboard-all"
+                        >
+                          Everyone
+                        </Button>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant={fpLeaderboardPeriod === "weekly" ? "default" : "ghost"}
+                          onClick={() => setFpLeaderboardPeriod("weekly")}
+                          data-testid="button-fp-leaderboard-weekly"
+                        >
+                          Week
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={fpLeaderboardPeriod === "monthly" ? "default" : "ghost"}
+                          onClick={() => setFpLeaderboardPeriod("monthly")}
+                          data-testid="button-fp-leaderboard-monthly"
+                        >
+                          Month
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={fpLeaderboardPeriod === "allTime" ? "default" : "ghost"}
+                          onClick={() => setFpLeaderboardPeriod("allTime")}
+                          data-testid="button-fp-leaderboard-alltime"
+                        >
+                          All Time
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
