@@ -1218,6 +1218,22 @@ export default function CommunityPage() {
     },
   });
 
+  // Email invitations interface
+  interface EmailInvitation {
+    id: number;
+    invitedEmail: string;
+    inviterId: string;
+    status: string;
+    createdAt: string;
+    expiresAt: string;
+  }
+
+  // Pending email invitations query
+  const pendingInvitationsQuery = useQuery<EmailInvitation[]>({
+    queryKey: ['/api/friends/invitations'],
+    enabled: !isDemo,
+  });
+
   // Friend request queries and mutations
   const friendRequestsQuery = useQuery<FriendRequest[]>({
     queryKey: ['/api/friends/requests'],
@@ -1347,6 +1363,24 @@ export default function CommunityPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send invitation", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelEmailInvitationMutation = useMutation({
+    mutationFn: async (invitationId: number) => {
+      const res = await apiRequest("DELETE", `/api/friends/invitations/${invitationId}`, {});
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to cancel invitation');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invitation cancelled" });
+      queryClient.invalidateQueries({ queryKey: ['/api/friends/invitations'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to cancel invitation", description: error.message, variant: "destructive" });
     },
   });
 
@@ -5265,6 +5299,69 @@ export default function CommunityPage() {
                         Cancel
                       </Button>
                     </div>
+                  </div>
+                )}
+                
+                {/* Pending Email Invitations */}
+                {!isDemo && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Pending Email Invitations
+                    </h4>
+                    {pendingInvitationsQuery.isLoading ? (
+                      <div className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading invitations...
+                      </div>
+                    ) : pendingInvitationsQuery.isError ? (
+                      <div className="flex items-center justify-between gap-2 p-2 text-sm text-destructive">
+                        <span className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          {pendingInvitationsQuery.error instanceof Error 
+                            ? pendingInvitationsQuery.error.message 
+                            : "Failed to load invitations"}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => pendingInvitationsQuery.refetch()}
+                          data-testid="button-retry-invitations"
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    ) : !pendingInvitationsQuery.isLoading && !pendingInvitationsQuery.isError && pendingInvitationsQuery.data && pendingInvitationsQuery.data.length > 0 ? (
+                      <div className="space-y-2">
+                        {pendingInvitationsQuery.data.map((invitation) => (
+                          <div
+                            key={invitation.id}
+                            className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                            data-testid={`pending-invite-${invitation.id}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <span className="text-sm truncate" data-testid={`invite-email-${invitation.id}`}>
+                                {invitation.invitedEmail}
+                              </span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => cancelEmailInvitationMutation.mutate(invitation.id)}
+                              disabled={cancelEmailInvitationMutation.isPending}
+                              data-testid={`button-cancel-invite-${invitation.id}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : !pendingInvitationsQuery.isLoading && !pendingInvitationsQuery.isError ? (
+                      <p className="text-sm text-muted-foreground p-2" data-testid="no-pending-invites">
+                        No pending invitations
+                      </p>
+                    ) : null}
                   </div>
                 )}
                 
