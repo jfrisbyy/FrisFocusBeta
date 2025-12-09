@@ -41,7 +41,7 @@ import {
   StoredFriendWelcomeMessage,
 } from "@/lib/storage";
 
-const getMockWeekData = (weekOffset: number = 0) => {
+const getMockWeekData = (weekOffset: number = 0, isDemo: boolean = false) => {
   const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekStart = addDays(baseWeekStart, weekOffset * 7);
   const today = new Date();
@@ -56,9 +56,13 @@ const getMockWeekData = (weekOffset: number = 0) => {
   
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
-    // For past weeks, all days have data. For current/future week, only up to today
+    // For demo mode: show full data for current week and past weeks
+    // For non-demo: past weeks have all data, current week only up to today, future weeks empty
     let isLogged = false;
-    if (weekOffset < 0) {
+    if (isDemo) {
+      // Demo mode: show all days for current and past weeks
+      isLogged = weekOffset <= 0;
+    } else if (weekOffset < 0) {
       isLogged = true; // Past weeks have all data
     } else if (weekOffset === 0) {
       isLogged = i <= todayDayIndex; // Current week: only up to today
@@ -508,7 +512,7 @@ export default function Dashboard() {
   useEffect(() => {
     // Use mock data during demo/onboarding, otherwise load from storage
     if (useMockData) {
-      setDays(getMockWeekData(weekOffset));
+      setDays(getMockWeekData(weekOffset, true));
       // Update week date strings for mock data too
       const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
       const weekStart = addDays(baseWeekStart, weekOffset * 7);
