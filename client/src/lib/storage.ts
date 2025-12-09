@@ -572,6 +572,7 @@ export interface StoredCirclePostComment {
   id: string;
   authorId: string;
   authorName: string;
+  authorProfileImageUrl?: string;
   content: string;
   createdAt: string;
   likes: string[];
@@ -582,6 +583,7 @@ export interface StoredCirclePost {
   circleId: string;
   authorId: string;
   authorName: string;
+  authorProfileImageUrl?: string;
   content: string;
   imageUrl?: string;
   createdAt: string;
@@ -607,6 +609,7 @@ export interface StoredCommunityPost {
   id: string;
   authorId: string;
   authorName: string;
+  authorProfileImageUrl?: string;
   content: string;
   imageUrl?: string;
   visibility: PostVisibility;
@@ -622,6 +625,7 @@ export interface StoredPostComment {
   id: string;
   authorId: string;
   authorName: string;
+  authorProfileImageUrl?: string;
   content: string;
   createdAt: string;
   likes: string[];

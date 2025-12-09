@@ -1395,6 +1395,7 @@ export default function CommunityPage() {
           circleId: p.circleId,
           authorId: p.authorId,
           authorName: p.author ? `${p.author.firstName || ''} ${p.author.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+          authorProfileImageUrl: p.author?.profileImageUrl || undefined,
           content: p.content || '',
           createdAt: p.createdAt,
           likes: p.likes || [],
@@ -1402,6 +1403,7 @@ export default function CommunityPage() {
             id: c.id,
             authorId: c.authorId,
             authorName: c.author ? `${c.author.firstName || ''} ${c.author.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
+            authorProfileImageUrl: c.author?.profileImageUrl || undefined,
             content: c.content || '',
             createdAt: c.createdAt,
             likes: c.likes || [],
@@ -2600,6 +2602,7 @@ export default function CommunityPage() {
         authorName: post.author 
           ? (post.author.displayName || `${post.author.firstName} ${post.author.lastName}`.trim())
           : "Unknown User",
+        authorProfileImageUrl: post.author?.profileImageUrl || undefined,
         content: post.content,
         visibility: post.visibility,
         createdAt: post.createdAt,
@@ -2931,6 +2934,7 @@ export default function CommunityPage() {
         authorName: c.author 
           ? (c.author.displayName || `${c.author.firstName} ${c.author.lastName}`.trim())
           : "Unknown User",
+        authorProfileImageUrl: c.author?.profileImageUrl || undefined,
         content: c.content,
         createdAt: c.createdAt,
         likes: [],
@@ -6785,6 +6789,7 @@ export default function CommunityPage() {
                                 onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${post.authorName}` })}
                               >
                                 <Avatar className="cursor-pointer">
+                                  {post.authorProfileImageUrl && <AvatarImage src={post.authorProfileImageUrl} alt={post.authorName} />}
                                   <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
                                 </Avatar>
                               </ProfileHoverCard>
@@ -6860,11 +6865,13 @@ export default function CommunityPage() {
                                             onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${comment.authorName}` })}
                                           >
                                             <Avatar className="h-6 w-6 cursor-pointer">
+                                              {comment.authorProfileImageUrl && <AvatarImage src={comment.authorProfileImageUrl} alt={comment.authorName} />}
                                               <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                           </ProfileHoverCard>
                                         ) : (
                                           <Avatar className="h-6 w-6">
+                                            {comment.authorProfileImageUrl && <AvatarImage src={comment.authorProfileImageUrl} alt={comment.authorName} />}
                                             <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
                                           </Avatar>
                                         )}
@@ -8488,6 +8495,7 @@ export default function CommunityPage() {
                       onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${post.authorName}` })}
                     >
                       <Avatar className="cursor-pointer">
+                        {post.authorProfileImageUrl && <AvatarImage src={post.authorProfileImageUrl} alt={post.authorName} />}
                         <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
                       </Avatar>
                     </ProfileHoverCard>
@@ -8570,11 +8578,13 @@ export default function CommunityPage() {
                                   onAddFriendClick={() => toast({ title: "Friend request sent", description: `Request sent to ${comment.authorName}` })}
                                 >
                                   <Avatar className="h-6 w-6 cursor-pointer">
+                                    {comment.authorProfileImageUrl && <AvatarImage src={comment.authorProfileImageUrl} alt={comment.authorName} />}
                                     <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
                                   </Avatar>
                                 </ProfileHoverCard>
                               ) : (
                                 <Avatar className="h-6 w-6">
+                                  {comment.authorProfileImageUrl && <AvatarImage src={comment.authorProfileImageUrl} alt={comment.authorName} />}
                                   <AvatarFallback className="text-xs">{comment.authorName.charAt(0)}</AvatarFallback>
                                 </Avatar>
                               )}
