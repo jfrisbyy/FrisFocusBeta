@@ -44,14 +44,30 @@ import {
 const getMockWeekData = (weekOffset: number = 0) => {
   const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekStart = addDays(baseWeekStart, weekOffset * 7);
+  const today = new Date();
+  const todayDayIndex = Math.floor((today.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
+  
+  // Seeded random for consistent values per week offset
+  const seed = Math.abs(weekOffset * 7 + 1000);
+  const seededRandom = (i: number) => {
+    const x = Math.sin(seed + i) * 10000;
+    return Math.floor((x - Math.floor(x)) * 50) + 30;
+  };
+  
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
-    // For past weeks, all days have data. For current week, only up to today
-    const isLogged = weekOffset < 0 || (weekOffset === 0 && i < 5);
+    // For past weeks, all days have data. For current/future week, only up to today
+    let isLogged = false;
+    if (weekOffset < 0) {
+      isLogged = true; // Past weeks have all data
+    } else if (weekOffset === 0) {
+      isLogged = i <= todayDayIndex; // Current week: only up to today
+    }
+    // Future weeks have no data
     return {
       date: format(date, "MMM d"),
       dayName: format(date, "EEE"),
-      points: isLogged ? Math.floor(Math.random() * 50) + 30 : null,
+      points: isLogged ? seededRandom(i) : null,
     };
   });
   return days;
