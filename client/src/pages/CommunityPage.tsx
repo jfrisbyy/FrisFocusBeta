@@ -1300,17 +1300,15 @@ export default function CommunityPage() {
       const res = await apiRequest("POST", "/api/friends/request", params);
       if (!res.ok) {
         const error = await res.json();
-        // Attach the original email to the error for the invite flow
-        const err = new Error(error.error || 'Failed to send friend request') as Error & { originalEmail?: string };
-        err.originalEmail = params.emailOrUsername;
-        throw err;
+        throw new Error(error.error || 'Failed to send friend request');
       }
       return res.json();
     },
-    onMutate: () => {
-      // Reset invite state before each new request to avoid stale prompts
+    onMutate: (params) => {
+      // Store the email being sent for potential invite flow, reset invite UI
       setShowEmailInvite(false);
-      setPendingInviteEmail("");
+      // Store the email in pendingInviteEmail so it's available in onError
+      setPendingInviteEmail(params.emailOrUsername || "");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
@@ -1319,23 +1317,26 @@ export default function CommunityPage() {
         return typeof key === 'string' && (key.startsWith('/api/users') || key.startsWith('/api/users/search'));
       }});
       toast({ title: "Friend request sent!" });
+      // Clear the pending email on success
+      setPendingInviteEmail("");
     },
-    onError: (error: Error & { originalEmail?: string }) => {
+    onError: (error: Error) => {
       // Check if this is a "User not found" error - offer email invitation
       const isUserNotFound = error.message.toLowerCase().includes("user not found") || 
                              error.message.toLowerCase().includes("no user found");
-      const emailToInvite = error.originalEmail || "";
+      // pendingInviteEmail was set in onMutate, so use it directly
+      const emailToInvite = pendingInviteEmail;
       
       if (isUserNotFound && emailToInvite && emailToInvite.includes("@")) {
         // Offer email invitation for valid email addresses
-        setPendingInviteEmail(emailToInvite);
         setShowEmailInvite(true);
         toast({ 
           title: "User not found", 
           description: "Would you like to send an email invitation instead?",
         });
       } else {
-        // Show error toast for all other cases
+        // Show error toast for all other cases and clear pending email
+        setPendingInviteEmail("");
         toast({ 
           title: isUserNotFound ? "User not found" : "Failed to send request", 
           description: error.message, 
