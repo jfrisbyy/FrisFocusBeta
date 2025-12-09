@@ -41,6 +41,7 @@ export default function FpBar() {
   const { data: fpData, isLoading } = useQuery<{ fpTotal: number }>({
     queryKey: ["/api/fp"],
     enabled: !!user && !isDemo,
+    refetchInterval: 5000,
   });
 
   if (!user || isDemo) {
