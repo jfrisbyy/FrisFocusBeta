@@ -1137,3 +1137,60 @@ export const appointments = pgTable("appointments", {
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointments.$inferSelect;
+
+// ==================== NOTIFICATIONS ====================
+
+// Notification types enum
+export const notificationTypeEnum = z.enum([
+  "friend_request",
+  "friend_accepted",
+  "task_request",
+  "task_approved",
+  "instant_message",
+  "post_like",
+  "post_comment",
+  "circle_invitation",
+  "circle_compete_invite",
+  "task_alert"
+]);
+export type NotificationType = z.infer<typeof notificationTypeEnum>;
+
+// Notifications table - user notifications for various events
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type").notNull(), // NotificationType
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").default(false),
+  actorId: varchar("actor_id").references(() => users.id), // The user who triggered the notification (optional)
+  resourceId: varchar("resource_id"), // ID of related resource (post, circle, etc.)
+  resourceType: varchar("resource_type"), // Type of resource (post, circle, friendship, etc.)
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+// Notification with actor details for display
+export const notificationWithActorSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  type: notificationTypeEnum,
+  title: z.string(),
+  message: z.string(),
+  read: z.boolean().nullable(),
+  actorId: z.string().nullable(),
+  resourceId: z.string().nullable(),
+  resourceType: z.string().nullable(),
+  createdAt: z.date().nullable(),
+  actor: z.object({
+    id: z.string(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    displayName: z.string().nullable(),
+    profileImageUrl: z.string().nullable(),
+  }).nullable(),
+});
+export type NotificationWithActor = z.infer<typeof notificationWithActorSchema>;
