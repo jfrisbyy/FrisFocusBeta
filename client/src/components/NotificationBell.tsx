@@ -153,13 +153,13 @@ export default function NotificationBell() {
 
   const { data: apiNotifications = [], isLoading } = useQuery<NotificationWithActor[]>({
     queryKey: ["/api/notifications"],
-    refetchInterval: 30000,
+    refetchInterval: 10000,
     enabled: !isDemo,
   });
 
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/count"],
-    refetchInterval: 30000,
+    refetchInterval: 10000,
     enabled: !isDemo,
   });
 
