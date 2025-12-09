@@ -4938,6 +4938,20 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           })
           .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)))
           .returning();
+        
+        // Check if user hit daily goal and award FP
+        try {
+          const { awardFp } = await import("./fpService");
+          const [settings] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
+          const dailyGoal = settings?.dailyGoal || 14;
+          const totalPoints = (todoPoints || 0) + (taskPoints || 0) - (penaltyPoints || 0);
+          if (totalPoints >= dailyGoal) {
+            await awardFp(userId, "hit_daily_goal", { checkDuplicate: true });
+          }
+        } catch (fpError) {
+          console.error("Error awarding FP for hit_daily_goal:", fpError);
+        }
+        
         res.json(log);
       } else {
         // Create new log
@@ -4958,8 +4972,16 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         try {
           const { awardFp } = await import("./fpService");
           await awardFp(userId, "log_day", { checkDuplicate: true });
+          
+          // Check if user hit daily goal and award FP
+          const [settings] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
+          const dailyGoal = settings?.dailyGoal || 14;
+          const totalPoints = (todoPoints || 0) + (taskPoints || 0) - (penaltyPoints || 0);
+          if (totalPoints >= dailyGoal) {
+            await awardFp(userId, "hit_daily_goal", { checkDuplicate: true });
+          }
         } catch (fpError) {
-          console.error("Error awarding FP for log_day:", fpError);
+          console.error("Error awarding FP for log_day/hit_daily_goal:", fpError);
         }
         
         res.json(log);

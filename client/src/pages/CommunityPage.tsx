@@ -1173,13 +1173,11 @@ export default function CommunityPage() {
   });
 
   // FP Leaderboard state (must be declared before the query that uses it)
-  const [fpLeaderboardMode, setFpLeaderboardMode] = useState<"points" | "fp">("points");
   const [fpLeaderboardScope, setFpLeaderboardScope] = useState<"friends" | "all">("friends");
 
-  // Reset FP leaderboard state when entering demo mode
+  // Reset FP leaderboard scope when entering demo mode
   useEffect(() => {
     if (isDemo) {
-      setFpLeaderboardMode("points");
       setFpLeaderboardScope("friends");
     }
   }, [isDemo]);
@@ -1196,7 +1194,7 @@ export default function CommunityPage() {
   }
   const fpLeaderboardQuery = useQuery<FpLeaderboardEntry[]>({
     queryKey: ['/api/fp/leaderboard', fpLeaderboardScope],
-    enabled: !isDemo && fpLeaderboardMode === "fp",
+    enabled: !isDemo,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/fp/leaderboard?type=${fpLeaderboardScope}`);
       return res.json();
@@ -5603,73 +5601,14 @@ export default function CommunityPage() {
               <CardHeader>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5" />
-                    Leaderboard
+                    <Flame className="w-5 h-5 text-orange-500" />
+                    FP Leaderboard
                   </CardTitle>
                   {!isDemo && (
                     <div className="flex gap-1">
                       <Button
                         size="sm"
-                        variant={fpLeaderboardMode === "points" ? "default" : "ghost"}
-                        onClick={() => setFpLeaderboardMode("points")}
-                        data-testid="button-leaderboard-points"
-                      >
-                        Points
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={fpLeaderboardMode === "fp" ? "default" : "ghost"}
-                        onClick={() => setFpLeaderboardMode("fp")}
-                        data-testid="button-leaderboard-fp"
-                        className="gap-1"
-                      >
-                        <Flame className="w-3 h-3" />
-                        FP
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                {(isDemo || fpLeaderboardMode === "points") ? (
-                  <div className="flex items-center justify-between gap-2">
-                    <CardDescription>
-                      {friendsLeaderboardViewMode === "day" ? "Today's" : friendsLeaderboardViewMode === "week" ? "This week's" : "All-time"} top performers
-                    </CardDescription>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant={friendsLeaderboardViewMode === "day" ? "secondary" : "ghost"}
-                        onClick={() => setFriendsLeaderboardViewMode("day")}
-                        data-testid="button-leaderboard-day"
-                      >
-                        Today
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={friendsLeaderboardViewMode === "week" ? "secondary" : "ghost"}
-                        onClick={() => setFriendsLeaderboardViewMode("week")}
-                        data-testid="button-leaderboard-week"
-                      >
-                        Week
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={friendsLeaderboardViewMode === "alltime" ? "secondary" : "ghost"}
-                        onClick={() => setFriendsLeaderboardViewMode("alltime")}
-                        data-testid="button-leaderboard-alltime"
-                      >
-                        All Time
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    <CardDescription>
-                      Focus Points rankings
-                    </CardDescription>
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant={fpLeaderboardScope === "friends" ? "secondary" : "ghost"}
+                        variant={fpLeaderboardScope === "friends" ? "default" : "ghost"}
                         onClick={() => setFpLeaderboardScope("friends")}
                         data-testid="button-fp-leaderboard-friends"
                       >
@@ -5677,18 +5616,21 @@ export default function CommunityPage() {
                       </Button>
                       <Button
                         size="sm"
-                        variant={fpLeaderboardScope === "all" ? "secondary" : "ghost"}
+                        variant={fpLeaderboardScope === "all" ? "default" : "ghost"}
                         onClick={() => setFpLeaderboardScope("all")}
                         data-testid="button-fp-leaderboard-all"
                       >
                         Everyone
                       </Button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                <CardDescription>
+                  Focus Points rankings
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {(isDemo || fpLeaderboardMode === "points") ? (
+                {isDemo ? (
                   <div className="space-y-2">
                     {sortedLeaderboard.slice(0, 5).map((friend, index) => (
                       <div
@@ -5709,12 +5651,9 @@ export default function CommunityPage() {
                             {getName(friend.firstName, friend.lastName)}
                           </span>
                         </div>
-                        <Badge variant="outline">
-                          {friendsLeaderboardViewMode === "day" 
-                            ? friend.todayPoints 
-                            : friendsLeaderboardViewMode === "week" 
-                              ? friend.weeklyPoints 
-                              : friend.totalPoints} pts
+                        <Badge variant="outline" className="gap-1">
+                          <Flame className="w-3 h-3 text-orange-500" />
+                          {friend.totalPoints || 0}
                         </Badge>
                       </div>
                     ))}

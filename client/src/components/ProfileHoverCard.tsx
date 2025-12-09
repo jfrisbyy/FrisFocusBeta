@@ -18,6 +18,7 @@ interface UserSummary {
   profileImageUrl: string | null;
   createdAt: string | null;
   weeklyPoints?: number;
+  fpTotal?: number;
   dayStreak?: number;
   bio?: string;
 }
@@ -149,17 +150,17 @@ export default function ProfileHoverCard({
               </div>
             </div>
 
-            {(userSummary.weeklyPoints !== undefined || userSummary.dayStreak !== undefined) && (
+            {(userSummary.fpTotal !== undefined || userSummary.dayStreak !== undefined) && (
               <div className="flex items-center gap-4 text-sm">
-                {userSummary.weeklyPoints !== undefined && (
-                  <div className="flex items-center gap-1" data-testid={`text-hover-points-${userId}`}>
-                    <Trophy className="h-3.5 w-3.5 text-amber-500" />
-                    <span>{userSummary.weeklyPoints} pts/wk</span>
+                {userSummary.fpTotal !== undefined && (
+                  <div className="flex items-center gap-1" data-testid={`text-hover-fp-${userId}`}>
+                    <Flame className="h-3.5 w-3.5 text-orange-500" />
+                    <span>{userSummary.fpTotal.toLocaleString()} FP</span>
                   </div>
                 )}
                 {userSummary.dayStreak !== undefined && (
                   <div className="flex items-center gap-1" data-testid={`text-hover-streak-${userId}`}>
-                    <Flame className="h-3.5 w-3.5 text-orange-500" />
+                    <Trophy className="h-3.5 w-3.5 text-amber-500" />
                     <span>{userSummary.dayStreak} day streak</span>
                   </div>
                 )}
