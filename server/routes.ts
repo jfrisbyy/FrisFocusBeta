@@ -1131,6 +1131,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         resourceType: "friendship",
       });
 
+      // Award FP to both users for adding a friend
+      const { awardFp } = await import("./fpService");
+      await awardFp(userId, "add_friend");
+      await awardFp(friendship.requesterId, "add_friend");
+
       res.json(updated);
     } catch (error) {
       console.error("Error accepting friend request:", error);
@@ -2519,6 +2524,10 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         role: "owner",
       });
 
+      // Award FP for creating a circle
+      const { awardFp } = await import("./fpService");
+      await awardFp(userId, "create_circle");
+
       res.json({ ...circle, memberCount: 1, isMember: true, userRole: "owner" });
     } catch (error) {
       console.error("Error creating circle:", error);
@@ -2603,6 +2612,10 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         userId,
         role: "member",
       });
+
+      // Award FP for joining a circle
+      const { awardFp } = await import("./fpService");
+      await awardFp(userId, "join_circle");
 
       res.json({ joined: true });
     } catch (error) {
@@ -4529,6 +4542,10 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
 
       const [cheerline] = await db.insert(cheerlines).values(parsed).returning();
 
+      // Award FP for sending a cheerline
+      const { awardFp } = await import("./fpService");
+      await awardFp(senderId, "send_cheerline");
+
       res.json(cheerline);
     } catch (error) {
       console.error("Error sending cheerline:", error);
@@ -4936,6 +4953,15 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           taskNotes: taskNotes || null
         });
         const [log] = await db.insert(userDailyLogs).values(parsed).returning();
+        
+        // Award FP for logging a day (first log of the day only)
+        try {
+          const { awardFp } = await import("./fpService");
+          await awardFp(userId, "log_day", { checkDuplicate: true });
+        } catch (fpError) {
+          console.error("Error awarding FP for log_day:", fpError);
+        }
+        
         res.json(log);
       }
     } catch (error) {
@@ -5451,6 +5477,57 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error completing challenge task:", error);
       res.status(500).json({ error: "Failed to complete challenge task" });
+    }
+  });
+
+  // ==================== FP (FOCUS POINTS) ROUTES ====================
+
+  // Get current user's FP total
+  app.get("/api/fp", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { getUserFpTotal } = await import("./fpService");
+      const fpTotal = await getUserFpTotal(userId);
+      res.json({ fpTotal });
+    } catch (error) {
+      console.error("Error fetching FP total:", error);
+      res.status(500).json({ error: "Failed to fetch FP total" });
+    }
+  });
+
+  // Get user's FP activity log
+  app.get("/api/fp/activity", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { limit = "50", offset = "0" } = req.query;
+      const { getUserFpActivity } = await import("./fpService");
+      const activities = await getUserFpActivity(
+        userId,
+        parseInt(limit as string),
+        parseInt(offset as string)
+      );
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching FP activity:", error);
+      res.status(500).json({ error: "Failed to fetch FP activity" });
+    }
+  });
+
+  // Get FP leaderboard (friends or all users)
+  app.get("/api/fp/leaderboard", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { type = "all", limit = "20" } = req.query;
+      const { getFpLeaderboard } = await import("./fpService");
+      const leaderboard = await getFpLeaderboard(
+        type as "all" | "friends",
+        userId,
+        parseInt(limit as string)
+      );
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching FP leaderboard:", error);
+      res.status(500).json({ error: "Failed to fetch FP leaderboard" });
     }
   });
 
