@@ -9810,7 +9810,7 @@ export default function CommunityPage() {
                         ) : (
                           <Badge variant="outline" className="text-xs"><Globe className="w-3 h-3 mr-1" />Public</Badge>
                         )}
-                        {post.authorId === "you" && (
+                        {(isDemo ? post.authorId === "you" : post.authorId === user?.id) && (
                           <Button
                             variant="ghost"
                             size="icon"
