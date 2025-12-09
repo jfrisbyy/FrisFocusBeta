@@ -2019,6 +2019,45 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Fix ACL policies on existing post images (admin utility)
+  app.post("/api/community/fix-image-acls", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { ObjectStorageService } = await import("./objectStorage");
+      const { setObjectAclPolicy } = await import("./objectAcl");
+      const objectStorageService = new ObjectStorageService();
+      
+      // Get all posts with image URLs
+      const postsWithImages = await db.select().from(communityPosts).where(
+        and(
+          eq(communityPosts.authorId, userId),
+          // Has imageUrl that starts with /objects/
+        )
+      );
+      
+      const fixed: string[] = [];
+      for (const post of postsWithImages) {
+        if (post.imageUrl && post.imageUrl.startsWith('/objects/')) {
+          try {
+            const objectFile = await objectStorageService.getObjectEntityFile(post.imageUrl);
+            await setObjectAclPolicy(objectFile, {
+              owner: post.authorId,
+              visibility: "public",
+            });
+            fixed.push(post.id);
+          } catch (error) {
+            console.error(`Failed to fix ACL for post ${post.id}:`, error);
+          }
+        }
+      }
+      
+      res.json({ message: `Fixed ACL for ${fixed.length} post images`, fixed });
+    } catch (error) {
+      console.error("Error fixing image ACLs:", error);
+      res.status(500).json({ error: "Failed to fix image ACLs" });
+    }
+  });
+
   // Create a new community post
   app.post("/api/community/posts", isAuthenticated, async (req: any, res) => {
     try {

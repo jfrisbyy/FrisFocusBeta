@@ -193,6 +193,18 @@ export class ObjectStorageService {
     const url = new URL(rawPath);
     const rawObjectPath = url.pathname;
   
+    // GCS URL pathname format: /{bucket-name}/.private/uploads/{id}
+    // We need to find ".private/uploads/" in the path and extract the ID after it
+    const uploadsMarker = ".private/uploads/";
+    const uploadsIndex = rawObjectPath.indexOf(uploadsMarker);
+    
+    if (uploadsIndex !== -1) {
+      // Extract everything after ".private/uploads/"
+      const entityId = rawObjectPath.slice(uploadsIndex + uploadsMarker.length);
+      return `/objects/uploads/${entityId}`;
+    }
+    
+    // Fallback to old logic for backwards compatibility
     let objectEntityDir = this.getPrivateObjectDir();
     if (!objectEntityDir.endsWith("/")) {
       objectEntityDir = `${objectEntityDir}/`;

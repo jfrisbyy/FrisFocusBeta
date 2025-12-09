@@ -89,8 +89,7 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
   const { data: appointments = [] } = useQuery<Appointment[]>({
     queryKey: ["/api/appointments", startDateStr, endDateStr],
     queryFn: async () => {
-      const response = await fetch(`/api/appointments?startDate=${startDateStr}&endDate=${endDateStr}`);
-      if (!response.ok) throw new Error("Failed to fetch appointments");
+      const response = await apiRequest("GET", `/api/appointments?startDate=${startDateStr}&endDate=${endDateStr}`);
       return response.json();
     },
   });
