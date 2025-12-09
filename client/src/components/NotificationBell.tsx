@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Bell, UserPlus, UserCheck, ListTodo, CheckCircle, MessageCircle, Heart, MessageSquare, Users, Swords, AlertTriangle, Check, Trash2 } from "lucide-react";
+import { Bell, UserPlus, UserCheck, ListTodo, CheckCircle, MessageCircle, Heart, MessageSquare, Users, Swords, AlertTriangle, Check, Trash2, TestTube } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -81,6 +81,16 @@ export default function NotificationBell() {
     },
   });
 
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/notifications/test");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
+    },
+  });
+
   const handleNotificationClick = (notification: NotificationWithActor) => {
     if (!notification.read) {
       markReadMutation.mutate(notification.id);
@@ -122,19 +132,32 @@ export default function NotificationBell() {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
           <h4 className="font-medium text-sm">Notifications</h4>
-          {unreadCount > 0 && (
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending}
+              onClick={() => testMutation.mutate()}
+              disabled={testMutation.isPending}
               className="h-7 text-xs"
-              data-testid="button-mark-all-read"
+              data-testid="button-test-notifications"
             >
-              <Check className="h-3 w-3 mr-1" />
-              Mark all read
+              <TestTube className="h-3 w-3 mr-1" />
+              Test
             </Button>
-          )}
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => markAllReadMutation.mutate()}
+                disabled={markAllReadMutation.isPending}
+                className="h-7 text-xs"
+                data-testid="button-mark-all-read"
+              >
+                <Check className="h-3 w-3 mr-1" />
+                Mark all read
+              </Button>
+            )}
+          </div>
         </div>
         <ScrollArea className="h-80">
           {isLoading ? (
