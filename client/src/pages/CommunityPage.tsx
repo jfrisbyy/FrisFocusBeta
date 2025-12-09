@@ -986,6 +986,10 @@ export default function CommunityPage() {
   // User directory state
   const [directoryPage, setDirectoryPage] = useState(1);
   const [directorySearch, setDirectorySearch] = useState("");
+  
+  // Circle invite dialog state
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteDialogSearch, setInviteDialogSearch] = useState("");
   const USERS_PER_PAGE = 4;
   
   // Competition state (must be declared before queries that use it)
@@ -1105,6 +1109,19 @@ export default function CommunityPage() {
     enabled: !isDemo && directorySearch.length < 2,
   });
 
+  // Query for invite dialog users - fetches when dialog is open
+  const inviteDialogUsersQuery = useQuery<UserSearchResponse>({
+    queryKey: ['/api/users', 'invite-dialog', inviteDialogSearch],
+    queryFn: async () => {
+      const url = inviteDialogSearch.length >= 2 
+        ? `/api/users/search?q=${encodeURIComponent(inviteDialogSearch)}&page=1&limit=20`
+        : `/api/users?page=1&limit=20`;
+      const res = await apiRequest("GET", url);
+      return res.json();
+    },
+    enabled: !isDemo && inviteDialogOpen,
+  });
+
   const sendFriendRequestMutation = useMutation({
     mutationFn: async (params: { emailOrUsername?: string; userId?: string }) => {
       const res = await apiRequest("POST", "/api/friends/request", params);
@@ -1201,6 +1218,24 @@ export default function CommunityPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create circle", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Send circle invite mutation
+  const sendCircleInviteMutation = useMutation({
+    mutationFn: async ({ circleId, inviteeId }: { circleId: string; inviteeId: string }) => {
+      const res = await apiRequest("POST", `/api/circles/${circleId}/invites`, { inviteeId });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to send invite');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invite sent!", description: "The user will be notified of your invitation." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send invite", description: error.message, variant: "destructive" });
     },
   });
 
@@ -6840,10 +6875,127 @@ export default function CommunityPage() {
                             {selectedCircle.memberCount} members in this circle
                           </CardDescription>
                         </div>
-                        <Button variant="outline" data-testid="button-invite-member">
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          Invite
-                        </Button>
+                        <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" data-testid="button-invite-member">
+                              <UserPlus className="w-4 h-4 mr-2" />
+                              Invite
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Invite to {selectedCircle.name}</DialogTitle>
+                              <DialogDescription>
+                                Select a friend or discover users to invite to this circle.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                  placeholder="Search users..."
+                                  value={inviteDialogSearch}
+                                  onChange={(e) => setInviteDialogSearch(e.target.value)}
+                                  className="pl-9"
+                                  data-testid="input-invite-search"
+                                />
+                              </div>
+                              <ScrollArea className="h-[300px]">
+                                <div className="space-y-2">
+                                  {friendsQuery.data && friendsQuery.data.length > 0 && (
+                                    <>
+                                      <p className="text-sm font-medium text-muted-foreground px-1">Friends</p>
+                                      {friendsQuery.data
+                                        .filter(friend => {
+                                          const name = `${friend.firstName} ${friend.lastName}`.toLowerCase();
+                                          return name.includes(inviteDialogSearch.toLowerCase());
+                                        })
+                                        .map(friend => (
+                                          <div
+                                            key={friend.id}
+                                            className="flex items-center justify-between gap-3 p-2 rounded-md border hover-elevate cursor-pointer"
+                                            data-testid={`invite-friend-${friend.friendId}`}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <Avatar className="h-8 w-8">
+                                                <AvatarImage src={friend.profileImageUrl} />
+                                                <AvatarFallback>{friend.firstName?.[0]}{friend.lastName?.[0]}</AvatarFallback>
+                                              </Avatar>
+                                              <span className="text-sm font-medium">{friend.firstName} {friend.lastName}</span>
+                                            </div>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                sendCircleInviteMutation.mutate({
+                                                  circleId: selectedCircle.id,
+                                                  inviteeId: friend.friendId,
+                                                });
+                                              }}
+                                              disabled={sendCircleInviteMutation.isPending}
+                                              data-testid={`button-invite-friend-${friend.friendId}`}
+                                            >
+                                              {sendCircleInviteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                                            </Button>
+                                          </div>
+                                        ))}
+                                    </>
+                                  )}
+                                  {inviteDialogUsersQuery.data && inviteDialogUsersQuery.data.users.length > 0 && (
+                                    <>
+                                      <p className="text-sm font-medium text-muted-foreground px-1 mt-4">Discover Users</p>
+                                      {inviteDialogUsersQuery.data.users
+                                        .filter(u => {
+                                          if (u.id === user?.id) return false;
+                                          const isFriend = friendsQuery.data?.some(f => f.friendId === u.id);
+                                          return !isFriend;
+                                        })
+                                        .map(u => (
+                                          <div
+                                            key={u.id}
+                                            className="flex items-center justify-between gap-3 p-2 rounded-md border hover-elevate cursor-pointer"
+                                            data-testid={`invite-user-${u.id}`}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <Avatar className="h-8 w-8">
+                                                <AvatarImage src={u.profileImageUrl || undefined} />
+                                                <AvatarFallback>{u.firstName?.[0]}{u.lastName?.[0]}</AvatarFallback>
+                                              </Avatar>
+                                              <span className="text-sm font-medium">{u.firstName} {u.lastName}</span>
+                                            </div>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                sendCircleInviteMutation.mutate({
+                                                  circleId: selectedCircle.id,
+                                                  inviteeId: u.id,
+                                                });
+                                              }}
+                                              disabled={sendCircleInviteMutation.isPending}
+                                              data-testid={`button-invite-user-${u.id}`}
+                                            >
+                                              {sendCircleInviteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                                            </Button>
+                                          </div>
+                                        ))}
+                                    </>
+                                  )}
+                                  {inviteDialogUsersQuery.isLoading && (
+                                    <div className="flex justify-center py-4">
+                                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  {(!friendsQuery.data || friendsQuery.data.length === 0) && 
+                                   (!inviteDialogUsersQuery.data || inviteDialogUsersQuery.data.users.length === 0) &&
+                                   !inviteDialogUsersQuery.isLoading && (
+                                    <p className="text-center text-muted-foreground py-8">No users found to invite.</p>
+                                  )}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </CardHeader>
                     <CardContent>
