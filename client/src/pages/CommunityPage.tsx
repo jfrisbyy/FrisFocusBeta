@@ -972,6 +972,17 @@ export default function CommunityPage() {
   const [dmMessage, setDmMessage] = useState("");
   const [cheerlineFriend, setCheerlineFriend] = useState<StoredFriend | null>(null);
   const [cheerlineMessage, setCheerlineMessage] = useState("");
+  
+  // Friend challenge dialog state
+  const [friendChallengeFriend, setFriendChallengeFriend] = useState<StoredFriend | null>(null);
+  const [friendChallengeName, setFriendChallengeName] = useState("");
+  const [friendChallengeDescription, setFriendChallengeDescription] = useState("");
+  const [friendChallengeType, setFriendChallengeType] = useState<"targetPoints" | "timed" | "ongoing">("targetPoints");
+  const [friendChallengeTargetPoints, setFriendChallengeTargetPoints] = useState(100);
+  const [friendChallengeEndDate, setFriendChallengeEndDate] = useState<Date | undefined>(undefined);
+  const [friendChallengeTasks, setFriendChallengeTasks] = useState<{ name: string; points: number }[]>([]);
+  const [newFriendChallengeTaskName, setNewFriendChallengeTaskName] = useState("");
+  const [newFriendChallengeTaskPoints, setNewFriendChallengeTaskPoints] = useState(10);
   const [directMessages, setDirectMessages] = useState<Record<string, StoredDirectMessage[]>>({});
   const [communityPosts, setCommunityPosts] = useState<StoredCommunityPost[]>([]);
   const [newPostContent, setNewPostContent] = useState("");
@@ -1203,6 +1214,33 @@ export default function CommunityPage() {
     },
   });
 
+  // Create friend challenge mutation
+  const createChallengeMutation = useMutation({
+    mutationFn: async (data: { 
+      challengeeId: string; 
+      name: string; 
+      description?: string;
+      challengeType: string;
+      targetPoints?: number;
+      endDate?: string;
+      tasks: { taskName: string; pointValue: number }[];
+    }) => {
+      const res = await apiRequest("POST", "/api/friend-challenges", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create challenge');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friend-challenges'] });
+      toast({ title: "Challenge sent!", description: "Your friend has been challenged!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create challenge", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Create circle mutation for non-demo mode
   const createCircleMutation = useMutation({
     mutationFn: async (data: { name: string; description?: string; iconColor?: string }) => {
@@ -1265,6 +1303,111 @@ export default function CommunityPage() {
       } catch {
         return [];
       }
+    },
+  });
+
+  // Friend challenges query
+  interface ChallengeUser {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    displayName: string | null;
+    profileImageUrl: string | null;
+  }
+  interface ChallengeTask {
+    id: string;
+    taskName: string;
+    pointValue: number;
+    isCustom: boolean | null;
+  }
+  interface FriendChallengeData {
+    id: string;
+    challengerId: string;
+    challengeeId: string;
+    name: string;
+    description: string | null;
+    challengeType: string;
+    startDate: string | null;
+    endDate: string | null;
+    targetPoints: number | null;
+    challengerPoints: number | null;
+    challengeePoints: number | null;
+    winnerId: string | null;
+    status: string;
+    createdAt: string | null;
+    challenger: ChallengeUser;
+    challengee: ChallengeUser;
+    tasks: ChallengeTask[];
+  }
+
+  const friendChallengesQuery = useQuery<FriendChallengeData[]>({
+    queryKey: ['/api/friend-challenges'],
+    enabled: !isDemo,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", '/api/friend-challenges');
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Accept friend challenge mutation
+  const acceptChallengeMutation = useMutation({
+    mutationFn: async (challengeId: string) => {
+      const res = await apiRequest("POST", `/api/friend-challenges/${challengeId}/accept`, {});
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to accept challenge');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friend-challenges'] });
+      toast({ title: "Challenge accepted!", description: "The competition has begun!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to accept challenge", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Decline friend challenge mutation
+  const declineChallengeMutation = useMutation({
+    mutationFn: async (challengeId: string) => {
+      const res = await apiRequest("POST", `/api/friend-challenges/${challengeId}/decline`, {});
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to decline challenge');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friend-challenges'] });
+      toast({ title: "Challenge declined" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to decline challenge", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Complete challenge task mutation
+  const completeTaskChallengeMutation = useMutation({
+    mutationFn: async ({ challengeId, taskId }: { challengeId: string; taskId: string }) => {
+      const res = await apiRequest("POST", `/api/friend-challenges/${challengeId}/complete-task`, { taskId });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to complete task');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friend-challenges'] });
+      toast({ title: "Task completed!", description: "Points added to your score!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to complete task", description: error.message, variant: "destructive" });
     },
   });
 
@@ -4287,6 +4430,10 @@ export default function CommunityPage() {
               <Heart className="w-4 h-4 mr-2" />
               Send Cheerline
             </Button>
+            <Button variant="secondary" onClick={() => { setFriendChallengeFriend(selectedFriend); setSelectedFriend(null); }} data-testid="button-challenge-friend">
+              <Swords className="w-4 h-4 mr-2" />
+              Challenge
+            </Button>
             <Button onClick={() => { setDmFriend(selectedFriend); setSelectedFriend(null); }} data-testid="button-dm-from-profile">
               <MessageCircle className="w-4 h-4 mr-2" />
               Message
@@ -4351,6 +4498,211 @@ export default function CommunityPage() {
             <Button onClick={handleSendCheerline} data-testid="button-confirm-cheerline">
               <Send className="w-4 h-4 mr-2" />
               Send Cheerline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const renderChallengeDialog = () => {
+    if (!friendChallengeFriend) return null;
+    
+    const resetChallengeForm = () => {
+      setFriendChallengeFriend(null);
+      setFriendChallengeName("");
+      setFriendChallengeDescription("");
+      setFriendChallengeType("targetPoints");
+      setFriendChallengeTargetPoints(100);
+      setFriendChallengeEndDate(undefined);
+      setFriendChallengeTasks([]);
+      setNewFriendChallengeTaskName("");
+      setNewFriendChallengeTaskPoints(10);
+    };
+    
+    const handleAddTask = () => {
+      if (!newFriendChallengeTaskName.trim()) return;
+      setFriendChallengeTasks([...friendChallengeTasks, { name: newFriendChallengeTaskName.trim(), points: newFriendChallengeTaskPoints }]);
+      setNewFriendChallengeTaskName("");
+      setNewFriendChallengeTaskPoints(10);
+    };
+    
+    const handleRemoveTask = (index: number) => {
+      setFriendChallengeTasks(friendChallengeTasks.filter((_, i) => i !== index));
+    };
+    
+    const handleSendChallenge = () => {
+      if (!friendChallengeName.trim()) {
+        toast({ title: "Name required", description: "Please enter a challenge name", variant: "destructive" });
+        return;
+      }
+      if (friendChallengeTasks.length === 0) {
+        toast({ title: "Tasks required", description: "Add at least one task to the challenge", variant: "destructive" });
+        return;
+      }
+      
+      if (isDemo) {
+        toast({ title: "Challenge sent!", description: `${friendChallengeFriend.firstName} has been challenged!` });
+        resetChallengeForm();
+      } else {
+        createChallengeMutation.mutate({
+          challengeeId: friendChallengeFriend.friendId,
+          name: friendChallengeName.trim(),
+          description: friendChallengeDescription.trim() || undefined,
+          challengeType: friendChallengeType,
+          targetPoints: friendChallengeType === "targetPoints" ? friendChallengeTargetPoints : undefined,
+          endDate: friendChallengeType === "timed" && friendChallengeEndDate ? friendChallengeEndDate.toISOString().split('T')[0] : undefined,
+          tasks: friendChallengeTasks.map(t => ({ taskName: t.name, pointValue: t.points })),
+        }, {
+          onSuccess: () => resetChallengeForm(),
+        });
+      }
+    };
+    
+    return (
+      <Dialog open={!!friendChallengeFriend} onOpenChange={() => resetChallengeForm()}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Swords className="w-5 h-5 text-orange-500" />
+              Challenge {friendChallengeFriend.firstName}
+            </DialogTitle>
+            <DialogDescription>
+              Create a 1v1 challenge and compete to earn the most points!
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Challenge Name</Label>
+              <Input
+                placeholder="Weekly Workout Showdown"
+                value={friendChallengeName}
+                onChange={(e) => setFriendChallengeName(e.target.value)}
+                data-testid="input-challenge-name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Textarea
+                placeholder="First to 500 points wins!"
+                value={friendChallengeDescription}
+                onChange={(e) => setFriendChallengeDescription(e.target.value)}
+                className="min-h-[60px]"
+                data-testid="input-challenge-description"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Challenge Type</Label>
+              <Select value={friendChallengeType} onValueChange={(v) => setFriendChallengeType(v as "targetPoints" | "timed" | "ongoing")}>
+                <SelectTrigger data-testid="select-challenge-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="targetPoints">Target Points (first to reach wins)</SelectItem>
+                  <SelectItem value="timed">Timed (most points by end date)</SelectItem>
+                  <SelectItem value="ongoing">Ongoing (no end)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {friendChallengeType === "targetPoints" && (
+              <div className="space-y-2">
+                <Label>Target Points</Label>
+                <Input
+                  type="number"
+                  value={friendChallengeTargetPoints}
+                  onChange={(e) => setFriendChallengeTargetPoints(parseInt(e.target.value) || 100)}
+                  min={10}
+                  data-testid="input-target-points"
+                />
+              </div>
+            )}
+            
+            {friendChallengeType === "timed" && (
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal" data-testid="button-end-date">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {friendChallengeEndDate ? friendChallengeEndDate.toLocaleDateString() : "Select end date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={friendChallengeEndDate}
+                      onSelect={setFriendChallengeEndDate}
+                      disabled={(date) => date < new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <Label>Challenge Tasks</Label>
+              <p className="text-sm text-muted-foreground">Add tasks that both of you can complete to earn points.</p>
+              
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Task name"
+                  value={newFriendChallengeTaskName}
+                  onChange={(e) => setNewFriendChallengeTaskName(e.target.value)}
+                  className="flex-1"
+                  data-testid="input-new-task-name"
+                />
+                <Input
+                  type="number"
+                  value={newFriendChallengeTaskPoints}
+                  onChange={(e) => setNewFriendChallengeTaskPoints(parseInt(e.target.value) || 10)}
+                  className="w-20"
+                  min={1}
+                  data-testid="input-new-task-points"
+                />
+                <Button size="icon" onClick={handleAddTask} data-testid="button-add-task">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              {friendChallengeTasks.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {friendChallengeTasks.map((task, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <span>{task.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{task.points} pts</Badge>
+                        <Button size="icon" variant="ghost" onClick={() => handleRemoveTask(i)} data-testid={`button-remove-task-${i}`}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={resetChallengeForm}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSendChallenge} 
+              disabled={createChallengeMutation.isPending}
+              data-testid="button-send-challenge"
+            >
+              {createChallengeMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Swords className="w-4 h-4 mr-2" />
+              )}
+              Send Challenge
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5138,6 +5490,307 @@ export default function CommunityPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Friend Challenges Dashboard */}
+          {!isDemo && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Swords className="w-5 h-5 text-orange-500" />
+                  Friend Challenges
+                </CardTitle>
+                <CardDescription>
+                  Compete 1v1 with friends to stay motivated
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {friendChallengesQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : !friendChallengesQuery.data || friendChallengesQuery.data.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Swords className="w-10 h-10 text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">
+                      No challenges yet. Click on a friend to start a challenge!
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Pending Challenges (Incoming) */}
+                    {(() => {
+                      const pendingIncoming = friendChallengesQuery.data.filter(
+                        c => c.status === 'pending' && c.challengeeId === user?.id
+                      );
+                      if (pendingIncoming.length === 0) return null;
+                      return (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                            <Mail className="w-4 h-4" />
+                            Incoming Challenges ({pendingIncoming.length})
+                          </h3>
+                          {pendingIncoming.map(challenge => (
+                            <div
+                              key={challenge.id}
+                              className="p-4 rounded-md border space-y-3"
+                              data-testid={`challenge-pending-${challenge.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar>
+                                    <AvatarImage src={challenge.challenger.profileImageUrl || undefined} />
+                                    <AvatarFallback>
+                                      {(challenge.challenger.firstName?.[0] || '') + (challenge.challenger.lastName?.[0] || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{challenge.name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      From {challenge.challenger.displayName || `${challenge.challenger.firstName} ${challenge.challenger.lastName}`.trim()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              </div>
+                              {challenge.description && (
+                                <p className="text-sm text-muted-foreground">{challenge.description}</p>
+                              )}
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <Target className="w-3 h-3" />
+                                  {challenge.challengeType === 'target_points' 
+                                    ? `First to ${challenge.targetPoints} pts` 
+                                    : challenge.challengeType === 'timed'
+                                    ? `Ends ${challenge.endDate ? new Date(challenge.endDate).toLocaleDateString() : 'TBD'}`
+                                    : 'Ongoing'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3" />
+                                  {challenge.tasks.length} tasks
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => acceptChallengeMutation.mutate(challenge.id)}
+                                  disabled={acceptChallengeMutation.isPending}
+                                  data-testid={`button-accept-challenge-${challenge.id}`}
+                                >
+                                  {acceptChallengeMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                  ) : (
+                                    <Check className="w-4 h-4 mr-1" />
+                                  )}
+                                  Accept
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => declineChallengeMutation.mutate(challenge.id)}
+                                  disabled={declineChallengeMutation.isPending}
+                                  data-testid={`button-decline-challenge-${challenge.id}`}
+                                >
+                                  {declineChallengeMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                  ) : (
+                                    <X className="w-4 h-4 mr-1" />
+                                  )}
+                                  Decline
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Pending Challenges (Outgoing) */}
+                    {(() => {
+                      const pendingOutgoing = friendChallengesQuery.data.filter(
+                        c => c.status === 'pending' && c.challengerId === user?.id
+                      );
+                      if (pendingOutgoing.length === 0) return null;
+                      return (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                            <Send className="w-4 h-4" />
+                            Sent Challenges ({pendingOutgoing.length})
+                          </h3>
+                          {pendingOutgoing.map(challenge => (
+                            <div
+                              key={challenge.id}
+                              className="p-4 rounded-md border space-y-2"
+                              data-testid={`challenge-sent-${challenge.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar>
+                                    <AvatarImage src={challenge.challengee.profileImageUrl || undefined} />
+                                    <AvatarFallback>
+                                      {(challenge.challengee.firstName?.[0] || '') + (challenge.challengee.lastName?.[0] || '')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">{challenge.name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Sent to {challenge.challengee.displayName || `${challenge.challengee.firstName} ${challenge.challengee.lastName}`.trim()}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  Awaiting Response
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Active Challenges */}
+                    {(() => {
+                      const activeChallenges = friendChallengesQuery.data.filter(c => c.status === 'active');
+                      if (activeChallenges.length === 0) return null;
+                      return (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                            <Flame className="w-4 h-4 text-orange-500" />
+                            Active Challenges ({activeChallenges.length})
+                          </h3>
+                          {activeChallenges.map(challenge => {
+                            const isChallenger = challenge.challengerId === user?.id;
+                            const myPoints = isChallenger ? (challenge.challengerPoints || 0) : (challenge.challengeePoints || 0);
+                            const opponentPoints = isChallenger ? (challenge.challengeePoints || 0) : (challenge.challengerPoints || 0);
+                            const opponent = isChallenger ? challenge.challengee : challenge.challenger;
+                            const progressPercent = challenge.targetPoints 
+                              ? Math.min(100, Math.max(myPoints, opponentPoints) / challenge.targetPoints * 100)
+                              : 50;
+
+                            return (
+                              <div
+                                key={challenge.id}
+                                className="p-4 rounded-md border space-y-4"
+                                data-testid={`challenge-active-${challenge.id}`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="font-medium">{challenge.name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      vs {opponent.displayName || `${opponent.firstName} ${opponent.lastName}`.trim()}
+                                    </p>
+                                  </div>
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
+                                    <Flame className="w-3 h-3 mr-1" />
+                                    Active
+                                  </Badge>
+                                </div>
+
+                                {/* Score display */}
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="font-medium">You: {myPoints} pts</span>
+                                    <span className="text-muted-foreground">{opponent.firstName}: {opponentPoints} pts</span>
+                                  </div>
+                                  {challenge.targetPoints && (
+                                    <div className="space-y-1">
+                                      <Progress value={progressPercent} className="h-2" />
+                                      <p className="text-xs text-muted-foreground text-center">
+                                        Target: {challenge.targetPoints} pts
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Tasks to complete */}
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-muted-foreground">Complete tasks to earn points:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {challenge.tasks.map(task => (
+                                      <Button
+                                        key={task.id}
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => completeTaskChallengeMutation.mutate({ 
+                                          challengeId: challenge.id, 
+                                          taskId: task.id 
+                                        })}
+                                        disabled={completeTaskChallengeMutation.isPending}
+                                        data-testid={`button-complete-task-${task.id}`}
+                                      >
+                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                        {task.taskName} (+{task.pointValue})
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Completed Challenges */}
+                    {(() => {
+                      const completedChallenges = friendChallengesQuery.data.filter(c => c.status === 'completed');
+                      if (completedChallenges.length === 0) return null;
+                      return (
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                            <Trophy className="w-4 h-4 text-yellow-500" />
+                            Completed ({completedChallenges.length})
+                          </h3>
+                          {completedChallenges.map(challenge => {
+                            const isChallenger = challenge.challengerId === user?.id;
+                            const myPoints = isChallenger ? (challenge.challengerPoints || 0) : (challenge.challengeePoints || 0);
+                            const opponentPoints = isChallenger ? (challenge.challengeePoints || 0) : (challenge.challengerPoints || 0);
+                            const opponent = isChallenger ? challenge.challengee : challenge.challenger;
+                            const isWinner = challenge.winnerId === user?.id;
+                            const isTie = !challenge.winnerId;
+
+                            return (
+                              <div
+                                key={challenge.id}
+                                className="p-4 rounded-md border space-y-2"
+                                data-testid={`challenge-completed-${challenge.id}`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="font-medium">{challenge.name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      vs {opponent.displayName || `${opponent.firstName} ${opponent.lastName}`.trim()}
+                                    </p>
+                                  </div>
+                                  {isTie ? (
+                                    <Badge variant="secondary">Tie</Badge>
+                                  ) : isWinner ? (
+                                    <Badge className="bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
+                                      <Trophy className="w-3 h-3 mr-1" />
+                                      Winner
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline">2nd Place</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 text-sm">
+                                  <span>You: {myPoints} pts</span>
+                                  <span className="text-muted-foreground">{opponent.firstName}: {opponentPoints} pts</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="circles" className="space-y-6 mt-4">
@@ -8637,6 +9290,7 @@ export default function CommunityPage() {
       {renderFriendProfile()}
       {renderDMDialog()}
       {renderCheerlineDialog()}
+      {renderChallengeDialog()}
     </div>
   );
 }

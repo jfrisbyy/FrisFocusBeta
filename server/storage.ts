@@ -328,6 +328,27 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
 
+    // Check for existing completion today (idempotency - one completion per task per day)
+    const today = new Date().toISOString().split('T')[0];
+    const existingCompletions = await db
+      .select()
+      .from(friendChallengeCompletions)
+      .where(
+        and(
+          eq(friendChallengeCompletions.challengeId, challengeId),
+          eq(friendChallengeCompletions.taskId, taskId),
+          eq(friendChallengeCompletions.userId, userId)
+        )
+      );
+    
+    // Check if user already completed this task today
+    const alreadyCompletedToday = existingCompletions.some(c => 
+      c.completedAt && c.completedAt.toISOString().split('T')[0] === today
+    );
+    if (alreadyCompletedToday) {
+      return undefined; // Already completed today
+    }
+
     const [completion] = await db
       .insert(friendChallengeCompletions)
       .values({
@@ -340,15 +361,33 @@ export class DatabaseStorage implements IStorage {
     const pointsToAdd = task.pointValue;
     const isChallenger = challenge.challengerId === userId;
 
+    const newChallengerPoints = isChallenger
+      ? (challenge.challengerPoints || 0) + pointsToAdd
+      : (challenge.challengerPoints || 0);
+    const newChallengeePoints = !isChallenger
+      ? (challenge.challengeePoints || 0) + pointsToAdd
+      : (challenge.challengeePoints || 0);
+
+    // Check if target points reached (for targetPoints type challenges)
+    let newStatus = challenge.status;
+    let winnerId: string | null = null;
+    if (challenge.challengeType === 'targetPoints' && challenge.targetPoints) {
+      if (newChallengerPoints >= challenge.targetPoints) {
+        newStatus = 'completed';
+        winnerId = challenge.challengerId;
+      } else if (newChallengeePoints >= challenge.targetPoints) {
+        newStatus = 'completed';
+        winnerId = challenge.challengeeId;
+      }
+    }
+
     await db
       .update(friendChallenges)
       .set({
-        challengerPoints: isChallenger
-          ? (challenge.challengerPoints || 0) + pointsToAdd
-          : challenge.challengerPoints,
-        challengeePoints: !isChallenger
-          ? (challenge.challengeePoints || 0) + pointsToAdd
-          : challenge.challengeePoints,
+        challengerPoints: newChallengerPoints,
+        challengeePoints: newChallengeePoints,
+        status: newStatus,
+        winnerId: winnerId,
         updatedAt: new Date(),
       })
       .where(eq(friendChallenges.id, challengeId));
