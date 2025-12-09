@@ -1172,6 +1172,25 @@ export default function CommunityPage() {
     ],
   });
 
+  // FP Leaderboard query
+  interface FpLeaderboardEntry {
+    userId: string;
+    displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    profileImageUrl: string | null;
+    fpTotal: number;
+    rank: number;
+  }
+  const fpLeaderboardQuery = useQuery<FpLeaderboardEntry[]>({
+    queryKey: ['/api/fp/leaderboard', fpLeaderboardScope],
+    enabled: !isDemo && fpLeaderboardMode === "fp",
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/fp/leaderboard?type=${fpLeaderboardScope}`);
+      return res.json();
+    },
+  });
+
   // API queries and mutations for non-demo mode
   const postsQuery = useQuery<APICommunityPost[]>({
     queryKey: ['/api/community/posts'],
@@ -2307,6 +2326,17 @@ export default function CommunityPage() {
   // Leaderboard view mode (day/week/all time)
   const [leaderboardViewMode, setLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
   const [friendsLeaderboardViewMode, setFriendsLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
+  const [fpLeaderboardMode, setFpLeaderboardMode] = useState<"points" | "fp">("points");
+  const [fpLeaderboardScope, setFpLeaderboardScope] = useState<"friends" | "all">("friends");
+  
+  // Reset FP leaderboard state when entering demo mode
+  useEffect(() => {
+    if (isDemo) {
+      setFpLeaderboardMode("points");
+      setFpLeaderboardScope("friends");
+    }
+  }, [isDemo]);
+  
   const [expandedDMFriend, setExpandedDMFriend] = useState<string | null>(null);
   const [dmMessages, setDmMessages] = useState<Record<string, string>>({});
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
@@ -5569,73 +5599,160 @@ export default function CommunityPage() {
 
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="flex items-center gap-2">
                     <Trophy className="w-5 h-5" />
                     Leaderboard
                   </CardTitle>
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant={friendsLeaderboardViewMode === "day" ? "default" : "ghost"}
-                      onClick={() => setFriendsLeaderboardViewMode("day")}
-                      data-testid="button-leaderboard-day"
-                    >
-                      Today
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={friendsLeaderboardViewMode === "week" ? "default" : "ghost"}
-                      onClick={() => setFriendsLeaderboardViewMode("week")}
-                      data-testid="button-leaderboard-week"
-                    >
-                      Week
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={friendsLeaderboardViewMode === "alltime" ? "default" : "ghost"}
-                      onClick={() => setFriendsLeaderboardViewMode("alltime")}
-                      data-testid="button-leaderboard-alltime"
-                    >
-                      All Time
-                    </Button>
-                  </div>
+                  {!isDemo && (
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant={fpLeaderboardMode === "points" ? "default" : "ghost"}
+                        onClick={() => setFpLeaderboardMode("points")}
+                        data-testid="button-leaderboard-points"
+                      >
+                        Points
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={fpLeaderboardMode === "fp" ? "default" : "ghost"}
+                        onClick={() => setFpLeaderboardMode("fp")}
+                        data-testid="button-leaderboard-fp"
+                        className="gap-1"
+                      >
+                        <Flame className="w-3 h-3" />
+                        FP
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <CardDescription>
-                  {friendsLeaderboardViewMode === "day" ? "Today's" : friendsLeaderboardViewMode === "week" ? "This week's" : "All-time"} top performers
-                </CardDescription>
+                {(isDemo || fpLeaderboardMode === "points") ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <CardDescription>
+                      {friendsLeaderboardViewMode === "day" ? "Today's" : friendsLeaderboardViewMode === "week" ? "This week's" : "All-time"} top performers
+                    </CardDescription>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant={friendsLeaderboardViewMode === "day" ? "secondary" : "ghost"}
+                        onClick={() => setFriendsLeaderboardViewMode("day")}
+                        data-testid="button-leaderboard-day"
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={friendsLeaderboardViewMode === "week" ? "secondary" : "ghost"}
+                        onClick={() => setFriendsLeaderboardViewMode("week")}
+                        data-testid="button-leaderboard-week"
+                      >
+                        Week
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={friendsLeaderboardViewMode === "alltime" ? "secondary" : "ghost"}
+                        onClick={() => setFriendsLeaderboardViewMode("alltime")}
+                        data-testid="button-leaderboard-alltime"
+                      >
+                        All Time
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <CardDescription>
+                      Focus Points rankings
+                    </CardDescription>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant={fpLeaderboardScope === "friends" ? "secondary" : "ghost"}
+                        onClick={() => setFpLeaderboardScope("friends")}
+                        data-testid="button-fp-leaderboard-friends"
+                      >
+                        Friends
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={fpLeaderboardScope === "all" ? "secondary" : "ghost"}
+                        onClick={() => setFpLeaderboardScope("all")}
+                        data-testid="button-fp-leaderboard-all"
+                      >
+                        Everyone
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {sortedLeaderboard.slice(0, 5).map((friend, index) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center justify-between gap-2"
-                      data-testid={`leaderboard-entry-${index}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 text-sm font-medium text-muted-foreground">
-                          {index + 1}.
-                        </span>
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(friend.firstName, friend.lastName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">
-                          {getName(friend.firstName, friend.lastName)}
-                        </span>
+                {(isDemo || fpLeaderboardMode === "points") ? (
+                  <div className="space-y-2">
+                    {sortedLeaderboard.slice(0, 5).map((friend, index) => (
+                      <div
+                        key={friend.id}
+                        className="flex items-center justify-between gap-2"
+                        data-testid={`leaderboard-entry-${index}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 text-sm font-medium text-muted-foreground">
+                            {index + 1}.
+                          </span>
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">
+                              {getInitials(friend.firstName, friend.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">
+                            {getName(friend.firstName, friend.lastName)}
+                          </span>
+                        </div>
+                        <Badge variant="outline">
+                          {friendsLeaderboardViewMode === "day" 
+                            ? friend.todayPoints 
+                            : friendsLeaderboardViewMode === "week" 
+                              ? friend.weeklyPoints 
+                              : friend.totalPoints} pts
+                        </Badge>
                       </div>
-                      <Badge variant="outline">
-                        {friendsLeaderboardViewMode === "day" 
-                          ? friend.todayPoints 
-                          : friendsLeaderboardViewMode === "week" 
-                            ? friend.weeklyPoints 
-                            : friend.totalPoints} pts
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {fpLeaderboardQuery.isLoading ? (
+                      <div className="text-sm text-muted-foreground text-center py-4">Loading FP rankings...</div>
+                    ) : !fpLeaderboardQuery.data || fpLeaderboardQuery.data.length === 0 ? (
+                      <div className="text-sm text-muted-foreground text-center py-4">No FP data yet</div>
+                    ) : (
+                      fpLeaderboardQuery.data.slice(0, 10).map((entry, index) => (
+                        <div
+                          key={entry.userId}
+                          className="flex items-center justify-between gap-2"
+                          data-testid={`fp-leaderboard-entry-${index}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 text-sm font-medium text-muted-foreground">
+                              {entry.rank}.
+                            </span>
+                            <Avatar className="h-6 w-6">
+                              <AvatarImage src={entry.profileImageUrl || undefined} />
+                              <AvatarFallback className="text-xs">
+                                {getInitials(entry.firstName, entry.lastName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">
+                              {entry.displayName || getName(entry.firstName || "", entry.lastName || "")}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="gap-1">
+                            <Flame className="w-3 h-3 text-orange-500" />
+                            {entry.fpTotal.toLocaleString()}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
