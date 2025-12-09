@@ -16,11 +16,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Clock, Calendar } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { format, startOfWeek, addDays, subWeeks, addWeeks, parse } from "date-fns";
+import { format, startOfWeek, addDays, subWeeks, addWeeks, parse, differenceInWeeks } from "date-fns";
 import type { Appointment } from "@shared/schema";
 
 interface DayData {
@@ -62,6 +68,7 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [newAppointment, setNewAppointment] = useState({
     title: "",
     startTime: "09:00",
@@ -139,6 +146,15 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
     return appointments.filter(apt => apt.date === dateKey);
   };
 
+  const handleWeekSelect = (date: Date | undefined) => {
+    if (!date) return;
+    const selectedWeekStart = startOfWeek(date, { weekStartsOn: 1 });
+    const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const newOffset = differenceInWeeks(selectedWeekStart, currentWeekStart);
+    onWeekChange?.(newOffset);
+    setWeekPickerOpen(false);
+  };
+
   const weekLabel = `${format(firstDayDate, "MMM d")} - ${format(lastDayDate, "MMM d, yyyy")}`;
 
   return (
@@ -156,9 +172,27 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-xs text-muted-foreground min-w-[140px] text-center">
-                {weekLabel}
-              </span>
+              <Popover open={weekPickerOpen} onOpenChange={setWeekPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-muted-foreground min-w-[140px] font-normal"
+                    data-testid="button-week-picker"
+                  >
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {weekLabel}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <CalendarPicker
+                    mode="single"
+                    selected={firstDayDate}
+                    onSelect={handleWeekSelect}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <Button
                 variant="ghost"
                 size="icon"
