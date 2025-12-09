@@ -1034,6 +1034,10 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         expiresAt,
       }).returning();
 
+      // Award FP for sending email invitation
+      const { awardFp } = await import("./fpService");
+      await awardFp(userId, "invite_friend_email");
+
       res.json({ 
         success: true, 
         message: `Invitation sent to ${email}`,
@@ -3154,6 +3158,66 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
           date,
         });
         await db.insert(circleTaskCompletions).values(parsed);
+        
+        // Check if this completion triggers a circle competition win
+        try {
+          const { sql, gte } = await import("drizzle-orm");
+          
+          // Find active competitions involving this circle
+          const activeComps = await db.select().from(circleCompetitions).where(
+            and(
+              eq(circleCompetitions.status, "active"),
+              or(
+                eq(circleCompetitions.circleOneId, circleId),
+                eq(circleCompetitions.circleTwoId, circleId)
+              )
+            )
+          );
+          
+          for (const comp of activeComps) {
+            if (comp.competitionType === 'targetPoints' && comp.targetPoints) {
+              // Calculate current points for both circles
+              const circleOneTasks = await db.select().from(circleTasks).where(eq(circleTasks.circleId, comp.circleOneId));
+              const circleTwoTasks = await db.select().from(circleTasks).where(eq(circleTasks.circleId, comp.circleTwoId));
+              const taskOneMap = new Map(circleOneTasks.map(t => [t.id, t.value || 0]));
+              const taskTwoMap = new Map(circleTwoTasks.map(t => [t.id, t.value || 0]));
+              
+              const circleOneCompletions = await db.select().from(circleTaskCompletions).where(
+                and(eq(circleTaskCompletions.circleId, comp.circleOneId), gte(circleTaskCompletions.date, comp.startDate))
+              );
+              const circleTwoCompletions = await db.select().from(circleTaskCompletions).where(
+                and(eq(circleTaskCompletions.circleId, comp.circleTwoId), gte(circleTaskCompletions.date, comp.startDate))
+              );
+              
+              let circleOnePoints = circleOneCompletions.reduce((sum, c) => sum + (taskOneMap.get(c.taskId) || 0), 0);
+              let circleTwoPoints = circleTwoCompletions.reduce((sum, c) => sum + (taskTwoMap.get(c.taskId) || 0), 0);
+              
+              let winnerId: string | null = null;
+              if (circleOnePoints >= comp.targetPoints) {
+                winnerId = comp.circleOneId;
+              } else if (circleTwoPoints >= comp.targetPoints) {
+                winnerId = comp.circleTwoId;
+              }
+              
+              if (winnerId && !comp.winnerId) {
+                // Mark competition as completed with winner
+                await db.update(circleCompetitions)
+                  .set({ status: "completed", winnerId, circleOnePoints, circleTwoPoints })
+                  .where(eq(circleCompetitions.id, comp.id));
+                
+                // Award FP to all members of winning circle
+                const { awardFp } = await import("./fpService");
+                const winningMembers = await db.select().from(circleMembers).where(eq(circleMembers.circleId, winnerId));
+                for (const member of winningMembers) {
+                  await awardFp(member.userId, "win_circle_challenge", { checkDuplicate: true });
+                }
+              }
+            }
+          }
+        } catch (compError) {
+          console.error("Error checking circle competition:", compError);
+        }
+        
         res.json({ completed: true });
       }
     } catch (error) {
@@ -4941,7 +5005,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         
         // Check if user hit daily goal and award FP + streak milestones
         try {
-          const { awardFp, awardLoggingStreakMilestones, awardDailyGoalStreakMilestones } = await import("./fpService");
+          const { awardFp, awardLoggingStreakMilestones, awardDailyGoalStreakMilestones, checkAndAwardWeeklyTriggers } = await import("./fpService");
           const [settings] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
           const dailyGoal = settings?.dailyGoal || 14;
           const totalPoints = (todoPoints || 0) + (taskPoints || 0) - (penaltyPoints || 0);
@@ -4950,6 +5014,35 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
             await awardDailyGoalStreakMilestones(userId);
           }
           await awardLoggingStreakMilestones(userId);
+          
+          // Check weekly FP triggers - calculate weekly total
+          const logDate = new Date(date);
+          const dayOfWeek = logDate.getDay();
+          const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const weekStart = new Date(logDate);
+          weekStart.setDate(logDate.getDate() + mondayOffset);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          const weekEndStr = weekEnd.toISOString().split('T')[0];
+          
+          const { sql, gte, lte } = await import("drizzle-orm");
+          const weekLogs = await db.select({
+            taskPoints: userDailyLogs.taskPoints,
+            todoPoints: userDailyLogs.todoPoints,
+            penaltyPoints: userDailyLogs.penaltyPoints
+          }).from(userDailyLogs).where(and(
+            eq(userDailyLogs.userId, userId),
+            gte(userDailyLogs.date, weekStartStr),
+            lte(userDailyLogs.date, weekEndStr)
+          ));
+          
+          const weeklyTotal = weekLogs.reduce((sum, log) => {
+            return sum + (log.taskPoints || 0) + (log.todoPoints || 0) + (log.penaltyPoints || 0);
+          }, 0);
+          const weeklyGoal = settings?.weeklyGoal || 100;
+          
+          await checkAndAwardWeeklyTriggers(userId, weeklyTotal, weeklyGoal);
         } catch (fpError) {
           console.error("Error awarding FP for hit_daily_goal:", fpError);
         }
@@ -4972,7 +5065,7 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         
         // Award FP for logging a day (first log of the day only) + streak milestones
         try {
-          const { awardFp, awardLoggingStreakMilestones, awardDailyGoalStreakMilestones } = await import("./fpService");
+          const { awardFp, awardLoggingStreakMilestones, awardDailyGoalStreakMilestones, checkAndAwardWeeklyTriggers } = await import("./fpService");
           await awardFp(userId, "log_day", { checkDuplicate: true });
           await awardLoggingStreakMilestones(userId);
           
@@ -4984,6 +5077,35 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
             await awardFp(userId, "hit_daily_goal", { checkDuplicate: true });
             await awardDailyGoalStreakMilestones(userId);
           }
+          
+          // Check weekly FP triggers - calculate weekly total
+          const logDate = new Date(date);
+          const dayOfWeek = logDate.getDay();
+          const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const weekStart = new Date(logDate);
+          weekStart.setDate(logDate.getDate() + mondayOffset);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          const weekEndStr = weekEnd.toISOString().split('T')[0];
+          
+          const { gte, lte } = await import("drizzle-orm");
+          const weekLogs = await db.select({
+            taskPoints: userDailyLogs.taskPoints,
+            todoPoints: userDailyLogs.todoPoints,
+            penaltyPoints: userDailyLogs.penaltyPoints
+          }).from(userDailyLogs).where(and(
+            eq(userDailyLogs.userId, userId),
+            gte(userDailyLogs.date, weekStartStr),
+            lte(userDailyLogs.date, weekEndStr)
+          ));
+          
+          const weeklyTotal = weekLogs.reduce((sum, log) => {
+            return sum + (log.taskPoints || 0) + (log.todoPoints || 0) + (log.penaltyPoints || 0);
+          }, 0);
+          const weeklyGoal = settings?.weeklyGoal || 100;
+          
+          await checkAndAwardWeeklyTriggers(userId, weeklyTotal, weeklyGoal);
         } catch (fpError) {
           console.error("Error awarding FP for log_day/hit_daily_goal:", fpError);
         }
@@ -5497,6 +5619,17 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const completion = await storage.completeChallengeTask(challengeId, taskId, userId);
       if (!completion) {
         return res.status(400).json({ error: "Cannot complete this task" });
+      }
+
+      // Check if challenge was just completed and award FP to winner
+      try {
+        const challenge = await storage.getFriendChallenge(challengeId);
+        if (challenge && challenge.status === 'completed' && challenge.winnerId) {
+          const { awardFp } = await import("./fpService");
+          await awardFp(challenge.winnerId, "win_1v1_challenge", { checkDuplicate: true });
+        }
+      } catch (fpError) {
+        console.error("Error awarding FP for 1v1 challenge win:", fpError);
       }
 
       res.json(completion);
