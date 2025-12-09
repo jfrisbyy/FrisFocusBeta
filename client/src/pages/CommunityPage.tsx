@@ -1091,6 +1091,8 @@ export default function CommunityPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
+  const [showEmailInvite, setShowEmailInvite] = useState(false);
+  const [pendingInviteEmail, setPendingInviteEmail] = useState("");
   const [friends, setFriends] = useState<StoredFriend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [circles, setCircles] = useState<StoredCircle[]>([]);
@@ -1282,9 +1284,17 @@ export default function CommunityPage() {
       const res = await apiRequest("POST", "/api/friends/request", params);
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || 'Failed to send friend request');
+        // Attach the original email to the error for the invite flow
+        const err = new Error(error.error || 'Failed to send friend request') as Error & { originalEmail?: string };
+        err.originalEmail = params.emailOrUsername;
+        throw err;
       }
       return res.json();
+    },
+    onMutate: () => {
+      // Reset invite state before each new request to avoid stale prompts
+      setShowEmailInvite(false);
+      setPendingInviteEmail("");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
@@ -1294,8 +1304,49 @@ export default function CommunityPage() {
       }});
       toast({ title: "Friend request sent!" });
     },
+    onError: (error: Error & { originalEmail?: string }) => {
+      // Check if this is a "User not found" error - offer email invitation
+      const isUserNotFound = error.message.toLowerCase().includes("user not found") || 
+                             error.message.toLowerCase().includes("no user found");
+      const emailToInvite = error.originalEmail || "";
+      
+      if (isUserNotFound && emailToInvite && emailToInvite.includes("@")) {
+        // Offer email invitation for valid email addresses
+        setPendingInviteEmail(emailToInvite);
+        setShowEmailInvite(true);
+        toast({ 
+          title: "User not found", 
+          description: "Would you like to send an email invitation instead?",
+        });
+      } else {
+        // Show error toast for all other cases
+        toast({ 
+          title: isUserNotFound ? "User not found" : "Failed to send request", 
+          description: error.message, 
+          variant: "destructive" 
+        });
+      }
+    },
+  });
+
+  const sendEmailInvitationMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", "/api/friends/invite", { email });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to send invitation');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invitation sent!", description: "An email invitation has been sent." });
+      setShowEmailInvite(false);
+      setPendingInviteEmail("");
+      setEmail("");
+      queryClient.invalidateQueries({ queryKey: ['/api/friends/invitations'] });
+    },
     onError: (error: Error) => {
-      toast({ title: "Failed to send request", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to send invitation", description: error.message, variant: "destructive" });
     },
   });
 
@@ -5167,7 +5218,13 @@ export default function CommunityPage() {
                     type="email"
                     placeholder="friend@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (showEmailInvite) {
+                        setShowEmailInvite(false);
+                        setPendingInviteEmail("");
+                      }
+                    }}
                     data-testid="input-friend-email"
                   />
                   <Button type="submit" data-testid="button-send-request">
@@ -5175,6 +5232,41 @@ export default function CommunityPage() {
                     Send
                   </Button>
                 </form>
+                
+                {showEmailInvite && pendingInviteEmail && !isDemo && (
+                  <div className="p-3 rounded-md bg-muted border border-border space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      No user found with email <span className="font-medium text-foreground">{pendingInviteEmail}</span>. 
+                      Would you like to send them an invitation to join FrisFocus?
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => sendEmailInvitationMutation.mutate(pendingInviteEmail)}
+                        disabled={sendEmailInvitationMutation.isPending}
+                        data-testid="button-send-email-invite"
+                      >
+                        {sendEmailInvitationMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        Send Invitation
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setShowEmailInvite(false);
+                          setPendingInviteEmail("");
+                        }}
+                        data-testid="button-cancel-email-invite"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 
                 {(() => {
                   // Get users from demo data or API query
