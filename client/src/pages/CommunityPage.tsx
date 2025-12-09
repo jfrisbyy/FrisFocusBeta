@@ -1112,6 +1112,11 @@ export default function CommunityPage() {
   const [expandedPendingChallenge, setExpandedPendingChallenge] = useState<string | null>(null);
   const [editingChallenge, setEditingChallenge] = useState<DemoFriendChallenge | null>(null);
   
+  // Edit challenge dialog state
+  const [editChallengeTasks, setEditChallengeTasks] = useState<{ id: string; name: string; points: number }[]>([]);
+  const [newEditTaskName, setNewEditTaskName] = useState("");
+  const [newEditTaskPoints, setNewEditTaskPoints] = useState(10);
+  
   // Friend challenge dialog state
   const [friendChallengeFriend, setFriendChallengeFriend] = useState<StoredFriend | null>(null);
   const [friendChallengeName, setFriendChallengeName] = useState("");
@@ -4849,6 +4854,142 @@ export default function CommunityPage() {
     );
   };
 
+  const handleOpenEditChallenge = useCallback((challenge: DemoFriendChallenge) => {
+    setEditChallengeTasks(challenge.tasks.map(t => ({ id: t.id, name: t.taskName, points: t.pointValue })));
+    setNewEditTaskName("");
+    setNewEditTaskPoints(10);
+    setEditingChallenge(challenge);
+  }, []);
+  
+  const renderEditChallengeDialog = () => {
+    if (!editingChallenge) return null;
+    
+    const handleAddEditTask = () => {
+      if (!newEditTaskName.trim()) return;
+      const newId = `task-edit-${Date.now()}`;
+      setEditChallengeTasks([...editChallengeTasks, { id: newId, name: newEditTaskName.trim(), points: newEditTaskPoints }]);
+      setNewEditTaskName("");
+      setNewEditTaskPoints(10);
+    };
+    
+    const handleRemoveEditTask = (taskId: string) => {
+      setEditChallengeTasks(editChallengeTasks.filter(t => t.id !== taskId));
+    };
+    
+    const handleSaveChanges = () => {
+      if (editChallengeTasks.length === 0) {
+        toast({ title: "Tasks required", description: "Add at least one task to the challenge", variant: "destructive" });
+        return;
+      }
+      
+      setDemoChallenges(prev => prev.map(c => 
+        c.id === editingChallenge.id 
+          ? { 
+              ...c, 
+              tasks: editChallengeTasks.map(t => ({ 
+                id: t.id, 
+                taskName: t.name, 
+                pointValue: t.points, 
+                isCustom: true 
+              }))
+            }
+          : c
+      ));
+      toast({ title: "Challenge updated!", description: "Tasks have been saved." });
+      setEditingChallenge(null);
+    };
+    
+    return (
+      <Dialog open={!!editingChallenge} onOpenChange={() => setEditingChallenge(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-blue-500" />
+              Edit Challenge
+            </DialogTitle>
+            <DialogDescription>
+              Modify tasks for "{editingChallenge.name}"
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="p-3 rounded-md bg-muted">
+              <p className="text-sm font-medium">{editingChallenge.name}</p>
+              {editingChallenge.description && (
+                <p className="text-sm text-muted-foreground mt-1">{editingChallenge.description}</p>
+              )}
+              {editingChallenge.targetPoints && (
+                <p className="text-xs text-muted-foreground mt-2">Target: {editingChallenge.targetPoints} pts</p>
+              )}
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <Label>Challenge Tasks</Label>
+              {editChallengeTasks.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-2">No tasks added yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {editChallengeTasks.map((task) => (
+                    <div key={task.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <span className="text-sm">{task.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{task.points} pts</Badge>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => handleRemoveEditTask(task.id)}
+                          data-testid={`button-remove-edit-task-${task.id}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Add New Task</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Task name"
+                  value={newEditTaskName}
+                  onChange={(e) => setNewEditTaskName(e.target.value)}
+                  className="flex-1"
+                  data-testid="input-edit-task-name"
+                />
+                <Input
+                  type="number"
+                  value={newEditTaskPoints}
+                  onChange={(e) => setNewEditTaskPoints(parseInt(e.target.value) || 10)}
+                  className="w-20"
+                  min={1}
+                  data-testid="input-edit-task-points"
+                />
+                <Button size="icon" onClick={handleAddEditTask} data-testid="button-add-edit-task">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={() => setEditingChallenge(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveChanges} data-testid="button-save-challenge-edits">
+              <Check className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   const renderDMDialog = () => {
     if (!dmFriend) return null;
     const messages = directMessages[dmFriend.friendId] || [];
@@ -5895,7 +6036,7 @@ export default function CommunityPage() {
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        onClick={() => setEditingChallenge(challenge)}
+                                        onClick={() => handleOpenEditChallenge(challenge)}
                                         data-testid={`button-edit-challenge-${challenge.id}`}
                                       >
                                         <Pencil className="w-4 h-4" />
@@ -9517,6 +9658,7 @@ export default function CommunityPage() {
       {renderDMDialog()}
       {renderCheerlineDialog()}
       {renderChallengeDialog()}
+      {renderEditChallengeDialog()}
     </div>
   );
 }
