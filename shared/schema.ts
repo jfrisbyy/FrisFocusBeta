@@ -1236,6 +1236,24 @@ export const friendChallengeWithDetailsSchema = z.object({
 });
 export type FriendChallengeWithDetails = z.infer<typeof friendChallengeWithDetailsSchema>;
 
+// ==================== EMAIL INVITATIONS ====================
+
+// Pending email invitations for users not in the system
+export const emailInvitations = pgTable("email_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inviterUserId: varchar("inviter_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  invitedEmail: varchar("invited_email").notNull(),
+  inviteCode: varchar("invite_code").notNull().unique(),
+  status: varchar("status").notNull().default("pending"), // pending, accepted, expired
+  sentAt: timestamp("sent_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertEmailInvitationSchema = createInsertSchema(emailInvitations).omit({ id: true, sentAt: true, acceptedAt: true });
+export type InsertEmailInvitation = z.infer<typeof insertEmailInvitationSchema>;
+export type EmailInvitation = typeof emailInvitations.$inferSelect;
+
 // ==================== NOTIFICATIONS ====================
 
 // Notification types enum

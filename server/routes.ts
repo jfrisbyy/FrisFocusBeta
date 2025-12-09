@@ -90,7 +90,9 @@ import {
   insertAppointmentSchema,
   insertFriendChallengeSchema,
   insertFriendChallengeTaskSchema,
+  emailInvitations,
 } from "@shared/schema";
+import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
 
@@ -960,6 +962,131 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error sending friend request:", error);
       res.status(500).json({ error: "Failed to send friend request" });
+    }
+  });
+
+  // Send email invitation to someone not in the system
+  app.post("/api/friends/invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { email } = req.body;
+
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ error: "Valid email address is required" });
+      }
+
+      // Check if user already exists with this email
+      const [existingUser] = await db.select().from(users).where(eq(users.email, email));
+      if (existingUser) {
+        return res.status(400).json({ 
+          error: "User already exists", 
+          existingUser: true,
+          message: "This email is already registered. You can send a friend request instead." 
+        });
+      }
+
+      // Check if invitation already sent
+      const [existingInvite] = await db.select().from(emailInvitations).where(
+        and(
+          eq(emailInvitations.inviterUserId, userId),
+          eq(emailInvitations.invitedEmail, email),
+          eq(emailInvitations.status, "pending")
+        )
+      );
+      if (existingInvite) {
+        return res.status(400).json({ error: "Invitation already sent to this email" });
+      }
+
+      // Generate unique invite code
+      const inviteCode = randomBytes(16).toString("hex");
+      
+      // Set expiration to 30 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      // Get inviter details for the email
+      const [inviter] = await db.select().from(users).where(eq(users.id, userId));
+      const inviterName = inviter?.displayName || `${inviter?.firstName || ''} ${inviter?.lastName || ''}`.trim() || "A FrisFocus user";
+
+      // Get app URL from request
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host || 'frisfocus.replit.app';
+      const appUrl = `${protocol}://${host}`;
+
+      // Send invitation email
+      const emailSent = await sendInvitationEmail({
+        toEmail: email,
+        inviterName,
+        inviteCode,
+        appUrl
+      });
+
+      if (!emailSent) {
+        return res.status(500).json({ error: "Failed to send invitation email" });
+      }
+
+      // Store invitation in database
+      const [invitation] = await db.insert(emailInvitations).values({
+        inviterUserId: userId,
+        invitedEmail: email,
+        inviteCode,
+        status: "pending",
+        expiresAt,
+      }).returning();
+
+      res.json({ 
+        success: true, 
+        message: `Invitation sent to ${email}`,
+        invitationId: invitation.id 
+      });
+    } catch (error) {
+      console.error("Error sending email invitation:", error);
+      res.status(500).json({ error: "Failed to send invitation" });
+    }
+  });
+
+  // Get pending invitations sent by the user
+  app.get("/api/friends/invitations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const invitations = await db.select().from(emailInvitations).where(
+        and(
+          eq(emailInvitations.inviterUserId, userId),
+          eq(emailInvitations.status, "pending")
+        )
+      );
+
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error fetching invitations:", error);
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  // Cancel/delete a pending invitation
+  app.delete("/api/friends/invitations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const [invitation] = await db.select().from(emailInvitations).where(
+        and(
+          eq(emailInvitations.id, id),
+          eq(emailInvitations.inviterUserId, userId)
+        )
+      );
+
+      if (!invitation) {
+        return res.status(404).json({ error: "Invitation not found" });
+      }
+
+      await db.delete(emailInvitations).where(eq(emailInvitations.id, id));
+
+      res.json({ success: true, message: "Invitation cancelled" });
+    } catch (error) {
+      console.error("Error cancelling invitation:", error);
+      res.status(500).json({ error: "Failed to cancel invitation" });
     }
   });
 
