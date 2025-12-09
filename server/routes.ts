@@ -965,6 +965,38 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Cancel outgoing friend request (requester can cancel their own request)
+  app.post("/api/friends/cancel/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      // Find the friendship
+      const [friendship] = await db.select().from(friendships).where(eq(friendships.id, id));
+
+      if (!friendship) {
+        return res.status(404).json({ error: "Friend request not found" });
+      }
+
+      // Only requester can cancel
+      if (friendship.requesterId !== userId) {
+        return res.status(403).json({ error: "Not authorized to cancel this request" });
+      }
+
+      if (friendship.status !== "pending") {
+        return res.status(400).json({ error: "Request already processed" });
+      }
+
+      // Delete the request
+      await db.delete(friendships).where(eq(friendships.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error canceling friend request:", error);
+      res.status(500).json({ error: "Failed to cancel friend request" });
+    }
+  });
+
   // Remove friend
   app.delete("/api/friends/:id", isAuthenticated, async (req: any, res) => {
     try {

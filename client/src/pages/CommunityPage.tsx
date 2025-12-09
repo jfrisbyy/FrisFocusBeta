@@ -62,6 +62,7 @@ import {
   Loader2,
   Copy,
   Swords,
+  UserCheck,
 } from "lucide-react";
 import type { 
   StoredFriend, 
@@ -87,6 +88,8 @@ interface FriendRequest {
   profileImageUrl?: string;
   createdAt: string;
   direction: "incoming" | "outgoing";
+  addresseeId?: string; // Present for outgoing requests
+  requesterId?: string; // Present for incoming requests
 }
 
 interface CircleBadgeReward {
@@ -1144,6 +1147,24 @@ export default function CommunityPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
       toast({ title: "Friend request declined" });
+    },
+  });
+
+  const cancelFriendRequestMutation = useMutation({
+    mutationFn: async (requestId: string) => {
+      const res = await apiRequest("POST", `/api/friends/cancel/${requestId}`, {});
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to cancel request');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/friends/requests'] });
+      toast({ title: "Friend request cancelled" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to cancel request", description: error.message, variant: "destructive" });
     },
   });
 
@@ -4526,23 +4547,42 @@ export default function CommunityPage() {
                                 </div>
                               </ProfileHoverCard>
                               <div className="flex gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    if (isDemo) {
-                                      toast({
-                                        title: "Demo Mode",
-                                        description: `Friend request would be sent to ${u.displayName}`,
-                                      });
-                                    } else {
-                                      sendFriendRequestMutation.mutate({ userId: u.id });
-                                    }
-                                  }}
-                                  data-testid={`button-add-friend-${u.id}`}
-                                >
-                                  <UserPlus className="w-4 h-4" />
-                                </Button>
+                                {(() => {
+                                  const outgoingRequest = friendRequestsQuery.data?.find(
+                                    r => r.direction === 'outgoing' && r.addresseeId === u.id
+                                  );
+                                  const isPending = !!outgoingRequest;
+                                  
+                                  return (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className={isPending ? "text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400" : ""}
+                                      onClick={() => {
+                                        if (isDemo) {
+                                          toast({
+                                            title: "Demo Mode",
+                                            description: isPending 
+                                              ? `Friend request to ${u.displayName} would be cancelled`
+                                              : `Friend request would be sent to ${u.displayName}`,
+                                          });
+                                        } else if (isPending && outgoingRequest) {
+                                          cancelFriendRequestMutation.mutate(outgoingRequest.id);
+                                        } else {
+                                          sendFriendRequestMutation.mutate({ userId: u.id });
+                                        }
+                                      }}
+                                      data-testid={`button-add-friend-${u.id}`}
+                                      title={isPending ? "Cancel request" : "Send friend request"}
+                                    >
+                                      {isPending ? (
+                                        <UserCheck className="w-4 h-4" />
+                                      ) : (
+                                        <UserPlus className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  );
+                                })()}
                                 <Button
                                   size="sm"
                                   variant="ghost"
