@@ -1034,9 +1034,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         expiresAt,
       }).returning();
 
-      // Award FP for sending email invitation
-      const { awardFp } = await import("./fpService");
-      await awardFp(userId, "invite_friend_email");
+      // Award FP for sending email invitation (non-blocking)
+      try {
+        const { awardFp } = await import("./fpService");
+        await awardFp(userId, "invite_friend_email");
+      } catch (fpError) {
+        console.error("Failed to award FP for email invitation:", fpError);
+      }
 
       res.json({ 
         success: true, 
