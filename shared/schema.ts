@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  fpTotal: integer("fp_total").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1314,3 +1315,86 @@ export const notificationWithActorSchema = z.object({
   }).nullable(),
 });
 export type NotificationWithActor = z.infer<typeof notificationWithActorSchema>;
+
+// ==================== FP (FOCUS POINTS) SYSTEM ====================
+
+// FP event types for tracking what action earned FP
+export const fpEventTypeEnum = z.enum([
+  "join_circle",
+  "send_cheerline",
+  "add_friend",
+  "create_circle",
+  "accept_1v1_challenge",
+  "accept_circle_challenge",
+  "log_day",
+  "daily_goal_streak_3",
+  "logging_streak_7",
+  "hit_daily_goal",
+  "daily_goal_streak_7",
+  "weekly_goal_streak_2",
+  "win_1v1_challenge",
+  "win_circle_challenge",
+  "earn_badge",
+  "earn_circle_award",
+  "earn_circle_badge",
+  "invite_friend_email",
+  "no_penalties_week",
+  "logging_streak_14",
+  "within_5_percent_weekly",
+  "logging_streak_21",
+  "daily_goal_streak_10",
+  "complete_all_weekly_daily",
+  "challenge_win_streak_3",
+  "weekly_goal_streak_3",
+  "daily_goal_streak_14",
+  "win_streak_1v1_2",
+  "logging_streak_28",
+  "no_penalty_streak_2_weeks",
+  "circle_win_streak_3",
+  "weekly_goal_streak_4",
+  "daily_goal_streak_21",
+  "win_streak_1v1_3",
+  "logging_streak_50",
+  "hit_weekly_goal",
+  "weekly_goal_streak_5",
+  "no_penalty_streak_4_weeks",
+  "circle_win_streak_5",
+  "weekly_goal_streak_6",
+  "daily_goal_streak_30",
+  "win_streak_1v1_5",
+  "weekly_goal_streak_7",
+  "logging_streak_100",
+  "weekly_goal_streak_8",
+  "win_streak_1v1_10",
+  "no_penalty_streak_6_weeks",
+  "weekly_goal_streak_10",
+  "logging_streak_200",
+  "weekly_goal_streak_15",
+  "weekly_goal_streak_20",
+  "logging_streak_365"
+]);
+export type FpEventType = z.infer<typeof fpEventTypeEnum>;
+
+// FP Activity Log table - tracks all FP awards
+export const fpActivityLog = pgTable("fp_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type").notNull(),
+  fpAmount: integer("fp_amount").notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFpActivityLogSchema = createInsertSchema(fpActivityLog).omit({ id: true, createdAt: true });
+export type InsertFpActivityLog = z.infer<typeof insertFpActivityLogSchema>;
+export type FpActivityLog = typeof fpActivityLog.$inferSelect;
+
+// FP Activity with formatted data for display
+export const fpActivityDisplaySchema = z.object({
+  id: z.string(),
+  eventType: fpEventTypeEnum,
+  fpAmount: z.number(),
+  description: z.string(),
+  createdAt: z.date().nullable(),
+});
+export type FpActivityDisplay = z.infer<typeof fpActivityDisplaySchema>;

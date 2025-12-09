@@ -1,0 +1,276 @@
+ 
+
+I want to add a dual scoring system to my app. Users will earn Points for completing their daily tasks, but they will earn a separate, global metric called FP for hitting goals and winning challenges.
+The purpose of this system is to make user-created task points personal while keeping FP universal, so competition is fair regardless of a user’s personal point scale.
+How the system should work:
+1. Points (Personal Currency)
+Users define their own point values for tasks.
+
+
+Completing tasks today increases their Daily Points and Weekly Points.
+
+
+
+
+
+2. FP (Global Universal Currency)
+FP is separate from Points. FP is earned based on outcomes, not task values.
+FP is used for:
+1v1 challenge results
+
+
+Circle (group) challenge results
+
+
+Leveling up
+
+
+Season progression
+
+
+Leaderboards
+
+
+FP is the only metric shared across users, so everyone competes on equal footing.
+
+3. FP Awarding Rules
+The system should automatically award FP for key achievements.
+ Here are the base FP events we need implemented: 
+
+
++1 Join a circle
+
+
++1 Send a cheerline
+
+
++1 Add friend
+
+
++2 Create a circle
+
+
++2 Accept a 1v1 challenge
+
+
++2 Accept a circle challenge
+
+
++3 Log day (save day only once per day)
+
+
++5 3-day daily point goal streak
+
+
++5 7-day logging streak
+
+
++10 Hit daily point goal
+
+
++10 7-day daily point goal streak
+
+
++10 2-week point goal streak
+
+
++10 Win 1v1 challenge
+
+
++10 Win circle challenge
+
+
++10 Earn badge
+
+
++10 Earn circle award
+
+
++10 Earn circle badge
+
+
++10 Invite friend to join (email that is not in our database)
+
+
++10 No penalties all week
+
+
++10 14-day logging streak
+
+
++15 Come within 5% of weekly goal
+
+
++15 21-day logging streak
+
++15 10-day daily point goal streak
+
+
++20 Complete all weekly + daily to-dos
+
+
++20 3-challenge win streak
+
+
++20 3-week point goal streak
+
+
++20 14-day daily point streak
+
+
++20 1v1 2-win streak
+
+
++20 28-day logging streak
+
+
++25 2-week no-penalty streak
+
+
++25 Circle 3-win streak
+
+
++30 4-week point goal streak
+
+
++30 21-day daily streak
+
+
++30 1v1 3-win streak
+
+
++35 50-day logging streak
+
+
++40 Hit weekly point goal
+
+
++40 5-week point goal streak
+
+
++40 4-week no-penalty streak
+
+
++40 Circle 5-win streak
+
+
++50 6-week point goal streak
+
+
++50 30-day daily streak
+
+
++50 1v1 5-win streak
+
+
++60 7-week point goal streak
+
+
++75 100-day logging streak
+
+
++80 8-week point goal streak
+
+
++80 1v1 10-win streak
+
+
++100 6-week no-penalty streak
+
+
++100 10-week point goal streak
+
+
++100 200-day logging streak
+
+
++150 15-week point goal streak
+
+
++250 20-week point goal streak
+
+
++250 365-day logging streak 
+
+FP rules should be stored in a configuration file so they can be adjusted later.
+
+3. Database Requirements
+Add a field to track global FP:
+user.xpTotal
+user.level (optional future feature)
+
+Points do not interact with FP directly.
+ FP should only come from defined achievement events.
+
+4. UI Requirements
+The dashboard needs to show both metrics:
+Daily Points / Weekly Points (personal task progress)
+
+
+FP – global progression score
+
+
+Example:
+Today: 125 / 200 Points
+Weekly: 830 / 1200 Points
+FP This Week: +4
+FP: 72
+
+FP must feel visually different from points so users instantly understand they are not related.
+5. Separation of Systems
+Points = personal habit-building
+
+
+FP = performance + competition
+
+
+This ensures users can have their own point scales without breaking the competitive ecosystem.
+
+⭐ 3. FP should appear in the top navigation bar
+On the main app interface (home dashboard):
+FP Bar Placement
+To the left of the notification bell
+
+
+Shows:
+
+
+A horizontal FP progress bar (filling up like FP)
+
+
+A numeric FP score (e.g., “238 FP”)
+
+
+This makes FP feel like a personal “level-up” meter.
+When the user clicks the FP bar:
+Expand into an “FP Activity Drawer”
+This drawer should show:
+A chronological list of every action that awarded FP, such as:
+“+10 FP — Hit daily point goal”
+
+
+“+40 FP — Weekly goal achieved”
+
+
+“+20 FP — 3-challenge win streak”
+
+
+“+75 FP — 100-day logging streak”
+
+
+“+2 FP — Sent a Cheerline”
+
+
+etc.
+
+
+Each entry should show:
+FP amount
+
+
+Badge icon (optional)
+
+
+Timestamp or day label
+
+On the leaderboard card in the friend tab of the community page allow users to toggle between friends and all users, where they will be able to see the top user’s FP scores 
