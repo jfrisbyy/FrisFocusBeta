@@ -1140,6 +1140,104 @@ export type Appointment = typeof appointments.$inferSelect;
 
 // ==================== NOTIFICATIONS ====================
 
+// ==================== FRIEND CHALLENGES ====================
+
+// Friend challenge status enum
+export const challengeStatusEnum = z.enum(["pending", "active", "completed", "declined", "cancelled"]);
+export type ChallengeStatus = z.infer<typeof challengeStatusEnum>;
+
+// Friend challenges - 1v1 competitions between friends
+export const friendChallenges = pgTable("friend_challenges", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  challengerId: varchar("challenger_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  challengeeId: varchar("challengee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  challengeType: varchar("challenge_type").notNull().default("targetPoints"), // "targetPoints", "timed", "ongoing"
+  startDate: varchar("start_date"), // YYYY-MM-DD format (set when accepted)
+  endDate: varchar("end_date"), // YYYY-MM-DD format (for "timed" type)
+  targetPoints: integer("target_points"), // Target points to win (for "targetPoints" type)
+  challengerPoints: integer("challenger_points").default(0),
+  challengeePoints: integer("challengee_points").default(0),
+  winnerId: varchar("winner_id").references(() => users.id),
+  status: varchar("status").notNull().default("pending"), // "pending", "active", "completed", "declined", "cancelled"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFriendChallengeSchema = createInsertSchema(friendChallenges).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFriendChallenge = z.infer<typeof insertFriendChallengeSchema>;
+export type FriendChallenge = typeof friendChallenges.$inferSelect;
+
+// Friend challenge tasks - tasks for a specific challenge
+export const friendChallengeTasks = pgTable("friend_challenge_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  challengeId: varchar("challenge_id").notNull().references(() => friendChallenges.id, { onDelete: "cascade" }),
+  taskName: varchar("task_name").notNull(),
+  pointValue: integer("point_value").notNull().default(10),
+  isCustom: boolean("is_custom").default(true), // True if created for challenge, false if selected from existing
+  sourceTaskId: varchar("source_task_id"), // Reference to original userTask if not custom
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFriendChallengeTaskSchema = createInsertSchema(friendChallengeTasks).omit({ id: true, createdAt: true });
+export type InsertFriendChallengeTask = z.infer<typeof insertFriendChallengeTaskSchema>;
+export type FriendChallengeTask = typeof friendChallengeTasks.$inferSelect;
+
+// Friend challenge completions - task completions within a challenge
+export const friendChallengeCompletions = pgTable("friend_challenge_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  challengeId: varchar("challenge_id").notNull().references(() => friendChallenges.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull().references(() => friendChallengeTasks.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  completedAt: timestamp("completed_at").defaultNow(),
+});
+
+export const insertFriendChallengeCompletionSchema = createInsertSchema(friendChallengeCompletions).omit({ id: true, completedAt: true });
+export type InsertFriendChallengeCompletion = z.infer<typeof insertFriendChallengeCompletionSchema>;
+export type FriendChallengeCompletion = typeof friendChallengeCompletions.$inferSelect;
+
+// Friend challenge with tasks and user details for display
+export const friendChallengeWithDetailsSchema = z.object({
+  id: z.string(),
+  challengerId: z.string(),
+  challengeeId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  challengeType: z.string(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  targetPoints: z.number().nullable(),
+  challengerPoints: z.number().nullable(),
+  challengeePoints: z.number().nullable(),
+  winnerId: z.string().nullable(),
+  status: z.string(),
+  createdAt: z.date().nullable(),
+  challenger: z.object({
+    id: z.string(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    displayName: z.string().nullable(),
+    profileImageUrl: z.string().nullable(),
+  }),
+  challengee: z.object({
+    id: z.string(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    displayName: z.string().nullable(),
+    profileImageUrl: z.string().nullable(),
+  }),
+  tasks: z.array(z.object({
+    id: z.string(),
+    taskName: z.string(),
+    pointValue: z.number(),
+    isCustom: z.boolean().nullable(),
+  })),
+});
+export type FriendChallengeWithDetails = z.infer<typeof friendChallengeWithDetailsSchema>;
+
+// ==================== NOTIFICATIONS ====================
+
 // Notification types enum
 export const notificationTypeEnum = z.enum([
   "friend_request",
@@ -1151,7 +1249,11 @@ export const notificationTypeEnum = z.enum([
   "post_comment",
   "circle_invitation",
   "circle_compete_invite",
-  "task_alert"
+  "task_alert",
+  "friend_challenge",
+  "challenge_accepted",
+  "challenge_declined",
+  "challenge_completed"
 ]);
 export type NotificationType = z.infer<typeof notificationTypeEnum>;
 
