@@ -467,6 +467,7 @@ export interface StoredFriend {
   todayPoints: number;
   weeklyPoints: number;
   totalPoints: number;
+  totalFP: number;
   dayStreak: number;
   weekStreak: number;
   totalBadgesEarned: number;

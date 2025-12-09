@@ -139,6 +139,7 @@ const demoFriends: StoredFriend[] = [
     todayPoints: 45,
     weeklyPoints: 485,
     totalPoints: 2340,
+    totalFP: 1250,
     dayStreak: 12,
     weekStreak: 4,
     totalBadgesEarned: 8,
@@ -154,6 +155,7 @@ const demoFriends: StoredFriend[] = [
     todayPoints: 30,
     weeklyPoints: 320,
     totalPoints: 1580,
+    totalFP: 820,
     dayStreak: 7,
     weekStreak: 2,
     totalBadgesEarned: 5,
@@ -169,6 +171,7 @@ const demoFriends: StoredFriend[] = [
     todayPoints: 55,
     weeklyPoints: 560,
     totalPoints: 4250,
+    totalFP: 2150,
     dayStreak: 21,
     weekStreak: 6,
     totalBadgesEarned: 12,
@@ -184,6 +187,7 @@ const demoFriends: StoredFriend[] = [
     todayPoints: 20,
     weeklyPoints: 280,
     totalPoints: 890,
+    totalFP: 450,
     dayStreak: 5,
     weekStreak: 1,
     totalBadgesEarned: 3,
@@ -3105,6 +3109,7 @@ export default function CommunityPage() {
           todayPoints: Math.floor(Math.random() * 50),
           weeklyPoints: Math.floor(Math.random() * 300) + 100,
           totalPoints: Math.floor(Math.random() * 2000) + 500,
+          totalFP: Math.floor(Math.random() * 1000) + 200,
           dayStreak: Math.floor(Math.random() * 10),
           weekStreak: Math.floor(Math.random() * 4),
           totalBadgesEarned: Math.floor(Math.random() * 5),
@@ -4548,8 +4553,8 @@ export default function CommunityPage() {
             {visibility !== "hidden" && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-3 rounded-md bg-muted">
-                  <p className="text-2xl font-bold">{selectedFriend.weeklyPoints}</p>
-                  <p className="text-sm text-muted-foreground">Weekly pts</p>
+                  <p className="text-2xl font-bold">{selectedFriend.totalFP}</p>
+                  <p className="text-sm text-muted-foreground">Total FP</p>
                 </div>
                 <div className="text-center p-3 rounded-md bg-muted">
                   <p className="text-2xl font-bold">{selectedFriend.weekStreak}</p>
@@ -5550,6 +5555,7 @@ export default function CommunityPage() {
                                         todayPoints: 0,
                                         weeklyPoints: 0,
                                         totalPoints: 0,
+                                        totalFP: 0,
                                         dayStreak: 0,
                                         weekStreak: 0,
                                         totalBadgesEarned: 0,
@@ -5987,7 +5993,7 @@ export default function CommunityPage() {
                           </p>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                             <span className="flex items-center gap-1">
-                              <Trophy className="w-3 h-3" /> {friend.weeklyPoints} pts
+                              <Star className="w-3 h-3" /> {friend.totalFP} FP
                             </span>
                             <span className="flex items-center gap-1">
                               <Flame className="w-3 h-3" /> {friend.dayStreak} days
