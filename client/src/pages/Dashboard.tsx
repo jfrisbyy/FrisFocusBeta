@@ -41,11 +41,12 @@ import {
   StoredFriendWelcomeMessage,
 } from "@/lib/storage";
 
-const getMockWeekData = () => {
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+const getMockWeekData = (weekOffset: number = 0) => {
+  const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStart = addDays(baseWeekStart, weekOffset * 7);
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
-    const isLogged = i < 5;
+    const isLogged = weekOffset <= 0 && i < 5; // Only past weeks have logged data
     return {
       date: format(date, "MMM d"),
       dayName: format(date, "EEE"),
@@ -490,7 +491,13 @@ export default function Dashboard() {
   useEffect(() => {
     // Use mock data during demo/onboarding, otherwise load from storage
     if (useMockData) {
-      setDays(getMockWeekData());
+      setDays(getMockWeekData(weekOffset));
+      // Update week date strings for mock data too
+      const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+      const weekStart = addDays(baseWeekStart, weekOffset * 7);
+      const weekEnd = addDays(weekStart, 6);
+      setWeekStartDate(format(weekStart, "yyyy-MM-dd"));
+      setWeekEndDate(format(weekEnd, "yyyy-MM-dd"));
       setRecentWeeks(getMockRecentWeeks(350));
       setMilestones(getMockMilestones());
       setBoosters(getMockBoosters());

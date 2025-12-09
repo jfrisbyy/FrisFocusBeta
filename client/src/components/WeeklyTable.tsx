@@ -163,7 +163,6 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
                 variant="ghost"
                 size="icon"
                 onClick={() => onWeekChange?.(weekOffset + 1)}
-                disabled={weekOffset >= 0}
                 data-testid="button-next-week"
               >
                 <ChevronRight className="h-4 w-4" />
