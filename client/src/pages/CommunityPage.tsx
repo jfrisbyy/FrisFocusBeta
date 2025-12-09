@@ -135,7 +135,7 @@ const demoFriends: StoredFriend[] = [
     friendId: "friend-1",
     firstName: "Alex",
     lastName: "Chen",
-    profileImageUrl: undefined,
+    profileImageUrl: "https://ui-avatars.com/api/?name=Alex+Chen&background=6366f1&color=fff&size=128",
     todayPoints: 45,
     weeklyPoints: 485,
     totalPoints: 2340,
@@ -150,7 +150,7 @@ const demoFriends: StoredFriend[] = [
     friendId: "friend-2",
     firstName: "Jordan",
     lastName: "Taylor",
-    profileImageUrl: undefined,
+    profileImageUrl: "https://ui-avatars.com/api/?name=Jordan+Taylor&background=22c55e&color=fff&size=128",
     todayPoints: 30,
     weeklyPoints: 320,
     totalPoints: 1580,
@@ -165,7 +165,7 @@ const demoFriends: StoredFriend[] = [
     friendId: "friend-3",
     firstName: "Sam",
     lastName: "Rivera",
-    profileImageUrl: undefined,
+    profileImageUrl: "https://ui-avatars.com/api/?name=Sam+Rivera&background=f59e0b&color=fff&size=128",
     todayPoints: 55,
     weeklyPoints: 560,
     totalPoints: 4250,
@@ -180,7 +180,7 @@ const demoFriends: StoredFriend[] = [
     friendId: "friend-4",
     firstName: "Morgan",
     lastName: "Kim",
-    profileImageUrl: undefined,
+    profileImageUrl: "https://ui-avatars.com/api/?name=Morgan+Kim&background=ec4899&color=fff&size=128",
     todayPoints: 20,
     weeklyPoints: 280,
     totalPoints: 890,
@@ -282,6 +282,7 @@ const demoRequests: FriendRequest[] = [
     id: "req-1",
     firstName: "Casey",
     lastName: "Park",
+    profileImageUrl: "https://ui-avatars.com/api/?name=Casey+Park&background=8b5cf6&color=fff&size=128",
     createdAt: new Date(Date.now() - 86400000).toISOString(),
     direction: "incoming",
   },
@@ -289,6 +290,7 @@ const demoRequests: FriendRequest[] = [
     id: "req-2",
     firstName: "Riley",
     lastName: "Johnson",
+    profileImageUrl: "https://ui-avatars.com/api/?name=Riley+Johnson&background=14b8a6&color=fff&size=128",
     createdAt: new Date(Date.now() - 172800000).toISOString(),
     direction: "outgoing",
   },
@@ -4525,6 +4527,7 @@ export default function CommunityPage() {
           <DialogHeader>
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
+                <AvatarImage src={selectedFriend.profileImageUrl} alt={getName(selectedFriend.firstName, selectedFriend.lastName)} />
                 <AvatarFallback className="text-xl">
                   {getInitials(selectedFriend.firstName, selectedFriend.lastName)}
                 </AvatarFallback>
@@ -5117,6 +5120,7 @@ export default function CommunityPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
+                <AvatarImage src={dmFriend.profileImageUrl} alt={getName(dmFriend.firstName, dmFriend.lastName)} />
                 <AvatarFallback>
                   {getInitials(dmFriend.firstName, dmFriend.lastName)}
                 </AvatarFallback>
@@ -5672,6 +5676,7 @@ export default function CommunityPage() {
                             {index + 1}.
                           </span>
                           <Avatar className="h-6 w-6">
+                            <AvatarImage src={friend.profileImageUrl} alt={getName(friend.firstName, friend.lastName)} />
                             <AvatarFallback className="text-xs">
                               {getInitials(friend.firstName, friend.lastName)}
                             </AvatarFallback>
@@ -5754,6 +5759,7 @@ export default function CommunityPage() {
                       >
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
+                            <AvatarImage src={friend?.profileImageUrl} alt={friend ? getName(friend.firstName, friend.lastName) : "Unknown"} />
                             <AvatarFallback className="text-sm">
                               {friend ? getInitials(friend.firstName, friend.lastName) : "?"}
                             </AvatarFallback>
@@ -5868,6 +5874,7 @@ export default function CommunityPage() {
                   >
                     <div className="flex items-center gap-3">
                       <Avatar>
+                        <AvatarImage src={request.profileImageUrl} alt={getName(request.firstName, request.lastName)} />
                         <AvatarFallback>
                           {getInitials(request.firstName, request.lastName)}
                         </AvatarFallback>
@@ -5913,6 +5920,7 @@ export default function CommunityPage() {
                     data-testid={`request-outgoing-${request.id}`}
                   >
                     <Avatar>
+                      <AvatarImage src={request.profileImageUrl} alt={getName(request.firstName, request.lastName)} />
                       <AvatarFallback>
                         {getInitials(request.firstName, request.lastName)}
                       </AvatarFallback>
@@ -5968,6 +5976,7 @@ export default function CommunityPage() {
                     >
                       <div className="flex items-center gap-3">
                         <Avatar>
+                          <AvatarImage src={friend.profileImageUrl} alt={getName(friend.firstName, friend.lastName)} />
                           <AvatarFallback>
                             {getInitials(friend.firstName, friend.lastName)}
                           </AvatarFallback>
