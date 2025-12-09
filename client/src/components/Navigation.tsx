@@ -8,6 +8,7 @@ import { signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { SiGoogle } from "react-icons/si";
 import ProfileDialog from "@/components/ProfileDialog";
+import NotificationBell from "@/components/NotificationBell";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -78,6 +79,7 @@ export default function Navigation() {
         
         {user ? (
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <button
               onClick={() => setProfileOpen(true)}
               className="flex items-center gap-2 rounded-md hover-elevate active-elevate-2 p-1 -m-1"
