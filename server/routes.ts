@@ -88,6 +88,8 @@ import {
   insertCircleMemberInviteSchema,
   appointments,
   insertAppointmentSchema,
+  insertFriendChallengeSchema,
+  insertFriendChallengeTaskSchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -5161,6 +5163,167 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error deleting notification:", error);
       res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // ==================== FRIEND CHALLENGES ROUTES ====================
+
+  // Create a new friend challenge
+  app.post("/api/friend-challenges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tasks, ...challengeData } = req.body;
+
+      const parsed = insertFriendChallengeSchema.parse({
+        ...challengeData,
+        challengerId: userId,
+        status: "pending",
+      });
+
+      if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+        return res.status(400).json({ error: "At least one task is required" });
+      }
+
+      const parsedTasks = tasks.map((task: any) => 
+        insertFriendChallengeTaskSchema.omit({ id: true, challengeId: true, createdAt: true }).parse(task)
+      );
+
+      const challenge = await storage.createFriendChallenge(parsed, parsedTasks);
+
+      // Create notification for challengee
+      await storage.createNotification({
+        userId: parsed.challengeeId,
+        type: "friend_challenge",
+        title: "New Challenge",
+        message: `You've been challenged to "${parsed.name}"!`,
+        actorId: userId,
+        resourceId: challenge.id,
+        resourceType: "friend_challenge",
+      });
+
+      res.json(challenge);
+    } catch (error) {
+      console.error("Error creating friend challenge:", error);
+      res.status(400).json({ error: "Failed to create friend challenge" });
+    }
+  });
+
+  // List challenges for current user
+  app.get("/api/friend-challenges", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const challenges = await storage.getFriendChallenges(userId);
+      res.json(challenges);
+    } catch (error) {
+      console.error("Error fetching friend challenges:", error);
+      res.status(500).json({ error: "Failed to fetch friend challenges" });
+    }
+  });
+
+  // Get a specific challenge
+  app.get("/api/friend-challenges/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const challengeId = req.params.id;
+      const challenge = await storage.getFriendChallenge(challengeId);
+
+      if (!challenge) {
+        return res.status(404).json({ error: "Challenge not found" });
+      }
+
+      // Only allow challenger or challengee to view
+      if (challenge.challengerId !== userId && challenge.challengeeId !== userId) {
+        return res.status(403).json({ error: "Not authorized to view this challenge" });
+      }
+
+      // Get completions for this challenge
+      const completions = await storage.getChallengeCompletions(challengeId);
+
+      res.json({ ...challenge, completions });
+    } catch (error) {
+      console.error("Error fetching friend challenge:", error);
+      res.status(500).json({ error: "Failed to fetch friend challenge" });
+    }
+  });
+
+  // Accept a challenge
+  app.post("/api/friend-challenges/:id/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const challengeId = req.params.id;
+
+      const challenge = await storage.acceptFriendChallenge(challengeId, userId);
+      if (!challenge) {
+        return res.status(400).json({ error: "Cannot accept this challenge" });
+      }
+
+      // Notify the challenger
+      await storage.createNotification({
+        userId: challenge.challengerId,
+        type: "challenge_accepted",
+        title: "Challenge Accepted",
+        message: `Your challenge "${challenge.name}" has been accepted!`,
+        actorId: userId,
+        resourceId: challenge.id,
+        resourceType: "friend_challenge",
+      });
+
+      res.json(challenge);
+    } catch (error) {
+      console.error("Error accepting friend challenge:", error);
+      res.status(500).json({ error: "Failed to accept friend challenge" });
+    }
+  });
+
+  // Decline a challenge
+  app.post("/api/friend-challenges/:id/decline", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const challengeId = req.params.id;
+
+      const challenge = await storage.declineFriendChallenge(challengeId, userId);
+      if (!challenge) {
+        return res.status(400).json({ error: "Cannot decline this challenge" });
+      }
+
+      // Notify the challenger
+      await storage.createNotification({
+        userId: challenge.challengerId,
+        type: "challenge_declined",
+        title: "Challenge Declined",
+        message: `Your challenge "${challenge.name}" was declined.`,
+        actorId: userId,
+        resourceId: challenge.id,
+        resourceType: "friend_challenge",
+      });
+
+      res.json(challenge);
+    } catch (error) {
+      console.error("Error declining friend challenge:", error);
+      res.status(500).json({ error: "Failed to decline friend challenge" });
+    }
+  });
+
+  // Complete a task in a challenge
+  app.post("/api/friend-challenges/:id/complete-task", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const challengeId = req.params.id;
+      const { taskId } = req.body;
+
+      if (!taskId) {
+        return res.status(400).json({ error: "taskId is required" });
+      }
+
+      const completion = await storage.completeChallengeTask(challengeId, taskId, userId);
+      if (!completion) {
+        return res.status(400).json({ error: "Cannot complete this task" });
+      }
+
+      res.json(completion);
+    } catch (error) {
+      console.error("Error completing challenge task:", error);
+      res.status(500).json({ error: "Failed to complete challenge task" });
     }
   });
 
