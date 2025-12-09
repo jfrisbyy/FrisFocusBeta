@@ -6,6 +6,15 @@ import sgMail from '@sendgrid/mail';
 let connectionSettings: any;
 
 async function getCredentials() {
+  // First, try to use SENDGRID_API_KEY environment variable
+  const envApiKey = process.env.SENDGRID_API_KEY;
+  const envFromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@frisfocus.app';
+  
+  if (envApiKey && envApiKey.startsWith('SG.')) {
+    return { apiKey: envApiKey, email: envFromEmail };
+  }
+  
+  // Fall back to Replit connector
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -28,7 +37,7 @@ async function getCredentials() {
   ).then(res => res.json()).then(data => data.items?.[0]);
 
   if (!connectionSettings || (!connectionSettings.settings.api_key || !connectionSettings.settings.from_email)) {
-    throw new Error('SendGrid not connected');
+    throw new Error('SendGrid not connected. Please set SENDGRID_API_KEY environment variable.');
   }
   return { apiKey: connectionSettings.settings.api_key, email: connectionSettings.settings.from_email };
 }
