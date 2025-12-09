@@ -1107,6 +1107,11 @@ export default function CommunityPage() {
   const [cheerlineFriend, setCheerlineFriend] = useState<StoredFriend | null>(null);
   const [cheerlineMessage, setCheerlineMessage] = useState("");
   
+  // Demo friend challenges state (modifiable in demo mode)
+  const [demoChallenges, setDemoChallenges] = useState<DemoFriendChallenge[]>(demoFriendChallenges);
+  const [expandedPendingChallenge, setExpandedPendingChallenge] = useState<string | null>(null);
+  const [editingChallenge, setEditingChallenge] = useState<DemoFriendChallenge | null>(null);
+  
   // Friend challenge dialog state
   const [friendChallengeFriend, setFriendChallengeFriend] = useState<StoredFriend | null>(null);
   const [friendChallengeName, setFriendChallengeName] = useState("");
@@ -5627,8 +5632,26 @@ export default function CommunityPage() {
 
           {/* Friend Challenges Dashboard */}
           {(() => {
-            const challengeData = isDemo ? demoFriendChallenges : (friendChallengesQuery.data || []);
+            const challengeData = isDemo ? demoChallenges : (friendChallengesQuery.data || []);
             const currentUserId = isDemo ? "demo-user" : user?.id;
+            
+            // Demo mode task completion handler
+            const handleDemoTaskComplete = (challengeId: string, taskId: string, pointValue: number) => {
+              setDemoChallenges(prev => prev.map(challenge => {
+                if (challenge.id !== challengeId) return challenge;
+                const isChallenger = challenge.challengerId === "demo-user";
+                return {
+                  ...challenge,
+                  challengerPoints: isChallenger 
+                    ? (challenge.challengerPoints || 0) + pointValue 
+                    : challenge.challengerPoints,
+                  challengeePoints: !isChallenger 
+                    ? (challenge.challengeePoints || 0) + pointValue 
+                    : challenge.challengeePoints,
+                };
+              }));
+              toast({ title: "Task completed!", description: `+${pointValue} points added to your score!` });
+            };
             
             return (
             <Card>
@@ -5705,19 +5728,58 @@ export default function CommunityPage() {
                                     ? `Ends ${challenge.endDate ? new Date(challenge.endDate).toLocaleDateString() : 'TBD'}`
                                     : 'Ongoing'}
                                 </span>
-                                <span className="flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-auto py-0 px-1 text-muted-foreground"
+                                  onClick={() => setExpandedPendingChallenge(
+                                    expandedPendingChallenge === challenge.id ? null : challenge.id
+                                  )}
+                                  data-testid={`button-expand-challenge-${challenge.id}`}
+                                >
+                                  <CheckCircle className="w-3 h-3 mr-1" />
                                   {challenge.tasks.length} tasks
-                                </span>
+                                  {expandedPendingChallenge === challenge.id ? (
+                                    <ChevronUp className="w-3 h-3 ml-1" />
+                                  ) : (
+                                    <ChevronDown className="w-3 h-3 ml-1" />
+                                  )}
+                                </Button>
                               </div>
+                              
+                              {/* Expandable task details */}
+                              {expandedPendingChallenge === challenge.id && (
+                                <div className="space-y-2 pt-2 border-t">
+                                  <p className="text-xs font-medium text-muted-foreground">Challenge tasks:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {challenge.tasks.map(task => (
+                                      <Badge key={task.id} variant="outline" className="text-xs">
+                                        {task.taskName} (+{task.pointValue})
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
                               <div className="flex items-center gap-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => acceptChallengeMutation.mutate(challenge.id)}
-                                  disabled={acceptChallengeMutation.isPending}
+                                  onClick={() => {
+                                    if (isDemo) {
+                                      setDemoChallenges(prev => prev.map(c => 
+                                        c.id === challenge.id 
+                                          ? { ...c, status: 'active', startDate: new Date().toISOString(), challengerPoints: 0, challengeePoints: 0 }
+                                          : c
+                                      ));
+                                      toast({ title: "Challenge accepted!", description: "The competition has begun!" });
+                                    } else {
+                                      acceptChallengeMutation.mutate(challenge.id);
+                                    }
+                                  }}
+                                  disabled={!isDemo && acceptChallengeMutation.isPending}
                                   data-testid={`button-accept-challenge-${challenge.id}`}
                                 >
-                                  {acceptChallengeMutation.isPending ? (
+                                  {!isDemo && acceptChallengeMutation.isPending ? (
                                     <Loader2 className="w-4 h-4 animate-spin mr-1" />
                                   ) : (
                                     <Check className="w-4 h-4 mr-1" />
@@ -5727,11 +5789,18 @@ export default function CommunityPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => declineChallengeMutation.mutate(challenge.id)}
-                                  disabled={declineChallengeMutation.isPending}
+                                  onClick={() => {
+                                    if (isDemo) {
+                                      setDemoChallenges(prev => prev.filter(c => c.id !== challenge.id));
+                                      toast({ title: "Challenge declined" });
+                                    } else {
+                                      declineChallengeMutation.mutate(challenge.id);
+                                    }
+                                  }}
+                                  disabled={!isDemo && declineChallengeMutation.isPending}
                                   data-testid={`button-decline-challenge-${challenge.id}`}
                                 >
-                                  {declineChallengeMutation.isPending ? (
+                                  {!isDemo && declineChallengeMutation.isPending ? (
                                     <Loader2 className="w-4 h-4 animate-spin mr-1" />
                                   ) : (
                                     <X className="w-4 h-4 mr-1" />
@@ -5821,10 +5890,22 @@ export default function CommunityPage() {
                                       vs {opponent.displayName || `${opponent.firstName} ${opponent.lastName}`.trim()}
                                     </p>
                                   </div>
-                                  <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
-                                    <Flame className="w-3 h-3 mr-1" />
-                                    Active
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    {isDemo && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => setEditingChallenge(challenge)}
+                                        data-testid={`button-edit-challenge-${challenge.id}`}
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">
+                                      <Flame className="w-3 h-3 mr-1" />
+                                      Active
+                                    </Badge>
+                                  </div>
                                 </div>
 
                                 {/* Score display */}
@@ -5852,11 +5933,17 @@ export default function CommunityPage() {
                                         key={task.id}
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => completeTaskChallengeMutation.mutate({ 
-                                          challengeId: challenge.id, 
-                                          taskId: task.id 
-                                        })}
-                                        disabled={completeTaskChallengeMutation.isPending}
+                                        onClick={() => {
+                                          if (isDemo) {
+                                            handleDemoTaskComplete(challenge.id, task.id, task.pointValue);
+                                          } else {
+                                            completeTaskChallengeMutation.mutate({ 
+                                              challengeId: challenge.id, 
+                                              taskId: task.id 
+                                            });
+                                          }
+                                        }}
+                                        disabled={!isDemo && completeTaskChallengeMutation.isPending}
                                         data-testid={`button-complete-task-${task.id}`}
                                       >
                                         <CheckCircle className="w-3 h-3 mr-1" />
