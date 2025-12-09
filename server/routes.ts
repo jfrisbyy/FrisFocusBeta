@@ -511,18 +511,36 @@ export async function registerRoutes(
     }
   });
 
-  // Serve uploaded objects
-  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+  // Serve uploaded objects - allow public objects without auth
+  app.get("/objects/:objectPath(*)", async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
       const { ObjectStorageService, ObjectNotFoundError } = await import("./objectStorage");
-      const { ObjectPermission } = await import("./objectAcl");
+      const { ObjectPermission, getObjectAclPolicy } = await import("./objectAcl");
       const objectStorageService = new ObjectStorageService();
       
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      
+      // Check ACL - if public, serve without auth
+      const aclPolicy = await getObjectAclPolicy(objectFile);
+      if (aclPolicy?.visibility === "public") {
+        return objectStorageService.downloadObject(objectFile, res);
+      }
+      
+      // For private objects, require authentication
+      // Try to get user from Firebase token if present
+      let userId: string | undefined;
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.substring(7);
+          const decodedToken = await verifyFirebaseToken(token);
+          userId = decodedToken?.uid;
+        } catch {}
+      }
+      
       const canAccess = await objectStorageService.canAccessObjectEntity({
         objectFile,
-        userId: userId,
+        userId,
         requestedPermission: ObjectPermission.READ,
       });
       
@@ -2006,7 +2024,27 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     try {
       const userId = req.user.claims.sub;
       const parsed = insertCommunityPostSchema.parse({ ...req.body, authorId: userId });
-      const [post] = await db.insert(communityPosts).values(parsed).returning();
+      
+      // Normalize image URL if provided (convert signed GCS URL to /objects/ path)
+      let normalizedImageUrl = parsed.imageUrl;
+      if (normalizedImageUrl) {
+        const { ObjectStorageService } = await import("./objectStorage");
+        const objectStorageService = new ObjectStorageService();
+        try {
+          normalizedImageUrl = await objectStorageService.trySetObjectEntityAclPolicy(normalizedImageUrl, {
+            owner: userId,
+            visibility: "public", // Posts are visible to friends/public
+          });
+        } catch (error) {
+          console.error("Error normalizing image URL:", error);
+          // Keep the original URL if normalization fails
+        }
+      }
+      
+      const [post] = await db.insert(communityPosts).values({
+        ...parsed,
+        imageUrl: normalizedImageUrl,
+      }).returning();
 
       // Get author info for response
       const [author] = await db.select().from(users).where(eq(users.id, userId));
