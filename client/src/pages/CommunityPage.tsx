@@ -2918,15 +2918,32 @@ export default function CommunityPage() {
 
   const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
+  const [fetchedComments, setFetchedComments] = useState<Record<string, StoredCirclePostComment[]>>({});
+
+  const fetchPostComments = async (postId: string) => {
+    if (isDemo || fetchedComments[postId]) return;
+    try {
+      const res = await apiRequest("GET", `/api/community/posts/${postId}/comments`);
+      const comments = await res.json();
+      setFetchedComments(prev => ({ ...prev, [postId]: comments }));
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    }
+  };
 
   const handleAddComment = (postId: string) => {
     if (!newComment.trim()) return;
     
     if (!isDemo) {
       addCommentMutation.mutate({ postId, content: newComment.trim() }, {
-        onSuccess: () => {
+        onSuccess: (newCommentData) => {
           setNewComment("");
           setCommentingPostId(null);
+          setFetchedComments(prev => ({
+            ...prev,
+            [postId]: [...(prev[postId] || []), newCommentData]
+          }));
+          queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
           toast({ title: "Comment added" });
         },
         onError: () => {
@@ -2988,6 +3005,16 @@ export default function CommunityPage() {
   };
 
   const handleDeleteComment = (postId: string, commentId: string) => {
+    if (!isDemo) {
+      setFetchedComments(prev => ({
+        ...prev,
+        [postId]: (prev[postId] || []).filter(c => c.id !== commentId)
+      }));
+      queryClient.invalidateQueries({ queryKey: ['/api/community/posts'] });
+      toast({ title: "Comment deleted" });
+      return;
+    }
+    
     setCommunityPosts(communityPosts.map(post => {
       if (post.id !== postId) return post;
       return { ...post, comments: post.comments.filter(c => c.id !== commentId) };
@@ -8482,7 +8509,13 @@ export default function CommunityPage() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => setCommentingPostId(commentingPostId === post.id ? null : post.id)}
+                          onClick={() => {
+                            const newPostId = commentingPostId === post.id ? null : post.id;
+                            setCommentingPostId(newPostId);
+                            if (newPostId && !isDemo) {
+                              fetchPostComments(newPostId);
+                            }
+                          }}
                           data-testid={`button-comment-${post.id}`}
                         >
                           <MessageCircle className="w-4 h-4 mr-1" />
@@ -8505,9 +8538,9 @@ export default function CommunityPage() {
                         </div>
                       )}
                       
-                      {post.comments.length > 0 && (
+                      {((isDemo ? post.comments : fetchedComments[post.id]) || []).length > 0 && (
                         <div className="mt-4 space-y-3 pl-4 border-l-2 border-muted">
-                          {post.comments.map((comment) => (
+                          {((isDemo ? post.comments : fetchedComments[post.id]) || []).map((comment) => (
                             <div key={comment.id} className="flex gap-2" data-testid={`feed-comment-${comment.id}`}>
                               {comment.authorId ? (
                                 <ProfileHoverCard
@@ -8529,7 +8562,7 @@ export default function CommunityPage() {
                                 <div className="flex items-baseline gap-2 flex-wrap">
                                   <span className="font-medium text-sm">{comment.authorName}</span>
                                   <span className="text-xs text-muted-foreground">{formatTime(comment.createdAt)}</span>
-                                  {comment.authorId === "you" && (
+                                  {comment.authorId === (isDemo ? "you" : user?.id) && (
                                     <Button
                                       variant="ghost"
                                       size="icon"
