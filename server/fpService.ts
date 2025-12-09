@@ -619,8 +619,13 @@ export async function checkAndAwardWeeklyTriggers(
     if (within5Result.success) results.push(within5Result);
   }
   
-  const noPenaltyResults = await awardNoPenaltyStreakMilestones(userId);
-  results.push(...noPenaltyResults);
+  // Only award no-penalty streak milestones on Monday (after the previous week ends)
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday
+  if (dayOfWeek === 1) {
+    const noPenaltyResults = await awardNoPenaltyStreakMilestones(userId);
+    results.push(...noPenaltyResults);
+  }
   
   return results;
 }

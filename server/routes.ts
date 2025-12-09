@@ -1008,10 +1008,8 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const [inviter] = await db.select().from(users).where(eq(users.id, userId));
       const inviterName = inviter?.displayName || `${inviter?.firstName || ''} ${inviter?.lastName || ''}`.trim() || "A FrisFocus user";
 
-      // Get app URL from request
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers.host || 'frisfocus.replit.app';
-      const appUrl = `${protocol}://${host}`;
+      // Get app URL - always use frisfocus.com domain
+      const appUrl = 'https://frisfocus.com';
 
       // Send invitation email
       const emailSent = await sendInvitationEmail({
