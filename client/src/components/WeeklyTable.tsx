@@ -185,6 +185,20 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="center">
+                  <div className="p-2 border-b">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        onWeekChange?.(0);
+                        setWeekPickerOpen(false);
+                      }}
+                      data-testid="button-go-today"
+                    >
+                      Today
+                    </Button>
+                  </div>
                   <CalendarPicker
                     mode="single"
                     selected={firstDayDate}
