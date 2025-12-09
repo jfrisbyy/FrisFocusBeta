@@ -294,6 +294,140 @@ const demoRequests: FriendRequest[] = [
   },
 ];
 
+interface DemoFriendChallenge {
+  id: string;
+  challengerId: string;
+  challengeeId: string;
+  name: string;
+  description: string | null;
+  challengeType: string;
+  startDate: string | null;
+  endDate: string | null;
+  targetPoints: number | null;
+  challengerPoints: number | null;
+  challengeePoints: number | null;
+  winnerId: string | null;
+  status: string;
+  createdAt: string | null;
+  challenger: { id: string; firstName: string | null; lastName: string | null; displayName: string | null; profileImageUrl: string | null };
+  challengee: { id: string; firstName: string | null; lastName: string | null; displayName: string | null; profileImageUrl: string | null };
+  tasks: { id: string; taskName: string; pointValue: number; isCustom: boolean | null }[];
+}
+
+const demoFriendChallenges: DemoFriendChallenge[] = [
+  {
+    id: "demo-challenge-1",
+    challengerId: "friend-1",
+    challengeeId: "demo-user",
+    name: "Weekly Workout Warrior",
+    description: "Let's see who can earn the most points from workouts this week!",
+    challengeType: "target_points",
+    startDate: null,
+    endDate: null,
+    targetPoints: 200,
+    challengerPoints: null,
+    challengeePoints: null,
+    winnerId: null,
+    status: "pending",
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    challenger: { id: "friend-1", firstName: "Alex", lastName: "Chen", displayName: "Alex Chen", profileImageUrl: null },
+    challengee: { id: "demo-user", firstName: "You", lastName: "", displayName: "You", profileImageUrl: null },
+    tasks: [
+      { id: "task-1", taskName: "Morning workout", pointValue: 15, isCustom: false },
+      { id: "task-2", taskName: "Evening run", pointValue: 10, isCustom: false },
+      { id: "task-3", taskName: "Stretching", pointValue: 5, isCustom: false },
+    ],
+  },
+  {
+    id: "demo-challenge-2",
+    challengerId: "demo-user",
+    challengeeId: "friend-2",
+    name: "Reading Race",
+    description: "First to 150 reading points wins!",
+    challengeType: "target_points",
+    startDate: new Date(Date.now() - 86400000 * 3).toISOString(),
+    endDate: null,
+    targetPoints: 150,
+    challengerPoints: 85,
+    challengeePoints: 60,
+    winnerId: null,
+    status: "active",
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+    challenger: { id: "demo-user", firstName: "You", lastName: "", displayName: "You", profileImageUrl: null },
+    challengee: { id: "friend-2", firstName: "Jordan", lastName: "Taylor", displayName: "Jordan Taylor", profileImageUrl: null },
+    tasks: [
+      { id: "task-4", taskName: "Read 30 minutes", pointValue: 10, isCustom: false },
+      { id: "task-5", taskName: "Journaling", pointValue: 5, isCustom: false },
+    ],
+  },
+  {
+    id: "demo-challenge-3",
+    challengerId: "friend-3",
+    challengeeId: "demo-user",
+    name: "Morning Routine Masters",
+    description: "Who has the better morning routine?",
+    challengeType: "target_points",
+    startDate: new Date(Date.now() - 86400000 * 5).toISOString(),
+    endDate: null,
+    targetPoints: 100,
+    challengerPoints: 45,
+    challengeePoints: 70,
+    winnerId: null,
+    status: "active",
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    challenger: { id: "friend-3", firstName: "Sam", lastName: "Rivera", displayName: "Sam Rivera", profileImageUrl: null },
+    challengee: { id: "demo-user", firstName: "You", lastName: "", displayName: "You", profileImageUrl: null },
+    tasks: [
+      { id: "task-6", taskName: "Wake up early", pointValue: 10, isCustom: false },
+      { id: "task-7", taskName: "Meditate", pointValue: 10, isCustom: false },
+    ],
+  },
+  {
+    id: "demo-challenge-4",
+    challengerId: "demo-user",
+    challengeeId: "friend-4",
+    name: "Fitness Face-off",
+    description: "Competed for the highest fitness points",
+    challengeType: "target_points",
+    startDate: new Date(Date.now() - 86400000 * 14).toISOString(),
+    endDate: new Date(Date.now() - 86400000 * 2).toISOString(),
+    targetPoints: 100,
+    challengerPoints: 105,
+    challengeePoints: 88,
+    winnerId: "demo-user",
+    status: "completed",
+    createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
+    challenger: { id: "demo-user", firstName: "You", lastName: "", displayName: "You", profileImageUrl: null },
+    challengee: { id: "friend-4", firstName: "Morgan", lastName: "Kim", displayName: "Morgan Kim", profileImageUrl: null },
+    tasks: [
+      { id: "task-8", taskName: "Gym session", pointValue: 20, isCustom: false },
+      { id: "task-9", taskName: "Walk 10k steps", pointValue: 15, isCustom: false },
+    ],
+  },
+  {
+    id: "demo-challenge-5",
+    challengerId: "friend-2",
+    challengeeId: "demo-user",
+    name: "Productivity Sprint",
+    description: "One week productivity challenge",
+    challengeType: "target_points",
+    startDate: new Date(Date.now() - 86400000 * 10).toISOString(),
+    endDate: new Date(Date.now() - 86400000 * 3).toISOString(),
+    targetPoints: 80,
+    challengerPoints: 95,
+    challengeePoints: 72,
+    winnerId: "friend-2",
+    status: "completed",
+    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+    challenger: { id: "friend-2", firstName: "Jordan", lastName: "Taylor", displayName: "Jordan Taylor", profileImageUrl: null },
+    challengee: { id: "demo-user", firstName: "You", lastName: "", displayName: "You", profileImageUrl: null },
+    tasks: [
+      { id: "task-10", taskName: "Focus session", pointValue: 15, isCustom: false },
+      { id: "task-11", taskName: "Complete daily tasks", pointValue: 10, isCustom: false },
+    ],
+  },
+];
+
 const demoCircles: StoredCircle[] = [
   {
     id: "circle-1",
@@ -5492,7 +5626,11 @@ export default function CommunityPage() {
           </Card>
 
           {/* Friend Challenges Dashboard */}
-          {!isDemo && (
+          {(() => {
+            const challengeData = isDemo ? demoFriendChallenges : (friendChallengesQuery.data || []);
+            const currentUserId = isDemo ? "demo-user" : user?.id;
+            
+            return (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -5504,11 +5642,11 @@ export default function CommunityPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {friendChallengesQuery.isLoading ? (
+                {!isDemo && friendChallengesQuery.isLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : !friendChallengesQuery.data || friendChallengesQuery.data.length === 0 ? (
+                ) : challengeData.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <Swords className="w-10 h-10 text-muted-foreground mb-3" />
                     <p className="text-muted-foreground">
@@ -5519,8 +5657,8 @@ export default function CommunityPage() {
                   <>
                     {/* Pending Challenges (Incoming) */}
                     {(() => {
-                      const pendingIncoming = friendChallengesQuery.data.filter(
-                        c => c.status === 'pending' && c.challengeeId === user?.id
+                      const pendingIncoming = challengeData.filter(
+                        c => c.status === 'pending' && c.challengeeId === currentUserId
                       );
                       if (pendingIncoming.length === 0) return null;
                       return (
@@ -5609,8 +5747,8 @@ export default function CommunityPage() {
 
                     {/* Pending Challenges (Outgoing) */}
                     {(() => {
-                      const pendingOutgoing = friendChallengesQuery.data.filter(
-                        c => c.status === 'pending' && c.challengerId === user?.id
+                      const pendingOutgoing = challengeData.filter(
+                        c => c.status === 'pending' && c.challengerId === currentUserId
                       );
                       if (pendingOutgoing.length === 0) return null;
                       return (
@@ -5653,7 +5791,7 @@ export default function CommunityPage() {
 
                     {/* Active Challenges */}
                     {(() => {
-                      const activeChallenges = friendChallengesQuery.data.filter(c => c.status === 'active');
+                      const activeChallenges = challengeData.filter(c => c.status === 'active');
                       if (activeChallenges.length === 0) return null;
                       return (
                         <div className="space-y-3">
@@ -5662,7 +5800,7 @@ export default function CommunityPage() {
                             Active Challenges ({activeChallenges.length})
                           </h3>
                           {activeChallenges.map(challenge => {
-                            const isChallenger = challenge.challengerId === user?.id;
+                            const isChallenger = challenge.challengerId === currentUserId;
                             const myPoints = isChallenger ? (challenge.challengerPoints || 0) : (challenge.challengeePoints || 0);
                             const opponentPoints = isChallenger ? (challenge.challengeePoints || 0) : (challenge.challengerPoints || 0);
                             const opponent = isChallenger ? challenge.challengee : challenge.challenger;
@@ -5736,7 +5874,7 @@ export default function CommunityPage() {
 
                     {/* Completed Challenges */}
                     {(() => {
-                      const completedChallenges = friendChallengesQuery.data.filter(c => c.status === 'completed');
+                      const completedChallenges = challengeData.filter(c => c.status === 'completed');
                       if (completedChallenges.length === 0) return null;
                       return (
                         <div className="space-y-3">
@@ -5745,11 +5883,11 @@ export default function CommunityPage() {
                             Completed ({completedChallenges.length})
                           </h3>
                           {completedChallenges.map(challenge => {
-                            const isChallenger = challenge.challengerId === user?.id;
+                            const isChallenger = challenge.challengerId === currentUserId;
                             const myPoints = isChallenger ? (challenge.challengerPoints || 0) : (challenge.challengeePoints || 0);
                             const opponentPoints = isChallenger ? (challenge.challengeePoints || 0) : (challenge.challengerPoints || 0);
                             const opponent = isChallenger ? challenge.challengee : challenge.challenger;
-                            const isWinner = challenge.winnerId === user?.id;
+                            const isWinner = challenge.winnerId === currentUserId;
                             const isTie = !challenge.winnerId;
 
                             return (
@@ -5790,7 +5928,8 @@ export default function CommunityPage() {
                 )}
               </CardContent>
             </Card>
-          )}
+          );
+          })()}
         </TabsContent>
 
         <TabsContent value="circles" className="space-y-6 mt-4">
