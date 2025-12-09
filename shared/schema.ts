@@ -1116,3 +1116,24 @@ export const taskTotalEntrySchema = z.object({
   count: z.number(),
 });
 export type TaskTotalEntry = z.infer<typeof taskTotalEntrySchema>;
+
+// ==================== APPOINTMENTS (Calendar) ====================
+
+// Appointments - calendar appointments for users
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  startTime: varchar("start_time").notNull(), // HH:MM format (24-hour)
+  endTime: varchar("end_time"), // HH:MM format (optional)
+  title: varchar("title").notNull(),
+  description: text("description"),
+  category: varchar("category"), // Optional category/color coding
+  isAllDay: boolean("is_all_day").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;

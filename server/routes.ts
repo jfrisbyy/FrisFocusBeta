@@ -86,6 +86,8 @@ import {
   insertCompetitionMessageSchema,
   circleMemberInvites,
   insertCircleMemberInviteSchema,
+  appointments,
+  insertAppointmentSchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -4773,6 +4775,107 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error fetching user stats:", error);
       res.status(500).json({ error: "Failed to fetch user stats" });
+    }
+  });
+
+  // ==================== APPOINTMENTS API ====================
+
+  // Get appointments for a date range
+  app.get("/api/appointments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { startDate, endDate } = req.query;
+      
+      let query = db.select().from(appointments).where(eq(appointments.userId, userId));
+      
+      if (startDate && endDate) {
+        query = db.select().from(appointments).where(
+          and(
+            eq(appointments.userId, userId),
+            and(
+              or(eq(appointments.date, startDate as string), and(eq(appointments.date, startDate as string), eq(appointments.date, endDate as string))),
+              or(eq(appointments.date, endDate as string), and(eq(appointments.date, startDate as string), eq(appointments.date, endDate as string)))
+            )
+          )
+        );
+        // Simple approach: fetch all and filter in JS for date range
+        const allAppointments = await db.select().from(appointments).where(eq(appointments.userId, userId));
+        const filtered = allAppointments.filter(apt => apt.date >= (startDate as string) && apt.date <= (endDate as string));
+        return res.json(filtered.sort((a, b) => {
+          if (a.date !== b.date) return a.date.localeCompare(b.date);
+          return a.startTime.localeCompare(b.startTime);
+        }));
+      }
+      
+      const result = await query.orderBy(desc(appointments.date));
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
+    }
+  });
+
+  // Create a new appointment
+  app.post("/api/appointments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertAppointmentSchema.parse({
+        ...req.body,
+        userId,
+      });
+      const [appointment] = await db.insert(appointments).values(parsed).returning();
+      res.json(appointment);
+    } catch (error) {
+      console.error("Error creating appointment:", error);
+      res.status(400).json({ error: "Failed to create appointment" });
+    }
+  });
+
+  // Update an appointment
+  app.put("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const appointmentId = req.params.id;
+      
+      // Verify ownership
+      const [existing] = await db.select().from(appointments).where(
+        and(eq(appointments.id, appointmentId), eq(appointments.userId, userId))
+      );
+      if (!existing) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      const { title, description, date, startTime, endTime, category, isAllDay } = req.body;
+      const [updated] = await db.update(appointments)
+        .set({ title, description, date, startTime, endTime, category, isAllDay, updatedAt: new Date() })
+        .where(eq(appointments.id, appointmentId))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating appointment:", error);
+      res.status(400).json({ error: "Failed to update appointment" });
+    }
+  });
+
+  // Delete an appointment
+  app.delete("/api/appointments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const appointmentId = req.params.id;
+      
+      // Verify ownership
+      const [existing] = await db.select().from(appointments).where(
+        and(eq(appointments.id, appointmentId), eq(appointments.userId, userId))
+      );
+      if (!existing) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      await db.delete(appointments).where(eq(appointments.id, appointmentId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      res.status(400).json({ error: "Failed to delete appointment" });
     }
   });
 
