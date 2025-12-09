@@ -84,6 +84,8 @@ import {
   insertCircleCompetitionInviteSchema,
   competitionMessages,
   insertCompetitionMessageSchema,
+  circleMemberInvites,
+  insertCircleMemberInviteSchema,
 } from "@shared/schema";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
@@ -2360,6 +2362,208 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error updating member role:", error);
       res.status(500).json({ error: "Failed to update member role" });
+    }
+  });
+
+  // ==================== CIRCLE MEMBER INVITES API ====================
+
+  // Send circle member invite
+  app.post("/api/circles/:id/invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const { inviteeId } = req.body;
+
+      if (!inviteeId) {
+        return res.status(400).json({ error: "inviteeId is required" });
+      }
+
+      // Check if user is a member of the circle
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to invite others" });
+      }
+
+      // Check if invitee already is a member
+      const [existingMember] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, inviteeId))
+      );
+      if (existingMember) {
+        return res.status(400).json({ error: "User is already a member of this circle" });
+      }
+
+      // Check if there's already a pending invite
+      const [existingInvite] = await db.select().from(circleMemberInvites).where(
+        and(
+          eq(circleMemberInvites.circleId, circleId),
+          eq(circleMemberInvites.inviteeId, inviteeId),
+          eq(circleMemberInvites.status, "pending")
+        )
+      );
+      if (existingInvite) {
+        return res.status(400).json({ error: "An invite is already pending for this user" });
+      }
+
+      // Create the invite
+      const [invite] = await db.insert(circleMemberInvites).values({
+        circleId,
+        inviterId: userId,
+        inviteeId,
+        status: "pending",
+      }).returning();
+
+      res.json(invite);
+    } catch (error) {
+      console.error("Error sending circle invite:", error);
+      res.status(500).json({ error: "Failed to send invite" });
+    }
+  });
+
+  // Get pending circle invites for current user (invites they received)
+  app.get("/api/circle-invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      const invites = await db.select().from(circleMemberInvites).where(
+        and(eq(circleMemberInvites.inviteeId, userId), eq(circleMemberInvites.status, "pending"))
+      );
+
+      // Enrich with circle and inviter info
+      const invitesWithInfo = await Promise.all(invites.map(async (invite) => {
+        const [circle] = await db.select().from(circles).where(eq(circles.id, invite.circleId));
+        const [inviter] = await db.select().from(users).where(eq(users.id, invite.inviterId));
+        return {
+          ...invite,
+          circle: circle ? { id: circle.id, name: circle.name, description: circle.description } : null,
+          inviter: inviter ? {
+            id: inviter.id,
+            firstName: inviter.firstName,
+            lastName: inviter.lastName,
+            displayName: inviter.displayName,
+            profileImageUrl: inviter.profileImageUrl,
+          } : null,
+        };
+      }));
+
+      res.json(invitesWithInfo);
+    } catch (error) {
+      console.error("Error fetching circle invites:", error);
+      res.status(500).json({ error: "Failed to fetch invites" });
+    }
+  });
+
+  // Get pending outgoing invites for a circle (invites sent from the circle)
+  app.get("/api/circles/:id/invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check if user is a member
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Must be a member to view invites" });
+      }
+
+      const invites = await db.select().from(circleMemberInvites).where(
+        and(eq(circleMemberInvites.circleId, circleId), eq(circleMemberInvites.status, "pending"))
+      );
+
+      // Enrich with invitee info
+      const invitesWithInfo = await Promise.all(invites.map(async (invite) => {
+        const [invitee] = await db.select().from(users).where(eq(users.id, invite.inviteeId));
+        return {
+          ...invite,
+          invitee: invitee ? {
+            id: invitee.id,
+            firstName: invitee.firstName,
+            lastName: invitee.lastName,
+            displayName: invitee.displayName,
+            profileImageUrl: invitee.profileImageUrl,
+          } : null,
+        };
+      }));
+
+      res.json(invitesWithInfo);
+    } catch (error) {
+      console.error("Error fetching circle invites:", error);
+      res.status(500).json({ error: "Failed to fetch invites" });
+    }
+  });
+
+  // Respond to a circle invite (accept/decline)
+  app.put("/api/circle-invites/:inviteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const inviteId = req.params.inviteId;
+      const { action } = req.body;
+
+      if (!action || (action !== "accept" && action !== "decline")) {
+        return res.status(400).json({ error: "Action must be 'accept' or 'decline'" });
+      }
+
+      const [invite] = await db.select().from(circleMemberInvites).where(eq(circleMemberInvites.id, inviteId));
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+
+      if (invite.inviteeId !== userId) {
+        return res.status(403).json({ error: "Not authorized to respond to this invite" });
+      }
+
+      if (invite.status !== "pending") {
+        return res.status(400).json({ error: "Invite is no longer pending" });
+      }
+
+      if (action === "accept") {
+        // Add user as member
+        await db.insert(circleMembers).values({
+          circleId: invite.circleId,
+          userId: userId,
+          role: "member",
+        });
+        await db.update(circleMemberInvites).set({ status: "accepted" }).where(eq(circleMemberInvites.id, inviteId));
+        res.json({ success: true, action: "accepted" });
+      } else {
+        await db.update(circleMemberInvites).set({ status: "declined" }).where(eq(circleMemberInvites.id, inviteId));
+        res.json({ success: true, action: "declined" });
+      }
+    } catch (error) {
+      console.error("Error responding to circle invite:", error);
+      res.status(500).json({ error: "Failed to respond to invite" });
+    }
+  });
+
+  // Cancel a circle invite (inviter can cancel)
+  app.delete("/api/circles/:id/invites/:inviteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const inviteId = req.params.inviteId;
+
+      const [invite] = await db.select().from(circleMemberInvites).where(
+        and(eq(circleMemberInvites.id, inviteId), eq(circleMemberInvites.circleId, circleId))
+      );
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+
+      // Check if user is a member of the circle (any member can cancel)
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership) {
+        return res.status(403).json({ error: "Not authorized to cancel this invite" });
+      }
+
+      await db.delete(circleMemberInvites).where(eq(circleMemberInvites.id, inviteId));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error canceling circle invite:", error);
+      res.status(500).json({ error: "Failed to cancel invite" });
     }
   });
 

@@ -677,6 +677,20 @@ export const insertCircleMemberSchema = createInsertSchema(circleMembers).omit({
 export type InsertCircleMember = z.infer<typeof insertCircleMemberSchema>;
 export type CircleMember = typeof circleMembers.$inferSelect;
 
+// Circle member invites - invitations to join a circle
+export const circleMemberInvites = pgTable("circle_member_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  inviterId: varchar("inviter_id").notNull().references(() => users.id),
+  inviteeId: varchar("invitee_id").notNull().references(() => users.id),
+  status: varchar("status").notNull().default("pending"), // "pending", "accepted", "declined"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCircleMemberInviteSchema = createInsertSchema(circleMemberInvites).omit({ id: true, createdAt: true });
+export type InsertCircleMemberInvite = z.infer<typeof insertCircleMemberInviteSchema>;
+export type CircleMemberInvite = typeof circleMemberInvites.$inferSelect;
+
 // Circle messages (chat)
 export const circleMessages = pgTable("circle_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
