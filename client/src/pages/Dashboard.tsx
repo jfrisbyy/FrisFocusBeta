@@ -46,7 +46,8 @@ const getMockWeekData = (weekOffset: number = 0) => {
   const weekStart = addDays(baseWeekStart, weekOffset * 7);
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
-    const isLogged = weekOffset <= 0 && i < 5; // Only past weeks have logged data
+    // For past weeks, all days have data. For current week, only up to today
+    const isLogged = weekOffset < 0 || (weekOffset === 0 && i < 5);
     return {
       date: format(date, "MMM d"),
       dayName: format(date, "EEE"),
