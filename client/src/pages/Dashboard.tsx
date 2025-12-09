@@ -388,6 +388,7 @@ export default function Dashboard() {
   const [weeklyTodoBonusPoints, setWeeklyTodoBonusPoints] = useState(25);
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
+  const [weekOffset, setWeekOffset] = useState(0);
 
   // Season interfaces
   interface Season {
@@ -1205,7 +1206,12 @@ export default function Dashboard() {
           <EarnedBadgesPanel badges={badges} />
         </div>
         <div className="lg:col-span-2 space-y-6">
-          <WeeklyTable days={days} onDayClick={handleDayClick} />
+          <WeeklyTable 
+            days={days} 
+            onDayClick={handleDayClick} 
+            weekOffset={weekOffset}
+            onWeekChange={setWeekOffset}
+          />
           <AlertsPanel alerts={alerts} />
         </div>
       </div>
