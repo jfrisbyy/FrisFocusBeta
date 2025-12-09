@@ -1959,6 +1959,58 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
   app.get("/api/community/posts", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // Auto-fix ACLs for post images (runs in background, doesn't block response)
+      (async () => {
+        try {
+          const { ObjectStorageService } = await import("./objectStorage");
+          const { setObjectAclPolicy, getObjectAclPolicy } = await import("./objectAcl");
+          const objectStorageService = new ObjectStorageService();
+          
+          // Get user's posts with images
+          const userPostsWithImages = await db.select().from(communityPosts).where(
+            eq(communityPosts.authorId, userId)
+          );
+          
+          for (const post of userPostsWithImages) {
+            if (post.imageUrl && post.imageUrl.startsWith('/objects/')) {
+              try {
+                const objectFile = await objectStorageService.getObjectEntityFile(post.imageUrl);
+                const existingAcl = await getObjectAclPolicy(objectFile);
+                if (!existingAcl || existingAcl.visibility !== "public") {
+                  await setObjectAclPolicy(objectFile, {
+                    owner: post.authorId,
+                    visibility: "public",
+                  });
+                  console.log(`[ACL] Fixed public ACL for post image: ${post.imageUrl}`);
+                }
+              } catch (err) {
+                // Silently ignore - file may not exist
+              }
+            }
+          }
+          
+          // Also fix user's profile image ACL
+          const [currentUser] = await db.select().from(users).where(eq(users.id, userId));
+          if (currentUser?.profileImageUrl?.startsWith('/objects/')) {
+            try {
+              const objectFile = await objectStorageService.getObjectEntityFile(currentUser.profileImageUrl);
+              const existingAcl = await getObjectAclPolicy(objectFile);
+              if (!existingAcl || existingAcl.visibility !== "public") {
+                await setObjectAclPolicy(objectFile, {
+                  owner: userId,
+                  visibility: "public",
+                });
+                console.log(`[ACL] Fixed public ACL for profile image: ${currentUser.profileImageUrl}`);
+              }
+            } catch (err) {
+              // Silently ignore
+            }
+          }
+        } catch (err) {
+          console.error("[ACL] Background ACL fix error:", err);
+        }
+      })();
 
       // Get user's friend IDs
       const friendshipsList = await db.select().from(friendships).where(
