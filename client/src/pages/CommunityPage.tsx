@@ -1172,6 +1172,18 @@ export default function CommunityPage() {
     ],
   });
 
+  // FP Leaderboard state (must be declared before the query that uses it)
+  const [fpLeaderboardMode, setFpLeaderboardMode] = useState<"points" | "fp">("points");
+  const [fpLeaderboardScope, setFpLeaderboardScope] = useState<"friends" | "all">("friends");
+
+  // Reset FP leaderboard state when entering demo mode
+  useEffect(() => {
+    if (isDemo) {
+      setFpLeaderboardMode("points");
+      setFpLeaderboardScope("friends");
+    }
+  }, [isDemo]);
+
   // FP Leaderboard query
   interface FpLeaderboardEntry {
     userId: string;
@@ -2326,16 +2338,6 @@ export default function CommunityPage() {
   // Leaderboard view mode (day/week/all time)
   const [leaderboardViewMode, setLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
   const [friendsLeaderboardViewMode, setFriendsLeaderboardViewMode] = useState<"day" | "week" | "alltime">("week");
-  const [fpLeaderboardMode, setFpLeaderboardMode] = useState<"points" | "fp">("points");
-  const [fpLeaderboardScope, setFpLeaderboardScope] = useState<"friends" | "all">("friends");
-  
-  // Reset FP leaderboard state when entering demo mode
-  useEffect(() => {
-    if (isDemo) {
-      setFpLeaderboardMode("points");
-      setFpLeaderboardScope("friends");
-    }
-  }, [isDemo]);
   
   const [expandedDMFriend, setExpandedDMFriend] = useState<string | null>(null);
   const [dmMessages, setDmMessages] = useState<Record<string, string>>({});
