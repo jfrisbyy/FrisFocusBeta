@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { eq, and, gte, sql } from "drizzle-orm";
-import { users, fpActivityLog, type FpEventType, type FpActivityLog } from "@shared/schema";
+import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { users, fpActivityLog, userDailyLogs, userHabitSettings, type FpEventType, type FpActivityLog } from "@shared/schema";
 import { fpRules } from "@shared/fpRules";
 
 export interface FpAwardResult {
@@ -262,4 +262,365 @@ export async function getFpLeaderboard(
       rank: index + 1,
     };
   });
+}
+
+// ==================== STREAK CALCULATION HELPERS ====================
+
+function formatDateString(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function getStartOfWeek(date: Date): Date {
+  const d = new Date(date);
+  const dayOfWeek = d.getDay();
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export async function getLoggingStreak(userId: string): Promise<number> {
+  const logs = await db.select({ date: userDailyLogs.date })
+    .from(userDailyLogs)
+    .where(eq(userDailyLogs.userId, userId))
+    .orderBy(desc(userDailyLogs.date));
+  
+  if (logs.length === 0) return 0;
+  
+  const today = formatDateString(new Date());
+  const yesterday = formatDateString(new Date(Date.now() - 86400000));
+  
+  const firstLogDate = logs[0].date;
+  if (firstLogDate !== today && firstLogDate !== yesterday) {
+    return 0;
+  }
+  
+  let streak = 1;
+  for (let i = 1; i < logs.length; i++) {
+    const prevDate = new Date(logs[i - 1].date);
+    const currDate = new Date(logs[i].date);
+    const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
+    
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+export async function getDailyGoalStreak(userId: string): Promise<number> {
+  const [settings] = await db.select()
+    .from(userHabitSettings)
+    .where(eq(userHabitSettings.userId, userId));
+  
+  if (!settings?.dailyGoal) return 0;
+  const dailyGoal = settings.dailyGoal;
+  
+  const logs = await db.select({ 
+    date: userDailyLogs.date, 
+    taskPoints: userDailyLogs.taskPoints,
+    todoPoints: userDailyLogs.todoPoints,
+    penaltyPoints: userDailyLogs.penaltyPoints
+  })
+    .from(userDailyLogs)
+    .where(eq(userDailyLogs.userId, userId))
+    .orderBy(desc(userDailyLogs.date));
+  
+  if (logs.length === 0) return 0;
+  
+  const today = formatDateString(new Date());
+  const yesterday = formatDateString(new Date(Date.now() - 86400000));
+  
+  const firstLogDate = logs[0].date;
+  if (firstLogDate !== today && firstLogDate !== yesterday) {
+    return 0;
+  }
+  
+  let streak = 0;
+  for (let i = 0; i < logs.length; i++) {
+    if (i > 0) {
+      const prevDate = new Date(logs[i - 1].date);
+      const currDate = new Date(logs[i].date);
+      const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
+      if (diffDays !== 1) break;
+    }
+    
+    const totalPoints = (logs[i].taskPoints || 0) + (logs[i].todoPoints || 0) + (logs[i].penaltyPoints || 0);
+    if (totalPoints >= dailyGoal) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+export async function getWeeklyGoalStreak(userId: string): Promise<number> {
+  const [settings] = await db.select()
+    .from(userHabitSettings)
+    .where(eq(userHabitSettings.userId, userId));
+  
+  if (!settings?.weeklyGoal) return 0;
+  const weeklyGoal = settings.weeklyGoal;
+  
+  const thirtyWeeksAgo = new Date();
+  thirtyWeeksAgo.setDate(thirtyWeeksAgo.getDate() - 210);
+  
+  const logs = await db.select({ 
+    date: userDailyLogs.date, 
+    taskPoints: userDailyLogs.taskPoints,
+    todoPoints: userDailyLogs.todoPoints,
+    penaltyPoints: userDailyLogs.penaltyPoints
+  })
+    .from(userDailyLogs)
+    .where(and(
+      eq(userDailyLogs.userId, userId),
+      gte(userDailyLogs.date, formatDateString(thirtyWeeksAgo))
+    ))
+    .orderBy(desc(userDailyLogs.date));
+  
+  if (logs.length === 0) return 0;
+  
+  const weekTotals = new Map<string, number>();
+  for (const log of logs) {
+    const weekStart = formatDateString(getStartOfWeek(new Date(log.date)));
+    const logTotal = (log.taskPoints || 0) + (log.todoPoints || 0) + (log.penaltyPoints || 0);
+    weekTotals.set(weekStart, (weekTotals.get(weekStart) || 0) + logTotal);
+  }
+  
+  const sortedWeeks = Array.from(weekTotals.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]));
+  
+  if (sortedWeeks.length === 0) return 0;
+  
+  const currentWeekStart = formatDateString(getStartOfWeek(new Date()));
+  const lastWeekStart = formatDateString(getStartOfWeek(new Date(Date.now() - 7 * 86400000)));
+  
+  const mostRecentWeek = sortedWeeks[0][0];
+  if (mostRecentWeek !== currentWeekStart && mostRecentWeek !== lastWeekStart) {
+    return 0;
+  }
+  
+  let streak = 0;
+  for (let i = 0; i < sortedWeeks.length; i++) {
+    const [weekStart, total] = sortedWeeks[i];
+    
+    if (i > 0) {
+      const prevWeek = new Date(sortedWeeks[i - 1][0]);
+      const currWeek = new Date(weekStart);
+      const diffWeeks = Math.round((prevWeek.getTime() - currWeek.getTime()) / (7 * 86400000));
+      if (diffWeeks !== 1) break;
+    }
+    
+    if (total >= weeklyGoal) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+export async function getNoPenaltyStreak(userId: string): Promise<number> {
+  const thirtyWeeksAgo = new Date();
+  thirtyWeeksAgo.setDate(thirtyWeeksAgo.getDate() - 210);
+  
+  const logs = await db.select({ date: userDailyLogs.date, penaltyPoints: userDailyLogs.penaltyPoints })
+    .from(userDailyLogs)
+    .where(and(
+      eq(userDailyLogs.userId, userId),
+      gte(userDailyLogs.date, formatDateString(thirtyWeeksAgo))
+    ))
+    .orderBy(desc(userDailyLogs.date));
+  
+  if (logs.length === 0) return 0;
+  
+  const weekPenalties = new Map<string, number>();
+  for (const log of logs) {
+    const weekStart = formatDateString(getStartOfWeek(new Date(log.date)));
+    weekPenalties.set(weekStart, (weekPenalties.get(weekStart) || 0) + Math.abs(log.penaltyPoints || 0));
+  }
+  
+  const sortedWeeks = Array.from(weekPenalties.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]));
+  
+  if (sortedWeeks.length === 0) return 0;
+  
+  const currentWeekStart = formatDateString(getStartOfWeek(new Date()));
+  const lastWeekStart = formatDateString(getStartOfWeek(new Date(Date.now() - 7 * 86400000)));
+  
+  const mostRecentWeek = sortedWeeks[0][0];
+  if (mostRecentWeek !== currentWeekStart && mostRecentWeek !== lastWeekStart) {
+    return 0;
+  }
+  
+  let streak = 0;
+  for (let i = 0; i < sortedWeeks.length; i++) {
+    const [weekStart, penalties] = sortedWeeks[i];
+    
+    if (i > 0) {
+      const prevWeek = new Date(sortedWeeks[i - 1][0]);
+      const currWeek = new Date(weekStart);
+      const diffWeeks = Math.round((prevWeek.getTime() - currWeek.getTime()) / (7 * 86400000));
+      if (diffWeeks !== 1) break;
+    }
+    
+    if (penalties === 0) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+// ==================== STREAK MILESTONE AWARDING ====================
+
+const loggingStreakMilestones: { days: number; event: FpEventType }[] = [
+  { days: 7, event: "logging_streak_7" },
+  { days: 14, event: "logging_streak_14" },
+  { days: 21, event: "logging_streak_21" },
+  { days: 28, event: "logging_streak_28" },
+  { days: 50, event: "logging_streak_50" },
+  { days: 100, event: "logging_streak_100" },
+  { days: 200, event: "logging_streak_200" },
+  { days: 365, event: "logging_streak_365" },
+];
+
+const dailyGoalStreakMilestones: { days: number; event: FpEventType }[] = [
+  { days: 3, event: "daily_goal_streak_3" },
+  { days: 7, event: "daily_goal_streak_7" },
+  { days: 10, event: "daily_goal_streak_10" },
+  { days: 14, event: "daily_goal_streak_14" },
+  { days: 21, event: "daily_goal_streak_21" },
+  { days: 30, event: "daily_goal_streak_30" },
+];
+
+const weeklyGoalStreakMilestones: { weeks: number; event: FpEventType }[] = [
+  { weeks: 2, event: "weekly_goal_streak_2" },
+  { weeks: 3, event: "weekly_goal_streak_3" },
+  { weeks: 4, event: "weekly_goal_streak_4" },
+  { weeks: 5, event: "weekly_goal_streak_5" },
+  { weeks: 6, event: "weekly_goal_streak_6" },
+  { weeks: 7, event: "weekly_goal_streak_7" },
+  { weeks: 8, event: "weekly_goal_streak_8" },
+  { weeks: 10, event: "weekly_goal_streak_10" },
+  { weeks: 15, event: "weekly_goal_streak_15" },
+  { weeks: 20, event: "weekly_goal_streak_20" },
+];
+
+const noPenaltyStreakMilestones: { weeks: number; event: FpEventType }[] = [
+  { weeks: 1, event: "no_penalties_week" },
+  { weeks: 2, event: "no_penalty_streak_2_weeks" },
+  { weeks: 4, event: "no_penalty_streak_4_weeks" },
+  { weeks: 6, event: "no_penalty_streak_6_weeks" },
+];
+
+async function hasReceivedStreakAward(userId: string, eventType: FpEventType): Promise<boolean> {
+  const existing = await db.select({ id: fpActivityLog.id })
+    .from(fpActivityLog)
+    .where(and(
+      eq(fpActivityLog.userId, userId),
+      eq(fpActivityLog.eventType, eventType)
+    ))
+    .limit(1);
+  return existing.length > 0;
+}
+
+export async function awardLoggingStreakMilestones(userId: string): Promise<FpAwardResult[]> {
+  const streak = await getLoggingStreak(userId);
+  const results: FpAwardResult[] = [];
+  
+  for (const milestone of loggingStreakMilestones) {
+    if (streak >= milestone.days) {
+      const alreadyAwarded = await hasReceivedStreakAward(userId, milestone.event);
+      if (!alreadyAwarded) {
+        const result = await awardFp(userId, milestone.event);
+        if (result.success) results.push(result);
+      }
+    }
+  }
+  
+  return results;
+}
+
+export async function awardDailyGoalStreakMilestones(userId: string): Promise<FpAwardResult[]> {
+  const streak = await getDailyGoalStreak(userId);
+  const results: FpAwardResult[] = [];
+  
+  for (const milestone of dailyGoalStreakMilestones) {
+    if (streak >= milestone.days) {
+      const alreadyAwarded = await hasReceivedStreakAward(userId, milestone.event);
+      if (!alreadyAwarded) {
+        const result = await awardFp(userId, milestone.event);
+        if (result.success) results.push(result);
+      }
+    }
+  }
+  
+  return results;
+}
+
+export async function awardWeeklyGoalStreakMilestones(userId: string): Promise<FpAwardResult[]> {
+  const streak = await getWeeklyGoalStreak(userId);
+  const results: FpAwardResult[] = [];
+  
+  for (const milestone of weeklyGoalStreakMilestones) {
+    if (streak >= milestone.weeks) {
+      const alreadyAwarded = await hasReceivedStreakAward(userId, milestone.event);
+      if (!alreadyAwarded) {
+        const result = await awardFp(userId, milestone.event);
+        if (result.success) results.push(result);
+      }
+    }
+  }
+  
+  return results;
+}
+
+export async function awardNoPenaltyStreakMilestones(userId: string): Promise<FpAwardResult[]> {
+  const streak = await getNoPenaltyStreak(userId);
+  const results: FpAwardResult[] = [];
+  
+  for (const milestone of noPenaltyStreakMilestones) {
+    if (streak >= milestone.weeks) {
+      const alreadyAwarded = await hasReceivedStreakAward(userId, milestone.event);
+      if (!alreadyAwarded) {
+        const result = await awardFp(userId, milestone.event);
+        if (result.success) results.push(result);
+      }
+    }
+  }
+  
+  return results;
+}
+
+export async function checkAndAwardWeeklyTriggers(
+  userId: string,
+  weeklyTotal: number,
+  weeklyGoal: number
+): Promise<FpAwardResult[]> {
+  const results: FpAwardResult[] = [];
+  
+  if (weeklyTotal >= weeklyGoal) {
+    const hitWeeklyResult = await awardFp(userId, "hit_weekly_goal", { checkDuplicate: true });
+    if (hitWeeklyResult.success) results.push(hitWeeklyResult);
+    
+    const weeklyStreakResults = await awardWeeklyGoalStreakMilestones(userId);
+    results.push(...weeklyStreakResults);
+  } else if (weeklyGoal > 0 && weeklyTotal >= weeklyGoal * 0.95) {
+    const within5Result = await awardFp(userId, "within_5_percent_weekly", { checkDuplicate: true });
+    if (within5Result.success) results.push(within5Result);
+  }
+  
+  const noPenaltyResults = await awardNoPenaltyStreakMilestones(userId);
+  results.push(...noPenaltyResults);
+  
+  return results;
 }
