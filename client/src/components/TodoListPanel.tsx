@@ -49,7 +49,7 @@ export default function TodoListPanel({
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("0");
   const [newPenaltyEnabled, setNewPenaltyEnabled] = useState(false);
-  const [newPenaltyValue, setNewPenaltyValue] = useState("0");
+  const [newPenaltyValue, setNewPenaltyValue] = useState("2");
   const [showSettings, setShowSettings] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -86,7 +86,7 @@ export default function TodoListPanel({
     setNewTitle("");
     setNewPoints("0");
     setNewPenaltyEnabled(false);
-    setNewPenaltyValue("0");
+    setNewPenaltyValue("2");
   };
 
   const handleToggleItem = (id: string) => {
