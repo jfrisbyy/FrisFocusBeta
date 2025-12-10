@@ -52,7 +52,9 @@ function getDayStatus(points: number | null) {
 }
 
 function formatTimeDisplay(time: string): string {
+  if (!time || !time.includes(":")) return "";
   const [hours, minutes] = time.split(":").map(Number);
+  if (isNaN(hours) || isNaN(minutes)) return "";
   const ampm = hours >= 12 ? "PM" : "AM";
   const displayHour = hours % 12 || 12;
   return `${displayHour}:${minutes.toString().padStart(2, "0")} ${ampm}`;
