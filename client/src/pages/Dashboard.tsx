@@ -1087,7 +1087,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleMilestoneAdd = (milestone: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
+  const handleMilestoneAdd = async (milestone: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
     const newMilestone: Milestone = {
       ...milestone,
       id: String(Date.now()),
@@ -1105,6 +1105,11 @@ export default function Dashboard() {
         achieved: m.achieved,
         achievedAt: m.achievedAt,
       })));
+      // Award first_milestone one-time FP bonus
+      try {
+        await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_milestone" });
+        queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
+      } catch (e) { console.error("FP award error:", e); }
     }
   };
 
@@ -1167,7 +1172,8 @@ export default function Dashboard() {
   };
 
   // Weekly todos handlers
-  const handleWeeklyTodosChange = (items: StoredTodoItem[]) => {
+  const handleWeeklyTodosChange = async (items: StoredTodoItem[]) => {
+    const wasAdding = items.length > weeklyTodos.length;
     setWeeklyTodos(items);
     if (!useMockData) {
       const weekId = getWeekId(new Date());
@@ -1178,6 +1184,13 @@ export default function Dashboard() {
         bonusPoints: weeklyTodoBonusPoints,
         bonusAwarded: weeklyTodoBonusAwarded,
       });
+      // Award first_weekly_todo one-time FP bonus when adding
+      if (wasAdding) {
+        try {
+          await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_weekly_todo" });
+          queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
+        } catch (e) { console.error("FP award error:", e); }
+      }
     }
   };
 
@@ -1210,10 +1223,18 @@ export default function Dashboard() {
   };
 
   // Due dates handlers
-  const handleDueDatesChange = (items: StoredDueDateItem[]) => {
+  const handleDueDatesChange = async (items: StoredDueDateItem[]) => {
+    const wasAdding = items.length > dueDates.length;
     setDueDates(items);
     if (!useMockData) {
       saveDueDatesToStorage(items);
+      // Award first_due_date one-time FP bonus when adding
+      if (wasAdding) {
+        try {
+          await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_due_date" });
+          queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
+        } catch (e) { console.error("FP award error:", e); }
+      }
     }
   };
 

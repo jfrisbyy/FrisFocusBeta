@@ -5923,6 +5923,34 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Trigger a one-time FP award (for features stored in local storage)
+  app.post("/api/fp/award-onetime", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { eventType } = req.body;
+      
+      // Only allow specific one-time event types that are stored client-side
+      const allowedEvents = [
+        "first_milestone",
+        "first_due_date", 
+        "first_weekly_todo",
+        "first_badge",
+      ];
+      
+      if (!allowedEvents.includes(eventType)) {
+        return res.status(400).json({ error: "Invalid event type" });
+      }
+      
+      const { awardFp } = await import("./fpService");
+      const result = await awardFp(userId, eventType, { checkDuplicate: true });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error awarding one-time FP:", error);
+      res.status(500).json({ error: "Failed to award FP" });
+    }
+  });
+
   // Get FP leaderboard (friends or all users)
   app.get("/api/fp/leaderboard", isAuthenticated, async (req: any, res) => {
     try {

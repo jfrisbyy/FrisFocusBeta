@@ -2061,8 +2061,13 @@ export default function CommunityPage() {
       }
       return res.json();
     },
-    onSuccess: (_, { circleId }) => {
+    onSuccess: async (_, { circleId }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'badges'] });
+      // Award first_badge one-time FP bonus
+      try {
+        await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_badge" });
+        queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
+      } catch (e) { console.error("FP award error:", e); }
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create badge", description: error.message, variant: "destructive" });
