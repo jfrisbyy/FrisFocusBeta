@@ -155,6 +155,8 @@ export default function TasksPage() {
   const [seasonDialogOpen, setSeasonDialogOpen] = useState(false);
   const [seasonName, setSeasonName] = useState("");
   const [seasonDescription, setSeasonDescription] = useState("");
+  const [welcomeSeasonDialogOpen, setWelcomeSeasonDialogOpen] = useState(false);
+  const [firstSeasonName, setFirstSeasonName] = useState("");
   
   // Track loaded season to prevent auto-save on initial load
   const lastLoadedSeasonIdRef = useRef<string | null>(null);
@@ -176,6 +178,33 @@ export default function TasksPage() {
   const isActiveSeasonArchived = activeSeason?.isArchived === true;
   const nonArchivedSeasons = seasons.filter((s) => !s.isArchived);
   const archivedSeasons = seasons.filter((s) => s.isArchived);
+
+  // Show welcome season dialog for new users with no seasons
+  useEffect(() => {
+    if (!useMockData && !seasonsLoading && seasons.length === 0) {
+      setWelcomeSeasonDialogOpen(true);
+    }
+  }, [useMockData, seasonsLoading, seasons.length]);
+
+  // Create first season mutation (with auto-activate)
+  const createFirstSeasonMutation = useMutation({
+    mutationFn: async (data: { name: string }) => {
+      const res = await apiRequest("POST", "/api/seasons", data);
+      const newSeason = await res.json();
+      // Auto-activate the first season
+      await apiRequest("PUT", `/api/seasons/${newSeason.id}/activate`);
+      return newSeason;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Season created!", description: "Your first season is ready. Start adding your tasks!" });
+      setWelcomeSeasonDialogOpen(false);
+      setFirstSeasonName("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create season", variant: "destructive" });
+    },
+  });
 
   // Fetch season data when a season is selected for import
   const { data: importSeasonData, isLoading: importSeasonDataLoading } = useQuery<SeasonWithData>({
@@ -1588,6 +1617,60 @@ export default function TasksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={welcomeSeasonDialogOpen} onOpenChange={setWelcomeSeasonDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Create Your First Season
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Life changes, and so do our priorities. Your system should grow with you!
+              </p>
+              <p>
+                This <span className="font-medium text-foreground">Season</span> saves your tasks and progress for this moment in your life.
+              </p>
+              <p>
+                Create a new Season anytime your circumstances shift or you want a fresh start.
+              </p>
+            </div>
+            <div className="space-y-2 pt-2">
+              <Label htmlFor="first-season-name">Season Name</Label>
+              <Input
+                id="first-season-name"
+                value={firstSeasonName}
+                onChange={(e) => setFirstSeasonName(e.target.value)}
+                placeholder="e.g., Winter 2025, New Job, Post-Grad Life"
+                data-testid="input-first-season-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (firstSeasonName.trim()) {
+                  createFirstSeasonMutation.mutate({ name: firstSeasonName.trim() });
+                }
+              }}
+              disabled={!firstSeasonName.trim() || createFirstSeasonMutation.isPending}
+              data-testid="button-create-first-season"
+            >
+              {createFirstSeasonMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                "Create Season"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

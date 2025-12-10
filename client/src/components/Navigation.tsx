@@ -43,10 +43,24 @@ export default function Navigation() {
     }
   };
 
-  const getInitials = (firstName?: string | null, lastName?: string | null) => {
+  const getInitials = (displayName?: string | null, firstName?: string | null, lastName?: string | null) => {
+    // If displayName exists, use first letter(s) of it
+    if (displayName) {
+      const parts = displayName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+      }
+      return displayName.charAt(0).toUpperCase();
+    }
+    // Fall back to firstName/lastName
     const first = firstName?.charAt(0) || "";
     const last = lastName?.charAt(0) || "";
     return (first + last).toUpperCase() || "U";
+  };
+  
+  // Get the name to display - prefer displayName, then firstName, then email prefix
+  const getDisplayName = () => {
+    return user?.displayName || user?.firstName || user?.email?.split("@")[0] || "User";
   };
 
   const getProfileImageUrl = () => {
@@ -88,11 +102,11 @@ export default function Navigation() {
               data-testid="button-open-profile"
             >
               <Avatar className="h-8 w-8">
-                <AvatarImage src={getProfileImageUrl()} alt={user.firstName || "User"} />
-                <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+                <AvatarImage src={getProfileImageUrl()} alt={getDisplayName()} />
+                <AvatarFallback>{getInitials(user.displayName, user.firstName, user.lastName)}</AvatarFallback>
               </Avatar>
               <span className="hidden md:inline text-sm text-muted-foreground">
-                {user.firstName || user.email?.split("@")[0] || "User"}
+                {getDisplayName()}
               </span>
             </button>
             <Button
