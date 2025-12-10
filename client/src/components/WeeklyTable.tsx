@@ -301,7 +301,7 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
                           data-testid={`button-add-appointment-${day.date}`}
                         >
                           <Plus className="h-3 w-3 mr-1" />
-                          Add Appointment
+                          Add Event
                         </Button>
                       </div>
                     </CollapsibleContent>
@@ -318,7 +318,7 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              Add Appointment
+              Add Event
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">

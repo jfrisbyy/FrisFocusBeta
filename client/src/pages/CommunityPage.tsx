@@ -1115,7 +1115,10 @@ export default function CommunityPage() {
   const [newCircleName, setNewCircleName] = useState("");
   const [newCircleDescription, setNewCircleDescription] = useState("");
   const [newCircleIsPrivate, setNewCircleIsPrivate] = useState(false);
+  const [newCircleInvites, setNewCircleInvites] = useState<{ id: string; name: string }[]>([]);
+  const [newCircleInviteSearch, setNewCircleInviteSearch] = useState("");
   const [browsePublicCircles, setBrowsePublicCircles] = useState(true); // Auto-expand by default
+  const [showBrowseCirclesForChallenge, setShowBrowseCirclesForChallenge] = useState(false);
   const [userManuallyToggledBrowse, setUserManuallyToggledBrowse] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<StoredFriend | null>(null);
   const [dmFriend, setDmFriend] = useState<StoredFriend | null>(null);
@@ -1772,6 +1775,7 @@ export default function CommunityPage() {
           createdBy: c.owner?.displayName || c.owner?.firstName || 'Unknown',
           memberCount: c.memberCount || 1,
           isPrivate: false,
+          inviteCode: c.inviteCode || undefined,
         }));
       } catch {
         return [];
@@ -3260,59 +3264,78 @@ export default function CommunityPage() {
   };
 
   const handleCreateCircle = () => {
-    if (newCircleName.trim()) {
-      const iconColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`;
-      
-      if (!isDemo) {
-        // In non-demo mode, call the API to persist the circle
-        createCircleMutation.mutate({
-          name: newCircleName.trim(),
-          description: newCircleDescription.trim() || "A new circle to share goals",
-          iconColor,
-          isPrivate: newCircleIsPrivate,
-        }, {
-          onSuccess: () => {
-            toast({
-              title: "Circle created",
-              description: `"${newCircleName}" has been created. ${newCircleIsPrivate ? 'Invite members to join!' : 'Others can find and join your public circle!'}`,
+    if (!newCircleName.trim()) {
+      toast({ title: "Name required", description: "Please enter a circle name.", variant: "destructive" });
+      return;
+    }
+    
+    // Validate private circles must have at least one invite
+    if (newCircleIsPrivate && newCircleInvites.length === 0) {
+      toast({ title: "Invite required", description: "Private circles must invite at least one person.", variant: "destructive" });
+      return;
+    }
+    
+    const iconColor = `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`;
+    
+    if (!isDemo) {
+      // In non-demo mode, call the API to persist the circle
+      createCircleMutation.mutate({
+        name: newCircleName.trim(),
+        description: newCircleDescription.trim() || "A new circle to share goals",
+        iconColor,
+        isPrivate: newCircleIsPrivate,
+      }, {
+        onSuccess: (data) => {
+          // Send invites to all selected members
+          if (newCircleInvites.length > 0 && data?.id) {
+            newCircleInvites.forEach(invite => {
+              sendCircleInviteMutation.mutate({ circleId: data.id, inviteeId: invite.id });
             });
-            setShowCreateCircle(false);
-            setNewCircleName("");
-            setNewCircleDescription("");
-            setNewCircleIsPrivate(false);
-          },
-        });
-      } else {
-        // Demo mode - only update local state
-        const newCircle: StoredCircle = {
-          id: `circle-${Date.now()}`,
-          name: newCircleName.trim(),
-          description: newCircleDescription.trim() || "A new circle to share goals",
-          iconColor,
-          createdAt: new Date().toISOString().split("T")[0],
-          createdBy: "you",
-          memberCount: 1,
-          isPrivate: newCircleIsPrivate,
-        };
-        setCircles([...circles, newCircle]);
-        setCircleMembers({ 
-          ...circleMembers, 
-          [newCircle.id]: [
-            { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
-          ]
-        });
-        setCircleTasks({ ...circleTasks, [newCircle.id]: [] });
-        setCircleMessages({ ...circleMessages, [newCircle.id]: [] });
-        setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
-        toast({
-          title: "Circle created",
-          description: `"${newCircleName}" has been created. ${newCircleIsPrivate ? 'Invite members to join!' : 'Others can find and join your public circle!'}`,
-        });
-        setShowCreateCircle(false);
-        setNewCircleName("");
-        setNewCircleDescription("");
-        setNewCircleIsPrivate(false);
-      }
+          }
+          toast({
+            title: "Circle created",
+            description: `"${newCircleName}" has been created. ${newCircleIsPrivate ? 'Invites have been sent!' : 'Others can find and join your public circle!'}`,
+          });
+          setShowCreateCircle(false);
+          setNewCircleName("");
+          setNewCircleDescription("");
+          setNewCircleIsPrivate(false);
+          setNewCircleInvites([]);
+          setNewCircleInviteSearch("");
+        },
+      });
+    } else {
+      // Demo mode - only update local state
+      const newCircle: StoredCircle = {
+        id: `circle-${Date.now()}`,
+        name: newCircleName.trim(),
+        description: newCircleDescription.trim() || "A new circle to share goals",
+        iconColor,
+        createdAt: new Date().toISOString().split("T")[0],
+        createdBy: "you",
+        memberCount: 1,
+        isPrivate: newCircleIsPrivate,
+      };
+      setCircles([...circles, newCircle]);
+      setCircleMembers({ 
+        ...circleMembers, 
+        [newCircle.id]: [
+          { id: `m-${Date.now()}`, circleId: newCircle.id, userId: "you", firstName: "You", lastName: "", role: "owner", joinedAt: new Date().toISOString().split("T")[0], weeklyPoints: 0 }
+        ]
+      });
+      setCircleTasks({ ...circleTasks, [newCircle.id]: [] });
+      setCircleMessages({ ...circleMessages, [newCircle.id]: [] });
+      setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
+      toast({
+        title: "Circle created",
+        description: `"${newCircleName}" has been created. ${newCircleIsPrivate ? 'Invites have been sent!' : 'Others can find and join your public circle!'}`,
+      });
+      setShowCreateCircle(false);
+      setNewCircleName("");
+      setNewCircleDescription("");
+      setNewCircleIsPrivate(false);
+      setNewCircleInvites([]);
+      setNewCircleInviteSearch("");
     }
   };
 
@@ -6633,6 +6656,74 @@ export default function CommunityPage() {
                           </Button>
                         </div>
                       </div>
+                      
+                      {/* Invite members section for private circles */}
+                      {newCircleIsPrivate && (
+                        <div className="space-y-2">
+                          <Label>Invite Members <span className="text-destructive">*</span></Label>
+                          <p className="text-xs text-muted-foreground">Private circles require at least one invited member</p>
+                          
+                          {/* Selected invites */}
+                          {newCircleInvites.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {newCircleInvites.map(invite => (
+                                <Badge key={invite.id} variant="secondary" className="gap-1">
+                                  {invite.name}
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewCircleInvites(newCircleInvites.filter(i => i.id !== invite.id))}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Search for friends to invite */}
+                          <Input
+                            placeholder="Search friends to invite..."
+                            value={newCircleInviteSearch}
+                            onChange={(e) => setNewCircleInviteSearch(e.target.value)}
+                            data-testid="input-circle-invite-search"
+                          />
+                          
+                          {/* Friends list */}
+                          <ScrollArea className="h-[120px] border rounded-md">
+                            <div className="p-2 space-y-1">
+                              {(isDemo ? friends : friendsQuery.data || [])
+                                .filter(friend => {
+                                  const name = `${friend.firstName} ${friend.lastName}`.toLowerCase();
+                                  const alreadyInvited = newCircleInvites.some(i => i.id === friend.friendId);
+                                  return name.includes(newCircleInviteSearch.toLowerCase()) && !alreadyInvited;
+                                })
+                                .map(friend => (
+                                  <div
+                                    key={friend.id}
+                                    className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate cursor-pointer"
+                                    onClick={() => setNewCircleInvites([...newCircleInvites, { id: friend.friendId, name: `${friend.firstName} ${friend.lastName}` }])}
+                                    data-testid={`invite-option-${friend.friendId}`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Avatar className="w-6 h-6">
+                                        {friend.profileImageUrl && <AvatarImage src={friend.profileImageUrl} />}
+                                        <AvatarFallback className="text-xs">{friend.firstName[0]}</AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-sm">{friend.firstName} {friend.lastName}</span>
+                                    </div>
+                                    <Plus className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                ))}
+                              {(isDemo ? friends : friendsQuery.data || []).length === 0 && (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                  No friends to invite. Add friends first!
+                                </p>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowCreateCircle(false)} data-testid="button-create-circle-cancel">
@@ -9595,7 +9686,19 @@ export default function CommunityPage() {
                             </CardHeader>
                             <CardContent className="space-y-4">
                               <div className="space-y-2">
-                                <Label htmlFor="challengeInviteCode">Opponent's Invite Code</Label>
+                                <div className="flex items-center justify-between gap-2">
+                                  <Label htmlFor="challengeInviteCode">Opponent's Invite Code</Label>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => setShowBrowseCirclesForChallenge(!showBrowseCirclesForChallenge)}
+                                    data-testid="button-browse-circles-challenge"
+                                  >
+                                    <Search className="w-3 h-3 mr-1" />
+                                    {showBrowseCirclesForChallenge ? "Hide" : "Browse Public Circles"}
+                                  </Button>
+                                </div>
                                 <Input
                                   id="challengeInviteCode"
                                   placeholder="Enter their invite code"
@@ -9603,6 +9706,54 @@ export default function CommunityPage() {
                                   onChange={(e) => setChallengeInviteCode(e.target.value)}
                                   data-testid="input-challenge-invite-code"
                                 />
+                                
+                                {/* Browse public circles for challenge */}
+                                {showBrowseCirclesForChallenge && (
+                                  <div className="border rounded-md p-3 space-y-2">
+                                    <p className="text-sm text-muted-foreground">Select a public circle to challenge:</p>
+                                    <ScrollArea className="h-[150px]">
+                                      <div className="space-y-2">
+                                        {(publicCirclesQuery.data || [])
+                                          .filter(c => c.id !== selectedCircle?.id)
+                                          .map(circle => (
+                                            <div
+                                              key={circle.id}
+                                              className="flex items-center justify-between gap-2 p-2 rounded-md border hover-elevate cursor-pointer"
+                                              onClick={() => {
+                                                if (circle.inviteCode) {
+                                                  setChallengeInviteCode(circle.inviteCode);
+                                                  setShowBrowseCirclesForChallenge(false);
+                                                  toast({ title: "Circle selected", description: `Selected "${circle.name}" for challenge` });
+                                                } else {
+                                                  toast({ title: "No invite code", description: "This circle hasn't generated an invite code yet", variant: "destructive" });
+                                                }
+                                              }}
+                                              data-testid={`challenge-circle-${circle.id}`}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <div
+                                                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                                                  style={{ backgroundColor: circle.iconColor || "hsl(200, 70%, 50%)" }}
+                                                >
+                                                  <CircleDot className="w-4 h-4 text-white" />
+                                                </div>
+                                                <div>
+                                                  <p className="text-sm font-medium">{circle.name}</p>
+                                                  <p className="text-xs text-muted-foreground">{circle.memberCount || 1} members</p>
+                                                </div>
+                                              </div>
+                                              <Swords className="w-4 h-4 text-muted-foreground" />
+                                            </div>
+                                          ))}
+                                        {(!publicCirclesQuery.data || publicCirclesQuery.data.filter(c => c.id !== selectedCircle?.id).length === 0) && (
+                                          <p className="text-sm text-muted-foreground text-center py-4">
+                                            No other public circles available to challenge
+                                          </p>
+                                        )}
+                                      </div>
+                                    </ScrollArea>
+                                  </div>
+                                )}
                               </div>
                               <div className="space-y-2">
                                 <Label>Competition Type</Label>

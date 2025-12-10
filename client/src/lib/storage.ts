@@ -498,6 +498,7 @@ export interface StoredCircle {
   dailyPointGoal?: number;
   weeklyPointGoal?: number;
   isPrivate?: boolean;
+  inviteCode?: string;
 }
 
 export interface StoredCircleMember {
