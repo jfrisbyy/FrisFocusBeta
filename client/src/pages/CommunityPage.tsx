@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Switch } from "@/components/ui/switch";
 import ProfileHoverCard from "@/components/ProfileHoverCard";
 import { getAvailableUsers, type DemoUser } from "@/lib/demoUsers";
 import {
@@ -1109,6 +1110,8 @@ export default function CommunityPage() {
   const [showCreateCircle, setShowCreateCircle] = useState(false);
   const [newCircleName, setNewCircleName] = useState("");
   const [newCircleDescription, setNewCircleDescription] = useState("");
+  const [newCircleIsPrivate, setNewCircleIsPrivate] = useState(false);
+  const [browsePublicCircles, setBrowsePublicCircles] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<StoredFriend | null>(null);
   const [dmFriend, setDmFriend] = useState<StoredFriend | null>(null);
   const [dmMessage, setDmMessage] = useState("");
@@ -1509,7 +1512,7 @@ export default function CommunityPage() {
 
   // Create circle mutation for non-demo mode
   const createCircleMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string; iconColor?: string }) => {
+    mutationFn: async (data: { name: string; description?: string; iconColor?: string; isPrivate?: boolean }) => {
       const res = await apiRequest("POST", "/api/circles", data);
       if (!res.ok) {
         const error = await res.json();
@@ -1693,10 +1696,57 @@ export default function CommunityPage() {
           createdAt: c.createdAt || new Date().toISOString(),
           createdBy: c.createdBy || '',
           memberCount: c.memberCount || 1,
+          isPrivate: c.isPrivate,
         }));
       } catch {
         return [];
       }
+    },
+  });
+
+  // Public circles query for browsing (non-demo mode)
+  const [publicCircleSearch, setPublicCircleSearch] = useState("");
+  const publicCirclesQuery = useQuery<StoredCircle[]>({
+    queryKey: ['/api/circles/public', publicCircleSearch],
+    enabled: !isDemo && browsePublicCircles,
+    queryFn: async () => {
+      try {
+        const searchParam = publicCircleSearch ? `?search=${encodeURIComponent(publicCircleSearch)}` : '';
+        const res = await apiRequest("GET", `/api/circles/public${searchParam}`);
+        const data = await res.json();
+        return data.map((c: any) => ({
+          id: c.id,
+          name: c.name || '',
+          description: c.description || '',
+          iconColor: c.iconColor || 'hsl(217, 91%, 60%)',
+          createdAt: c.createdAt || new Date().toISOString(),
+          createdBy: c.owner?.displayName || c.owner?.firstName || 'Unknown',
+          memberCount: c.memberCount || 1,
+          isPrivate: false,
+        }));
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Join circle mutation
+  const joinCircleMutation = useMutation({
+    mutationFn: async (circleId: string) => {
+      const res = await apiRequest("POST", `/api/circles/${circleId}/join`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to join circle');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles/public'] });
+      toast({ title: "Joined circle!", description: "You are now a member of this circle." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to join circle", description: error.message, variant: "destructive" });
     },
   });
 
@@ -3159,15 +3209,17 @@ export default function CommunityPage() {
           name: newCircleName.trim(),
           description: newCircleDescription.trim() || "A new circle to share goals",
           iconColor,
+          isPrivate: newCircleIsPrivate,
         }, {
           onSuccess: () => {
             toast({
               title: "Circle created",
-              description: `"${newCircleName}" has been created. Invite members to get started!`,
+              description: `"${newCircleName}" has been created. ${newCircleIsPrivate ? 'Invite members to join!' : 'Others can find and join your public circle!'}`,
             });
             setShowCreateCircle(false);
             setNewCircleName("");
             setNewCircleDescription("");
+            setNewCircleIsPrivate(false);
           },
         });
       } else {
@@ -3180,6 +3232,7 @@ export default function CommunityPage() {
           createdAt: new Date().toISOString().split("T")[0],
           createdBy: "you",
           memberCount: 1,
+          isPrivate: newCircleIsPrivate,
         };
         setCircles([...circles, newCircle]);
         setCircleMembers({ 
@@ -3193,11 +3246,12 @@ export default function CommunityPage() {
         setCirclePosts({ ...circlePosts, [newCircle.id]: [] });
         toast({
           title: "Circle created",
-          description: `"${newCircleName}" has been created. Invite members to get started!`,
+          description: `"${newCircleName}" has been created. ${newCircleIsPrivate ? 'Invite members to join!' : 'Others can find and join your public circle!'}`,
         });
         setShowCreateCircle(false);
         setNewCircleName("");
         setNewCircleDescription("");
+        setNewCircleIsPrivate(false);
       }
     }
   };
@@ -6492,6 +6546,20 @@ export default function CommunityPage() {
                           data-testid="input-circle-description"
                         />
                       </div>
+                      <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="circle-private" className="cursor-pointer">Private Circle</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {newCircleIsPrivate ? "Only members you invite can join" : "Anyone can find and join this circle"}
+                          </p>
+                        </div>
+                        <Switch
+                          id="circle-private"
+                          checked={newCircleIsPrivate}
+                          onCheckedChange={setNewCircleIsPrivate}
+                          data-testid="switch-circle-private"
+                        />
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setShowCreateCircle(false)} data-testid="button-create-circle-cancel">
@@ -6532,10 +6600,21 @@ export default function CommunityPage() {
                             <CircleDot className="w-6 h-6 text-white" />
                           </div>
                           <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <CardTitle className="text-lg">{circle.name}</CardTitle>
                               {circle.createdBy === "you" && (
                                 <Crown className="w-4 h-4 text-yellow-500" />
+                              )}
+                              {circle.isPrivate ? (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Lock className="w-3 h-3 mr-1" />
+                                  Private
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs">
+                                  <Globe className="w-3 h-3 mr-1" />
+                                  Public
+                                </Badge>
                               )}
                             </div>
                             <CardDescription className="line-clamp-2">
@@ -6555,6 +6634,106 @@ export default function CommunityPage() {
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+
+              {/* Browse Public Circles Section */}
+              {!isDemo && (
+                <div className="space-y-4 mt-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-muted-foreground" />
+                      Browse Public Circles
+                    </h2>
+                    <Button
+                      variant={browsePublicCircles ? "default" : "outline"}
+                      onClick={() => setBrowsePublicCircles(!browsePublicCircles)}
+                      data-testid="button-toggle-browse-circles"
+                    >
+                      {browsePublicCircles ? "Hide" : "Browse"}
+                    </Button>
+                  </div>
+                  
+                  {browsePublicCircles && (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search public circles..."
+                          value={publicCircleSearch}
+                          onChange={(e) => setPublicCircleSearch(e.target.value)}
+                          className="pl-10"
+                          data-testid="input-search-public-circles"
+                        />
+                      </div>
+
+                      {publicCirclesQuery.isLoading ? (
+                        <Card>
+                          <CardContent className="flex items-center justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                          </CardContent>
+                        </Card>
+                      ) : (publicCirclesQuery.data?.length || 0) === 0 ? (
+                        <Card>
+                          <CardContent className="flex flex-col items-center justify-center py-8">
+                            <Globe className="w-10 h-10 text-muted-foreground mb-3" />
+                            <p className="text-muted-foreground text-center">
+                              {publicCircleSearch ? "No public circles match your search" : "No public circles available to join"}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {publicCirclesQuery.data?.map((circle) => (
+                            <Card key={circle.id} data-testid={`card-public-circle-${circle.id}`}>
+                              <CardHeader>
+                                <div className="flex items-start gap-3">
+                                  <div
+                                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                                    style={{ backgroundColor: circle.iconColor }}
+                                  >
+                                    <CircleDot className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <CardTitle className="text-base">{circle.name}</CardTitle>
+                                    <CardDescription className="line-clamp-2 text-xs">
+                                      {circle.description}
+                                    </CardDescription>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <Users className="w-4 h-4" />
+                                      {circle.memberCount}
+                                    </div>
+                                    <span className="text-xs">by {circle.createdBy}</span>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => joinCircleMutation.mutate(circle.id)}
+                                    disabled={joinCircleMutation.isPending}
+                                    data-testid={`button-join-circle-${circle.id}`}
+                                  >
+                                    {joinCircleMutation.isPending ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <UserPlus className="w-4 h-4 mr-1" />
+                                        Join
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </>

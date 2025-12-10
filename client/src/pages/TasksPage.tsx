@@ -1131,7 +1131,6 @@ export default function TasksPage() {
                     <SelectValue placeholder="Select a season" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No active season</SelectItem>
                     {nonArchivedSeasons.length > 0 && (
                       <>
                         {nonArchivedSeasons.map((season) => (

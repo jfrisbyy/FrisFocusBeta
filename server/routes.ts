@@ -2536,6 +2536,98 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Get public circles for browsing (circles user can join)
+  app.get("/api/circles/public", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const searchQuery = req.query.search as string || "";
+
+      // Get user's current memberships
+      const memberships = await db.select().from(circleMembers).where(eq(circleMembers.userId, userId));
+      const memberCircleIds = memberships.map(m => m.circleId);
+
+      // Get public circles that user is NOT a member of
+      let publicCircles = await db.select().from(circles).where(eq(circles.isPrivate, false));
+
+      // Filter out circles user is already a member of
+      publicCircles = publicCircles.filter(c => !memberCircleIds.includes(c.id));
+
+      // Apply search filter if provided
+      if (searchQuery) {
+        const lowerSearch = searchQuery.toLowerCase();
+        publicCircles = publicCircles.filter(c => 
+          c.name.toLowerCase().includes(lowerSearch) || 
+          (c.description?.toLowerCase().includes(lowerSearch))
+        );
+      }
+
+      // Add member count and owner info for each circle
+      const circlesWithData = await Promise.all(
+        publicCircles.map(async (circle) => {
+          const members = await db.select().from(circleMembers).where(eq(circleMembers.circleId, circle.id));
+          const [owner] = await db.select().from(users).where(eq(users.id, circle.ownerId));
+
+          return {
+            ...circle,
+            memberCount: members.length,
+            owner: owner ? {
+              id: owner.id,
+              firstName: owner.firstName,
+              lastName: owner.lastName,
+              displayName: owner.displayName,
+              profileImageUrl: owner.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+
+      res.json(circlesWithData);
+    } catch (error) {
+      console.error("Error fetching public circles:", error);
+      res.status(500).json({ error: "Failed to fetch public circles" });
+    }
+  });
+
+  // Join a public circle
+  app.post("/api/circles/:id/join", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check if circle exists and is public
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+      if (circle.isPrivate) {
+        return res.status(403).json({ error: "Cannot join private circle without an invite" });
+      }
+
+      // Check if user is already a member
+      const [existingMembership] = await db.select().from(circleMembers)
+        .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId)));
+      if (existingMembership) {
+        return res.status(400).json({ error: "Already a member of this circle" });
+      }
+
+      // Add user as member
+      await db.insert(circleMembers).values({
+        circleId,
+        userId,
+        role: "member",
+      });
+
+      // Award FP for joining a circle
+      const { awardFp } = await import("./fpService");
+      await awardFp(userId, "join_circle");
+
+      res.json({ success: true, message: "Joined circle successfully" });
+    } catch (error) {
+      console.error("Error joining circle:", error);
+      res.status(500).json({ error: "Failed to join circle" });
+    }
+  });
+
   // Create a new circle
   app.post("/api/circles", isAuthenticated, async (req: any, res) => {
     try {
