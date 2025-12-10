@@ -2,6 +2,7 @@ import { createContext, useContext, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ export function useJourneyDialog() {
 function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const { startJourney } = useOnboarding();
+  const { refetchUser } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [displayNameError, setDisplayNameError] = useState("");
@@ -90,8 +92,10 @@ function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     mutationFn: async (data: { username: string; displayName: string }) => {
       return apiRequest("PUT", "/api/auth/user", data);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Also refresh the useAuth hook's internal state
+      await refetchUser();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

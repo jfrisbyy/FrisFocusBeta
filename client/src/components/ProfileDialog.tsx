@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ interface ProfileDialogProps {
 
 export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialogProps) {
   const { toast } = useToast();
+  const { refetchUser } = useAuth();
   const [username, setUsername] = useState(user.username || "");
   const [displayName, setDisplayName] = useState(user.displayName || "");
   const [usernameError, setUsernameError] = useState("");
@@ -73,8 +75,10 @@ export default function ProfileDialog({ open, onOpenChange, user }: ProfileDialo
     mutationFn: async (data: { username: string | null; displayName: string | null }) => {
       return apiRequest("PUT", "/api/auth/user", data);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Also refresh the useAuth hook's internal state
+      await refetchUser();
       toast({ title: "Profile updated", description: "Your profile has been saved." });
       onOpenChange(false);
     },
