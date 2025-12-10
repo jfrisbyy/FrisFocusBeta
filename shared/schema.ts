@@ -1391,6 +1391,54 @@ export const fpEventTypeEnum = z.enum([
 ]);
 export type FpEventType = z.infer<typeof fpEventTypeEnum>;
 
+// ==================== TO-DO LISTS (Daily & Weekly) ====================
+
+// To-do item schema (for both daily and weekly items)
+export const todoItemSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1),
+  completed: z.boolean(),
+  points: z.number().int().default(0),
+  hasPenalty: z.boolean().default(false),
+  penaltyValue: z.number().int().default(0),
+  notes: z.string().optional(),
+});
+export type TodoItem = z.infer<typeof todoItemSchema>;
+
+// Daily to-do lists - tasks for a specific day
+export const userDailyTodos = pgTable("user_daily_todos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  items: jsonb("items").default([]), // Array of TodoItem
+  bonusEnabled: boolean("bonus_enabled").default(false),
+  bonusPoints: integer("bonus_points").default(10),
+  bonusAwarded: boolean("bonus_awarded").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserDailyTodoSchema = createInsertSchema(userDailyTodos).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserDailyTodo = z.infer<typeof insertUserDailyTodoSchema>;
+export type UserDailyTodo = typeof userDailyTodos.$inferSelect;
+
+// Weekly to-do lists - tasks for a specific week
+export const userWeeklyTodos = pgTable("user_weekly_todos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  weekId: varchar("week_id").notNull(), // YYYY-WXX format (e.g., 2024-W49)
+  items: jsonb("items").default([]), // Array of TodoItem
+  bonusEnabled: boolean("bonus_enabled").default(false),
+  bonusPoints: integer("bonus_points").default(25),
+  bonusAwarded: boolean("bonus_awarded").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserWeeklyTodoSchema = createInsertSchema(userWeeklyTodos).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserWeeklyTodo = z.infer<typeof insertUserWeeklyTodoSchema>;
+export type UserWeeklyTodo = typeof userWeeklyTodos.$inferSelect;
+
 // FP Activity Log table - tracks all FP awards
 export const fpActivityLog = pgTable("fp_activity_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

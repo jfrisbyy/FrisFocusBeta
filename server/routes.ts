@@ -75,6 +75,10 @@ import {
   insertUserPenaltySchema,
   insertUserHabitSettingsSchema,
   insertUserDailyLogSchema,
+  userDailyTodos,
+  userWeeklyTodos,
+  insertUserDailyTodoSchema,
+  insertUserWeeklyTodoSchema,
   userJournalEntries,
   insertUserJournalEntrySchema,
   circleMemberStats,
@@ -5484,6 +5488,147 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     } catch (error) {
       console.error("Error updating daily log:", error);
       res.status(400).json({ error: "Failed to update daily log" });
+    }
+  });
+
+  // ==================== DAILY TO-DO LIST API ====================
+
+  // Get daily to-do list for a specific date
+  app.get("/api/habit/daily-todos/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+
+      const [todo] = await db.select().from(userDailyTodos)
+        .where(and(eq(userDailyTodos.userId, userId), eq(userDailyTodos.date, date)));
+      
+      res.json(todo || null);
+    } catch (error) {
+      console.error("Error fetching daily to-do list:", error);
+      res.status(500).json({ error: "Failed to fetch daily to-do list" });
+    }
+  });
+
+  // Create or update daily to-do list for a specific date (upsert)
+  app.put("/api/habit/daily-todos/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+      const { items, bonusEnabled, bonusPoints, bonusAwarded } = req.body;
+
+      // Check if to-do list exists for this date
+      const [existing] = await db.select().from(userDailyTodos)
+        .where(and(eq(userDailyTodos.userId, userId), eq(userDailyTodos.date, date)));
+
+      if (existing) {
+        // Update existing to-do list
+        const [todo] = await db.update(userDailyTodos)
+          .set({
+            items: items || [],
+            bonusEnabled: bonusEnabled ?? false,
+            bonusPoints: bonusPoints ?? 10,
+            bonusAwarded: bonusAwarded ?? false,
+            updatedAt: new Date()
+          })
+          .where(and(eq(userDailyTodos.userId, userId), eq(userDailyTodos.date, date)))
+          .returning();
+        
+        res.json(todo);
+      } else {
+        // Create new to-do list
+        const parsed = insertUserDailyTodoSchema.parse({
+          userId,
+          date,
+          items: items || [],
+          bonusEnabled: bonusEnabled ?? false,
+          bonusPoints: bonusPoints ?? 10,
+          bonusAwarded: bonusAwarded ?? false
+        });
+        const [todo] = await db.insert(userDailyTodos).values(parsed).returning();
+        res.json(todo);
+      }
+    } catch (error) {
+      console.error("Error updating daily to-do list:", error);
+      res.status(400).json({ error: "Failed to update daily to-do list" });
+    }
+  });
+
+  // ==================== WEEKLY TO-DO LIST API ====================
+
+  // Get weekly to-do list for a specific week
+  app.get("/api/habit/weekly-todos/:weekId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const weekId = req.params.weekId;
+
+      const [todo] = await db.select().from(userWeeklyTodos)
+        .where(and(eq(userWeeklyTodos.userId, userId), eq(userWeeklyTodos.weekId, weekId)));
+      
+      res.json(todo || null);
+    } catch (error) {
+      console.error("Error fetching weekly to-do list:", error);
+      res.status(500).json({ error: "Failed to fetch weekly to-do list" });
+    }
+  });
+
+  // Create or update weekly to-do list for a specific week (upsert)
+  app.put("/api/habit/weekly-todos/:weekId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const weekId = req.params.weekId;
+      const { items, bonusEnabled, bonusPoints, bonusAwarded } = req.body;
+
+      // Check if to-do list exists for this week
+      const [existing] = await db.select().from(userWeeklyTodos)
+        .where(and(eq(userWeeklyTodos.userId, userId), eq(userWeeklyTodos.weekId, weekId)));
+
+      if (existing) {
+        // Update existing to-do list
+        const [todo] = await db.update(userWeeklyTodos)
+          .set({
+            items: items || [],
+            bonusEnabled: bonusEnabled ?? false,
+            bonusPoints: bonusPoints ?? 25,
+            bonusAwarded: bonusAwarded ?? false,
+            updatedAt: new Date()
+          })
+          .where(and(eq(userWeeklyTodos.userId, userId), eq(userWeeklyTodos.weekId, weekId)))
+          .returning();
+        
+        // Award first_weekly_todo one-time FP bonus when adding first item
+        if (items && items.length > 0 && (!existing.items || (existing.items as any[]).length === 0)) {
+          try {
+            const { awardFp } = await import("./fpService");
+            await awardFp(userId, "first_weekly_todo", { checkDuplicate: true });
+          } catch (e) { console.error("FP award error:", e); }
+        }
+        
+        res.json(todo);
+      } else {
+        // Create new to-do list
+        const parsed = insertUserWeeklyTodoSchema.parse({
+          userId,
+          weekId,
+          items: items || [],
+          bonusEnabled: bonusEnabled ?? false,
+          bonusPoints: bonusPoints ?? 25,
+          bonusAwarded: bonusAwarded ?? false
+        });
+        const [todo] = await db.insert(userWeeklyTodos).values(parsed).returning();
+        
+        // Award first_weekly_todo one-time FP bonus
+        if (items && items.length > 0) {
+          try {
+            const { awardFp } = await import("./fpService");
+            await awardFp(userId, "first_weekly_todo", { checkDuplicate: true });
+          } catch (e) { console.error("FP award error:", e); }
+        }
+        
+        res.json(todo);
+      }
+    } catch (error) {
+      console.error("Error updating weekly to-do list:", error);
+      res.status(400).json({ error: "Failed to update weekly to-do list" });
     }
   });
 

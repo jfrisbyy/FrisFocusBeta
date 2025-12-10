@@ -477,6 +477,13 @@ export default function Dashboard() {
     enabled: !useMockData,
   });
   
+  // Fetch weekly todos from API
+  const currentWeekId = getWeekId(new Date());
+  const { data: apiWeeklyTodos, isFetched: weeklyTodosFetched } = useQuery<any>({
+    queryKey: ["/api/habit/weekly-todos", currentWeekId],
+    enabled: !useMockData,
+  });
+  
   // Check if API queries have completed their initial fetch
   const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched));
 
@@ -607,14 +614,21 @@ export default function Dashboard() {
       currentProgress: b.currentProgress || 0,
     })));
 
-    // Load weekly todos
-    const currentWeekId = getWeekId(new Date());
-    const storedWeeklyTodoList = loadWeeklyTodoListFromStorage(currentWeekId);
-    if (storedWeeklyTodoList) {
-      setWeeklyTodos(storedWeeklyTodoList.items);
-      setWeeklyTodoBonusEnabled(storedWeeklyTodoList.bonusEnabled);
-      setWeeklyTodoBonusPoints(storedWeeklyTodoList.bonusPoints);
-      setWeeklyTodoBonusAwarded(storedWeeklyTodoList.bonusAwarded);
+    // Load weekly todos - prefer API data, fall back to localStorage
+    if (apiWeeklyTodos) {
+      setWeeklyTodos(apiWeeklyTodos.items || []);
+      setWeeklyTodoBonusEnabled(apiWeeklyTodos.bonusEnabled ?? false);
+      setWeeklyTodoBonusPoints(apiWeeklyTodos.bonusPoints ?? 25);
+      setWeeklyTodoBonusAwarded(apiWeeklyTodos.bonusAwarded ?? false);
+    } else if (!weeklyTodosFetched) {
+      // While fetching, use localStorage as initial state
+      const storedWeeklyTodoList = loadWeeklyTodoListFromStorage(currentWeekId);
+      if (storedWeeklyTodoList) {
+        setWeeklyTodos(storedWeeklyTodoList.items);
+        setWeeklyTodoBonusEnabled(storedWeeklyTodoList.bonusEnabled);
+        setWeeklyTodoBonusPoints(storedWeeklyTodoList.bonusPoints);
+        setWeeklyTodoBonusAwarded(storedWeeklyTodoList.bonusAwarded);
+      }
     }
 
     // Load due dates
@@ -944,7 +958,7 @@ export default function Dashboard() {
       });
 
     setBoosters([...taskBoosters, ...negativeBoosters]);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
@@ -1172,54 +1186,49 @@ export default function Dashboard() {
     }
   };
 
-  // Weekly todos handlers
+  // Weekly todos handlers - save to API
   const handleWeeklyTodosChange = async (items: StoredTodoItem[]) => {
-    const wasAdding = items.length > weeklyTodos.length;
     setWeeklyTodos(items);
     if (!useMockData) {
-      const weekId = getWeekId(new Date());
-      saveWeeklyTodoListToStorage({
-        weekId,
-        items,
-        bonusEnabled: weeklyTodoBonusEnabled,
-        bonusPoints: weeklyTodoBonusPoints,
-        bonusAwarded: weeklyTodoBonusAwarded,
-      });
-      // Award first_weekly_todo one-time FP bonus when adding
-      if (wasAdding) {
-        try {
-          await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_weekly_todo" });
-          queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
-        } catch (e) { console.error("FP award error:", e); }
-      }
+      try {
+        await apiRequest("PUT", `/api/habit/weekly-todos/${currentWeekId}`, {
+          items,
+          bonusEnabled: weeklyTodoBonusEnabled,
+          bonusPoints: weeklyTodoBonusPoints,
+          bonusAwarded: weeklyTodoBonusAwarded,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", currentWeekId] });
+      } catch (e) { console.error("Error saving weekly todos:", e); }
     }
   };
 
-  const handleWeeklyTodoBonusEnabledChange = (enabled: boolean) => {
+  const handleWeeklyTodoBonusEnabledChange = async (enabled: boolean) => {
     setWeeklyTodoBonusEnabled(enabled);
     if (!useMockData) {
-      const weekId = getWeekId(new Date());
-      saveWeeklyTodoListToStorage({
-        weekId,
-        items: weeklyTodos,
-        bonusEnabled: enabled,
-        bonusPoints: weeklyTodoBonusPoints,
-        bonusAwarded: weeklyTodoBonusAwarded,
-      });
+      try {
+        await apiRequest("PUT", `/api/habit/weekly-todos/${currentWeekId}`, {
+          items: weeklyTodos,
+          bonusEnabled: enabled,
+          bonusPoints: weeklyTodoBonusPoints,
+          bonusAwarded: weeklyTodoBonusAwarded,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", currentWeekId] });
+      } catch (e) { console.error("Error saving weekly todos:", e); }
     }
   };
 
-  const handleWeeklyTodoBonusPointsChange = (points: number) => {
+  const handleWeeklyTodoBonusPointsChange = async (points: number) => {
     setWeeklyTodoBonusPoints(points);
     if (!useMockData) {
-      const weekId = getWeekId(new Date());
-      saveWeeklyTodoListToStorage({
-        weekId,
-        items: weeklyTodos,
-        bonusEnabled: weeklyTodoBonusEnabled,
-        bonusPoints: points,
-        bonusAwarded: weeklyTodoBonusAwarded,
-      });
+      try {
+        await apiRequest("PUT", `/api/habit/weekly-todos/${currentWeekId}`, {
+          items: weeklyTodos,
+          bonusEnabled: weeklyTodoBonusEnabled,
+          bonusPoints: points,
+          bonusAwarded: weeklyTodoBonusAwarded,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", currentWeekId] });
+      } catch (e) { console.error("Error saving weekly todos:", e); }
     }
   };
 

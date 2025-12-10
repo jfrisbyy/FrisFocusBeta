@@ -127,6 +127,12 @@ export default function DailyPage() {
     queryKey: ["/api/habit/logs", dateStr],
     enabled: !isDemo,
   });
+
+  // Fetch daily todos from API
+  const { data: apiDailyTodos, isFetched: dailyTodosFetched } = useQuery<any>({
+    queryKey: ["/api/habit/daily-todos", dateStr],
+    enabled: !isDemo,
+  });
   
   // Check if API queries have completed their initial fetch
   const apiQueriesReady = isDemo || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched));
@@ -276,23 +282,32 @@ export default function DailyPage() {
     }
   }, [dateStr, isDemo, apiDailyLog, dailyLogFetched]);
 
-  // Load todos from localStorage when date changes (todos not in API yet)
+  // Load todos from API when date changes
   useEffect(() => {
     if (isDemo) return;
     
-    const todoList = loadDailyTodoListFromStorage(dateStr);
-    if (todoList) {
-      setTodoItems(todoList.items);
-      setTodoBonusEnabled(todoList.bonusEnabled);
-      setTodoBonusPoints(todoList.bonusPoints);
-      setTodoBonusAwarded(todoList.bonusAwarded);
-    } else {
+    if (apiDailyTodos) {
+      setTodoItems(apiDailyTodos.items || []);
+      setTodoBonusEnabled(apiDailyTodos.bonusEnabled ?? false);
+      setTodoBonusPoints(apiDailyTodos.bonusPoints ?? 10);
+      setTodoBonusAwarded(apiDailyTodos.bonusAwarded ?? false);
+    } else if (dailyTodosFetched) {
+      // API returned null (no todos for this date) - start fresh
       setTodoItems([]);
       setTodoBonusEnabled(false);
       setTodoBonusPoints(10);
       setTodoBonusAwarded(false);
+    } else {
+      // While fetching, use localStorage as initial state
+      const todoList = loadDailyTodoListFromStorage(dateStr);
+      if (todoList) {
+        setTodoItems(todoList.items);
+        setTodoBonusEnabled(todoList.bonusEnabled);
+        setTodoBonusPoints(todoList.bonusPoints);
+        setTodoBonusAwarded(todoList.bonusAwarded);
+      }
     }
-  }, [dateStr, isDemo]);
+  }, [dateStr, isDemo, apiDailyTodos, dailyTodosFetched]);
 
   const categories = useMemo(() => {
     const cats = Array.from(new Set(allTasks.map(t => t.category)));
@@ -350,44 +365,50 @@ export default function DailyPage() {
   const todoBonus = allTodosCompleted && todoBonusEnabled ? todoBonusPoints : 0;
   const totalTodoPoints = todoCompletedPoints + todoBonus;
 
-  const handleTodoItemsChange = (items: StoredTodoItem[]) => {
+  const handleTodoItemsChange = async (items: StoredTodoItem[]) => {
     setTodoItems(items);
     if (!isDemo) {
       const allCompleted = items.length > 0 && items.every(item => item.completed);
       const bonusAwarded = allCompleted && todoBonusEnabled;
-      saveDailyTodoListToStorage({
-        date: dateStr,
-        items,
-        bonusEnabled: todoBonusEnabled,
-        bonusPoints: todoBonusPoints,
-        bonusAwarded,
-      });
+      try {
+        await apiRequest("PUT", `/api/habit/daily-todos/${dateStr}`, {
+          items,
+          bonusEnabled: todoBonusEnabled,
+          bonusPoints: todoBonusPoints,
+          bonusAwarded,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/daily-todos", dateStr] });
+      } catch (e) { console.error("Error saving daily todos:", e); }
     }
   };
 
-  const handleTodoBonusEnabledChange = (enabled: boolean) => {
+  const handleTodoBonusEnabledChange = async (enabled: boolean) => {
     setTodoBonusEnabled(enabled);
     if (!isDemo) {
-      saveDailyTodoListToStorage({
-        date: dateStr,
-        items: todoItems,
-        bonusEnabled: enabled,
-        bonusPoints: todoBonusPoints,
-        bonusAwarded: todoBonusAwarded,
-      });
+      try {
+        await apiRequest("PUT", `/api/habit/daily-todos/${dateStr}`, {
+          items: todoItems,
+          bonusEnabled: enabled,
+          bonusPoints: todoBonusPoints,
+          bonusAwarded: todoBonusAwarded,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/daily-todos", dateStr] });
+      } catch (e) { console.error("Error saving daily todos:", e); }
     }
   };
 
-  const handleTodoBonusPointsChange = (points: number) => {
+  const handleTodoBonusPointsChange = async (points: number) => {
     setTodoBonusPoints(points);
     if (!isDemo) {
-      saveDailyTodoListToStorage({
-        date: dateStr,
-        items: todoItems,
-        bonusEnabled: todoBonusEnabled,
-        bonusPoints: points,
-        bonusAwarded: todoBonusAwarded,
-      });
+      try {
+        await apiRequest("PUT", `/api/habit/daily-todos/${dateStr}`, {
+          items: todoItems,
+          bonusEnabled: todoBonusEnabled,
+          bonusPoints: points,
+          bonusAwarded: todoBonusAwarded,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/daily-todos", dateStr] });
+      } catch (e) { console.error("Error saving daily todos:", e); }
     }
   };
 
