@@ -3863,7 +3863,26 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         circleId,
         authorId: userId,
       });
-      const [post] = await db.insert(circlePosts).values(parsed).returning();
+
+      // Normalize image URL if provided (convert signed GCS URL to /objects/ path)
+      let normalizedImageUrl = parsed.imageUrl;
+      if (normalizedImageUrl) {
+        const { ObjectStorageService } = await import("./objectStorage");
+        const objectStorageService = new ObjectStorageService();
+        try {
+          normalizedImageUrl = await objectStorageService.trySetObjectEntityAclPolicy(normalizedImageUrl, {
+            owner: userId,
+            visibility: "public",
+          });
+        } catch (error) {
+          console.error("Error normalizing image URL:", error);
+        }
+      }
+
+      const [post] = await db.insert(circlePosts).values({
+        ...parsed,
+        imageUrl: normalizedImageUrl,
+      }).returning();
 
       const [author] = await db.select().from(users).where(eq(users.id, userId));
       res.json({

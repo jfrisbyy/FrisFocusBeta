@@ -711,6 +711,7 @@ export const circlePosts = pgTable("circle_posts", {
   circleId: varchar("circle_id").notNull().references(() => circles.id, { onDelete: "cascade" }),
   authorId: varchar("author_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
