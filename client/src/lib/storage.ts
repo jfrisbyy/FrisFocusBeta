@@ -548,6 +548,13 @@ export interface StoredCircleTaskCompletion {
   completedAt: string;
 }
 
+export interface RequestVote {
+  voterId: string;
+  voterName: string;
+  vote: "for" | "against";
+  votedAt: string;
+}
+
 export interface StoredCircleTaskAdjustmentRequest {
   id: string;
   circleId: string;
@@ -560,6 +567,37 @@ export interface StoredCircleTaskAdjustmentRequest {
   createdAt: string;
   reviewedById?: string;
   reviewedAt?: string;
+  note?: string;
+  votes?: RequestVote[];
+}
+
+export interface StoredBadgeRequest {
+  id: string;
+  circleId: string;
+  requesterId: string;
+  requesterName: string;
+  type: "badge" | "award";
+  data: {
+    name: string;
+    description?: string;
+    icon?: string;
+    required?: number;
+    taskId?: string;
+    awardType?: "first_to" | "most_in_category" | "weekly_champion";
+    target?: number;
+    category?: string;
+    reward?: {
+      type: "points" | "gift" | "both";
+      points?: number;
+      gift?: string;
+    };
+  };
+  status: ApprovalStatus;
+  createdAt: string;
+  reviewedById?: string;
+  reviewedAt?: string;
+  note?: string;
+  votes?: RequestVote[];
 }
 
 export interface StoredCircleMessage {

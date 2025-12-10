@@ -68,6 +68,9 @@ import {
   UserCheck,
   LogOut,
   UserMinus,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
 } from "lucide-react";
 import type { 
   StoredFriend, 
@@ -83,6 +86,8 @@ import type {
   StoredCircleTaskAdjustmentRequest,
   StoredFriendActivity,
   CircleTaskType,
+  StoredBadgeRequest,
+  RequestVote,
 } from "@/lib/storage";
 // Note: localStorage functions removed - API endpoints handle data persistence in non-demo mode
 
@@ -2432,7 +2437,22 @@ export default function CommunityPage() {
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskValue, setNewTaskValue] = useState("10");
   const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
+  const [newTaskNote, setNewTaskNote] = useState("");
   const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>({});
+  
+  // Request Edit Task state (for regular members)
+  const [showRequestEditTask, setShowRequestEditTask] = useState(false);
+  const [requestEditTask, setRequestEditTask] = useState<StoredCircleTask | null>(null);
+  const [requestEditTaskName, setRequestEditTaskName] = useState("");
+  const [requestEditTaskValue, setRequestEditTaskValue] = useState("");
+  const [requestEditTaskType, setRequestEditTaskType] = useState<CircleTaskType>("per_person");
+  const [requestEditTaskNote, setRequestEditTaskNote] = useState("");
+  
+  // Request Award state (for regular members)
+  const [showRequestAward, setShowRequestAward] = useState(false);
+  const [requestAwardName, setRequestAwardName] = useState("");
+  const [requestAwardDescription, setRequestAwardDescription] = useState("");
+  const [requestAwardNote, setRequestAwardNote] = useState("");
   const [circleDetailTab, setCircleDetailTab] = useState("tasks");
   
   // Circle badges and awards state (mutable versions of demo data)
@@ -3005,7 +3025,9 @@ export default function CommunityPage() {
   const [newAwardTaskId, setNewAwardTaskId] = useState<string>("");
   
   // Badge/Award requests for approval
-  const [badgeRequests, setBadgeRequests] = useState<{ id: string; circleId: string; requesterId: string; requesterName: string; type: "badge" | "award"; data: any; status: string; createdAt: string }[]>([]);
+  const [badgeRequests, setBadgeRequests] = useState<StoredBadgeRequest[]>([]);
+  
+  // Request note fields (newTaskNote, showRequestEditTask, etc. defined earlier)
 
   // Edit state for tasks, badges, awards
   const [editingTask, setEditingTask] = useState<StoredCircleTask | null>(null);
@@ -4022,6 +4044,8 @@ export default function CommunityPage() {
         taskData: { name: newTaskName.trim(), value: parseInt(newTaskValue) || 10, taskType: newTaskType },
         status: "pending",
         createdAt: new Date().toISOString(),
+        note: newTaskNote.trim() || undefined,
+        votes: [],
       };
       setTaskRequests([...taskRequests, request]);
       toast({ title: "Task request submitted", description: "Waiting for owner/admin approval" });
@@ -4031,6 +4055,7 @@ export default function CommunityPage() {
     setNewTaskName("");
     setNewTaskValue("10");
     setNewTaskType("per_person");
+    setNewTaskNote("");
   };
 
   const handleApproveRequest = (requestId: string) => {
@@ -4050,6 +4075,22 @@ export default function CommunityPage() {
       };
       const current = circleTasks[selectedCircle.id] || [];
       setCircleTasks({ ...circleTasks, [selectedCircle.id]: [...current, newTask] });
+    } else if (request.type === "edit" && request.existingTaskId) {
+      const current = circleTasks[selectedCircle.id] || [];
+      const updatedTasks = current.map(t => 
+        t.id === request.existingTaskId 
+          ? { 
+              ...t, 
+              name: request.taskData.name || t.name,
+              value: request.taskData.value || t.value,
+              taskType: request.taskData.taskType || t.taskType,
+            } 
+          : t
+      );
+      setCircleTasks({ ...circleTasks, [selectedCircle.id]: updatedTasks });
+    } else if (request.type === "delete" && request.existingTaskId) {
+      const current = circleTasks[selectedCircle.id] || [];
+      setCircleTasks({ ...circleTasks, [selectedCircle.id]: current.filter(t => t.id !== request.existingTaskId) });
     }
     
     setTaskRequests(taskRequests.map(r => 
@@ -4063,6 +4104,107 @@ export default function CommunityPage() {
       r.id === requestId ? { ...r, status: "rejected", reviewedById: "you", reviewedAt: new Date().toISOString() } : r
     ));
     toast({ title: "Request rejected" });
+  };
+
+  // Handle task edit request from regular members
+  const handleSubmitEditTaskRequest = () => {
+    if (!selectedCircle || !requestEditTask) return;
+    
+    const request: StoredCircleTaskAdjustmentRequest = {
+      id: `req-${Date.now()}`,
+      circleId: selectedCircle.id,
+      requesterId: "you",
+      requesterName: "You",
+      type: "edit",
+      existingTaskId: requestEditTask.id,
+      taskData: { 
+        name: requestEditTaskName.trim(), 
+        value: parseInt(requestEditTaskValue) || 10, 
+        taskType: requestEditTaskType 
+      },
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      note: requestEditTaskNote.trim() || undefined,
+      votes: [],
+    };
+    setTaskRequests([...taskRequests, request]);
+    toast({ title: "Edit request submitted", description: "Waiting for owner/admin approval" });
+    
+    setShowRequestEditTask(false);
+    setRequestEditTask(null);
+    setRequestEditTaskName("");
+    setRequestEditTaskValue("10");
+    setRequestEditTaskType("per_person");
+    setRequestEditTaskNote("");
+  };
+
+  // Handle award request from regular members
+  const handleSubmitAwardRequest = () => {
+    if (!selectedCircle) return;
+    
+    const request: StoredBadgeRequest = {
+      id: `breq-${Date.now()}`,
+      circleId: selectedCircle.id,
+      requesterId: "you",
+      requesterName: "You",
+      type: "award",
+      data: {
+        name: requestAwardName.trim(),
+        description: requestAwardDescription.trim(),
+      },
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      note: requestAwardNote.trim() || undefined,
+      votes: [],
+    };
+    setBadgeRequests([...badgeRequests, request]);
+    toast({ title: "Award request submitted", description: "Waiting for owner/admin approval" });
+    
+    setShowRequestAward(false);
+    setRequestAwardName("");
+    setRequestAwardDescription("");
+    setRequestAwardNote("");
+  };
+
+  // Handle voting on requests
+  const handleVoteOnRequest = (requestId: string, requestType: "task" | "badge", vote: "for" | "against") => {
+    const newVote: RequestVote = {
+      voterId: "you",
+      voterName: "You",
+      vote,
+      votedAt: new Date().toISOString(),
+    };
+    
+    if (requestType === "task") {
+      setTaskRequests(taskRequests.map(r => {
+        if (r.id !== requestId) return r;
+        const existingVotes = r.votes || [];
+        const filtered = existingVotes.filter(v => v.voterId !== "you");
+        return { ...r, votes: [...filtered, newVote] };
+      }));
+    } else {
+      setBadgeRequests(badgeRequests.map(r => {
+        if (r.id !== requestId) return r;
+        const existingVotes = r.votes || [];
+        const filtered = existingVotes.filter(v => v.voterId !== "you");
+        return { ...r, votes: [...filtered, newVote] };
+      }));
+    }
+    toast({ title: vote === "for" ? "Voted in favor" : "Voted against" });
+  };
+
+  const getVoteCounts = (votes: RequestVote[] | undefined) => {
+    if (!votes) return { for: 0, against: 0 };
+    return {
+      for: votes.filter(v => v.vote === "for").length,
+      against: votes.filter(v => v.vote === "against").length,
+    };
+  };
+
+  const getMyVote = (votes: RequestVote[] | undefined): "for" | "against" | null => {
+    if (!votes) return null;
+    const myVote = votes.find(v => v.voterId === "you");
+    return myVote?.vote || null;
   };
 
   const handleChangeMemberRole = async (memberId: string, memberUserId: string, newRole: "admin" | "member") => {
@@ -4165,14 +4307,14 @@ export default function CommunityPage() {
       setCircleBadges({ ...circleBadges, [selectedCircle.id]: [...current, newBadge] });
       toast({ title: "Badge created" });
     } else {
-      const request = {
+      const request: StoredBadgeRequest = {
         id: `br-${Date.now()}`,
         circleId: selectedCircle.id,
         requesterId: "you",
         requesterName: "You",
         type: "badge" as const,
         data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10, reward, taskId: newBadgeTaskId || undefined },
-        status: "pending",
+        status: "pending" as ApprovalStatus,
         createdAt: new Date().toISOString(),
       };
       setBadgeRequests([...badgeRequests, request]);
@@ -4251,14 +4393,14 @@ export default function CommunityPage() {
       setCircleAwards({ ...circleAwards, [selectedCircle.id]: [...current, newAward] });
       toast({ title: "Award created" });
     } else {
-      const request = {
+      const request: StoredBadgeRequest = {
         id: `ar-${Date.now()}`,
         circleId: selectedCircle.id,
         requesterId: "you",
         requesterName: "You",
         type: "award" as const,
         data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory, reward: awardReward, taskId: newAwardTaskId || undefined },
-        status: "pending",
+        status: "pending" as ApprovalStatus,
         createdAt: new Date().toISOString(),
       };
       setBadgeRequests([...badgeRequests, request]);
@@ -7240,6 +7382,18 @@ export default function CommunityPage() {
                                   </SelectContent>
                                 </Select>
                               </div>
+                              {!isOwnerOrAdmin(selectedCircle.id) && (
+                                <div className="space-y-2">
+                                  <Label>Note (Optional)</Label>
+                                  <Textarea
+                                    placeholder="Explain why this task should be added..."
+                                    value={newTaskNote}
+                                    onChange={(e) => setNewTaskNote(e.target.value)}
+                                    className="min-h-[80px]"
+                                    data-testid="input-new-task-note"
+                                  />
+                                </div>
+                              )}
                             </div>
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setShowAddTask(false)}>Cancel</Button>
@@ -7285,6 +7439,116 @@ export default function CommunityPage() {
                       </DialogContent>
                     </Dialog>
 
+                    {/* Request Edit Task Dialog (for regular members) */}
+                    <Dialog open={showRequestEditTask} onOpenChange={setShowRequestEditTask}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Request Task Edit</DialogTitle>
+                          <DialogDescription>
+                            Suggest changes to this task. An admin will review your request.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Task Name</Label>
+                            <Input 
+                              value={requestEditTaskName} 
+                              onChange={(e) => setRequestEditTaskName(e.target.value)} 
+                              data-testid="input-request-edit-task-name" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Point Value</Label>
+                            <Input 
+                              type="number" 
+                              value={requestEditTaskValue} 
+                              onChange={(e) => setRequestEditTaskValue(e.target.value)} 
+                              data-testid="input-request-edit-task-value" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Task Type</Label>
+                            <Select value={requestEditTaskType} onValueChange={(v) => setRequestEditTaskType(v as CircleTaskType)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="per_person">Per-Person Daily</SelectItem>
+                                <SelectItem value="circle_task">Circle Task</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Reason for Change</Label>
+                            <Textarea
+                              placeholder="Explain why this change should be made..."
+                              value={requestEditTaskNote}
+                              onChange={(e) => setRequestEditTaskNote(e.target.value)}
+                              className="min-h-[80px]"
+                              data-testid="input-request-edit-task-note"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowRequestEditTask(false)}>Cancel</Button>
+                          <Button onClick={handleSubmitEditTaskRequest} data-testid="button-submit-edit-request">
+                            Submit Request
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Request Award Dialog (for regular members) */}
+                    <Dialog open={showRequestAward} onOpenChange={setShowRequestAward}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Request New Award</DialogTitle>
+                          <DialogDescription>
+                            Suggest a new award for the circle. An admin will review your request.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Award Name</Label>
+                            <Input 
+                              placeholder="e.g., Most Improved, Weekly Champion"
+                              value={requestAwardName} 
+                              onChange={(e) => setRequestAwardName(e.target.value)} 
+                              data-testid="input-request-award-name" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea 
+                              placeholder="Describe the award and how it's earned..."
+                              value={requestAwardDescription} 
+                              onChange={(e) => setRequestAwardDescription(e.target.value)}
+                              className="min-h-[80px]"
+                              data-testid="input-request-award-description" 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Note (Optional)</Label>
+                            <Textarea
+                              placeholder="Explain why this award should be added..."
+                              value={requestAwardNote}
+                              onChange={(e) => setRequestAwardNote(e.target.value)}
+                              className="min-h-[60px]"
+                              data-testid="input-request-award-note"
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowRequestAward(false)}>Cancel</Button>
+                          <Button 
+                            onClick={handleSubmitAwardRequest} 
+                            disabled={!requestAwardName.trim()}
+                            data-testid="button-submit-award-request"
+                          >
+                            Submit Request
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <CardContent>
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium text-muted-foreground mb-2">Per-Person Daily Tasks</h4>
@@ -7324,7 +7588,7 @@ export default function CommunityPage() {
                                       </div>
                                     )}
                                     <Badge variant="outline">{task.value} pts</Badge>
-                                    {isOwnerOrAdmin(selectedCircle.id) && (
+                                    {isOwnerOrAdmin(selectedCircle.id) ? (
                                       <div className="flex gap-1">
                                         <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); startEditTask(task); }} data-testid={`button-edit-task-${task.id}`}>
                                           <Pencil className="w-4 h-4" />
@@ -7333,6 +7597,24 @@ export default function CommunityPage() {
                                           <Trash2 className="w-4 h-4" />
                                         </Button>
                                       </div>
+                                    ) : (
+                                      <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          setRequestEditTask(task);
+                                          setRequestEditTaskName(task.name);
+                                          setRequestEditTaskValue(task.value.toString());
+                                          setRequestEditTaskType(task.taskType);
+                                          setRequestEditTaskNote("");
+                                          setShowRequestEditTask(true);
+                                        }} 
+                                        data-testid={`button-request-edit-task-${task.id}`}
+                                      >
+                                        <Pencil className="w-4 h-4 mr-1" />
+                                        Request Edit
+                                      </Button>
                                     )}
                                   </div>
                                 </div>
@@ -7390,7 +7672,7 @@ export default function CommunityPage() {
                                       </Avatar>
                                     )}
                                     <Badge variant="outline">{task.value} pts</Badge>
-                                    {isOwnerOrAdmin(selectedCircle.id) && (
+                                    {isOwnerOrAdmin(selectedCircle.id) ? (
                                       <div className="flex gap-1">
                                         <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); startEditTask(task); }} data-testid={`button-edit-task-${task.id}`}>
                                           <Pencil className="w-4 h-4" />
@@ -7399,6 +7681,24 @@ export default function CommunityPage() {
                                           <Trash2 className="w-4 h-4" />
                                         </Button>
                                       </div>
+                                    ) : (
+                                      <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          setRequestEditTask(task);
+                                          setRequestEditTaskName(task.name);
+                                          setRequestEditTaskValue(task.value.toString());
+                                          setRequestEditTaskType(task.taskType);
+                                          setRequestEditTaskNote("");
+                                          setShowRequestEditTask(true);
+                                        }} 
+                                        data-testid={`button-request-edit-task-${task.id}`}
+                                      >
+                                        <Pencil className="w-4 h-4 mr-1" />
+                                        Request Edit
+                                      </Button>
                                     )}
                                   </div>
                                 </div>
@@ -10170,7 +10470,7 @@ export default function CommunityPage() {
                   {!isOwnerOrAdmin(selectedCircle.id) && (
                     <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
                       <AlertCircle className="w-4 h-4" />
-                      <span>You can view pending requests, but only admins can approve or reject them.</span>
+                      <span>You can view and vote on pending requests, but only admins can approve or reject them.</span>
                     </div>
                   )}
                   
@@ -10183,7 +10483,7 @@ export default function CommunityPage() {
                       <CardDescription>
                         {isOwnerOrAdmin(selectedCircle.id) 
                           ? "Review and approve task changes from members" 
-                          : "Pending task requests awaiting approval"}
+                          : "Pending task requests awaiting approval - vote to show your support"}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -10194,38 +10494,78 @@ export default function CommunityPage() {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {pendingRequestsForCircle.map((request) => (
-                            <div key={request.id} className="p-4 rounded-md border">
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Badge variant={request.type === "add" ? "default" : request.type === "edit" ? "secondary" : "destructive"}>
-                                      {request.type.toUpperCase()}
-                                    </Badge>
-                                    <span className="text-sm text-muted-foreground">
-                                      from {request.requesterName} - {formatTime(request.createdAt)}
-                                    </span>
+                          {pendingRequestsForCircle.map((request) => {
+                            const voteCounts = getVoteCounts(request.votes);
+                            const myVote = getMyVote(request.votes);
+                            return (
+                              <div key={request.id} className="p-4 rounded-md border space-y-3">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                      <Badge variant={request.type === "add" ? "default" : request.type === "edit" ? "secondary" : "destructive"}>
+                                        {request.type.toUpperCase()}
+                                      </Badge>
+                                      <span className="text-sm text-muted-foreground">
+                                        from {request.requesterName} - {formatTime(request.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="font-medium">{request.taskData.name}</p>
+                                    {request.taskData.value && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {request.taskData.value} points - {request.taskData.taskType === "circle_task" ? "Circle Task" : "Per-Person"}
+                                      </p>
+                                    )}
+                                    {request.note && (
+                                      <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                                          <MessageSquare className="w-3 h-3" />
+                                          <span>Note:</span>
+                                        </div>
+                                        <p className="text-sm">{request.note}</p>
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className="font-medium">{request.taskData.name}</p>
-                                  {request.taskData.value && (
-                                    <p className="text-sm text-muted-foreground">
-                                      {request.taskData.value} points - {request.taskData.taskType === "circle_task" ? "Circle Task" : "Per-Person"}
-                                    </p>
+                                  {isOwnerOrAdmin(selectedCircle.id) && (
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => handleApproveRequest(request.id)} data-testid={`button-approve-${request.id}`}>
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => handleRejectRequest(request.id)} data-testid={`button-reject-${request.id}`}>
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
                                   )}
                                 </div>
-                                {isOwnerOrAdmin(selectedCircle.id) && (
-                                  <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => handleApproveRequest(request.id)} data-testid={`button-approve-${request.id}`}>
-                                      <Check className="w-4 h-4" />
+                                <div className="flex items-center gap-4 pt-2 border-t">
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant={myVote === "for" ? "default" : "ghost"}
+                                      onClick={() => handleVoteOnRequest(request.id, "task", "for")}
+                                      className="gap-1"
+                                      data-testid={`button-vote-for-${request.id}`}
+                                    >
+                                      <ThumbsUp className="w-4 h-4" />
+                                      <span>{voteCounts.for}</span>
                                     </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => handleRejectRequest(request.id)} data-testid={`button-reject-${request.id}`}>
-                                      <X className="w-4 h-4" />
+                                    <Button
+                                      size="sm"
+                                      variant={myVote === "against" ? "destructive" : "ghost"}
+                                      onClick={() => handleVoteOnRequest(request.id, "task", "against")}
+                                      className="gap-1"
+                                      data-testid={`button-vote-against-${request.id}`}
+                                    >
+                                      <ThumbsDown className="w-4 h-4" />
+                                      <span>{voteCounts.against}</span>
                                     </Button>
                                   </div>
-                                )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {(voteCounts.for + voteCounts.against)} vote{(voteCounts.for + voteCounts.against) !== 1 ? "s" : ""}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </CardContent>
@@ -10235,54 +10575,94 @@ export default function CommunityPage() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Award className="w-5 h-5" />
-                        Badge Requests
+                        Badge & Award Requests
                       </CardTitle>
                       <CardDescription>
                         {isOwnerOrAdmin(selectedCircle.id) 
-                          ? "Review and approve badge requests from members" 
-                          : "Pending badge requests awaiting approval"}
+                          ? "Review and approve badge/award requests from members" 
+                          : "Pending badge/award requests awaiting approval - vote to show your support"}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       {pendingBadgeRequestsForCircle.length === 0 ? (
                         <div className="text-center py-8 text-muted-foreground">
                           <Check className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                          <p>No pending badge requests</p>
+                          <p>No pending badge or award requests</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {pendingBadgeRequestsForCircle.map((request) => (
-                            <div key={request.id} className="p-4 rounded-md border">
-                              <div className="flex items-start justify-between gap-4">
-                                <div>
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Badge variant="secondary">
-                                      {request.type.toUpperCase()}
-                                    </Badge>
-                                    <span className="text-sm text-muted-foreground">
-                                      from {request.requesterName} - {formatTime(request.createdAt)}
-                                    </span>
+                          {pendingBadgeRequestsForCircle.map((request) => {
+                            const voteCounts = getVoteCounts(request.votes);
+                            const myVote = getMyVote(request.votes);
+                            return (
+                              <div key={request.id} className="p-4 rounded-md border space-y-3">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                      <Badge variant={request.type === "award" ? "default" : "secondary"}>
+                                        {request.type.toUpperCase()}
+                                      </Badge>
+                                      <span className="text-sm text-muted-foreground">
+                                        from {request.requesterName} - {formatTime(request.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="font-medium">{request.data?.name || "Request"}</p>
+                                    {request.data?.description && (
+                                      <p className="text-sm text-muted-foreground">
+                                        {request.data.description}
+                                      </p>
+                                    )}
+                                    {request.note && (
+                                      <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                                          <MessageSquare className="w-3 h-3" />
+                                          <span>Note:</span>
+                                        </div>
+                                        <p className="text-sm">{request.note}</p>
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className="font-medium">{request.data?.name || "Badge Request"}</p>
-                                  {request.data?.description && (
-                                    <p className="text-sm text-muted-foreground">
-                                      {request.data.description}
-                                    </p>
+                                  {isOwnerOrAdmin(selectedCircle.id) && (
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => handleApproveBadgeRequest(request.id)} data-testid={`button-approve-badge-${request.id}`}>
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => handleRejectBadgeRequest(request.id)} data-testid={`button-reject-badge-${request.id}`}>
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
                                   )}
                                 </div>
-                                {isOwnerOrAdmin(selectedCircle.id) && (
-                                  <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => handleApproveBadgeRequest(request.id)} data-testid={`button-approve-badge-${request.id}`}>
-                                      <Check className="w-4 h-4" />
+                                <div className="flex items-center gap-4 pt-2 border-t">
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant={myVote === "for" ? "default" : "ghost"}
+                                      onClick={() => handleVoteOnRequest(request.id, "badge", "for")}
+                                      className="gap-1"
+                                      data-testid={`button-vote-for-badge-${request.id}`}
+                                    >
+                                      <ThumbsUp className="w-4 h-4" />
+                                      <span>{voteCounts.for}</span>
                                     </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => handleRejectBadgeRequest(request.id)} data-testid={`button-reject-badge-${request.id}`}>
-                                      <X className="w-4 h-4" />
+                                    <Button
+                                      size="sm"
+                                      variant={myVote === "against" ? "destructive" : "ghost"}
+                                      onClick={() => handleVoteOnRequest(request.id, "badge", "against")}
+                                      className="gap-1"
+                                      data-testid={`button-vote-against-badge-${request.id}`}
+                                    >
+                                      <ThumbsDown className="w-4 h-4" />
+                                      <span>{voteCounts.against}</span>
                                     </Button>
                                   </div>
-                                )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {(voteCounts.for + voteCounts.against)} vote{(voteCounts.for + voteCounts.against) !== 1 ? "s" : ""}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </CardContent>
