@@ -1398,3 +1398,55 @@ export const fpActivityDisplaySchema = z.object({
   createdAt: z.date().nullable(),
 });
 export type FpActivityDisplay = z.infer<typeof fpActivityDisplaySchema>;
+
+// ==================== ONE-TIME ACHIEVEMENTS ====================
+
+// Achievement types for first-time milestones
+export const achievementTypeEnum = z.enum([
+  "first_task",
+  "first_post",
+  "first_journal",
+  "first_event",
+  "first_due_date",
+  "first_milestone",
+  "first_weekly_todo",
+  "first_friend",
+  "first_badge",
+  "first_7_day_streak",
+  "first_challenge_accepted",
+  "first_cheerline_sent",
+  "first_circle_joined",
+  "first_circle_created",
+]);
+export type AchievementType = z.infer<typeof achievementTypeEnum>;
+
+// Achievement FP values
+export const ACHIEVEMENT_FP_VALUES: Record<AchievementType, number> = {
+  first_task: 10,
+  first_post: 10,
+  first_journal: 10,
+  first_event: 10,
+  first_due_date: 10,
+  first_milestone: 10,
+  first_weekly_todo: 10,
+  first_friend: 10,
+  first_badge: 10,
+  first_7_day_streak: 50,
+  first_challenge_accepted: 10,
+  first_cheerline_sent: 10,
+  first_circle_joined: 10,
+  first_circle_created: 10,
+};
+
+// User achievements table - tracks unlocked one-time achievements
+export const userAchievements = pgTable("user_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  achievementType: varchar("achievement_type").notNull(),
+  fpAwarded: integer("fp_awarded").notNull(),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+});
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true, unlockedAt: true });
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type UserAchievement = typeof userAchievements.$inferSelect;
