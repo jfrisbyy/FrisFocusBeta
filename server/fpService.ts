@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
-import { users, fpActivityLog, userDailyLogs, userHabitSettings, type FpEventType, type FpActivityLog } from "@shared/schema";
+import { users, fpActivityLog, userDailyLogs, userHabitSettings, userAchievements, type FpEventType, type FpActivityLog, type AchievementType, ACHIEVEMENT_FP_VALUES } from "@shared/schema";
 import { fpRules } from "@shared/fpRules";
 
 export interface FpAwardResult {
@@ -628,4 +628,124 @@ export async function checkAndAwardWeeklyTriggers(
   }
   
   return results;
+}
+
+// ==================== ONE-TIME ACHIEVEMENTS ====================
+
+export interface AchievementAwardResult {
+  success: boolean;
+  achievementType: AchievementType;
+  fpAwarded: number;
+  newTotal: number;
+  message: string;
+  alreadyUnlocked: boolean;
+}
+
+// Check if a user has already unlocked an achievement
+export async function hasAchievement(userId: string, achievementType: AchievementType): Promise<boolean> {
+  const existing = await db.select({ id: userAchievements.id })
+    .from(userAchievements)
+    .where(and(
+      eq(userAchievements.userId, userId),
+      eq(userAchievements.achievementType, achievementType)
+    ))
+    .limit(1);
+  return existing.length > 0;
+}
+
+// Get all achievements for a user
+export async function getUserAchievements(userId: string) {
+  return db.select()
+    .from(userAchievements)
+    .where(eq(userAchievements.userId, userId));
+}
+
+// Award a one-time achievement (if not already unlocked)
+export async function awardAchievement(
+  userId: string,
+  achievementType: AchievementType
+): Promise<AchievementAwardResult> {
+  const fpAmount = ACHIEVEMENT_FP_VALUES[achievementType];
+  
+  const alreadyUnlocked = await hasAchievement(userId, achievementType);
+  if (alreadyUnlocked) {
+    const [user] = await db.select({ fpTotal: users.fpTotal }).from(users).where(eq(users.id, userId));
+    return {
+      success: false,
+      achievementType,
+      fpAwarded: 0,
+      newTotal: user?.fpTotal || 0,
+      message: `Achievement "${achievementType}" already unlocked`,
+      alreadyUnlocked: true,
+    };
+  }
+
+  try {
+    // Insert achievement record
+    await db.insert(userAchievements).values({
+      userId,
+      achievementType,
+      fpAwarded: fpAmount,
+    });
+
+    // Log the FP award in activity log
+    const description = getAchievementDescription(achievementType);
+    await db.insert(fpActivityLog).values({
+      userId,
+      eventType: `achievement_${achievementType}`,
+      fpAmount,
+      description,
+    });
+
+    // Update user's FP total
+    const [updatedUser] = await db.update(users)
+      .set({ 
+        fpTotal: sql`COALESCE(${users.fpTotal}, 0) + ${fpAmount}`,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning({ fpTotal: users.fpTotal });
+
+    console.log(`[ACHIEVEMENT] Awarded "${achievementType}" to user ${userId}: +${fpAmount} FP`);
+
+    return {
+      success: true,
+      achievementType,
+      fpAwarded: fpAmount,
+      newTotal: updatedUser?.fpTotal || fpAmount,
+      message: description,
+      alreadyUnlocked: false,
+    };
+  } catch (error) {
+    console.error(`Error awarding achievement ${achievementType}:`, error);
+    return {
+      success: false,
+      achievementType,
+      fpAwarded: 0,
+      newTotal: 0,
+      message: `Failed to award achievement: ${error}`,
+      alreadyUnlocked: false,
+    };
+  }
+}
+
+// Get human-readable description for achievements
+function getAchievementDescription(achievementType: AchievementType): string {
+  const descriptions: Record<AchievementType, string> = {
+    first_task: "Created your first task",
+    first_post: "Posted to the feed for the first time",
+    first_journal: "Wrote your first journal entry",
+    first_event: "Added your first event",
+    first_due_date: "Added your first due date",
+    first_milestone: "Created your first milestone",
+    first_weekly_todo: "Added your first weekly to-do item",
+    first_friend: "Added your first friend",
+    first_badge: "Created your first badge",
+    first_7_day_streak: "Completed your first 7-day logging streak",
+    first_challenge_accepted: "Accepted your first challenge",
+    first_cheerline_sent: "Sent your first cheerline",
+    first_circle_joined: "Joined your first circle",
+    first_circle_created: "Created your first circle",
+  };
+  return descriptions[achievementType];
 }
