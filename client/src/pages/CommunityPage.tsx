@@ -7104,14 +7104,12 @@ export default function CommunityPage() {
                     <Swords className="w-4 h-4 mr-1" />
                     Compete
                   </TabsTrigger>
-                  {isOwnerOrAdmin(selectedCircle.id) && (
-                    <TabsTrigger value="approvals">
-                      Approvals
-                      {pendingRequestsForCircle.length > 0 && (
-                        <Badge variant="destructive" className="ml-1">{pendingRequestsForCircle.length}</Badge>
-                      )}
-                    </TabsTrigger>
-                  )}
+                  <TabsTrigger value="requests" data-testid="tab-requests">
+                    Requests
+                    {(pendingRequestsForCircle.length + pendingBadgeRequestsForCircle.length) > 0 && (
+                      <Badge variant="secondary" className="ml-1">{pendingRequestsForCircle.length + pendingBadgeRequestsForCircle.length}</Badge>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="tasks" className="space-y-4 mt-4">
@@ -10168,45 +10166,54 @@ export default function CommunityPage() {
                   )}
                 </TabsContent>
 
-                {isOwnerOrAdmin(selectedCircle.id) && (
-                  <TabsContent value="approvals" className="space-y-4 mt-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <AlertCircle className="w-5 h-5" />
-                          Task Adjustment Requests
-                        </CardTitle>
-                        <CardDescription>
-                          Review and approve task changes from members
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {pendingRequestsForCircle.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <Check className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                            <p>No pending requests</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {pendingRequestsForCircle.map((request) => (
-                              <div key={request.id} className="p-4 rounded-md border">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Badge variant={request.type === "add" ? "default" : request.type === "edit" ? "secondary" : "destructive"}>
-                                        {request.type.toUpperCase()}
-                                      </Badge>
-                                      <span className="text-sm text-muted-foreground">
-                                        from {request.requesterName} - {formatTime(request.createdAt)}
-                                      </span>
-                                    </div>
-                                    <p className="font-medium">{request.taskData.name}</p>
-                                    {request.taskData.value && (
-                                      <p className="text-sm text-muted-foreground">
-                                        {request.taskData.value} points - {request.taskData.taskType === "circle_task" ? "Circle Task" : "Per-Person"}
-                                      </p>
-                                    )}
+                <TabsContent value="requests" className="space-y-4 mt-4">
+                  {!isOwnerOrAdmin(selectedCircle.id) && (
+                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md text-sm text-muted-foreground">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>You can view pending requests, but only admins can approve or reject them.</span>
+                    </div>
+                  )}
+                  
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5" />
+                        Task Requests
+                      </CardTitle>
+                      <CardDescription>
+                        {isOwnerOrAdmin(selectedCircle.id) 
+                          ? "Review and approve task changes from members" 
+                          : "Pending task requests awaiting approval"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {pendingRequestsForCircle.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Check className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No pending task requests</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {pendingRequestsForCircle.map((request) => (
+                            <div key={request.id} className="p-4 rounded-md border">
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge variant={request.type === "add" ? "default" : request.type === "edit" ? "secondary" : "destructive"}>
+                                      {request.type.toUpperCase()}
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      from {request.requesterName} - {formatTime(request.createdAt)}
+                                    </span>
                                   </div>
+                                  <p className="font-medium">{request.taskData.name}</p>
+                                  {request.taskData.value && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {request.taskData.value} points - {request.taskData.taskType === "circle_task" ? "Circle Task" : "Per-Person"}
+                                    </p>
+                                  )}
+                                </div>
+                                {isOwnerOrAdmin(selectedCircle.id) && (
                                   <div className="flex gap-2">
                                     <Button size="sm" onClick={() => handleApproveRequest(request.id)} data-testid={`button-approve-${request.id}`}>
                                       <Check className="w-4 h-4" />
@@ -10215,15 +10222,72 @@ export default function CommunityPage() {
                                       <X className="w-4 h-4" />
                                     </Button>
                                   </div>
-                                </div>
+                                )}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Award className="w-5 h-5" />
+                        Badge Requests
+                      </CardTitle>
+                      <CardDescription>
+                        {isOwnerOrAdmin(selectedCircle.id) 
+                          ? "Review and approve badge requests from members" 
+                          : "Pending badge requests awaiting approval"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {pendingBadgeRequestsForCircle.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Check className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No pending badge requests</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {pendingBadgeRequestsForCircle.map((request) => (
+                            <div key={request.id} className="p-4 rounded-md border">
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge variant="secondary">
+                                      {request.type.toUpperCase()}
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      from {request.requesterName} - {formatTime(request.createdAt)}
+                                    </span>
+                                  </div>
+                                  <p className="font-medium">{request.data?.name || "Badge Request"}</p>
+                                  {request.data?.description && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {request.data.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {isOwnerOrAdmin(selectedCircle.id) && (
+                                  <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => handleApproveBadgeRequest(request.id)} data-testid={`button-approve-badge-${request.id}`}>
+                                      <Check className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleRejectBadgeRequest(request.id)} data-testid={`button-reject-badge-${request.id}`}>
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
               </Tabs>
             </div>
           )}
