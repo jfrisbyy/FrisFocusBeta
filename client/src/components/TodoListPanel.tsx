@@ -47,9 +47,9 @@ export default function TodoListPanel({
   isDemo = false,
 }: TodoListPanelProps) {
   const [newTitle, setNewTitle] = useState("");
-  const [newPoints, setNewPoints] = useState("5");
+  const [newPoints, setNewPoints] = useState("0");
   const [newPenaltyEnabled, setNewPenaltyEnabled] = useState(false);
-  const [newPenaltyValue, setNewPenaltyValue] = useState("5");
+  const [newPenaltyValue, setNewPenaltyValue] = useState("0");
   const [showSettings, setShowSettings] = useState(false);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -84,9 +84,9 @@ export default function TodoListPanel({
     };
     onItemsChange([...items, newItem]);
     setNewTitle("");
-    setNewPoints("5");
+    setNewPoints("0");
     setNewPenaltyEnabled(false);
-    setNewPenaltyValue("5");
+    setNewPenaltyValue("0");
   };
 
   const handleToggleItem = (id: string) => {
