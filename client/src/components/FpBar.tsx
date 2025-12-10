@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Flame } from "lucide-react";
+import { Flame, Plus } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +35,9 @@ function getProgressToNextTier(fp: number) {
 export default function FpBar() {
   const { user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [fpGain, setFpGain] = useState<number | null>(null);
+  const [showGainAnimation, setShowGainAnimation] = useState(false);
+  const prevFpRef = useRef<number | null>(null);
 
   const { isDemo } = useDemo();
   
@@ -44,11 +47,33 @@ export default function FpBar() {
     refetchInterval: 5000,
   });
 
+  const fpTotal = fpData?.fpTotal || 0;
+
+  // Detect FP changes and show animation
+  useEffect(() => {
+    if (prevFpRef.current !== null && fpTotal > prevFpRef.current) {
+      const gain = fpTotal - prevFpRef.current;
+      setFpGain(gain);
+      setShowGainAnimation(true);
+      
+      // Hide animation after 2 seconds
+      const timer = setTimeout(() => {
+        setShowGainAnimation(false);
+        setFpGain(null);
+      }, 2000);
+      
+      // Always update the ref to the latest value
+      prevFpRef.current = fpTotal;
+      
+      return () => clearTimeout(timer);
+    }
+    // Always update the ref to the latest value
+    prevFpRef.current = fpTotal;
+  }, [fpTotal]);
+
   if (!user || isDemo) {
     return null;
   }
-
-  const fpTotal = fpData?.fpTotal || 0;
   const currentTier = getCurrentTier(fpTotal);
   const progress = getProgressToNextTier(fpTotal);
   const nextTierFp = currentTier.maxFp === Infinity ? null : currentTier.maxFp;
@@ -59,7 +84,7 @@ export default function FpBar() {
         <TooltipTrigger asChild>
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex items-center gap-2 rounded-md hover-elevate active-elevate-2 px-2 py-1"
+            className="flex items-center gap-2 rounded-md hover-elevate active-elevate-2 px-2 py-1 relative"
             data-testid="button-fp-bar"
           >
             <Flame className="h-4 w-4 text-orange-500" />
@@ -76,6 +101,17 @@ export default function FpBar() {
                 data-testid="progress-fp"
               />
             </div>
+            
+            {/* FP Gain Animation */}
+            {showGainAnimation && fpGain && (
+              <span 
+                className="absolute -top-2 -right-2 flex items-center gap-0.5 text-xs font-bold text-green-500 animate-bounce pointer-events-none"
+                data-testid="text-fp-gain"
+              >
+                <Plus className="h-3 w-3" />
+                {fpGain}
+              </span>
+            )}
           </button>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="text-center">

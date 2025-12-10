@@ -2815,6 +2815,56 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
+  // Remove member from circle (owner or admin only)
+  app.delete("/api/circles/:id/members/:memberId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+      const memberId = req.params.memberId;
+
+      // Check if current user is owner or admin
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      const isOwner = circle.ownerId === userId;
+      const [currentUserMember] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      const isAdmin = currentUserMember?.role === "admin";
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: "Only owners or admins can remove members" });
+      }
+
+      // Get the target member
+      const [targetMember] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.id, memberId), eq(circleMembers.circleId, circleId))
+      );
+      if (!targetMember) {
+        return res.status(404).json({ error: "Member not found in this circle" });
+      }
+
+      // Can't remove the owner
+      if (targetMember.role === "owner") {
+        return res.status(400).json({ error: "Cannot remove the owner" });
+      }
+
+      // Admins can only remove regular members, not other admins
+      if (isAdmin && !isOwner && targetMember.role === "admin") {
+        return res.status(403).json({ error: "Admins cannot remove other admins" });
+      }
+
+      await db.delete(circleMembers).where(eq(circleMembers.id, memberId));
+
+      res.json({ removed: true });
+    } catch (error) {
+      console.error("Error removing member:", error);
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
   // ==================== CIRCLE MEMBER INVITES API ====================
 
   // Send circle member invite

@@ -15,6 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -64,6 +66,8 @@ import {
   Copy,
   Swords,
   UserCheck,
+  LogOut,
+  UserMinus,
 } from "lucide-react";
 import type { 
   StoredFriend, 
@@ -1111,7 +1115,8 @@ export default function CommunityPage() {
   const [newCircleName, setNewCircleName] = useState("");
   const [newCircleDescription, setNewCircleDescription] = useState("");
   const [newCircleIsPrivate, setNewCircleIsPrivate] = useState(false);
-  const [browsePublicCircles, setBrowsePublicCircles] = useState(false);
+  const [browsePublicCircles, setBrowsePublicCircles] = useState(true); // Auto-expand by default
+  const [userManuallyToggledBrowse, setUserManuallyToggledBrowse] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<StoredFriend | null>(null);
   const [dmFriend, setDmFriend] = useState<StoredFriend | null>(null);
   const [dmMessage, setDmMessage] = useState("");
@@ -1155,6 +1160,8 @@ export default function CommunityPage() {
   
   // Circle invite dialog state
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [removeMemberConfirm, setRemoveMemberConfirm] = useState<{ memberId: string; memberName: string } | null>(null);
   const [inviteDialogSearch, setInviteDialogSearch] = useState("");
   const USERS_PER_PAGE = 4;
   
@@ -1543,6 +1550,48 @@ export default function CommunityPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send invite", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Leave circle mutation
+  const leaveCircleMutation = useMutation({
+    mutationFn: async (circleId: string) => {
+      const res = await apiRequest("POST", `/api/circles/${circleId}/leave`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to leave circle');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      setSelectedCircle(null);
+      toast({ title: "Left circle", description: "You have left the circle." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to leave circle", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Remove member from circle mutation
+  const removeMemberMutation = useMutation({
+    mutationFn: async ({ circleId, memberId }: { circleId: string; memberId: string }) => {
+      const res = await apiRequest("DELETE", `/api/circles/${circleId}/members/${memberId}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to remove member');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      if (selectedCircle) {
+        queryClient.invalidateQueries({ queryKey: ['/api/circles', selectedCircle.id, 'members'] });
+      }
+      toast({ title: "Member removed", description: "The member has been removed from the circle." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to remove member", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1980,8 +2029,12 @@ export default function CommunityPage() {
       return res.json();
     },
     onSuccess: (_, { circleId }) => {
+      // Invalidate all circle-related queries to ensure points update instantly
       queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'completions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/fp'] });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update task", description: error.message, variant: "destructive" });
@@ -2521,6 +2574,13 @@ export default function CommunityPage() {
       setCircles(circlesQuery.data);
     }
   }, [isDemo, circlesQuery.data]);
+
+  // Auto-collapse browse public circles section when user has many circles
+  useEffect(() => {
+    if (!userManuallyToggledBrowse && circles.length >= 4) {
+      setBrowsePublicCircles(false);
+    }
+  }, [circles.length, userManuallyToggledBrowse]);
 
   // Fetch circle details including members when a circle is selected (non-demo mode)
   useEffect(() => {
@@ -6546,19 +6606,32 @@ export default function CommunityPage() {
                           data-testid="input-circle-description"
                         />
                       </div>
-                      <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="circle-private" className="cursor-pointer">Private Circle</Label>
-                          <p className="text-xs text-muted-foreground">
-                            {newCircleIsPrivate ? "Only members you invite can join" : "Anyone can find and join this circle"}
-                          </p>
+                      <div className="space-y-2">
+                        <Label>Circle Visibility</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            type="button"
+                            variant={!newCircleIsPrivate ? "default" : "outline"}
+                            className="flex flex-col items-center gap-1 h-auto py-3"
+                            onClick={() => setNewCircleIsPrivate(false)}
+                            data-testid="button-circle-public"
+                          >
+                            <Globe className="w-5 h-5" />
+                            <span className="font-medium">Public</span>
+                            <span className="text-xs opacity-70">Anyone can find and join</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={newCircleIsPrivate ? "default" : "outline"}
+                            className="flex flex-col items-center gap-1 h-auto py-3"
+                            onClick={() => setNewCircleIsPrivate(true)}
+                            data-testid="button-circle-private"
+                          >
+                            <Lock className="w-5 h-5" />
+                            <span className="font-medium">Private</span>
+                            <span className="text-xs opacity-70">Invite only</span>
+                          </Button>
                         </div>
-                        <Switch
-                          id="circle-private"
-                          checked={newCircleIsPrivate}
-                          onCheckedChange={setNewCircleIsPrivate}
-                          data-testid="switch-circle-private"
-                        />
                       </div>
                     </div>
                     <DialogFooter>
@@ -6647,7 +6720,10 @@ export default function CommunityPage() {
                     </h2>
                     <Button
                       variant={browsePublicCircles ? "default" : "outline"}
-                      onClick={() => setBrowsePublicCircles(!browsePublicCircles)}
+                      onClick={() => {
+                        setUserManuallyToggledBrowse(true);
+                        setBrowsePublicCircles(!browsePublicCircles);
+                      }}
                       data-testid="button-toggle-browse-circles"
                     >
                       {browsePublicCircles ? "Hide" : "Browse"}
@@ -8553,7 +8629,11 @@ export default function CommunityPage() {
                         {(circleMembers[selectedCircle.id] || []).map((member) => {
                           const currentUserId = isDemo ? "you" : user?.id;
                           const isCurrentUser = member.userId === currentUserId;
-                          const canManageRoles = getUserRole(selectedCircle.id) === "owner" && member.role !== "owner" && !isCurrentUser;
+                          const userRole = getUserRole(selectedCircle.id);
+                          const canManageRoles = userRole === "owner" && member.role !== "owner" && !isCurrentUser;
+                          const canRemoveMember = (userRole === "owner" || userRole === "admin") && member.role !== "owner" && !isCurrentUser;
+                          const canLeave = isCurrentUser && member.role !== "owner";
+                          const isFriend = friendsQuery.data?.some(f => f.friendId === member.userId);
                           
                           return (
                             <div
@@ -8561,25 +8641,85 @@ export default function CommunityPage() {
                               className="flex items-center justify-between gap-4 p-3 rounded-md border"
                               data-testid={`member-${member.id}`}
                             >
-                              <div className="flex items-center gap-3">
-                                <Avatar>
-                                  <AvatarFallback>
-                                    {getInitials(member.firstName, member.lastName)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">
-                                      {member.firstName} {member.lastName}
-                                    </span>
-                                    {getRoleIcon(member.role)}
-                                    {isCurrentUser && <Badge variant="secondary" className="text-xs">You</Badge>}
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <div className="flex items-center gap-3 cursor-pointer">
+                                    <Avatar>
+                                      {member.profileImageUrl ? (
+                                        <AvatarImage src={member.profileImageUrl} />
+                                      ) : null}
+                                      <AvatarFallback>
+                                        {getInitials(member.firstName, member.lastName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-medium">
+                                          {member.displayName || `${member.firstName} ${member.lastName}`}
+                                        </span>
+                                        {getRoleIcon(member.role)}
+                                        {isCurrentUser && <Badge variant="secondary" className="text-xs">You</Badge>}
+                                      </div>
+                                      <p className="text-sm text-muted-foreground">
+                                        Joined {new Date(member.joinedAt).toLocaleDateString()}
+                                      </p>
+                                    </div>
                                   </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    Joined {new Date(member.joinedAt).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-64" align="start">
+                                  <div className="flex items-start gap-3">
+                                    <Avatar className="h-12 w-12">
+                                      {member.profileImageUrl ? (
+                                        <AvatarImage src={member.profileImageUrl} />
+                                      ) : null}
+                                      <AvatarFallback>
+                                        {getInitials(member.firstName, member.lastName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 space-y-1">
+                                      <h4 className="font-semibold">{member.displayName || `${member.firstName} ${member.lastName}`}</h4>
+                                      <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                                      {member.weeklyPoints !== undefined && (
+                                        <p className="text-xs text-muted-foreground">{member.weeklyPoints} pts this week</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {!isCurrentUser && !isDemo && (
+                                    <div className="flex gap-2 mt-3">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => {
+                                          const friend = friendsQuery.data?.find(f => f.friendId === member.userId);
+                                          if (friend) {
+                                            setDmFriend(friend);
+                                          } else {
+                                            toast({ title: "Add as friend first", description: "You need to be friends to send a direct message." });
+                                          }
+                                        }}
+                                        data-testid={`button-message-member-${member.id}`}
+                                      >
+                                        <MessageCircle className="w-4 h-4 mr-1" />
+                                        Message
+                                      </Button>
+                                      {!isFriend && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            sendFriendRequestMutation.mutate({ userId: member.userId });
+                                          }}
+                                          disabled={sendFriendRequestMutation.isPending}
+                                          data-testid={`button-add-friend-member-${member.id}`}
+                                        >
+                                          <UserPlus className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </HoverCardContent>
+                              </HoverCard>
                               <div className="flex items-center gap-2">
                                 {canManageRoles ? (
                                   <Select
@@ -8599,6 +8739,28 @@ export default function CommunityPage() {
                                     {member.role}
                                   </Badge>
                                 )}
+                                {canRemoveMember && !isDemo && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-destructive"
+                                    onClick={() => setRemoveMemberConfirm({ memberId: member.id, memberName: member.displayName || `${member.firstName} ${member.lastName}` })}
+                                    data-testid={`button-remove-member-${member.id}`}
+                                  >
+                                    <UserMinus className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {canLeave && !isDemo && (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setLeaveConfirmOpen(true)}
+                                    data-testid="button-leave-circle"
+                                  >
+                                    <LogOut className="w-4 h-4 mr-1" />
+                                    Leave
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           );
@@ -8606,6 +8768,57 @@ export default function CommunityPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Leave Circle Confirmation Dialog */}
+                  <AlertDialog open={leaveConfirmOpen} onOpenChange={setLeaveConfirmOpen}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Leave Circle?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to leave "{selectedCircle.name}"? You will lose access to circle tasks, messages, and competitions.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => leaveCircleMutation.mutate(selectedCircle.id)}
+                          data-testid="button-confirm-leave-circle"
+                        >
+                          {leaveCircleMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Leave Circle
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  {/* Remove Member Confirmation Dialog */}
+                  <AlertDialog open={!!removeMemberConfirm} onOpenChange={(open) => !open && setRemoveMemberConfirm(null)}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Member?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to remove "{removeMemberConfirm?.memberName}" from this circle? They will need to be invited again to rejoin.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => {
+                            if (removeMemberConfirm) {
+                              removeMemberMutation.mutate({ circleId: selectedCircle.id, memberId: removeMemberConfirm.memberId });
+                              setRemoveMemberConfirm(null);
+                            }
+                          }}
+                          data-testid="button-confirm-remove-member"
+                        >
+                          {removeMemberMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Remove Member
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </TabsContent>
 
                 <TabsContent value="compete" className="space-y-4 mt-4">

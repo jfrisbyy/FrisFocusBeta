@@ -506,6 +506,7 @@ export interface StoredCircleMember {
   userId: string;
   firstName: string;
   lastName: string;
+  displayName?: string;
   profileImageUrl?: string;
   role: "owner" | "admin" | "member";
   joinedAt: string;
