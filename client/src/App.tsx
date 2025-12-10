@@ -8,7 +8,8 @@ import { DemoProvider } from "@/contexts/DemoContext";
 import { useAuth } from "@/hooks/useAuth";
 import Navigation from "@/components/Navigation";
 import DemoBanner from "@/components/DemoBanner";
-import StartJourneyButton from "@/components/StartJourneyButton";
+import StartJourneyButton, { JourneyDialogProvider } from "@/components/StartJourneyButton";
+import OnboardingBanner from "@/components/OnboardingBanner";
 import Dashboard from "@/pages/Dashboard";
 import DailyPage from "@/pages/DailyPage";
 import TasksPage from "@/pages/TasksPage";
@@ -63,14 +64,17 @@ function AuthenticatedApp() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {!isAuthenticated && <DemoBanner />}
-      <Navigation />
-      <main>
-        <Router />
-      </main>
-      {isAuthenticated && <StartJourneyButton />}
-    </div>
+    <JourneyDialogProvider>
+      <div className="min-h-screen bg-background">
+        {!isAuthenticated && <DemoBanner />}
+        {isAuthenticated && <OnboardingBanner />}
+        <Navigation />
+        <main>
+          <Router />
+        </main>
+        {isAuthenticated && <StartJourneyButton />}
+      </div>
+    </JourneyDialogProvider>
   );
 }
 
