@@ -30,8 +30,8 @@ export default function DueDatesPanel({
 }: DueDatesPanelProps) {
   const [newTitle, setNewTitle] = useState("");
   const [newDueDate, setNewDueDate] = useState("");
-  const [newPoints, setNewPoints] = useState("10");
-  const [newPenalty, setNewPenalty] = useState("10");
+  const [newPoints, setNewPoints] = useState("2");
+  const [newPenalty, setNewPenalty] = useState("2");
   const [newIsRecurring, setNewIsRecurring] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [recurringItem, setRecurringItem] = useState<StoredDueDateItem | null>(null);
@@ -89,8 +89,8 @@ export default function DueDatesPanel({
     onItemsChange([...items, newItem]);
     setNewTitle("");
     setNewDueDate("");
-    setNewPoints("10");
-    setNewPenalty("10");
+    setNewPoints("2");
+    setNewPenalty("2");
     setNewIsRecurring(false);
     setShowAddForm(false);
   };
