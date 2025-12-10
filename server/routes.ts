@@ -1159,13 +1159,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP to both users for adding a friend
-      const { awardFp, awardAchievement } = await import("./fpService");
+      const { awardFp } = await import("./fpService");
       await awardFp(userId, "add_friend");
       await awardFp(friendship.requesterId, "add_friend");
       
-      // Award first_friend achievement to both users
-      await awardAchievement(userId, "first_friend");
-      await awardAchievement(friendship.requesterId, "first_friend");
+      // Award first_friend one-time bonus to both users
+      await awardFp(userId, "first_friend", { checkDuplicate: true });
+      await awardFp(friendship.requesterId, "first_friend", { checkDuplicate: true });
 
       res.json(updated);
     } catch (error) {
@@ -2331,11 +2331,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       // Get author info for response
       const [author] = await db.select().from(users).where(eq(users.id, userId));
 
-      // Award first_post achievement
+      // Award first_post one-time bonus
       try {
-        const { awardAchievement } = await import("./fpService");
-        await awardAchievement(userId, "first_post");
-      } catch (e) { console.error("Achievement error:", e); }
+        const { awardFp } = await import("./fpService");
+        await awardFp(userId, "first_post", { checkDuplicate: true });
+      } catch (e) { console.error("FP award error:", e); }
 
       res.json({
         ...post,
@@ -2629,9 +2629,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP for joining a circle
-      const { awardFp, awardAchievement } = await import("./fpService");
+      const { awardFp } = await import("./fpService");
       await awardFp(userId, "join_circle");
-      await awardAchievement(userId, "first_circle_joined");
+      await awardFp(userId, "first_circle_joined", { checkDuplicate: true });
 
       res.json({ success: true, message: "Joined circle successfully" });
     } catch (error) {
@@ -2655,9 +2655,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP for creating a circle
-      const { awardFp, awardAchievement } = await import("./fpService");
+      const { awardFp } = await import("./fpService");
       await awardFp(userId, "create_circle");
-      await awardAchievement(userId, "first_circle_created");
+      await awardFp(userId, "first_circle_created", { checkDuplicate: true });
 
       res.json({ ...circle, memberCount: 1, isMember: true, userRole: "owner" });
     } catch (error) {
@@ -2745,9 +2745,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP for joining a circle
-      const { awardFp, awardAchievement } = await import("./fpService");
+      const { awardFp } = await import("./fpService");
       await awardFp(userId, "join_circle");
-      await awardAchievement(userId, "first_circle_joined");
+      await awardFp(userId, "first_circle_joined", { checkDuplicate: true });
 
       res.json({ joined: true });
     } catch (error) {
@@ -4785,11 +4785,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const [cheerline] = await db.insert(cheerlines).values(parsed).returning();
 
       // Award FP for sending a cheerline
-      const { awardFp, awardAchievement } = await import("./fpService");
+      const { awardFp } = await import("./fpService");
       await awardFp(senderId, "send_cheerline");
       
-      // Award first_cheerline_sent achievement
-      await awardAchievement(senderId, "first_cheerline_sent");
+      // Award first_cheerline_sent one-time bonus
+      await awardFp(senderId, "first_cheerline_sent", { checkDuplicate: true });
 
       res.json(cheerline);
     } catch (error) {
@@ -4892,11 +4892,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         penaltyRule: penaltyRule || null,
       }).returning();
       
-      // Award first_task achievement
+      // Award first_task one-time bonus
       try {
-        const { awardAchievement } = await import("./fpService");
-        await awardAchievement(userId, "first_task");
-      } catch (e) { console.error("Achievement error:", e); }
+        const { awardFp } = await import("./fpService");
+        await awardFp(userId, "first_task", { checkDuplicate: true });
+      } catch (e) { console.error("FP award error:", e); }
       
       res.json(task);
     } catch (error) {
@@ -5398,11 +5398,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       
       const [entry] = await db.insert(userJournalEntries).values(parsed).returning();
       
-      // Award first_journal achievement
+      // Award first_journal one-time bonus
       try {
-        const { awardAchievement } = await import("./fpService");
-        await awardAchievement(userId, "first_journal");
-      } catch (e) { console.error("Achievement error:", e); }
+        const { awardFp } = await import("./fpService");
+        await awardFp(userId, "first_journal", { checkDuplicate: true });
+      } catch (e) { console.error("FP award error:", e); }
       
       res.json(entry);
     } catch (error) {
@@ -5584,11 +5584,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
       const [appointment] = await db.insert(appointments).values(parsed).returning();
       
-      // Award first_event achievement
+      // Award first_event one-time bonus
       try {
-        const { awardAchievement } = await import("./fpService");
-        await awardAchievement(userId, "first_event");
-      } catch (e) { console.error("Achievement error:", e); }
+        const { awardFp } = await import("./fpService");
+        await awardFp(userId, "first_event", { checkDuplicate: true });
+      } catch (e) { console.error("FP award error:", e); }
       
       res.json(appointment);
     } catch (error) {

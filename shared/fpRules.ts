@@ -267,6 +267,76 @@ export const fpRules: Record<FpEventType, FpRule> = {
     fpAmount: 250,
     description: "365-day logging streak",
   },
+  first_task: {
+    eventType: "first_task",
+    fpAmount: 10,
+    description: "Created your first task",
+  },
+  first_post: {
+    eventType: "first_post",
+    fpAmount: 10,
+    description: "Posted to the feed for the first time",
+  },
+  first_journal: {
+    eventType: "first_journal",
+    fpAmount: 10,
+    description: "Wrote your first journal entry",
+  },
+  first_event: {
+    eventType: "first_event",
+    fpAmount: 10,
+    description: "Added your first event",
+  },
+  first_due_date: {
+    eventType: "first_due_date",
+    fpAmount: 10,
+    description: "Added your first due date",
+  },
+  first_milestone: {
+    eventType: "first_milestone",
+    fpAmount: 10,
+    description: "Created your first milestone",
+  },
+  first_weekly_todo: {
+    eventType: "first_weekly_todo",
+    fpAmount: 10,
+    description: "Added your first weekly to-do item",
+  },
+  first_friend: {
+    eventType: "first_friend",
+    fpAmount: 10,
+    description: "Added your first friend",
+  },
+  first_badge: {
+    eventType: "first_badge",
+    fpAmount: 10,
+    description: "Created your first badge",
+  },
+  first_7_day_streak: {
+    eventType: "first_7_day_streak",
+    fpAmount: 50,
+    description: "Completed your first 7-day logging streak",
+  },
+  first_challenge_accepted: {
+    eventType: "first_challenge_accepted",
+    fpAmount: 10,
+    description: "Accepted your first challenge",
+  },
+  first_cheerline_sent: {
+    eventType: "first_cheerline_sent",
+    fpAmount: 10,
+    description: "Sent your first cheerline",
+  },
+  first_circle_joined: {
+    eventType: "first_circle_joined",
+    fpAmount: 10,
+    description: "Joined your first circle",
+  },
+  first_circle_created: {
+    eventType: "first_circle_created",
+    fpAmount: 10,
+    description: "Created your first circle",
+  },
 };
 
 export function getFpRule(eventType: FpEventType): FpRule {
