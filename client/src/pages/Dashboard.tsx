@@ -553,9 +553,10 @@ export default function Dashboard() {
       return;
     }
 
-    // Load user profile - prefer storage name, then auth display name, then "You"
+    // Load user profile - prefer storage name, then auth display name, then first name, then "You"
     const profile = loadUserProfileFromStorage();
-    setUserName(profile.userName !== "You" ? profile.userName : (authDisplayName || "You"));
+    const defaultName = user?.displayName || user?.firstName || "You";
+    setUserName(profile.userName !== "You" ? profile.userName : defaultName);
     setEncouragementMessage(profile.encouragementMessage);
     setUseCustomMessage(profile.useCustomMessage ?? false);
     // Use API cheerlines if available, otherwise fall back to localStorage
@@ -943,7 +944,7 @@ export default function Dashboard() {
       });
 
     setBoosters([...taskBoosters, ...negativeBoosters]);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, activeSeason, activeSeasonData, apiQueriesReady, weekOffset]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user]);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = addDays(weekStart, 6);
