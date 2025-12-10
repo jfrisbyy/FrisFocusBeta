@@ -95,6 +95,7 @@ import {
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray } from "drizzle-orm";
 import { lt } from "drizzle-orm";
+import { getGitHubUser, listRepositories, createRepository, getRepository, listCommits } from "./github";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
@@ -5852,6 +5853,71 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     } catch (error) {
       console.error("Error fetching FP leaderboard:", error);
       res.status(500).json({ error: "Failed to fetch FP leaderboard" });
+    }
+  });
+
+  // ==================== GITHUB ROUTES ====================
+
+  // Get GitHub authenticated user
+  app.get("/api/github/user", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await getGitHubUser();
+      res.json(user);
+    } catch (error: any) {
+      console.error("Error fetching GitHub user:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch GitHub user" });
+    }
+  });
+
+  // List user's GitHub repositories
+  app.get("/api/github/repos", isAuthenticated, async (req: any, res) => {
+    try {
+      const { page = "1", perPage = "30" } = req.query;
+      const repos = await listRepositories(parseInt(page as string), parseInt(perPage as string));
+      res.json(repos);
+    } catch (error: any) {
+      console.error("Error listing GitHub repos:", error);
+      res.status(500).json({ error: error.message || "Failed to list GitHub repositories" });
+    }
+  });
+
+  // Create a new GitHub repository
+  app.post("/api/github/repos", isAuthenticated, async (req: any, res) => {
+    try {
+      const { name, description, isPrivate = true } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Repository name is required" });
+      }
+      const repo = await createRepository(name, description, isPrivate);
+      res.json(repo);
+    } catch (error: any) {
+      console.error("Error creating GitHub repo:", error);
+      res.status(500).json({ error: error.message || "Failed to create GitHub repository" });
+    }
+  });
+
+  // Get a specific repository
+  app.get("/api/github/repos/:owner/:repo", isAuthenticated, async (req: any, res) => {
+    try {
+      const { owner, repo } = req.params;
+      const repoData = await getRepository(owner, repo);
+      res.json(repoData);
+    } catch (error: any) {
+      console.error("Error fetching GitHub repo:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch GitHub repository" });
+    }
+  });
+
+  // List commits for a repository
+  app.get("/api/github/repos/:owner/:repo/commits", isAuthenticated, async (req: any, res) => {
+    try {
+      const { owner, repo } = req.params;
+      const { page = "1", perPage = "30" } = req.query;
+      const commits = await listCommits(owner, repo, parseInt(page as string), parseInt(perPage as string));
+      res.json(commits);
+    } catch (error: any) {
+      console.error("Error listing GitHub commits:", error);
+      res.status(500).json({ error: error.message || "Failed to list GitHub commits" });
     }
   });
 
