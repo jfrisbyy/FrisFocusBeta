@@ -4827,11 +4827,23 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
 
   // ==================== USER HABIT SYNC API ROUTES ====================
 
-  // Get all user tasks
+  // Get all user tasks (from active season)
   app.get("/api/habit/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const tasks = await db.select().from(userTasks).where(eq(userTasks.userId, userId));
+      
+      // First, find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        // No active season, return empty array
+        return res.json([]);
+      }
+      
+      // Get tasks from the active season
+      const tasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, activeSeason.id));
       res.json(tasks);
     } catch (error) {
       console.error("Error fetching user tasks:", error);
@@ -4839,12 +4851,31 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
-  // Create a new user task
+  // Create a new user task (in active season)
   app.post("/api/habit/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const parsed = insertUserTaskSchema.parse({ ...req.body, userId });
-      const [task] = await db.insert(userTasks).values(parsed).returning();
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season. Please create a season first." });
+      }
+      
+      const { name, value, category, priority, boosterRule, penaltyRule } = req.body;
+      const [task] = await db.insert(seasonTasks).values({
+        seasonId: activeSeason.id,
+        name,
+        value: value || 0,
+        category: category || "General",
+        priority: priority || "shouldDo",
+        boosterRule: boosterRule || null,
+        penaltyRule: penaltyRule || null,
+      }).returning();
+      
       res.json(task);
     } catch (error) {
       console.error("Error creating user task:", error);
@@ -4852,26 +4883,33 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
-  // Update a user task
+  // Update a user task (in active season)
   app.put("/api/habit/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const taskId = req.params.id;
-      const { name, value, category, priority, boostEnabled, boostThreshold, boostPeriod, boostPoints } = req.body;
+      
+      // Verify the task belongs to user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season" });
+      }
+      
+      const { name, value, category, priority, boosterRule, penaltyRule } = req.body;
 
-      const [task] = await db.update(userTasks)
+      const [task] = await db.update(seasonTasks)
         .set({ 
           name, 
           value, 
           category, 
-          priority, 
-          boostEnabled, 
-          boostThreshold, 
-          boostPeriod, 
-          boostPoints,
-          updatedAt: new Date() 
+          priority,
+          boosterRule,
+          penaltyRule
         })
-        .where(and(eq(userTasks.id, taskId), eq(userTasks.userId, userId)))
+        .where(and(eq(seasonTasks.id, taskId), eq(seasonTasks.seasonId, activeSeason.id)))
         .returning();
 
       if (!task) {
@@ -4884,14 +4922,23 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
     }
   });
 
-  // Delete a user task
+  // Delete a user task (from active season)
   app.delete("/api/habit/tasks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const taskId = req.params.id;
+      
+      // Verify the task belongs to user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season" });
+      }
 
-      const [deleted] = await db.delete(userTasks)
-        .where(and(eq(userTasks.id, taskId), eq(userTasks.userId, userId)))
+      const [deleted] = await db.delete(seasonTasks)
+        .where(and(eq(seasonTasks.id, taskId), eq(seasonTasks.seasonId, activeSeason.id)))
         .returning();
 
       if (!deleted) {
@@ -5650,9 +5697,12 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         return res.status(400).json({ error: "At least one task is required" });
       }
 
-      const parsedTasks = tasks.map((task: any) => 
-        insertFriendChallengeTaskSchema.omit({ id: true, challengeId: true, createdAt: true }).parse(task)
-      );
+      const parsedTasks = tasks.map((task: any) => ({
+        taskName: task.taskName,
+        pointValue: task.pointValue || 0,
+        isCustom: task.isCustom || false,
+        sourceTaskId: task.sourceTaskId || null,
+      }));
 
       const challenge = await storage.createFriendChallenge(parsed, parsedTasks);
 
