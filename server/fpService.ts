@@ -567,6 +567,12 @@ export async function awardLoggingStreakMilestones(userId: string): Promise<FpAw
   const streak = await getLoggingStreak(userId);
   const results: FpAwardResult[] = [];
   
+  // Award first_7_day_streak one-time bonus when user reaches 7+ days
+  if (streak >= 7) {
+    const first7DayResult = await awardFp(userId, "first_7_day_streak", { checkDuplicate: true });
+    if (first7DayResult.success) results.push(first7DayResult);
+  }
+  
   for (const milestone of loggingStreakMilestones) {
     if (streak >= milestone.days) {
       const alreadyAwarded = await hasReceivedStreakAward(userId, milestone.event);

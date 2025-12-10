@@ -5820,6 +5820,10 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         resourceType: "friend_challenge",
       });
 
+      // Award first_challenge_accepted one-time bonus
+      const { awardFp } = await import("./fpService");
+      await awardFp(userId, "first_challenge_accepted", { checkDuplicate: true });
+
       res.json(challenge);
     } catch (error) {
       console.error("Error accepting friend challenge:", error);
