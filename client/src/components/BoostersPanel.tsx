@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Zap, TrendingDown, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Check, X, Zap, TrendingDown, Target, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UnifiedBooster } from "@shared/schema";
 
@@ -8,12 +10,30 @@ interface BoostersPanelProps {
   boosters: UnifiedBooster[];
 }
 
+const BOOSTERS_PER_PAGE = 4;
+
 export default function BoostersPanel({ boosters }: BoostersPanelProps) {
+  const [currentPage, setCurrentPage] = useState(0);
+  
   const positiveBoosters = boosters.filter(b => !b.isNegative);
   const negativeBoosters = boosters.filter(b => b.isNegative);
   
   const totalEarned = positiveBoosters.filter(b => b.achieved).reduce((sum, b) => sum + b.points, 0);
   const totalPenalty = negativeBoosters.filter(b => b.achieved).reduce((sum, b) => sum + Math.abs(b.points), 0);
+
+  // Combine all boosters for pagination
+  const allBoosters = [...positiveBoosters, ...negativeBoosters];
+  const totalPages = Math.ceil(allBoosters.length / BOOSTERS_PER_PAGE);
+  const startIndex = currentPage * BOOSTERS_PER_PAGE;
+  const visibleBoosters = allBoosters.slice(startIndex, startIndex + BOOSTERS_PER_PAGE);
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+  };
 
   const renderBooster = (booster: UnifiedBooster) => {
     const hasProgress = booster.progress !== undefined && booster.required !== undefined;
@@ -112,24 +132,38 @@ export default function BoostersPanel({ boosters }: BoostersPanelProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {positiveBoosters.map(renderBooster)}
-        
-        {negativeBoosters.length > 0 && (
-          <>
-            <div className="border-t pt-3 mt-3">
-              <p className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-1">
-                <TrendingDown className="h-3 w-3" />
-                Negative Boosters
-              </p>
-            </div>
-            {negativeBoosters.map(renderBooster)}
-          </>
-        )}
+        {visibleBoosters.map(renderBooster)}
         
         {boosters.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-4">
             No boosters configured yet.
           </p>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handlePrevPage}
+              disabled={currentPage === 0}
+              data-testid="button-boosters-prev"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {currentPage + 1} / {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages - 1}
+              data-testid="button-boosters-next"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>

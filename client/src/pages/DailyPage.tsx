@@ -2,11 +2,14 @@ import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DatePicker from "@/components/DatePicker";
-import TaskGroup from "@/components/TaskGroup";
+import TaskCheckbox from "@/components/TaskCheckbox";
 import DailySummary from "@/components/DailySummary";
 import TodoListPanel from "@/components/TodoListPanel";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
+import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   loadTasksFromStorage,
@@ -85,6 +88,7 @@ export default function DailyPage() {
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
   const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
   const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
@@ -534,18 +538,82 @@ export default function DailyPage() {
             bonusAwarded={todoBonusAwarded}
             data-testid="panel-daily-todos"
           />
-          {categories.map((category) => (
-            <TaskGroup
-              key={category}
-              category={category}
-              tasks={tasksByCategory[category]}
-              completedIds={completedIds}
-              onTaskToggle={handleTaskToggle}
-              defaultOpen={category !== "Penalties"}
-              taskNotes={taskNotes}
-              onTaskNoteChange={handleTaskNoteChange}
-            />
-          ))}
+          
+          {/* Horizontal Category Tabs */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap gap-2 mb-4" data-testid="category-tabs">
+                {categories.map((category) => {
+                  const categoryTasks = tasksByCategory[category] || [];
+                  const completedCount = categoryTasks.filter(t => completedIds.has(t.id)).length;
+                  const categoryPoints = categoryTasks
+                    .filter(t => completedIds.has(t.id))
+                    .reduce((sum, t) => sum + t.value, 0);
+                  const isSelected = selectedCategory === category;
+                  
+                  return (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(isSelected ? null : category)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover-elevate active-elevate-2",
+                        isSelected 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted text-muted-foreground"
+                      )}
+                      data-testid={`category-tab-${category.toLowerCase().replace(/\s/g, "-")}`}
+                    >
+                      <span>{category}</span>
+                      <Badge 
+                        variant={isSelected ? "secondary" : "outline"} 
+                        className="text-xs"
+                      >
+                        {completedCount}/{categoryTasks.length}
+                      </Badge>
+                      {categoryPoints !== 0 && (
+                        <span
+                          className={cn(
+                            "font-mono text-xs font-semibold",
+                            categoryPoints > 0 ? "text-chart-1" : "text-chart-3"
+                          )}
+                        >
+                          {categoryPoints > 0 ? `+${categoryPoints}` : categoryPoints}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Tasks for Selected Category */}
+              {selectedCategory && tasksByCategory[selectedCategory] && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium mb-3">{selectedCategory} Tasks</h3>
+                  <div className="space-y-1">
+                    {tasksByCategory[selectedCategory].map((task) => (
+                      <TaskCheckbox
+                        key={task.id}
+                        id={task.id}
+                        name={task.name}
+                        value={task.value}
+                        isBooster={task.isBooster}
+                        checked={completedIds.has(task.id)}
+                        onChange={(checked) => handleTaskToggle(task.id, checked)}
+                        note={taskNotes?.[task.id]}
+                        onNoteChange={(note) => handleTaskNoteChange(task.id, note)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {!selectedCategory && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Click a category above to view and complete tasks
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="order-first lg:order-last">
