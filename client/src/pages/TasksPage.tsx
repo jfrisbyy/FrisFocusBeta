@@ -293,8 +293,11 @@ export default function TasksPage() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons", variables.seasonId, "data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
       toast({ title: "Tasks imported", description: "Selected items have been imported to your new season" });
     },
     onError: () => {
@@ -308,6 +311,11 @@ export default function TasksPage() {
       const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}/tasks`, { tasks: data.tasks });
       return res.json();
     },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons", variables.seasonId, "data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/tasks"] });
+    },
   });
 
   // Save categories to season mutation
@@ -316,6 +324,10 @@ export default function TasksPage() {
       const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}/categories`, { categories: data.categories });
       return res.json();
     },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons", variables.seasonId, "data"] });
+    },
   });
 
   // Save penalties to season mutation
@@ -323,6 +335,11 @@ export default function TasksPage() {
     mutationFn: async (data: { seasonId: string; penalties: any[] }) => {
       const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}/penalties`, { penalties: data.penalties });
       return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons", variables.seasonId, "data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
     },
   });
 
