@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Clock, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Plus, Clock, Calendar, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format, startOfWeek, addDays, subWeeks, addWeeks, parse, differenceInWeeks } from "date-fns";
@@ -68,7 +69,9 @@ function getDateKeyByIndex(index: number, firstDayDate: Date): string {
 
 export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekChange, weekStartDate, weekEndDate }: WeeklyTableProps) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [weekPickerOpen, setWeekPickerOpen] = useState(false);
   const [newAppointment, setNewAppointment] = useState({
@@ -120,6 +123,21 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
     },
   });
 
+  // Update appointment mutation
+  const updateMutation = useMutation({
+    mutationFn: async (data: { id: string; title: string; date: string; startTime: string; endTime?: string; description?: string }) => {
+      const { id, ...rest } = data;
+      const response = await apiRequest("PUT", `/api/appointments/${id}`, rest);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      setDialogOpen(false);
+      setEditingAppointment(null);
+      setNewAppointment({ title: "", startTime: "09:00", endTime: "", description: "" });
+    },
+  });
+
   const handleDayExpand = (index: number) => {
     const dateKey = getDateKeyByIndex(index, firstDayDate);
     setExpandedDate(expandedDate === dateKey ? null : dateKey);
@@ -128,18 +146,50 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
   const handleAddAppointment = (index: number) => {
     const dateKey = getDateKeyByIndex(index, firstDayDate);
     setSelectedDate(dateKey);
+    setEditingAppointment(null);
+    setNewAppointment({ title: "", startTime: "09:00", endTime: "", description: "" });
+    setDialogOpen(true);
+  };
+
+  const handleEditAppointment = (apt: Appointment) => {
+    setEditingAppointment(apt);
+    setSelectedDate(apt.date);
+    setNewAppointment({
+      title: apt.title,
+      startTime: apt.startTime || "09:00",
+      endTime: apt.endTime || "",
+      description: apt.description || "",
+    });
     setDialogOpen(true);
   };
 
   const handleSubmit = () => {
     if (!newAppointment.title.trim() || !selectedDate) return;
-    createMutation.mutate({
-      title: newAppointment.title,
-      date: selectedDate,
-      startTime: newAppointment.startTime,
-      endTime: newAppointment.endTime || undefined,
-      description: newAppointment.description || undefined,
-    });
+    
+    if (editingAppointment) {
+      updateMutation.mutate({
+        id: editingAppointment.id,
+        title: newAppointment.title,
+        date: selectedDate,
+        startTime: newAppointment.startTime,
+        endTime: newAppointment.endTime || undefined,
+        description: newAppointment.description || undefined,
+      });
+    } else {
+      createMutation.mutate({
+        title: newAppointment.title,
+        date: selectedDate,
+        startTime: newAppointment.startTime,
+        endTime: newAppointment.endTime || undefined,
+        description: newAppointment.description || undefined,
+      });
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setEditingAppointment(null);
+    setNewAppointment({ title: "", startTime: "09:00", endTime: "", description: "" });
   };
 
   const getAppointmentsForDate = (index: number): Appointment[] => {
@@ -263,36 +313,88 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
                     <CollapsibleContent>
                       <div className="bg-muted/30 px-6 py-3 space-y-2">
                         {dayAppointments.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">No appointments</p>
+                          <p className="text-xs text-muted-foreground">No events</p>
                         ) : (
                           <div className="space-y-2">
-                            {dayAppointments.map((apt) => (
-                              <div
-                                key={apt.id}
-                                className="flex items-center justify-between gap-2 p-2 bg-background rounded-md"
-                                data-testid={`appointment-${apt.id}`}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatTimeDisplay(apt.startTime)}
-                                    {apt.endTime && ` - ${formatTimeDisplay(apt.endTime)}`}
-                                  </span>
-                                  <span className="text-sm font-medium truncate">{apt.title}</span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 flex-shrink-0"
-                                  onClick={() => deleteMutation.mutate(apt.id)}
-                                  disabled={deleteMutation.isPending}
-                                  data-testid={`button-delete-appointment-${apt.id}`}
+                            {dayAppointments.map((apt) => {
+                              const isEventExpanded = expandedEventId === apt.id;
+                              const timeDisplay = formatTimeDisplay(apt.startTime);
+                              const endTimeDisplay = apt.endTime ? formatTimeDisplay(apt.endTime) : "";
+                              
+                              return (
+                                <div
+                                  key={apt.id}
+                                  className="bg-background rounded-md overflow-hidden"
+                                  data-testid={`appointment-${apt.id}`}
                                 >
-                                  <span className="sr-only">Delete</span>
-                                  <span className="text-destructive text-xs">X</span>
-                                </Button>
-                              </div>
-                            ))}
+                                  <div 
+                                    className="flex items-center justify-between gap-2 p-2 cursor-pointer hover-elevate"
+                                    onClick={() => setExpandedEventId(isEventExpanded ? null : apt.id)}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      {timeDisplay && (
+                                        <>
+                                          <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                          <span className="text-xs text-muted-foreground">
+                                            {timeDisplay}
+                                            {endTimeDisplay && ` - ${endTimeDisplay}`}
+                                          </span>
+                                        </>
+                                      )}
+                                      <span className="text-sm font-medium truncate">{apt.title}</span>
+                                      {apt.description && (
+                                        <span className="text-xs text-muted-foreground">(has notes)</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      {isEventExpanded ? (
+                                        <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  </div>
+                                  {isEventExpanded && (
+                                    <div className="px-2 pb-2 space-y-2">
+                                      {apt.description ? (
+                                        <div className="text-sm text-muted-foreground bg-muted/50 rounded p-2">
+                                          {apt.description}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground italic">No notes</p>
+                                      )}
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEditAppointment(apt);
+                                          }}
+                                          data-testid={`button-edit-appointment-${apt.id}`}
+                                        >
+                                          <Pencil className="h-3 w-3 mr-1" />
+                                          Edit
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteMutation.mutate(apt.id);
+                                          }}
+                                          disabled={deleteMutation.isPending}
+                                          data-testid={`button-delete-appointment-${apt.id}`}
+                                        >
+                                          <Trash2 className="h-3 w-3 mr-1 text-destructive" />
+                                          Delete
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         <Button
@@ -315,13 +417,16 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              Add Event
+              {editingAppointment ? "Edit Event" : "Add Event"}
             </DialogTitle>
+            <DialogDescription>
+              {editingAppointment ? "Update the event details below." : "Add a new event to your schedule."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -372,15 +477,15 @@ export default function WeeklyTable({ days, onDayClick, weekOffset = 0, onWeekCh
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel-appointment">
+            <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel-appointment">
               Cancel
             </Button>
             <Button 
               onClick={handleSubmit} 
-              disabled={!newAppointment.title.trim() || createMutation.isPending}
+              disabled={!newAppointment.title.trim() || createMutation.isPending || updateMutation.isPending}
               data-testid="button-save-appointment"
             >
-              {createMutation.isPending ? "Saving..." : "Save"}
+              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : (editingAppointment ? "Update" : "Save")}
             </Button>
           </DialogFooter>
         </DialogContent>
