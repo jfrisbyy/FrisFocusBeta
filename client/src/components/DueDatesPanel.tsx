@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format, parseISO, isBefore, startOfDay, differenceInDays } from "date-fns";
-import { Plus, Trash2, Calendar, Check, AlertTriangle, Repeat, CalendarPlus } from "lucide-react";
+import { Plus, Trash2, Calendar, Check, AlertTriangle, Repeat, CalendarPlus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,12 @@ export default function DueDatesPanel({
   const [showAddForm, setShowAddForm] = useState(false);
   const [recurringItem, setRecurringItem] = useState<StoredDueDateItem | null>(null);
   const [nextDueDate, setNextDueDate] = useState("");
+  const [editingItem, setEditingItem] = useState<StoredDueDateItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editPoints, setEditPoints] = useState("");
+  const [editPenalty, setEditPenalty] = useState("");
+  const [editIsRecurring, setEditIsRecurring] = useState(false);
 
   const today = startOfDay(new Date());
 
@@ -132,6 +138,34 @@ export default function DueDatesPanel({
 
   const handleDelete = (id: string) => {
     onItemsChange(items.filter(item => item.id !== id));
+  };
+
+  const handleStartEdit = (item: StoredDueDateItem) => {
+    setEditingItem(item);
+    setEditTitle(item.title);
+    setEditDueDate(item.dueDate);
+    setEditPoints(item.pointValue.toString());
+    setEditPenalty(item.penaltyValue.toString());
+    setEditIsRecurring(item.isRecurring || false);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingItem || !editTitle.trim() || !editDueDate) return;
+    onItemsChange(
+      items.map(item =>
+        item.id === editingItem.id
+          ? {
+              ...item,
+              title: editTitle.trim(),
+              dueDate: editDueDate,
+              pointValue: parseInt(editPoints) || 0,
+              penaltyValue: parseInt(editPenalty) || 0,
+              isRecurring: editIsRecurring,
+            }
+          : item
+      )
+    );
+    setEditingItem(null);
   };
 
   const getDaysUntil = (dueDate: string) => {
@@ -234,15 +268,26 @@ export default function DueDatesPanel({
           )}
         </div>
         {!isDemo && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={() => handleDelete(item.id)}
-            data-testid={`button-delete-due-${item.id}`}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => handleStartEdit(item)}
+              data-testid={`button-edit-due-${item.id}`}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => handleDelete(item.id)}
+              data-testid={`button-delete-due-${item.id}`}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         )}
       </div>
     );
@@ -440,6 +485,80 @@ export default function DueDatesPanel({
             >
               <CalendarPlus className="h-4 w-4 mr-1" />
               Add to Board
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for editing due date item */}
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Due Date Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-muted-foreground">Title</label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="What's due?"
+                data-testid="input-edit-due-title"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground">Due Date</label>
+              <Input
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                data-testid="input-edit-due-date"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-sm text-muted-foreground">Points</label>
+                <Input
+                  type="number"
+                  value={editPoints}
+                  onChange={(e) => setEditPoints(e.target.value)}
+                  min="0"
+                  data-testid="input-edit-due-points"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground">Penalty</label>
+                <Input
+                  type="number"
+                  value={editPenalty}
+                  onChange={(e) => setEditPenalty(e.target.value)}
+                  min="0"
+                  data-testid="input-edit-due-penalty"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="edit-recurring"
+                checked={editIsRecurring}
+                onCheckedChange={(checked) => setEditIsRecurring(checked === true)}
+                data-testid="checkbox-edit-recurring"
+              />
+              <label htmlFor="edit-recurring" className="text-sm cursor-pointer">
+                Recurring item
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingItem(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={!editTitle.trim() || !editDueDate}
+              data-testid="button-save-edit-due"
+            >
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
