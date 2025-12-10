@@ -1618,8 +1618,18 @@ export default function TasksPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={welcomeSeasonDialogOpen} onOpenChange={setWelcomeSeasonDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={welcomeSeasonDialogOpen} onOpenChange={(open) => {
+        // Only allow closing if user has at least one season
+        if (!open && seasons.length === 0) return;
+        setWelcomeSeasonDialogOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => {
+          // Prevent closing by clicking outside when no seasons exist
+          if (seasons.length === 0) e.preventDefault();
+        }} onEscapeKeyDown={(e) => {
+          // Prevent closing with Escape when no seasons exist
+          if (seasons.length === 0) e.preventDefault();
+        }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
