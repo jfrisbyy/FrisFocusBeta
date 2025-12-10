@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useDemo } from "@/contexts/DemoContext";
+import { useAuth } from "@/hooks/useAuth";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
@@ -385,7 +386,11 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { isOnboarding } = useOnboarding();
   const { isDemo } = useDemo();
+  const { user } = useAuth();
   const useMockData = isDemo || isOnboarding;
+  
+  // Get display name from authenticated user, fallback to "You"
+  const authDisplayName = user?.displayName || user?.firstName || null;
   
   // State initialization
   const [days, setDays] = useState<{ date: string; dayName: string; points: number | null }[]>([]);
@@ -548,9 +553,9 @@ export default function Dashboard() {
       return;
     }
 
-    // Load user profile
+    // Load user profile - prefer storage name, then auth display name, then "You"
     const profile = loadUserProfileFromStorage();
-    setUserName(profile.userName);
+    setUserName(profile.userName !== "You" ? profile.userName : (authDisplayName || "You"));
     setEncouragementMessage(profile.encouragementMessage);
     setUseCustomMessage(profile.useCustomMessage ?? false);
     // Use API cheerlines if available, otherwise fall back to localStorage
