@@ -3128,8 +3128,43 @@ export default function CommunityPage() {
 
   const pendingRequestsForCircle = useMemo(() => {
     if (!selectedCircle) return [];
-    return taskRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
-  }, [selectedCircle, taskRequests]);
+    
+    // Get local task requests
+    const localRequests = taskRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
+    
+    // Get pending tasks from API (tasks with approvalStatus === "pending")
+    const pendingApiTasks = (circleTasks[selectedCircle.id] || [])
+      .filter(t => t.approvalStatus === "pending")
+      .map(task => ({
+        id: `api-${task.id}`,
+        circleId: task.circleId,
+        type: "add" as const,
+        taskData: {
+          name: task.name,
+          value: task.value,
+          category: task.category || "",
+          taskType: task.taskType || "per_person",
+        },
+        existingTaskId: null,
+        requesterId: task.createdById || "unknown",
+        requesterName: task.createdBy?.displayName || task.createdBy?.username || "A member",
+        status: "pending" as const,
+        votes: [] as Array<{ odId: string; odName: string; vote: "approve" | "reject" }>,
+        createdAt: task.createdAt || new Date().toISOString(),
+        note: undefined,
+        apiTaskId: task.id, // Store the actual API task ID for approval
+      }));
+    
+    // Combine both, avoiding duplicates (local requests might reference same API task)
+    const allRequests = [...localRequests];
+    pendingApiTasks.forEach(apiReq => {
+      if (!allRequests.find(r => r.id === apiReq.id)) {
+        allRequests.push(apiReq);
+      }
+    });
+    
+    return allRequests;
+  }, [selectedCircle, taskRequests, circleTasks]);
 
   // Compute display posts from API data in non-demo mode
   const displayPosts: StoredCommunityPost[] = useMemo(() => {
@@ -4058,9 +4093,38 @@ export default function CommunityPage() {
     setNewTaskNote("");
   };
 
-  const handleApproveRequest = (requestId: string) => {
+  const handleApproveRequest = async (requestId: string) => {
+    if (!selectedCircle) return;
+    
+    // Check if this is an API-based pending task (id starts with "api-")
+    if (requestId.startsWith("api-")) {
+      const actualTaskId = requestId.replace("api-", "");
+      try {
+        // Call API to approve the task
+        await apiRequest("PATCH", `/api/circles/${selectedCircle.id}/tasks/${actualTaskId}`, {
+          approvalStatus: "approved"
+        });
+        
+        // Update local state
+        const current = circleTasks[selectedCircle.id] || [];
+        const updatedTasks = current.map(t => 
+          t.id === actualTaskId ? { ...t, approvalStatus: "approved" as const } : t
+        );
+        setCircleTasks({ ...circleTasks, [selectedCircle.id]: updatedTasks });
+        
+        // Invalidate queries to refetch
+        queryClient.invalidateQueries({ queryKey: ['/api/circles', selectedCircle.id, 'tasks'] });
+        
+        toast({ title: "Task approved" });
+      } catch (error) {
+        toast({ title: "Failed to approve task", variant: "destructive" });
+      }
+      return;
+    }
+    
+    // Handle local request
     const request = taskRequests.find(r => r.id === requestId);
-    if (!request || !selectedCircle) return;
+    if (!request) return;
     
     if (request.type === "add") {
       const newTask: StoredCircleTask = {
@@ -4099,7 +4163,31 @@ export default function CommunityPage() {
     toast({ title: "Request approved" });
   };
 
-  const handleRejectRequest = (requestId: string) => {
+  const handleRejectRequest = async (requestId: string) => {
+    if (!selectedCircle) return;
+    
+    // Check if this is an API-based pending task (id starts with "api-")
+    if (requestId.startsWith("api-")) {
+      const actualTaskId = requestId.replace("api-", "");
+      try {
+        // Call API to reject/delete the task
+        await apiRequest("DELETE", `/api/circles/${selectedCircle.id}/tasks/${actualTaskId}`);
+        
+        // Update local state - remove the task
+        const current = circleTasks[selectedCircle.id] || [];
+        setCircleTasks({ ...circleTasks, [selectedCircle.id]: current.filter(t => t.id !== actualTaskId) });
+        
+        // Invalidate queries to refetch
+        queryClient.invalidateQueries({ queryKey: ['/api/circles', selectedCircle.id, 'tasks'] });
+        
+        toast({ title: "Task request rejected" });
+      } catch (error) {
+        toast({ title: "Failed to reject task", variant: "destructive" });
+      }
+      return;
+    }
+    
+    // Handle local request
     setTaskRequests(taskRequests.map(r => 
       r.id === requestId ? { ...r, status: "rejected", reviewedById: "you", reviewedAt: new Date().toISOString() } : r
     ));
@@ -9928,261 +10016,257 @@ export default function CommunityPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {isOwnerOrAdmin(selectedCircle.id) && (
-                        <>
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="flex items-center gap-2">
-                                <Copy className="w-5 h-5" />
-                                Your Circle's Invite Code
-                              </CardTitle>
-                              <CardDescription>
-                                Share this code with other circles to receive competition challenges
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              {selectedCircle.inviteCode ? (
-                                <div className="flex items-center gap-2">
-                                  <code className="flex-1 bg-muted px-4 py-2 rounded-md font-mono text-lg" data-testid="text-invite-code">
-                                    {selectedCircle.inviteCode}
-                                  </code>
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Copy className="w-5 h-5" />
+                            Your Circle's Invite Code
+                          </CardTitle>
+                          <CardDescription>
+                            Share this code with other circles to receive competition challenges
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {selectedCircle.inviteCode ? (
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 bg-muted px-4 py-2 rounded-md font-mono text-lg" data-testid="text-invite-code">
+                                {selectedCircle.inviteCode}
+                              </code>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(selectedCircle.inviteCode || "");
+                                  toast({ title: "Copied to clipboard" });
+                                }}
+                                data-testid="button-copy-invite-code"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => generateInviteCodeMutation.mutate(selectedCircle.id)}
+                              disabled={generateInviteCodeMutation.isPending}
+                              data-testid="button-generate-invite-code"
+                            >
+                              {generateInviteCodeMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : null}
+                              Generate Invite Code
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <Swords className="w-5 h-5" />
+                            Challenge Another Circle
+                          </CardTitle>
+                          <CardDescription>
+                            Enter another circle's invite code to send them a competition challenge
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <Label htmlFor="challengeInviteCode">Opponent's Invite Code</Label>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => setShowBrowseCirclesForChallenge(!showBrowseCirclesForChallenge)}
+                                data-testid="button-browse-circles-challenge"
+                              >
+                                <Search className="w-3 h-3 mr-1" />
+                                {showBrowseCirclesForChallenge ? "Hide" : "Browse Public Circles"}
+                              </Button>
+                            </div>
+                            <Input
+                              id="challengeInviteCode"
+                              placeholder="Enter their invite code"
+                              value={challengeInviteCode}
+                              onChange={(e) => setChallengeInviteCode(e.target.value)}
+                              data-testid="input-challenge-invite-code"
+                            />
+                            
+                            {/* Browse public circles for challenge */}
+                            {showBrowseCirclesForChallenge && (
+                              <div className="border rounded-md p-3 space-y-2">
+                                <p className="text-sm text-muted-foreground">Select a public circle to challenge:</p>
+                                <ScrollArea className="h-[150px]">
+                                  <div className="space-y-2">
+                                    {(publicCirclesQuery.data || [])
+                                      .filter(c => c.id !== selectedCircle?.id)
+                                      .map(circle => (
+                                        <div
+                                          key={circle.id}
+                                          className="flex items-center justify-between gap-2 p-2 rounded-md border hover-elevate cursor-pointer"
+                                          onClick={() => {
+                                            if (circle.inviteCode) {
+                                              setChallengeInviteCode(circle.inviteCode);
+                                              setShowBrowseCirclesForChallenge(false);
+                                              toast({ title: "Circle selected", description: `Selected "${circle.name}" for challenge` });
+                                            } else {
+                                              toast({ title: "No invite code", description: "This circle hasn't generated an invite code yet", variant: "destructive" });
+                                            }
+                                          }}
+                                          data-testid={`challenge-circle-${circle.id}`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <div
+                                              className="w-8 h-8 rounded-full flex items-center justify-center"
+                                              style={{ backgroundColor: circle.iconColor || "hsl(200, 70%, 50%)" }}
+                                            >
+                                              <CircleDot className="w-4 h-4 text-white" />
+                                            </div>
+                                            <div>
+                                              <p className="text-sm font-medium">{circle.name}</p>
+                                              <p className="text-xs text-muted-foreground">{circle.memberCount || 1} members</p>
+                                            </div>
+                                          </div>
+                                          <Swords className="w-4 h-4 text-muted-foreground" />
+                                        </div>
+                                      ))}
+                                    {(!publicCirclesQuery.data || publicCirclesQuery.data.filter(c => c.id !== selectedCircle?.id).length === 0) && (
+                                      <p className="text-sm text-muted-foreground text-center py-4">
+                                        No other public circles available to challenge
+                                      </p>
+                                    )}
+                                  </div>
+                                </ScrollArea>
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Competition Type</Label>
+                            <Select
+                              value={challengeCompetitionType}
+                              onValueChange={(value) => setChallengeCompetitionType(value as CompetitionType)}
+                              data-testid="select-competition-type"
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select competition type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="targetPoints">
+                                  <div className="flex items-center gap-2">
+                                    <Target className="w-3 h-3" />
+                                    Target Points - First to reach wins
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="timed">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-3 h-3" />
+                                    Timed - Most points by end date wins
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="ongoing">
+                                  <div className="flex items-center gap-2">
+                                    <Flame className="w-3 h-3" />
+                                    Ongoing - Continuous competition
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {challengeCompetitionType === "targetPoints" && (
+                            <div className="space-y-2">
+                              <Label htmlFor="challengeTargetPoints">Target Points</Label>
+                              <Input
+                                id="challengeTargetPoints"
+                                type="number"
+                                placeholder="e.g., 1000"
+                                value={challengeTargetPoints}
+                                onChange={(e) => setChallengeTargetPoints(e.target.value)}
+                                data-testid="input-challenge-target-points"
+                              />
+                            </div>
+                          )}
+                          {challengeCompetitionType === "timed" && (
+                            <div className="space-y-2">
+                              <Label>End Date</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(selectedCircle.inviteCode || "");
-                                      toast({ title: "Copied to clipboard" });
-                                    }}
-                                    data-testid="button-copy-invite-code"
+                                    className="w-full justify-start text-left font-normal"
+                                    data-testid="button-challenge-end-date"
                                   >
-                                    <Copy className="w-4 h-4" />
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {challengeEndDate ? challengeEndDate.toLocaleDateString() : "Pick an end date"}
                                   </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  onClick={() => generateInviteCodeMutation.mutate(selectedCircle.id)}
-                                  disabled={generateInviteCodeMutation.isPending}
-                                  data-testid="button-generate-invite-code"
-                                >
-                                  {generateInviteCodeMutation.isPending ? (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  ) : null}
-                                  Generate Invite Code
-                                </Button>
-                              )}
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardHeader>
-                              <CardTitle className="flex items-center gap-2">
-                                <Swords className="w-5 h-5" />
-                                Challenge Another Circle
-                              </CardTitle>
-                              <CardDescription>
-                                Enter another circle's invite code to send them a competition challenge
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2">
-                                  <Label htmlFor="challengeInviteCode">Opponent's Invite Code</Label>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs"
-                                    onClick={() => setShowBrowseCirclesForChallenge(!showBrowseCirclesForChallenge)}
-                                    data-testid="button-browse-circles-challenge"
-                                  >
-                                    <Search className="w-3 h-3 mr-1" />
-                                    {showBrowseCirclesForChallenge ? "Hide" : "Browse Public Circles"}
-                                  </Button>
-                                </div>
-                                <Input
-                                  id="challengeInviteCode"
-                                  placeholder="Enter their invite code"
-                                  value={challengeInviteCode}
-                                  onChange={(e) => setChallengeInviteCode(e.target.value)}
-                                  data-testid="input-challenge-invite-code"
-                                />
-                                
-                                {/* Browse public circles for challenge */}
-                                {showBrowseCirclesForChallenge && (
-                                  <div className="border rounded-md p-3 space-y-2">
-                                    <p className="text-sm text-muted-foreground">Select a public circle to challenge:</p>
-                                    <ScrollArea className="h-[150px]">
-                                      <div className="space-y-2">
-                                        {(publicCirclesQuery.data || [])
-                                          .filter(c => c.id !== selectedCircle?.id)
-                                          .map(circle => (
-                                            <div
-                                              key={circle.id}
-                                              className="flex items-center justify-between gap-2 p-2 rounded-md border hover-elevate cursor-pointer"
-                                              onClick={() => {
-                                                if (circle.inviteCode) {
-                                                  setChallengeInviteCode(circle.inviteCode);
-                                                  setShowBrowseCirclesForChallenge(false);
-                                                  toast({ title: "Circle selected", description: `Selected "${circle.name}" for challenge` });
-                                                } else {
-                                                  toast({ title: "No invite code", description: "This circle hasn't generated an invite code yet", variant: "destructive" });
-                                                }
-                                              }}
-                                              data-testid={`challenge-circle-${circle.id}`}
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                <div
-                                                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                                                  style={{ backgroundColor: circle.iconColor || "hsl(200, 70%, 50%)" }}
-                                                >
-                                                  <CircleDot className="w-4 h-4 text-white" />
-                                                </div>
-                                                <div>
-                                                  <p className="text-sm font-medium">{circle.name}</p>
-                                                  <p className="text-xs text-muted-foreground">{circle.memberCount || 1} members</p>
-                                                </div>
-                                              </div>
-                                              <Swords className="w-4 h-4 text-muted-foreground" />
-                                            </div>
-                                          ))}
-                                        {(!publicCirclesQuery.data || publicCirclesQuery.data.filter(c => c.id !== selectedCircle?.id).length === 0) && (
-                                          <p className="text-sm text-muted-foreground text-center py-4">
-                                            No other public circles available to challenge
-                                          </p>
-                                        )}
-                                      </div>
-                                    </ScrollArea>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Competition Type</Label>
-                                <Select
-                                  value={challengeCompetitionType}
-                                  onValueChange={(value) => setChallengeCompetitionType(value as CompetitionType)}
-                                  data-testid="select-competition-type"
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select competition type" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="targetPoints">
-                                      <div className="flex items-center gap-2">
-                                        <Target className="w-3 h-3" />
-                                        Target Points - First to reach wins
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="timed">
-                                      <div className="flex items-center gap-2">
-                                        <Clock className="w-3 h-3" />
-                                        Timed - Most points by end date wins
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="ongoing">
-                                      <div className="flex items-center gap-2">
-                                        <Flame className="w-3 h-3" />
-                                        Ongoing - Continuous competition
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              {challengeCompetitionType === "targetPoints" && (
-                                <div className="space-y-2">
-                                  <Label htmlFor="challengeTargetPoints">Target Points</Label>
-                                  <Input
-                                    id="challengeTargetPoints"
-                                    type="number"
-                                    placeholder="e.g., 1000"
-                                    value={challengeTargetPoints}
-                                    onChange={(e) => setChallengeTargetPoints(e.target.value)}
-                                    data-testid="input-challenge-target-points"
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={challengeEndDate}
+                                    onSelect={setChallengeEndDate}
+                                    disabled={(date) => date < new Date()}
                                   />
-                                </div>
-                              )}
-                              {challengeCompetitionType === "timed" && (
-                                <div className="space-y-2">
-                                  <Label>End Date</Label>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        className="w-full justify-start text-left font-normal"
-                                        data-testid="button-challenge-end-date"
-                                      >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {challengeEndDate ? challengeEndDate.toLocaleDateString() : "Pick an end date"}
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                      <CalendarComponent
-                                        mode="single"
-                                        selected={challengeEndDate}
-                                        onSelect={setChallengeEndDate}
-                                        disabled={(date) => date < new Date()}
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                </div>
-                              )}
-                              <div className="space-y-2">
-                                <Label htmlFor="challengeName">Competition Name (optional)</Label>
-                                <Input
-                                  id="challengeName"
-                                  placeholder="e.g., Weekly Showdown"
-                                  value={challengeName}
-                                  onChange={(e) => setChallengeName(e.target.value)}
-                                  data-testid="input-challenge-name"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="challengeNotes">Notes (optional)</Label>
-                                <Textarea
-                                  id="challengeNotes"
-                                  placeholder="Add any rules, context, or details about this competition..."
-                                  value={challengeNotes}
-                                  onChange={(e) => setChallengeNotes(e.target.value)}
-                                  className="min-h-[80px]"
-                                  data-testid="textarea-challenge-notes"
-                                />
-                              </div>
-                              <Button
-                                onClick={() => {
-                                  if (!challengeInviteCode.trim()) {
-                                    toast({ title: "Please enter an invite code", variant: "destructive" });
-                                    return;
-                                  }
-                                  if (challengeCompetitionType === "targetPoints") {
-                                    const targetPoints = parseInt(challengeTargetPoints);
-                                    if (!targetPoints || targetPoints <= 0) {
-                                      toast({ title: "Please enter a valid target points value", variant: "destructive" });
-                                      return;
-                                    }
-                                  }
-                                  if (challengeCompetitionType === "timed" && !challengeEndDate) {
-                                    toast({ title: "Please select an end date", variant: "destructive" });
-                                    return;
-                                  }
-                                  sendCompetitionInviteMutation.mutate({
-                                    circleId: selectedCircle.id,
-                                    inviteeInviteCode: challengeInviteCode,
-                                    targetPoints: challengeCompetitionType === "targetPoints" ? parseInt(challengeTargetPoints) : 0,
-                                    name: challengeName || undefined,
-                                    notes: challengeNotes || undefined,
-                                  });
-                                }}
-                                disabled={sendCompetitionInviteMutation.isPending}
-                                data-testid="button-send-challenge"
-                              >
-                                {sendCompetitionInviteMutation.isPending ? (
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Send className="w-4 h-4 mr-2" />
-                                )}
-                                Send Challenge
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        </>
-                      )}
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label htmlFor="challengeName">Competition Name (optional)</Label>
+                            <Input
+                              id="challengeName"
+                              placeholder="e.g., Weekly Showdown"
+                              value={challengeName}
+                              onChange={(e) => setChallengeName(e.target.value)}
+                              data-testid="input-challenge-name"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="challengeNotes">Notes (optional)</Label>
+                            <Textarea
+                              id="challengeNotes"
+                              placeholder="Add any rules, context, or details about this competition..."
+                              value={challengeNotes}
+                              onChange={(e) => setChallengeNotes(e.target.value)}
+                              className="min-h-[80px]"
+                              data-testid="textarea-challenge-notes"
+                            />
+                          </div>
+                          <Button
+                            onClick={() => {
+                              if (!challengeInviteCode.trim()) {
+                                toast({ title: "Please enter an invite code", variant: "destructive" });
+                                return;
+                              }
+                              if (challengeCompetitionType === "targetPoints") {
+                                const targetPoints = parseInt(challengeTargetPoints);
+                                if (!targetPoints || targetPoints <= 0) {
+                                  toast({ title: "Please enter a valid target points value", variant: "destructive" });
+                                  return;
+                                }
+                              }
+                              if (challengeCompetitionType === "timed" && !challengeEndDate) {
+                                toast({ title: "Please select an end date", variant: "destructive" });
+                                return;
+                              }
+                              sendCompetitionInviteMutation.mutate({
+                                circleId: selectedCircle.id,
+                                inviteeInviteCode: challengeInviteCode,
+                                targetPoints: challengeCompetitionType === "targetPoints" ? parseInt(challengeTargetPoints) : 0,
+                                name: challengeName || undefined,
+                                notes: challengeNotes || undefined,
+                              });
+                            }}
+                            disabled={sendCompetitionInviteMutation.isPending}
+                            data-testid="button-send-challenge"
+                          >
+                            {sendCompetitionInviteMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Send className="w-4 h-4 mr-2" />
+                            )}
+                            Send Challenge
+                          </Button>
+                        </CardContent>
+                      </Card>
 
                       {(competitionInvitesQuery.data?.length || 0) > 0 && (
                         <Card>
