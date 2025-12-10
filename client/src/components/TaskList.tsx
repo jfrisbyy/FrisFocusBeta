@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Zap, AlertTriangle, AlertCircle, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Zap, AlertTriangle, AlertCircle, Check, Layers, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskForm, { TaskWithBooster } from "./TaskForm";
 import { BoosterRule } from "./BoosterRuleConfig";
+
+type ViewMode = "priority" | "category";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +56,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("priority");
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -79,19 +82,50 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-lg font-semibold">All Tasks</CardTitle>
-          <Button size="sm" onClick={() => setFormOpen(true)} data-testid="button-add-task">
-            <Plus className="h-4 w-4 mr-1" />
-            Add Task
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-md border p-1 gap-1" data-testid="view-mode-toggle">
+              <button
+                onClick={() => setViewMode("priority")}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors",
+                  viewMode === "priority"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover-elevate"
+                )}
+                data-testid="button-view-priority"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                By Priority
+              </button>
+              <button
+                onClick={() => setViewMode("category")}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors",
+                  viewMode === "category"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover-elevate"
+                )}
+                data-testid="button-view-category"
+              >
+                <Tag className="h-3.5 w-3.5" />
+                By Category
+              </button>
+            </div>
+            <Button size="sm" onClick={() => setFormOpen(true)} data-testid="button-add-task">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Task
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {tasks.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               No tasks yet. Add your first task to get started.
             </div>
-          ) : (
+          ) : viewMode === "priority" ? (
+            /* Priority View */
             <div className="divide-y">
               {priorityOrder.map((priority) => {
                 const priorityTasks = tasks.filter((t) => t.priority === priority);
@@ -191,6 +225,115 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
                         </div>
                       </div>
                     ))}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Category View */
+            <div className="divide-y">
+              {categories.map((category) => {
+                const categoryTasks = tasks.filter((t) => t.category === category);
+                if (categoryTasks.length === 0) return null;
+
+                return (
+                  <div key={category}>
+                    <div className="bg-muted/30 px-6 py-2 flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {category}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {categoryTasks.length}
+                      </Badge>
+                    </div>
+                    {categoryTasks.map((task) => {
+                      const priorityConf = priorityConfig[task.priority];
+                      const PriorityIcon = priorityConf.icon;
+                      
+                      return (
+                        <div
+                          key={task.id}
+                          className="flex items-center justify-between gap-4 px-6 py-3 hover-elevate"
+                          data-testid={`task-row-${task.id}`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-wrap">
+                            <span className="text-sm font-medium truncate">{task.name}</span>
+                            <Badge 
+                              variant={priorityConf.variant} 
+                              className={cn(
+                                "text-xs shrink-0 gap-1",
+                                task.priority === "mustDo" && "text-chart-3"
+                              )}
+                            >
+                              <PriorityIcon className="h-3 w-3" />
+                              {priorityConf.label}
+                            </Badge>
+                            {task.boosterRule?.enabled && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-xs text-chart-2 border-chart-2/30 shrink-0 gap-1">
+                                    <Zap className="h-3 w-3" />
+                                    {task.boosterRule.timesRequired}x/{task.boosterRule.period === "week" ? "wk" : "mo"}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    Complete {task.boosterRule.timesRequired} times per {task.boosterRule.period} for +{task.boosterRule.bonusPoints} bonus
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {task.penaltyRule?.enabled && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-xs text-chart-3 border-chart-3/30 shrink-0 gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    -{task.penaltyRule.penaltyPoints}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    Penalty of -{task.penaltyRule.penaltyPoints} if done {task.penaltyRule.condition === "lessThan" ? "less than" : "more than"} {task.penaltyRule.timesThreshold} times/week
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {task.group && (
+                              <Badge variant="secondary" className="text-xs shrink-0">
+                                {task.group}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={cn(
+                                "font-mono text-sm font-semibold w-12 text-right",
+                                task.value > 0 ? "text-chart-1" : "text-chart-3"
+                              )}
+                            >
+                              {task.value > 0 ? `+${task.value}` : task.value}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleEdit(task)}
+                              data-testid={`button-edit-${task.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteId(task.id)}
+                              data-testid={`button-delete-${task.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-chart-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
