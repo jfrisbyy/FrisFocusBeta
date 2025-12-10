@@ -57,6 +57,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("priority");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -230,31 +231,52 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
               })}
             </div>
           ) : (
-            /* Category View */
-            <div className="divide-y">
-              {categories.map((category) => {
-                const categoryTasks = tasks.filter((t) => t.category === category);
-                if (categoryTasks.length === 0) return null;
-
-                return (
-                  <div key={category}>
-                    <div className="bg-muted/30 px-6 py-2 flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {category}
-                      </span>
-                      <Badge variant="secondary" className="text-xs">
+            /* Category View with Horizontal Tabs */
+            <div className="p-4">
+              {/* Category Tabs */}
+              <div className="flex flex-wrap gap-2 mb-4" data-testid="category-tabs">
+                {categories.map((category) => {
+                  const categoryTasks = tasks.filter((t) => t.category === category);
+                  if (categoryTasks.length === 0) return null;
+                  const isSelected = selectedCategory === category;
+                  
+                  return (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(isSelected ? null : category)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover-elevate active-elevate-2",
+                        isSelected 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted text-muted-foreground"
+                      )}
+                      data-testid={`category-tab-${category.toLowerCase().replace(/\s/g, "-")}`}
+                    >
+                      <span>{category}</span>
+                      <Badge 
+                        variant={isSelected ? "secondary" : "outline"} 
+                        className="text-xs"
+                      >
                         {categoryTasks.length}
                       </Badge>
-                    </div>
-                    {categoryTasks.map((task) => {
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Tasks for Selected Category */}
+              {selectedCategory && tasks.filter(t => t.category === selectedCategory).length > 0 ? (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium mb-3">{selectedCategory} Tasks</h3>
+                  <div className="space-y-1">
+                    {tasks.filter(t => t.category === selectedCategory).map((task) => {
                       const priorityConf = priorityConfig[task.priority];
                       const PriorityIcon = priorityConf.icon;
                       
                       return (
                         <div
                           key={task.id}
-                          className="flex items-center justify-between gap-4 px-6 py-3 hover-elevate"
+                          className="flex items-center justify-between gap-4 px-3 py-2.5 rounded-md hover-elevate"
                           data-testid={`task-row-${task.id}`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-wrap">
@@ -335,8 +357,12 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
                       );
                     })}
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Click a category above to view tasks
+                </p>
+              )}
             </div>
           )}
         </CardContent>
