@@ -58,6 +58,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("priority");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedPriority, setSelectedPriority] = useState<TaskPriority | null>(null);
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -126,35 +127,55 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
               No tasks yet. Add your first task to get started.
             </div>
           ) : viewMode === "priority" ? (
-            /* Priority View */
-            <div className="divide-y">
-              {priorityOrder.map((priority) => {
-                const priorityTasks = tasks.filter((t) => t.priority === priority);
-                if (priorityTasks.length === 0) return null;
-
-                const config = priorityConfig[priority];
-                const Icon = config.icon;
-
-                return (
-                  <div key={priority}>
-                    <div className="bg-muted/30 px-6 py-2 flex items-center gap-2">
+            /* Priority View with Horizontal Tabs */
+            <div className="p-4">
+              {/* Priority Tabs */}
+              <div className="flex flex-wrap gap-2 mb-4" data-testid="priority-tabs">
+                {priorityOrder.map((priority) => {
+                  const priorityTasks = tasks.filter((t) => t.priority === priority);
+                  if (priorityTasks.length === 0) return null;
+                  const config = priorityConfig[priority];
+                  const Icon = config.icon;
+                  const isSelected = selectedPriority === priority;
+                  
+                  return (
+                    <button
+                      key={priority}
+                      onClick={() => setSelectedPriority(isSelected ? null : priority)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover-elevate active-elevate-2",
+                        isSelected 
+                          ? "bg-primary text-primary-foreground" 
+                          : "bg-muted text-muted-foreground"
+                      )}
+                      data-testid={`priority-tab-${priority}`}
+                    >
                       <Icon className={cn(
                         "h-4 w-4",
-                        priority === "mustDo" && "text-chart-3",
-                        priority === "shouldDo" && "text-chart-2",
-                        priority === "couldDo" && "text-muted-foreground"
+                        !isSelected && priority === "mustDo" && "text-chart-3",
+                        !isSelected && priority === "shouldDo" && "text-chart-2"
                       )} />
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {config.label}
-                      </span>
-                      <Badge variant="secondary" className="text-xs">
+                      <span>{config.label}</span>
+                      <Badge 
+                        variant={isSelected ? "secondary" : "outline"} 
+                        className="text-xs"
+                      >
                         {priorityTasks.length}
                       </Badge>
-                    </div>
-                    {priorityTasks.map((task) => (
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Tasks for Selected Priority */}
+              {selectedPriority && tasks.filter(t => t.priority === selectedPriority).length > 0 ? (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium mb-3">{priorityConfig[selectedPriority].label} Tasks</h3>
+                  <div className="space-y-1">
+                    {tasks.filter(t => t.priority === selectedPriority).map((task) => (
                       <div
                         key={task.id}
-                        className="flex items-center justify-between gap-4 px-6 py-3 hover-elevate"
+                        className="flex items-center justify-between gap-4 px-3 py-2.5 rounded-md hover-elevate"
                         data-testid={`task-row-${task.id}`}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-wrap">
@@ -227,8 +248,12 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
                       </div>
                     ))}
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Click a priority level above to view tasks
+                </p>
+              )}
             </div>
           ) : (
             /* Category View with Horizontal Tabs */
