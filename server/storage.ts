@@ -48,15 +48,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Filter out undefined values to preserve existing data in the database
+    // This prevents overwriting username/displayName when not provided (e.g., during Firebase auth)
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    for (const [key, value] of Object.entries(userData)) {
+      if (value !== undefined && key !== 'id') {
+        updateData[key] = value;
+      }
+    }
+    
     const [user] = await db
       .insert(users)
       .values(userData)
       .onConflictDoUpdate({
         target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
+        set: updateData,
       })
       .returning();
     return user;
