@@ -3249,7 +3249,26 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
       }
 
       const parsed = insertCircleMessageSchema.parse({ ...req.body, circleId, senderId: userId });
-      const [message] = await db.insert(circleMessages).values(parsed).returning();
+
+      // Normalize image URL if provided (convert signed GCS URL to /objects/ path)
+      let normalizedImageUrl = parsed.imageUrl;
+      if (normalizedImageUrl) {
+        const { ObjectStorageService } = await import("./objectStorage");
+        const objectStorageService = new ObjectStorageService();
+        try {
+          normalizedImageUrl = await objectStorageService.trySetObjectEntityAclPolicy(normalizedImageUrl, {
+            owner: userId,
+            visibility: "public",
+          });
+        } catch (error) {
+          console.error("Error normalizing image URL:", error);
+        }
+      }
+
+      const [message] = await db.insert(circleMessages).values({
+        ...parsed,
+        imageUrl: normalizedImageUrl,
+      }).returning();
 
       const [sender] = await db.select().from(users).where(eq(users.id, userId));
       res.json({
