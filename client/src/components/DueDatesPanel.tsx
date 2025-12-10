@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { format, parseISO, isBefore, startOfDay } from "date-fns";
-import { Plus, Trash2, Calendar, Check, AlertTriangle } from "lucide-react";
+import { format, parseISO, isBefore, startOfDay, differenceInDays } from "date-fns";
+import { Plus, Trash2, Calendar, Check, AlertTriangle, Repeat, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { StoredDueDateItem } from "@/lib/storage";
 
@@ -23,9 +32,27 @@ export default function DueDatesPanel({
   const [newDueDate, setNewDueDate] = useState("");
   const [newPoints, setNewPoints] = useState("10");
   const [newPenalty, setNewPenalty] = useState("10");
+  const [newIsRecurring, setNewIsRecurring] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [recurringItem, setRecurringItem] = useState<StoredDueDateItem | null>(null);
+  const [nextDueDate, setNextDueDate] = useState("");
 
   const today = startOfDay(new Date());
+
+  // Auto-remove completed items older than 14 days
+  const cleanedItems = items.filter(item => {
+    if (item.status === "completed" && item.completedAt) {
+      const completedDate = parseISO(item.completedAt);
+      const daysSinceCompletion = differenceInDays(today, completedDate);
+      return daysSinceCompletion < 14;
+    }
+    return true;
+  });
+
+  // If items were cleaned, update the parent
+  if (cleanedItems.length !== items.length) {
+    setTimeout(() => onItemsChange(cleanedItems), 0);
+  }
 
   const processedItems = items.map(item => {
     const dueDate = parseISO(item.dueDate);
@@ -51,13 +78,36 @@ export default function DueDatesPanel({
       pointValue,
       penaltyValue,
       status: "pending",
+      isRecurring: newIsRecurring,
     };
     onItemsChange([...items, newItem]);
     setNewTitle("");
     setNewDueDate("");
     setNewPoints("10");
     setNewPenalty("10");
+    setNewIsRecurring(false);
     setShowAddForm(false);
+  };
+
+  const handleScheduleNext = (item: StoredDueDateItem) => {
+    setRecurringItem(item);
+    setNextDueDate("");
+  };
+
+  const handleConfirmNextDate = () => {
+    if (!recurringItem || !nextDueDate) return;
+    const newItem: StoredDueDateItem = {
+      id: `due-${Date.now()}`,
+      title: recurringItem.title,
+      dueDate: nextDueDate,
+      pointValue: recurringItem.pointValue,
+      penaltyValue: recurringItem.penaltyValue,
+      status: "pending",
+      isRecurring: true,
+    };
+    onItemsChange([...items, newItem]);
+    setRecurringItem(null);
+    setNextDueDate("");
   };
 
   const handleComplete = (id: string) => {
@@ -131,14 +181,19 @@ export default function DueDatesPanel({
           </Button>
         )}
         <div className="flex-1 min-w-0">
-          <span
-            className={cn(
-              "text-sm block truncate",
-              isCompleted && "line-through"
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                "text-sm truncate",
+                isCompleted && "line-through"
+              )}
+            >
+              {item.title}
+            </span>
+            {item.isRecurring && (
+              <Repeat className="h-3 w-3 text-muted-foreground shrink-0" />
             )}
-          >
-            {item.title}
-          </span>
+          </div>
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Calendar className="h-3 w-3" />
             {format(parseISO(item.dueDate), "MMM d, yyyy")}
@@ -152,6 +207,19 @@ export default function DueDatesPanel({
             )}
           </span>
         </div>
+        {/* Schedule Next button for completed recurring items */}
+        {isCompleted && item.isRecurring && !isDemo && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1"
+            onClick={() => handleScheduleNext(item)}
+            data-testid={`button-schedule-next-${item.id}`}
+          >
+            <CalendarPlus className="h-3 w-3" />
+            Next
+          </Button>
+        )}
         <div className="text-right">
           {isCompleted && (
             <span className="font-mono text-sm text-chart-1">+{item.pointValue}</span>
@@ -250,22 +318,36 @@ export default function DueDatesPanel({
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAddForm(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleAddItem}
-                disabled={!newTitle.trim() || !newDueDate}
-                data-testid="button-due-date-save"
-              >
-                Add
-              </Button>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="recurring"
+                  checked={newIsRecurring}
+                  onCheckedChange={(checked) => setNewIsRecurring(checked === true)}
+                  data-testid="checkbox-due-date-recurring"
+                />
+                <Label htmlFor="recurring" className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  Recurring
+                </Label>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAddForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleAddItem}
+                  disabled={!newTitle.trim() || !newDueDate}
+                  data-testid="button-due-date-save"
+                >
+                  Add
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -325,6 +407,43 @@ export default function DueDatesPanel({
           </div>
         )}
       </CardContent>
+
+      {/* Dialog for scheduling next occurrence */}
+      <Dialog open={!!recurringItem} onOpenChange={(open) => !open && setRecurringItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Next Occurrence</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Set the next due date for "{recurringItem?.title}"
+            </p>
+            <Input
+              type="date"
+              value={nextDueDate}
+              onChange={(e) => setNextDueDate(e.target.value)}
+              min={format(new Date(), "yyyy-MM-dd")}
+              data-testid="input-next-due-date"
+            />
+            <div className="text-xs text-muted-foreground">
+              Points: +{recurringItem?.pointValue} / Penalty: -{recurringItem?.penaltyValue}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecurringItem(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmNextDate} 
+              disabled={!nextDueDate}
+              data-testid="button-confirm-next-date"
+            >
+              <CalendarPlus className="h-4 w-4 mr-1" />
+              Add to Board
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

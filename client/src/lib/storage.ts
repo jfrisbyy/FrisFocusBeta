@@ -436,6 +436,7 @@ export interface StoredDueDateItem {
   penaltyValue: number;
   status: "pending" | "completed" | "missed";
   completedAt?: string;
+  isRecurring?: boolean;
 }
 
 export function loadDueDatesFromStorage(): StoredDueDateItem[] {
