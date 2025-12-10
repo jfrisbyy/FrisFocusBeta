@@ -1159,9 +1159,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP to both users for adding a friend
-      const { awardFp } = await import("./fpService");
+      const { awardFp, awardAchievement } = await import("./fpService");
       await awardFp(userId, "add_friend");
       await awardFp(friendship.requesterId, "add_friend");
+      
+      // Award first_friend achievement to both users
+      await awardAchievement(userId, "first_friend");
+      await awardAchievement(friendship.requesterId, "first_friend");
 
       res.json(updated);
     } catch (error) {
@@ -2327,6 +2331,12 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       // Get author info for response
       const [author] = await db.select().from(users).where(eq(users.id, userId));
 
+      // Award first_post achievement
+      try {
+        const { awardAchievement } = await import("./fpService");
+        await awardAchievement(userId, "first_post");
+      } catch (e) { console.error("Achievement error:", e); }
+
       res.json({
         ...post,
         likeCount: 0,
@@ -2619,8 +2629,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP for joining a circle
-      const { awardFp } = await import("./fpService");
+      const { awardFp, awardAchievement } = await import("./fpService");
       await awardFp(userId, "join_circle");
+      await awardAchievement(userId, "first_circle_joined");
 
       res.json({ success: true, message: "Joined circle successfully" });
     } catch (error) {
@@ -2644,8 +2655,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP for creating a circle
-      const { awardFp } = await import("./fpService");
+      const { awardFp, awardAchievement } = await import("./fpService");
       await awardFp(userId, "create_circle");
+      await awardAchievement(userId, "first_circle_created");
 
       res.json({ ...circle, memberCount: 1, isMember: true, userRole: "owner" });
     } catch (error) {
@@ -2733,8 +2745,9 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
 
       // Award FP for joining a circle
-      const { awardFp } = await import("./fpService");
+      const { awardFp, awardAchievement } = await import("./fpService");
       await awardFp(userId, "join_circle");
+      await awardAchievement(userId, "first_circle_joined");
 
       res.json({ joined: true });
     } catch (error) {
@@ -4772,8 +4785,11 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       const [cheerline] = await db.insert(cheerlines).values(parsed).returning();
 
       // Award FP for sending a cheerline
-      const { awardFp } = await import("./fpService");
+      const { awardFp, awardAchievement } = await import("./fpService");
       await awardFp(senderId, "send_cheerline");
+      
+      // Award first_cheerline_sent achievement
+      await awardAchievement(senderId, "first_cheerline_sent");
 
       res.json(cheerline);
     } catch (error) {
@@ -4875,6 +4891,12 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         boosterRule: boosterRule || null,
         penaltyRule: penaltyRule || null,
       }).returning();
+      
+      // Award first_task achievement
+      try {
+        const { awardAchievement } = await import("./fpService");
+        await awardAchievement(userId, "first_task");
+      } catch (e) { console.error("Achievement error:", e); }
       
       res.json(task);
     } catch (error) {
@@ -5375,6 +5397,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
       });
       
       const [entry] = await db.insert(userJournalEntries).values(parsed).returning();
+      
+      // Award first_journal achievement
+      try {
+        const { awardAchievement } = await import("./fpService");
+        await awardAchievement(userId, "first_journal");
+      } catch (e) { console.error("Achievement error:", e); }
+      
       res.json(entry);
     } catch (error) {
       console.error("Error creating journal entry:", error);
@@ -5554,6 +5583,13 @@ Keep responses brief (2-4 sentences usually) unless the user asks for detailed a
         userId,
       });
       const [appointment] = await db.insert(appointments).values(parsed).returning();
+      
+      // Award first_event achievement
+      try {
+        const { awardAchievement } = await import("./fpService");
+        await awardAchievement(userId, "first_event");
+      } catch (e) { console.error("Achievement error:", e); }
+      
       res.json(appointment);
     } catch (error) {
       console.error("Error creating appointment:", error);
