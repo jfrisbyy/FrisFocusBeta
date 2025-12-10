@@ -528,7 +528,7 @@ export default function DailyPage() {
         <div className="space-y-4">
           <TodoListPanel
             title="Today's To-Do List"
-            prompt="Add a task for today"
+            prompt="Add tasks that aren't recurring habits but still matter today. Think: &quot;Call Debby,&quot; &quot;Order new headphones,&quot; &quot;Schedule dentist,&quot; or &quot;Hit the farmer's market.&quot;"
             items={todoItems}
             onItemsChange={handleTodoItemsChange}
             bonusEnabled={todoBonusEnabled}
