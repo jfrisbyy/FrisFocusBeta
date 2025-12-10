@@ -1286,7 +1286,7 @@ export default function Dashboard() {
         <div className="max-w-md">
           <TodoListPanel
             title="Weekly To-Do List"
-            prompt="Add a weekly task..."
+            prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
             items={weeklyTodos}
             onItemsChange={handleWeeklyTodosChange}
             bonusEnabled={weeklyTodoBonusEnabled}
