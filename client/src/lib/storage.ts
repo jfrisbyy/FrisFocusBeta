@@ -600,6 +600,29 @@ export interface StoredBadgeRequest {
   votes?: RequestVote[];
 }
 
+export interface StoredChallengeRequest {
+  id: string;
+  circleId: string;
+  requesterId: string;
+  requesterName: string;
+  challengeData: {
+    challengeeId: string;
+    challengeeName: string;
+    name: string;
+    description?: string;
+    challengeType: "timed" | "targetPoints";
+    targetPoints?: number;
+    endDate?: string;
+    tasks: Array<{ taskName: string; pointValue: number }>;
+  };
+  status: ApprovalStatus;
+  createdAt: string;
+  reviewedById?: string;
+  reviewedAt?: string;
+  note?: string;
+  votes?: RequestVote[];
+}
+
 export interface StoredCircleMessage {
   id: string;
   circleId: string;
@@ -631,6 +654,9 @@ export interface StoredCirclePost {
   createdAt: string;
   likes: string[];
   comments: StoredCirclePostComment[];
+  isLiked?: boolean;
+  likeCount?: number;
+  commentCount?: number;
 }
 
 export interface StoredDirectMessage {

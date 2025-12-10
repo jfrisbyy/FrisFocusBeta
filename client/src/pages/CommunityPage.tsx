@@ -87,6 +87,7 @@ import type {
   StoredFriendActivity,
   CircleTaskType,
   StoredBadgeRequest,
+  StoredChallengeRequest,
   RequestVote,
 } from "@/lib/storage";
 // Note: localStorage functions removed - API endpoints handle data persistence in non-demo mode
@@ -2623,8 +2624,9 @@ export default function CommunityPage() {
             id: m.id,
             circleId: m.circleId,
             userId: m.userId,
-            firstName: m.user?.firstName || m.user?.displayName || 'Unknown',
-            lastName: m.user?.lastName || '',
+            displayName: m.user?.displayName || undefined,
+            firstName: m.user?.displayName || m.user?.firstName || 'Unknown',
+            lastName: m.user?.displayName ? '' : (m.user?.lastName || ''),
             role: m.role || 'member',
             joinedAt: m.joinedAt || new Date().toISOString(),
             weeklyPoints: m.weeklyPoints || 0,
@@ -2705,8 +2707,9 @@ export default function CommunityPage() {
         id: stat.id || stat.userId,
         circleId: circleId,
         userId: stat.userId,
-        firstName: stat.firstName || 'Unknown',
-        lastName: stat.lastName || '',
+        displayName: stat.displayName || undefined,
+        firstName: stat.displayName || stat.firstName || 'Unknown',
+        lastName: stat.displayName ? '' : (stat.lastName || ''),
         role: stat.role || 'member',
         joinedAt: new Date().toISOString(),
         weeklyPoints: stat.totalPoints || 0,
@@ -3027,6 +3030,9 @@ export default function CommunityPage() {
   // Badge/Award requests for approval
   const [badgeRequests, setBadgeRequests] = useState<StoredBadgeRequest[]>([]);
   
+  // Challenge requests for approval (non-admin users)
+  const [challengeRequests, setChallengeRequests] = useState<StoredChallengeRequest[]>([]);
+  
   // Request note fields (newTaskNote, showRequestEditTask, etc. defined earlier)
 
   // Edit state for tasks, badges, awards
@@ -3145,12 +3151,12 @@ export default function CommunityPage() {
           category: task.category || "",
           taskType: task.taskType || "per_person",
         },
-        existingTaskId: null,
+        existingTaskId: undefined,
         requesterId: task.createdById || "unknown",
-        requesterName: task.createdBy?.displayName || task.createdBy?.username || "A member",
+        requesterName: "A member",
         status: "pending" as const,
-        votes: [] as Array<{ odId: string; odName: string; vote: "approve" | "reject" }>,
-        createdAt: task.createdAt || new Date().toISOString(),
+        votes: [] as RequestVote[],
+        createdAt: new Date().toISOString(),
         note: undefined,
         apiTaskId: task.id, // Store the actual API task ID for approval
       }));
@@ -3924,26 +3930,28 @@ export default function CommunityPage() {
   const handleLikeCirclePost = (postId: string) => {
     if (!selectedCircle) return;
     
+    // Update local state optimistically for both demo and non-demo
+    setCirclePosts(prev => ({
+      ...prev,
+      [selectedCircle.id]: (prev[selectedCircle.id] || []).map(post => {
+        if (post.id !== postId) return post;
+        const liked = post.likes.includes("you") || post.isLiked;
+        return {
+          ...post,
+          likes: liked ? post.likes.filter(id => id !== "you") : [...post.likes, "you"],
+          isLiked: !liked,
+          likeCount: liked ? (post.likeCount || 1) - 1 : (post.likeCount || 0) + 1,
+        };
+      })
+    }));
+    
     // Use API for non-demo mode
     if (!isDemo) {
       likeCirclePostMutation.mutate({
         circleId: selectedCircle.id,
         postId: postId,
       });
-      return;
     }
-    
-    setCirclePosts({
-      ...circlePosts,
-      [selectedCircle.id]: (circlePosts[selectedCircle.id] || []).map(post => {
-        if (post.id !== postId) return post;
-        const liked = post.likes.includes("you");
-        return {
-          ...post,
-          likes: liked ? post.likes.filter(id => id !== "you") : [...post.likes, "you"]
-        };
-      })
-    });
   };
 
   const handleAddCirclePostComment = (postId: string) => {
@@ -4401,8 +4409,8 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "badge" as const,
-        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10, reward, taskId: newBadgeTaskId || undefined },
-        status: "pending" as ApprovalStatus,
+        data: { name: newBadgeName.trim(), description: newBadgeDescription.trim(), required: parseInt(newBadgeRequired) || 10, reward },
+        status: "pending" as "pending" | "approved" | "rejected",
         createdAt: new Date().toISOString(),
       };
       setBadgeRequests([...badgeRequests, request]);
@@ -4487,8 +4495,8 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "award" as const,
-        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), awardType: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory, reward: awardReward, taskId: newAwardTaskId || undefined },
-        status: "pending" as ApprovalStatus,
+        data: { name: newAwardName.trim(), description: newAwardDescription.trim(), type: newAwardType, target: parseInt(newAwardTarget), category: newAwardCategory, reward: awardReward },
+        status: "pending" as "pending" | "approved" | "rejected",
         createdAt: new Date().toISOString(),
       };
       setBadgeRequests([...badgeRequests, request]);
@@ -4545,6 +4553,30 @@ export default function CommunityPage() {
   const handleRejectBadgeRequest = (requestId: string) => {
     setBadgeRequests(badgeRequests.filter(r => r.id !== requestId));
     toast({ title: "Request rejected" });
+  };
+
+  const handleApproveChallengeRequest = (requestId: string) => {
+    const request = challengeRequests.find(r => r.id === requestId);
+    if (!request || !selectedCircle) return;
+    
+    // Actually send the challenge via API
+    sendCompetitionInviteMutation.mutate({
+      circleId: selectedCircle.id,
+      inviteeInviteCode: request.challengeData.challengeeId,
+      targetPoints: request.challengeData.targetPoints || 1000,
+      name: request.challengeData.name,
+      notes: request.challengeData.description,
+    }, {
+      onSuccess: () => {
+        setChallengeRequests(prev => prev.filter(r => r.id !== requestId));
+        toast({ title: "Challenge request approved and sent" });
+      },
+    });
+  };
+
+  const handleRejectChallengeRequest = (requestId: string) => {
+    setChallengeRequests(prev => prev.filter(r => r.id !== requestId));
+    toast({ title: "Challenge request rejected" });
   };
 
   const startEditTask = (task: StoredCircleTask) => {
@@ -4647,7 +4679,6 @@ export default function CommunityPage() {
           description: editBadgeDescription.trim(),
           required: parseInt(editBadgeRequired) || 10,
           reward,
-          taskId: editBadgeTaskId && editBadgeTaskId !== "_none" ? editBadgeTaskId : undefined,
         }
       }, {
         onSuccess: () => {
@@ -4733,7 +4764,6 @@ export default function CommunityPage() {
           target: editAwardType === "first_to" ? parseInt(editAwardTarget) || 100 : undefined,
           category: editAwardType === "most_in_category" ? editAwardCategory : undefined,
           reward,
-          taskId: editAwardTaskId && editAwardTaskId !== "_none" ? editAwardTaskId : undefined,
         }
       }, {
         onSuccess: () => {
@@ -4779,6 +4809,11 @@ export default function CommunityPage() {
     if (!selectedCircle) return [];
     return badgeRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
   }, [selectedCircle, badgeRequests]);
+
+  const pendingChallengeRequestsForCircle = useMemo(() => {
+    if (!selectedCircle) return [];
+    return challengeRequests.filter(r => r.circleId === selectedCircle.id && r.status === "pending");
+  }, [selectedCircle, challengeRequests]);
 
   const handleToggleTaskComplete = (circleId: string, taskId: string, task: StoredCircleTask) => {
     const today = new Date().toISOString().split('T')[0];
@@ -5782,8 +5817,8 @@ export default function CommunityPage() {
                     const availableUsers = getAvailableUsers();
                     const filteredUsers = availableUsers.filter(u => {
                       const searchLower = directorySearch.toLowerCase();
-                      return u.displayName.toLowerCase().includes(searchLower) ||
-                             u.username.toLowerCase().includes(searchLower);
+                      return (u.displayName || '').toLowerCase().includes(searchLower) ||
+                             (u.username || '').toLowerCase().includes(searchLower);
                     });
                     totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
                     displayUsers = filteredUsers.slice(
@@ -5791,10 +5826,10 @@ export default function CommunityPage() {
                       directoryPage * USERS_PER_PAGE
                     ).map(u => ({
                       id: u.id,
-                      displayName: u.displayName,
-                      username: u.username,
-                      firstName: u.firstName,
-                      lastName: u.lastName,
+                      displayName: u.displayName || 'Unknown',
+                      username: u.username || '',
+                      firstName: u.firstName || '',
+                      lastName: u.lastName || '',
                       profileImageUrl: u.profileImageUrl,
                     }));
                   } else if (directorySearch.length >= 2 && userSearchQuery.data) {
@@ -7336,8 +7371,8 @@ export default function CommunityPage() {
                   </TabsTrigger>
                   <TabsTrigger value="requests" data-testid="tab-requests">
                     Requests
-                    {(pendingRequestsForCircle.length + pendingBadgeRequestsForCircle.length) > 0 && (
-                      <Badge variant="secondary" className="ml-1">{pendingRequestsForCircle.length + pendingBadgeRequestsForCircle.length}</Badge>
+                    {(pendingRequestsForCircle.length + pendingBadgeRequestsForCircle.length + pendingChallengeRequestsForCircle.length) > 0 && (
+                      <Badge variant="secondary" className="ml-1">{pendingRequestsForCircle.length + pendingBadgeRequestsForCircle.length + pendingChallengeRequestsForCircle.length}</Badge>
                     )}
                   </TabsTrigger>
                 </TabsList>
@@ -8863,8 +8898,8 @@ export default function CommunityPage() {
                                     onClick={() => handleLikeCirclePost(post.id)}
                                     data-testid={`button-like-circle-post-${post.id}`}
                                   >
-                                    <Heart className={`w-4 h-4 mr-1 ${post.likes.includes("you") ? "fill-red-500 text-red-500" : ""}`} />
-                                    {post.likes.length}
+                                    <Heart className={`w-4 h-4 mr-1 ${(post.likes.includes("you") || post.isLiked) ? "fill-red-500 text-red-500" : ""}`} />
+                                    {post.likeCount ?? post.likes.length}
                                   </Button>
                                   <Button 
                                     variant="ghost" 
@@ -10247,13 +10282,47 @@ export default function CommunityPage() {
                                 toast({ title: "Please select an end date", variant: "destructive" });
                                 return;
                               }
-                              sendCompetitionInviteMutation.mutate({
-                                circleId: selectedCircle.id,
-                                inviteeInviteCode: challengeInviteCode,
-                                targetPoints: challengeCompetitionType === "targetPoints" ? parseInt(challengeTargetPoints) : 0,
-                                name: challengeName || undefined,
-                                notes: challengeNotes || undefined,
-                              });
+                              
+                              // If admin, send challenge directly
+                              if (isOwnerOrAdmin(selectedCircle.id)) {
+                                sendCompetitionInviteMutation.mutate({
+                                  circleId: selectedCircle.id,
+                                  inviteeInviteCode: challengeInviteCode,
+                                  targetPoints: challengeCompetitionType === "targetPoints" ? parseInt(challengeTargetPoints) : 0,
+                                  name: challengeName || undefined,
+                                  notes: challengeNotes || undefined,
+                                });
+                              } else {
+                                // Non-admins create a challenge request for approval
+                                const challengeRequest: StoredChallengeRequest = {
+                                  id: `creq-${Date.now()}`,
+                                  circleId: selectedCircle.id,
+                                  requesterId: user?.id || "you",
+                                  requesterName: user?.displayName || user?.firstName || "You",
+                                  challengeData: {
+                                    challengeeId: challengeInviteCode, // Using invite code as identifier
+                                    challengeeName: `Circle (${challengeInviteCode})`,
+                                    name: challengeName || "Competition Challenge",
+                                    description: challengeNotes || undefined,
+                                    challengeType: challengeCompetitionType === "timed" ? "timed" : "targetPoints",
+                                    targetPoints: parseInt(challengeTargetPoints) || 1000,
+                                    endDate: challengeEndDate?.toISOString().split('T')[0],
+                                    tasks: [],
+                                  },
+                                  status: "pending",
+                                  createdAt: new Date().toISOString(),
+                                  votes: [],
+                                };
+                                setChallengeRequests(prev => [...prev, challengeRequest]);
+                                setChallengeInviteCode("");
+                                setChallengeTargetPoints("1000");
+                                setChallengeName("");
+                                setChallengeNotes("");
+                                toast({ 
+                                  title: "Challenge request submitted", 
+                                  description: "Waiting for owner/admin approval before sending" 
+                                });
+                              }
                             }}
                             disabled={sendCompetitionInviteMutation.isPending}
                             data-testid="button-send-challenge"
@@ -10263,7 +10332,7 @@ export default function CommunityPage() {
                             ) : (
                               <Send className="w-4 h-4 mr-2" />
                             )}
-                            Send Challenge
+                            {isOwnerOrAdmin(selectedCircle.id) ? "Send Challenge" : "Request Challenge"}
                           </Button>
                         </CardContent>
                       </Card>
@@ -10296,9 +10365,9 @@ export default function CommunityPage() {
                                       <Target className="w-3 h-3 inline mr-1" />
                                       Race to {invite.targetPoints.toLocaleString()} points
                                     </p>
-                                    {invite.notes && (
+                                    {invite.description && (
                                       <p className="text-sm text-muted-foreground mt-2 italic" data-testid={`text-invite-notes-${invite.id}`}>
-                                        "{invite.notes}"
+                                        "{invite.description}"
                                       </p>
                                     )}
                                   </div>
@@ -10735,6 +10804,126 @@ export default function CommunityPage() {
                                       onClick={() => handleVoteOnRequest(request.id, "badge", "against")}
                                       className="gap-1"
                                       data-testid={`button-vote-against-badge-${request.id}`}
+                                    >
+                                      <ThumbsDown className="w-4 h-4" />
+                                      <span>{voteCounts.against}</span>
+                                    </Button>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {(voteCounts.for + voteCounts.against)} vote{(voteCounts.for + voteCounts.against) !== 1 ? "s" : ""}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Challenge Requests */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Swords className="w-5 h-5" />
+                        Challenge Requests
+                      </CardTitle>
+                      <CardDescription>
+                        {isOwnerOrAdmin(selectedCircle.id) 
+                          ? "Review and approve competition challenge requests from members" 
+                          : "Pending challenge requests awaiting approval - vote to show your support"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {pendingChallengeRequestsForCircle.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Check className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                          <p>No pending challenge requests</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {pendingChallengeRequestsForCircle.map((request) => {
+                            const voteCounts = getVoteCounts(request.votes);
+                            const myVote = getMyVote(request.votes);
+                            return (
+                              <div key={request.id} className="p-4 rounded-md border space-y-3">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                      <Badge variant="default">
+                                        CHALLENGE
+                                      </Badge>
+                                      <span className="text-sm text-muted-foreground">
+                                        from {request.requesterName} - {formatTime(request.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="font-medium">{request.challengeData.name}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      To: {request.challengeData.challengeeName} | Target: {request.challengeData.targetPoints?.toLocaleString()} points
+                                    </p>
+                                    {request.challengeData.description && (
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        {request.challengeData.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {isOwnerOrAdmin(selectedCircle.id) && (
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => handleApproveChallengeRequest(request.id)} data-testid={`button-approve-challenge-${request.id}`}>
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => handleRejectChallengeRequest(request.id)} data-testid={`button-reject-challenge-${request.id}`}>
+                                        <X className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-4 pt-2 border-t">
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant={myVote === "for" ? "default" : "ghost"}
+                                      onClick={() => {
+                                        const newVote: RequestVote = {
+                                          voterId: "you",
+                                          voterName: "You",
+                                          vote: "for",
+                                          votedAt: new Date().toISOString(),
+                                        };
+                                        setChallengeRequests(prev => prev.map(r => {
+                                          if (r.id !== request.id) return r;
+                                          const existingVotes = r.votes || [];
+                                          const filtered = existingVotes.filter(v => v.voterId !== "you");
+                                          return { ...r, votes: [...filtered, newVote] };
+                                        }));
+                                        toast({ title: "Voted in favor" });
+                                      }}
+                                      className="gap-1"
+                                      data-testid={`button-vote-for-challenge-${request.id}`}
+                                    >
+                                      <ThumbsUp className="w-4 h-4" />
+                                      <span>{voteCounts.for}</span>
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant={myVote === "against" ? "destructive" : "ghost"}
+                                      onClick={() => {
+                                        const newVote: RequestVote = {
+                                          voterId: "you",
+                                          voterName: "You",
+                                          vote: "against",
+                                          votedAt: new Date().toISOString(),
+                                        };
+                                        setChallengeRequests(prev => prev.map(r => {
+                                          if (r.id !== request.id) return r;
+                                          const existingVotes = r.votes || [];
+                                          const filtered = existingVotes.filter(v => v.voterId !== "you");
+                                          return { ...r, votes: [...filtered, newVote] };
+                                        }));
+                                        toast({ title: "Voted against" });
+                                      }}
+                                      className="gap-1"
+                                      data-testid={`button-vote-against-challenge-${request.id}`}
                                     >
                                       <ThumbsDown className="w-4 h-4" />
                                       <span>{voteCounts.against}</span>
