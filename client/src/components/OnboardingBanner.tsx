@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Rocket, Sparkles, AlertCircle } from "lucide-react";
 import { useOnboarding } from "@/contexts/OnboardingContext";
-import { useJourneyDialog } from "./StartJourneyButton";
+import { useJourneyDialog } from "@/contexts/JourneyDialogContext";
 
 export default function OnboardingBanner() {
   const { isOnboarding } = useOnboarding();
