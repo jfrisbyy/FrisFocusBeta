@@ -902,6 +902,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           return {
             id: friendship?.id,
             friendId,
+            displayName: user?.displayName ?? null,
             firstName: user?.firstName ?? null,
             lastName: user?.lastName ?? null,
             profileImageUrl: user?.profileImageUrl ?? null,
@@ -945,6 +946,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           return {
             id: request.id,
             requesterId: request.requesterId,
+            displayName: requester?.displayName ?? null,
             firstName: requester?.firstName ?? null,
             lastName: requester?.lastName ?? null,
             profileImageUrl: requester?.profileImageUrl ?? null,
@@ -981,6 +983,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           return {
             id: request.id,
             addresseeId: request.addresseeId,
+            displayName: addressee?.displayName ?? null,
             firstName: addressee?.firstName ?? null,
             lastName: addressee?.lastName ?? null,
             profileImageUrl: addressee?.profileImageUrl ?? null,

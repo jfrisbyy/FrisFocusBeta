@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 interface Friend {
   id: string;
   friendId: string;
+  displayName: string | null;
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
@@ -37,6 +38,7 @@ interface FriendRequest {
   id: string;
   requesterId?: string;
   addresseeId?: string;
+  displayName: string | null;
   firstName: string | null;
   lastName: string | null;
   profileImageUrl: string | null;
@@ -56,6 +58,7 @@ const demoFriends: Friend[] = [
   {
     id: "demo-1",
     friendId: "friend-1",
+    displayName: null,
     firstName: "Alex",
     lastName: "Chen",
     profileImageUrl: null,
@@ -70,6 +73,7 @@ const demoFriends: Friend[] = [
   {
     id: "demo-2",
     friendId: "friend-2",
+    displayName: null,
     firstName: "Jordan",
     lastName: "Taylor",
     profileImageUrl: null,
@@ -84,6 +88,7 @@ const demoFriends: Friend[] = [
   {
     id: "demo-3",
     friendId: "friend-3",
+    displayName: null,
     firstName: "Sam",
     lastName: "Rivera",
     profileImageUrl: null,
@@ -101,6 +106,7 @@ const demoIncomingRequests: FriendRequest[] = [
   {
     id: "req-1",
     requesterId: "user-4",
+    displayName: null,
     firstName: "Morgan",
     lastName: "Kim",
     profileImageUrl: null,
@@ -112,6 +118,7 @@ const demoOutgoingRequests: FriendRequest[] = [
   {
     id: "req-2",
     addresseeId: "user-5",
+    displayName: null,
     firstName: "Casey",
     lastName: "Park",
     profileImageUrl: null,
@@ -234,13 +241,21 @@ export default function FriendsPage() {
     }
   };
 
-  const getInitials = (firstName: string | null, lastName: string | null) => {
+  const getInitials = (displayName: string | null, firstName: string | null, lastName: string | null) => {
+    if (displayName) {
+      const parts = displayName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+      }
+      return displayName.charAt(0).toUpperCase() || "?";
+    }
     const first = firstName?.charAt(0) ?? "";
     const last = lastName?.charAt(0) ?? "";
     return (first + last).toUpperCase() || "?";
   };
 
-  const getName = (firstName: string | null, lastName: string | null) => {
+  const getName = (displayName: string | null, firstName: string | null, lastName: string | null) => {
+    if (displayName) return displayName;
     if (firstName && lastName) return `${firstName} ${lastName}`;
     if (firstName) return firstName;
     if (lastName) return lastName;
@@ -364,16 +379,16 @@ export default function FriendsPage() {
                         data-testid={`directory-user-${user.id}`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <ProfileHoverCard userId={user.id} isDemo={true}>
+                          <ProfileHoverCard userId={user.id}>
                             <Avatar className="cursor-pointer">
                               <AvatarImage src={user.profileImageUrl ?? undefined} />
-                              <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
+                              <AvatarFallback>{getInitials(user.displayName, user.firstName, user.lastName)}</AvatarFallback>
                             </Avatar>
                           </ProfileHoverCard>
                           <div className="min-w-0">
-                            <ProfileHoverCard userId={user.id} isDemo={true}>
+                            <ProfileHoverCard userId={user.id}>
                               <p className="font-medium truncate cursor-pointer hover:underline">
-                                {user.displayName || getName(user.firstName, user.lastName)}
+                                {getName(user.displayName, user.firstName, user.lastName)}
                               </p>
                             </ProfileHoverCard>
                             <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -466,9 +481,9 @@ export default function FriendsPage() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarImage src={request.profileImageUrl ?? undefined} />
-                        <AvatarFallback>{getInitials(request.firstName, request.lastName)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(request.displayName, request.firstName, request.lastName)}</AvatarFallback>
                       </Avatar>
-                      <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
+                      <p className="font-medium">{getName(request.displayName, request.firstName, request.lastName)}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -529,10 +544,10 @@ export default function FriendsPage() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarImage src={friend.profileImageUrl ?? undefined} />
-                        <AvatarFallback>{getInitials(friend.firstName, friend.lastName)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(friend.displayName, friend.firstName, friend.lastName)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{getName(friend.firstName, friend.lastName)}</p>
+                        <p className="font-medium">{getName(friend.displayName, friend.firstName, friend.lastName)}</p>
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           {friend.weeklyPoints !== null && (
                             <span className="flex items-center gap-1">
@@ -588,9 +603,9 @@ export default function FriendsPage() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarImage src={request.profileImageUrl ?? undefined} />
-                        <AvatarFallback>{getInitials(request.firstName, request.lastName)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(request.displayName, request.firstName, request.lastName)}</AvatarFallback>
                       </Avatar>
-                      <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
+                      <p className="font-medium">{getName(request.displayName, request.firstName, request.lastName)}</p>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -641,10 +656,10 @@ export default function FriendsPage() {
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarImage src={request.profileImageUrl ?? undefined} />
-                        <AvatarFallback>{getInitials(request.firstName, request.lastName)}</AvatarFallback>
+                        <AvatarFallback>{getInitials(request.displayName, request.firstName, request.lastName)}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{getName(request.firstName, request.lastName)}</p>
+                        <p className="font-medium">{getName(request.displayName, request.firstName, request.lastName)}</p>
                         <Badge variant="outline">Pending</Badge>
                       </div>
                     </div>
