@@ -163,11 +163,11 @@ export async function registerRoutes(
     }
   });
 
-  // Update user profile (username, displayName, profileImageUrl)
+  // Update user profile (username, displayName, profileImageUrl, hasStartedJourney)
   app.put('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { username, displayName, profileImageUrl } = req.body;
+      const { username, displayName, profileImageUrl, hasStartedJourney } = req.body;
 
       // Validate username format if provided
       if (username !== null && username !== undefined) {
@@ -221,6 +221,9 @@ export async function registerRoutes(
       }
       if (profileImageUrl !== undefined) {
         updateData.profileImageUrl = profileImageUrl || null;
+      }
+      if (hasStartedJourney === true) {
+        updateData.hasStartedJourney = true;
       }
 
       // Update user

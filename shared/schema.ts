@@ -24,6 +24,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   fpTotal: integer("fp_total").default(0),
+  hasStartedJourney: boolean("has_started_journey").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

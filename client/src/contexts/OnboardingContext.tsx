@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, ReactNode } from "react";
 import { clearAllFrisFocusData } from "@/lib/storage";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -10,32 +10,19 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-function getOnboardingKey(userId: string | undefined): string {
-  return userId ? `frisfocus_started_${userId}` : "frisfocus_started";
-}
-
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
-  const [hasStartedJourney, setHasStartedJourney] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && user?.id) {
-      const key = getOnboardingKey(user.id);
-      const started = localStorage.getItem(key) === "true";
-      setHasStartedJourney(started);
-    } else {
-      setHasStartedJourney(false);
-    }
-  }, [user?.id]);
-
+  const { user, isAuthenticated, refetchUser } = useAuth();
+  
+  // Use the database field directly from user object
+  const hasStartedJourney = user?.hasStartedJourney ?? false;
   const isOnboarding = isAuthenticated && !hasStartedJourney;
 
-  const startJourney = () => {
+  const startJourney = async () => {
     if (!user?.id) return;
     clearAllFrisFocusData();
-    const key = getOnboardingKey(user.id);
-    localStorage.setItem(key, "true");
-    setHasStartedJourney(true);
+    // Refetch user to get the updated hasStartedJourney from the database
+    // The actual update is done in the JourneyDialogContext when saving the profile
+    await refetchUser();
   };
 
   return (

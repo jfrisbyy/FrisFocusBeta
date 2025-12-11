@@ -89,7 +89,7 @@ function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   };
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: { username: string; displayName: string }) => {
+    mutationFn: async (data: { username: string; displayName: string; hasStartedJourney: boolean }) => {
       return apiRequest("PUT", "/api/auth/user", data);
     },
     onSuccess: async () => {
@@ -117,6 +117,7 @@ function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
       await updateProfileMutation.mutateAsync({
         username: trimmedUsername,
         displayName: trimmedDisplayName,
+        hasStartedJourney: true,
       });
       startJourney();
       onOpenChange(false);
