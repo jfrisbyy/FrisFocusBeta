@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, Zap, AlertTriangle, AlertCircle, Check, Layers, T
 import { cn } from "@/lib/utils";
 import TaskForm, { TaskWithBooster } from "./TaskForm";
 import { BoosterRule } from "./BoosterRuleConfig";
+import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
 type ViewMode = "priority" | "category";
 import {
@@ -85,7 +86,10 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-lg font-semibold">All Tasks</CardTitle>
+          <div className="flex items-center gap-1">
+            <CardTitle className="text-lg font-semibold">All Tasks</CardTitle>
+            <HelpIndicator {...helpContent.tasks} />
+          </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded-md border p-1 gap-1" data-testid="view-mode-toggle">
               <button

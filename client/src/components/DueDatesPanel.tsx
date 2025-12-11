@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { StoredDueDateItem } from "@/lib/storage";
+import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
 interface DueDatesPanelProps {
   items: StoredDueDateItem[];
@@ -300,7 +301,10 @@ export default function DueDatesPanel({
     <Card className="w-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base font-medium">Due Dates</CardTitle>
+          <div className="flex items-center gap-1">
+            <CardTitle className="text-base font-medium">Due Dates</CardTitle>
+            <HelpIndicator {...helpContent.dueDates} />
+          </div>
           <div className="flex items-center gap-2">
             {upcomingItems.length > 0 && (
               <Badge variant="secondary" className="text-xs">

@@ -3,6 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
 interface DailySummaryProps {
   positivePoints: number;
@@ -30,7 +31,10 @@ export default function DailySummary({
   return (
     <Card className="sticky top-20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium">Daily Summary</CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle className="text-sm font-medium">Daily Summary</CardTitle>
+          <HelpIndicator {...helpContent.dailyGoal} />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -46,7 +50,10 @@ export default function DailySummary({
           )}
           {checkInBonus > 0 && (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Check-in Bonus</span>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Check-in Bonus</span>
+                <HelpIndicator {...helpContent.checkInBonus} />
+              </div>
               <span className="font-mono font-semibold text-chart-1">+{checkInBonus}</span>
             </div>
           )}

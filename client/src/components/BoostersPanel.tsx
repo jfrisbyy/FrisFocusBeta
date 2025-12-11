@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Check, X, Zap, TrendingDown, Target, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UnifiedBooster } from "@shared/schema";
+import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
 interface BoostersPanelProps {
   boosters: UnifiedBooster[];
@@ -114,10 +115,13 @@ export default function BoostersPanel({ boosters }: BoostersPanelProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <Zap className="h-4 w-4 text-chart-2" />
-          Boosters
-        </CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Zap className="h-4 w-4 text-chart-2" />
+            Boosters
+          </CardTitle>
+          <HelpIndicator {...helpContent.boosters} />
+        </div>
         <div className="flex items-center gap-2">
           {totalEarned > 0 && (
             <Badge variant="secondary" className="font-mono text-chart-1">

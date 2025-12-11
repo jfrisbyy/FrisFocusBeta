@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TrendingUp, TrendingDown, Minus, Target, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
 interface PointsCardProps {
   weekTotal: number;
@@ -71,7 +72,10 @@ export default function PointsCard({ weekTotal, weekRange, boosterPoints = 0, we
   return (
     <Card className={cn("border", status.borderColor, status.bgColor)}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Week Total</CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Week Total</CardTitle>
+          <HelpIndicator {...helpContent.weeklyPoints} />
+        </div>
         <Icon className={cn("h-5 w-5", status.color)} />
       </CardHeader>
       <CardContent className="space-y-4">

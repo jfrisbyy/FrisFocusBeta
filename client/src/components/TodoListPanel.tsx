@@ -18,6 +18,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { StoredTodoItem } from "@/lib/storage";
+import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
 interface TodoListPanelProps {
   title: string;
@@ -166,7 +167,10 @@ export default function TodoListPanel({
     <Card className="w-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base font-medium">{title}</CardTitle>
+          <div className="flex items-center gap-1">
+            <CardTitle className="text-base font-medium">{title}</CardTitle>
+            <HelpIndicator {...helpContent.todos} />
+          </div>
           <div className="flex items-center gap-2">
             {items.length > 0 && (
               <Badge variant="secondary" className="text-xs">

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Flame, Calendar, TrendingUp, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HelpIndicator } from "@/components/HelpIndicator";
 
 interface StreaksCardProps {
   dayStreak: number;
@@ -70,10 +71,20 @@ export default function StreaksCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Flame className="h-4 w-4 text-chart-2" />
-          Streaks
-        </CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Flame className="h-4 w-4 text-chart-2" />
+            Streaks
+          </CardTitle>
+          <HelpIndicator 
+            title="Streaks" 
+            content={[
+              "Day Streak: Consecutive days you've logged activities.",
+              "Week Streak: Consecutive weeks hitting your weekly goal.",
+              "Keep your streaks going for motivation boosts!"
+            ]} 
+          />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
