@@ -8,6 +8,7 @@ interface DailySummaryProps {
   positivePoints: number;
   negativePoints: number;
   todoPoints?: number;
+  checkInBonus?: number;
   notes: string;
   onNotesChange: (notes: string) => void;
   onSave: () => void;
@@ -18,12 +19,13 @@ export default function DailySummary({
   positivePoints,
   negativePoints,
   todoPoints = 0,
+  checkInBonus = 0,
   notes,
   onNotesChange,
   onSave,
   isSaving,
 }: DailySummaryProps) {
-  const netTotal = positivePoints + negativePoints + todoPoints;
+  const netTotal = positivePoints + negativePoints + todoPoints + checkInBonus;
 
   return (
     <Card className="sticky top-20">
@@ -40,6 +42,12 @@ export default function DailySummary({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">To-Do List</span>
               <span className="font-mono font-semibold text-chart-1">+{todoPoints}</span>
+            </div>
+          )}
+          {checkInBonus > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Check-in Bonus</span>
+              <span className="font-mono font-semibold text-chart-1">+{checkInBonus}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">

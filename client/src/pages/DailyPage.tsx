@@ -642,6 +642,7 @@ export default function DailyPage() {
             positivePoints={positivePoints}
             negativePoints={negativePoints}
             todoPoints={totalTodoPoints}
+            checkInBonus={apiDailyLog?.checkInBonusAwarded ? 3 : 0}
             notes={notes}
             onNotesChange={setNotes}
             onSave={handleSave}

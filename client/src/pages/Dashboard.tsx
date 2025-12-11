@@ -663,8 +663,8 @@ export default function Dashboard() {
     }
     
     // Build daily logs map from API data or localStorage fallback
-    // Include todoPoints, penaltyPoints, and taskPoints for complete daily summary calculations
-    let dailyLogs: Record<string, { completedTaskIds: string[]; todoPoints: number; penaltyPoints: number; taskPoints?: number }> = {};
+    // Include todoPoints, penaltyPoints, taskPoints, and checkInBonusAwarded for complete daily summary calculations
+    let dailyLogs: Record<string, { completedTaskIds: string[]; todoPoints: number; penaltyPoints: number; taskPoints?: number; checkInBonusAwarded?: boolean }> = {};
     const hasApiLogs = apiDailyLogs && apiDailyLogs.length > 0;
     
     if (hasApiLogs) {
@@ -673,17 +673,19 @@ export default function Dashboard() {
           completedTaskIds: log.completedTaskIds || [],
           todoPoints: log.todoPoints || 0,
           penaltyPoints: log.penaltyPoints || 0,
-          taskPoints: log.taskPoints
+          taskPoints: log.taskPoints,
+          checkInBonusAwarded: log.checkInBonusAwarded || false
         };
       });
     } else {
-      // Fallback to localStorage when API returns empty
+      // Fallback to localStorage when API returns empty (no check-in bonus for localStorage data)
       const storedLogs = loadDailyLogsFromStorage();
       Object.values(storedLogs).forEach((log) => {
         dailyLogs[log.date] = { 
           completedTaskIds: log.completedTaskIds || [],
           todoPoints: log.todoPoints || 0,
-          penaltyPoints: log.penaltyPoints || 0
+          penaltyPoints: log.penaltyPoints || 0,
+          checkInBonusAwarded: false
         };
       });
     }
@@ -710,8 +712,9 @@ export default function Dashboard() {
           if (task && task.value > 0) return sum + task.value;
           return sum;
         }, 0);
-        // Add todoPoints and subtract penaltyPoints to get total daily points
-        points = taskPoints + (log.todoPoints || 0) - (log.penaltyPoints || 0);
+        // Add todoPoints, subtract penaltyPoints, and add +3 check-in bonus if awarded
+        const checkInBonus = log.checkInBonusAwarded ? 3 : 0;
+        points = taskPoints + (log.todoPoints || 0) - (log.penaltyPoints || 0) + checkInBonus;
       }
       
       return {
@@ -745,8 +748,9 @@ export default function Dashboard() {
             if (task && task.value > 0) return sum + task.value;
             return sum;
           }, 0);
-          // Add todoPoints and subtract penaltyPoints to get total daily points
-          dayPoints = taskPoints + (log.todoPoints || 0) - (log.penaltyPoints || 0);
+          // Add todoPoints, subtract penaltyPoints, and add +3 check-in bonus if awarded
+          const checkInBonus = log.checkInBonusAwarded ? 3 : 0;
+          dayPoints = taskPoints + (log.todoPoints || 0) - (log.penaltyPoints || 0) + checkInBonus;
         }
         
         weekDays.push({

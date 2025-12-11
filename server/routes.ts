@@ -5425,7 +5425,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         
         res.json(log);
       } else {
-        // Create new log
+        // Create new log - set checkInBonusAwarded to true since FP is awarded on first save
         const parsed = insertUserDailyLogSchema.parse({
           userId,
           date,
@@ -5433,6 +5433,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           todoPoints: todoPoints || 0,
           penaltyPoints: penaltyPoints || 0,
           taskPoints: taskPoints || 0,
+          checkInBonusAwarded: true,
           seasonId: seasonId || null,
           notes,
           taskNotes: taskNotes || null
