@@ -1061,6 +1061,7 @@ export const userDailyLogs = pgTable("user_daily_logs", {
   taskPoints: integer("task_points").default(0), // Computed points from tasks - frozen at save time
   todoPoints: integer("todo_points").default(0), // Points earned from todo list items
   penaltyPoints: integer("penalty_points").default(0), // Negative points from penalties (stored as negative)
+  checkInBonusAwarded: boolean("check_in_bonus_awarded").default(false), // +3 FP daily check-in bonus
   seasonId: varchar("season_id"), // Season active when log was created (for reference)
   notes: text("notes"),
   taskNotes: jsonb("task_notes"), // Per-task notes (taskId -> note string)
