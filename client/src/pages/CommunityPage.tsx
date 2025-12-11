@@ -1789,6 +1789,70 @@ export default function CommunityPage() {
     },
   });
 
+  // Circle invitations query - pending invites for current user
+  interface CircleInvite {
+    id: string;
+    circleId: string;
+    inviterId: string;
+    inviteeId: string;
+    status: string;
+    createdAt: string;
+    circle: { id: string; name: string; description: string } | null;
+    inviter: { id: string; firstName: string; lastName: string; displayName?: string; profileImageUrl?: string } | null;
+  }
+  const circleInvitesQuery = useQuery<CircleInvite[]>({
+    queryKey: ['/api/circle-invites'],
+    enabled: !isDemo,
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", '/api/circle-invites');
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  // Accept circle invite mutation
+  const acceptCircleInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const res = await apiRequest("PUT", `/api/circle-invites/${inviteId}`, { action: "accept" });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to accept invite');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circle-invites'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      toast({ title: "Joined circle!", description: "You have accepted the invitation and joined the circle." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to accept invite", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Decline circle invite mutation
+  const declineCircleInviteMutation = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const res = await apiRequest("PUT", `/api/circle-invites/${inviteId}`, { action: "decline" });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to decline invite');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circle-invites'] });
+      toast({ title: "Invitation declined", description: "You have declined the circle invitation." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to decline invite", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Join circle mutation
   const joinCircleMutation = useMutation({
     mutationFn: async (circleId: string) => {
@@ -6862,6 +6926,65 @@ export default function CommunityPage() {
         <TabsContent value="circles" className="space-y-6 mt-4">
           {!selectedCircle ? (
             <>
+              {/* Pending Circle Invitations */}
+              {!isDemo && circleInvitesQuery.data && circleInvitesQuery.data.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-semibold">Circle Invitations</h2>
+                  <div className="grid gap-3">
+                    {circleInvitesQuery.data.map((invite) => {
+                      const inviterName = invite.inviter?.displayName || 
+                        `${invite.inviter?.firstName || ''} ${invite.inviter?.lastName || ''}`.trim() || 
+                        'Someone';
+                      return (
+                        <Card key={invite.id} data-testid={`card-circle-invite-${invite.id}`}>
+                          <CardContent className="flex items-center justify-between gap-4 py-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                {invite.inviter?.profileImageUrl && (
+                                  <AvatarImage src={invite.inviter.profileImageUrl} />
+                                )}
+                                <AvatarFallback>
+                                  {inviterName.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">
+                                  {invite.circle?.name || 'Unknown Circle'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  Invited by {inviterName}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => acceptCircleInviteMutation.mutate(invite.id)}
+                                disabled={acceptCircleInviteMutation.isPending || declineCircleInviteMutation.isPending}
+                                data-testid={`button-accept-invite-${invite.id}`}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => declineCircleInviteMutation.mutate(invite.id)}
+                                disabled={acceptCircleInviteMutation.isPending || declineCircleInviteMutation.isPending}
+                                data-testid={`button-decline-invite-${invite.id}`}
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Decline
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold">Your Circles</h2>
                 <Dialog open={showCreateCircle} onOpenChange={setShowCreateCircle}>
