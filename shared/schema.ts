@@ -1481,6 +1481,8 @@ export const dashboardPreferencesSchema = z.object({
   recentWeeks: z.boolean().default(true),
   circlesOverview: z.boolean().default(true),
   journal: z.boolean().default(true),
+  feed: z.boolean().default(true),
+  selectedCircles: z.array(z.string()).default([]),
 });
 export type DashboardPreferences = z.infer<typeof dashboardPreferencesSchema>;
 
@@ -1498,6 +1500,8 @@ export const defaultDashboardPreferences: DashboardPreferences = {
   recentWeeks: true,
   circlesOverview: true,
   journal: true,
+  feed: true,
+  selectedCircles: [],
 };
 
 // Dashboard preferences table - stores user dashboard card visibility settings

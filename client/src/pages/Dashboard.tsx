@@ -17,9 +17,10 @@ import MilestonesPanel from "@/components/MilestonesPanel";
 import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
 import TodoListPanel from "@/components/TodoListPanel";
 import DueDatesPanel from "@/components/DueDatesPanel";
-import DashboardSettings from "@/components/DashboardSettings";
+import DashboardSettingsDialog from "@/components/DashboardSettingsDialog";
 import CirclesOverviewCard from "@/components/CirclesOverviewCard";
 import JournalCard from "@/components/JournalCard";
+import FeedCard from "@/components/FeedCard";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels, DashboardPreferences } from "@shared/schema";
 import { defaultDashboardPreferences } from "@shared/schema";
 import {
@@ -1347,6 +1348,32 @@ export default function Dashboard() {
     }
   };
 
+  const welcomeSettings = {
+    userName,
+    message: encouragementMessage,
+    useCustomMessage,
+    savedCustomMessages,
+    selectedMessageIndex,
+  };
+
+  const handleWelcomeSettingsChange = (settings: typeof welcomeSettings) => {
+    setUserName(settings.userName);
+    setEncouragementMessage(settings.message);
+    setUseCustomMessage(settings.useCustomMessage);
+    setSavedCustomMessages(settings.savedCustomMessages);
+    setSelectedMessageIndex(settings.selectedMessageIndex);
+    if (!useMockData) {
+      saveUserProfileToStorage({
+        userName: settings.userName,
+        encouragementMessage: settings.message,
+        useCustomMessage: settings.useCustomMessage,
+        friendWelcomeMessages,
+        savedCustomMessages: settings.savedCustomMessages,
+        selectedMessageIndex: settings.selectedMessageIndex,
+      });
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -1357,12 +1384,13 @@ export default function Dashboard() {
           friendMessages={friendWelcomeMessages}
           savedCustomMessages={savedCustomMessages}
           selectedMessageIndex={selectedMessageIndex}
-          onUpdate={handleWelcomeUpdate}
           onDismissFriendMessage={handleDismissFriendMessage}
         />
-        <DashboardSettings
+        <DashboardSettingsDialog
           preferences={dashboardPrefs}
           onPreferencesChange={handlePreferencesChange}
+          welcomeSettings={welcomeSettings}
+          onWelcomeSettingsChange={handleWelcomeSettingsChange}
           isPending={updatePrefsMutation.isPending}
         />
       </div>
@@ -1461,12 +1489,23 @@ export default function Dashboard() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {dashboardPrefs.circlesOverview && (
           <div className="max-w-md">
-            <CirclesOverviewCard />
+            <CirclesOverviewCard 
+              useMockData={useMockData} 
+              circleId={dashboardPrefs.selectedCircles?.[0]}
+            />
           </div>
         )}
         {dashboardPrefs.journal && (
           <div className="max-w-md">
-            <JournalCard />
+            <JournalCard useMockData={useMockData} />
+          </div>
+        )}
+        {dashboardPrefs.feed && (
+          <div className="max-w-md">
+            <FeedCard 
+              useMockData={useMockData} 
+              onViewAll={() => navigate("/community")}
+            />
           </div>
         )}
       </div>
