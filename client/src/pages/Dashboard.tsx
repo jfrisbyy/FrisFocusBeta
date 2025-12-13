@@ -489,10 +489,20 @@ export default function Dashboard() {
   });
 
   // Fetch dashboard preferences
-  const { data: dashboardPrefs = defaultDashboardPreferences } = useQuery<DashboardPreferences>({
+  const { data: apiDashboardPrefs } = useQuery<DashboardPreferences>({
     queryKey: ["/api/dashboard/preferences"],
     enabled: !useMockData,
   });
+
+  // Local state for dashboard preferences (supports demo mode and optimistic updates)
+  const [localDashboardPrefs, setLocalDashboardPrefs] = useState<DashboardPreferences>(defaultDashboardPreferences);
+
+  // Sync local state with API data when available
+  useEffect(() => {
+    if (apiDashboardPrefs) {
+      setLocalDashboardPrefs(apiDashboardPrefs);
+    }
+  }, [apiDashboardPrefs]);
 
   // Mutation for updating dashboard preferences
   const updatePrefsMutation = useMutation({
@@ -506,10 +516,16 @@ export default function Dashboard() {
   });
 
   const handlePreferencesChange = (prefs: DashboardPreferences) => {
+    // Always update local state for immediate feedback
+    setLocalDashboardPrefs(prefs);
+    // Only persist to API when not in demo mode
     if (!useMockData) {
       updatePrefsMutation.mutate(prefs);
     }
   };
+
+  // Use local state for rendering
+  const dashboardPrefs = localDashboardPrefs;
   
   // Check if API queries have completed their initial fetch
   const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched));
