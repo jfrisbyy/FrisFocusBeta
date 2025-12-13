@@ -690,6 +690,58 @@ export default function Dashboard() {
       });
     }
 
+    // Compute task alerts based on priority thresholds
+    // mustDo: alert if not done in 3+ days
+    // shouldDo: alert if not done in 10+ days
+    const computedAlerts: TaskAlert[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (const task of tasks) {
+      if (task.priority === "couldDo" || !task.priority) continue;
+      
+      // Find the most recent date this task was completed
+      let lastCompletedDate: Date | null = null;
+      Object.entries(dailyLogs).forEach(([dateStr, log]) => {
+        if (log.completedTaskIds?.includes(task.id)) {
+          const logDate = new Date(dateStr);
+          if (!lastCompletedDate || logDate > lastCompletedDate) {
+            lastCompletedDate = logDate;
+          }
+        }
+      });
+      
+      const threshold = task.priority === "mustDo" ? 3 : 10;
+      let daysMissing: number;
+      
+      if (lastCompletedDate) {
+        lastCompletedDate.setHours(0, 0, 0, 0);
+        daysMissing = Math.floor((today.getTime() - lastCompletedDate.getTime()) / (1000 * 60 * 60 * 24));
+      } else {
+        // Never completed - show high number
+        daysMissing = 999;
+      }
+      
+      if (daysMissing >= threshold) {
+        computedAlerts.push({
+          taskId: task.id,
+          taskName: task.name,
+          priority: task.priority,
+          daysMissing: daysMissing > 999 ? 999 : daysMissing,
+          threshold,
+        });
+      }
+    }
+    
+    // Sort alerts: mustDo first, then by daysMissing descending
+    computedAlerts.sort((a, b) => {
+      if (a.priority === "mustDo" && b.priority !== "mustDo") return -1;
+      if (a.priority !== "mustDo" && b.priority === "mustDo") return 1;
+      return b.daysMissing - a.daysMissing;
+    });
+    
+    setAlerts(computedAlerts);
+
     // Calculate current week data from daily logs (using weekOffset for navigation)
     const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
     const weekStart = weekOffset === 0 ? baseWeekStart : addDays(baseWeekStart, weekOffset * 7);
