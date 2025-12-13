@@ -1464,3 +1464,51 @@ export const fpActivityDisplaySchema = z.object({
   createdAt: z.date().nullable(),
 });
 export type FpActivityDisplay = z.infer<typeof fpActivityDisplaySchema>;
+
+// ==================== DASHBOARD PREFERENCES ====================
+
+// Dashboard card visibility preferences
+export const dashboardPreferencesSchema = z.object({
+  weekTotal: z.boolean().default(true),
+  streaks: z.boolean().default(true),
+  badges: z.boolean().default(true),
+  weeklyTable: z.boolean().default(true),
+  alerts: z.boolean().default(true),
+  weeklyTodos: z.boolean().default(true),
+  dueDates: z.boolean().default(true),
+  boosters: z.boolean().default(true),
+  milestones: z.boolean().default(true),
+  recentWeeks: z.boolean().default(true),
+  circlesOverview: z.boolean().default(true),
+  journal: z.boolean().default(true),
+});
+export type DashboardPreferences = z.infer<typeof dashboardPreferencesSchema>;
+
+// Default dashboard preferences
+export const defaultDashboardPreferences: DashboardPreferences = {
+  weekTotal: true,
+  streaks: true,
+  badges: true,
+  weeklyTable: true,
+  alerts: true,
+  weeklyTodos: true,
+  dueDates: true,
+  boosters: true,
+  milestones: true,
+  recentWeeks: true,
+  circlesOverview: true,
+  journal: true,
+};
+
+// Dashboard preferences table - stores user dashboard card visibility settings
+export const userDashboardPreferences = pgTable("user_dashboard_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  preferences: jsonb("preferences").default(defaultDashboardPreferences).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserDashboardPreferencesSchema = createInsertSchema(userDashboardPreferences).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserDashboardPreferences = z.infer<typeof insertUserDashboardPreferencesSchema>;
+export type UserDashboardPreferences = typeof userDashboardPreferences.$inferSelect;

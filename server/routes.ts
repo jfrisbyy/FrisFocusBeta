@@ -95,6 +95,10 @@ import {
   insertFriendChallengeSchema,
   insertFriendChallengeTaskSchema,
   emailInvitations,
+  userDashboardPreferences,
+  insertUserDashboardPreferencesSchema,
+  defaultDashboardPreferences,
+  dashboardPreferencesSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray } from "drizzle-orm";
@@ -5309,6 +5313,58 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     } catch (error) {
       console.error("Error updating user settings:", error);
       res.status(400).json({ error: "Failed to update settings" });
+    }
+  });
+
+  // Get user dashboard preferences
+  app.get("/api/dashboard/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [prefs] = await db.select().from(userDashboardPreferences).where(eq(userDashboardPreferences.userId, userId));
+      
+      if (prefs) {
+        res.json(prefs.preferences);
+      } else {
+        res.json(defaultDashboardPreferences);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard preferences:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard preferences" });
+    }
+  });
+
+  // Update user dashboard preferences
+  app.put("/api/dashboard/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preferences = dashboardPreferencesSchema.parse(req.body);
+
+      // Check if preferences exist
+      const [existing] = await db.select().from(userDashboardPreferences).where(eq(userDashboardPreferences.userId, userId));
+
+      if (existing) {
+        // Update existing preferences
+        const [updated] = await db.update(userDashboardPreferences)
+          .set({
+            preferences,
+            updatedAt: new Date()
+          })
+          .where(eq(userDashboardPreferences.userId, userId))
+          .returning();
+        res.json(updated.preferences);
+      } else {
+        // Create new preferences
+        const [created] = await db.insert(userDashboardPreferences)
+          .values({
+            userId,
+            preferences,
+          })
+          .returning();
+        res.json(created.preferences);
+      }
+    } catch (error) {
+      console.error("Error updating dashboard preferences:", error);
+      res.status(400).json({ error: "Failed to update dashboard preferences" });
     }
   });
 
