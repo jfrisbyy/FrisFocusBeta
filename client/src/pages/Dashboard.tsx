@@ -17,7 +17,11 @@ import MilestonesPanel from "@/components/MilestonesPanel";
 import EarnedBadgesPanel from "@/components/EarnedBadgesPanel";
 import TodoListPanel from "@/components/TodoListPanel";
 import DueDatesPanel from "@/components/DueDatesPanel";
-import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels } from "@shared/schema";
+import DashboardSettings from "@/components/DashboardSettings";
+import CirclesOverviewCard from "@/components/CirclesOverviewCard";
+import JournalCard from "@/components/JournalCard";
+import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels, DashboardPreferences } from "@shared/schema";
+import { defaultDashboardPreferences } from "@shared/schema";
 import {
   loadMilestonesFromStorage,
   saveMilestonesToStorage,
@@ -483,6 +487,29 @@ export default function Dashboard() {
     queryKey: ["/api/habit/weekly-todos", currentWeekId],
     enabled: !useMockData,
   });
+
+  // Fetch dashboard preferences
+  const { data: dashboardPrefs = defaultDashboardPreferences } = useQuery<DashboardPreferences>({
+    queryKey: ["/api/dashboard/preferences"],
+    enabled: !useMockData,
+  });
+
+  // Mutation for updating dashboard preferences
+  const updatePrefsMutation = useMutation({
+    mutationFn: async (prefs: DashboardPreferences) => {
+      const response = await apiRequest("PUT", "/api/dashboard/preferences", prefs);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/preferences"] });
+    },
+  });
+
+  const handlePreferencesChange = (prefs: DashboardPreferences) => {
+    if (!useMockData) {
+      updatePrefsMutation.mutate(prefs);
+    }
+  };
   
   // Check if API queries have completed their initial fetch
   const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched));
@@ -1306,90 +1333,126 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <WelcomeMessage
-        userName={userName}
-        message={encouragementMessage}
-        useCustomMessage={useCustomMessage}
-        friendMessages={friendWelcomeMessages}
-        savedCustomMessages={savedCustomMessages}
-        selectedMessageIndex={selectedMessageIndex}
-        onUpdate={handleWelcomeUpdate}
-        onDismissFriendMessage={handleDismissFriendMessage}
-      />
+      <div className="flex items-start justify-between gap-4">
+        <WelcomeMessage
+          userName={userName}
+          message={encouragementMessage}
+          useCustomMessage={useCustomMessage}
+          friendMessages={friendWelcomeMessages}
+          savedCustomMessages={savedCustomMessages}
+          selectedMessageIndex={selectedMessageIndex}
+          onUpdate={handleWelcomeUpdate}
+          onDismissFriendMessage={handleDismissFriendMessage}
+        />
+        <DashboardSettings
+          preferences={dashboardPrefs}
+          onPreferencesChange={handlePreferencesChange}
+          isPending={updatePrefsMutation.isPending}
+        />
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">
-          <PointsCard
-            weekTotal={finalTotal}
-            weekRange={weekRange}
-            boosterPoints={boosterPoints}
-            weeklyGoal={weeklyGoal}
-            onGoalChange={handleGoalChange}
-          />
-          <StreaksCard
-            dayStreak={dayStreak}
-            weekStreak={weekStreak}
-            longestDayStreak={longestDayStreak}
-            longestWeekStreak={longestWeekStreak}
-          />
-          <EarnedBadgesPanel badges={badges} />
+          {dashboardPrefs.weekTotal && (
+            <PointsCard
+              weekTotal={finalTotal}
+              weekRange={weekRange}
+              boosterPoints={boosterPoints}
+              weeklyGoal={weeklyGoal}
+              onGoalChange={handleGoalChange}
+            />
+          )}
+          {dashboardPrefs.streaks && (
+            <StreaksCard
+              dayStreak={dayStreak}
+              weekStreak={weekStreak}
+              longestDayStreak={longestDayStreak}
+              longestWeekStreak={longestWeekStreak}
+            />
+          )}
+          {dashboardPrefs.badges && <EarnedBadgesPanel badges={badges} />}
         </div>
         <div className="lg:col-span-2 space-y-6">
-          <WeeklyTable 
-            days={days} 
-            onDayClick={handleDayClick} 
-            weekOffset={weekOffset}
-            onWeekChange={setWeekOffset}
-            weekStartDate={weekStartDate}
-            weekEndDate={weekEndDate}
-          />
-          <AlertsPanel alerts={alerts} />
+          {dashboardPrefs.weeklyTable && (
+            <WeeklyTable 
+              days={days} 
+              onDayClick={handleDayClick} 
+              weekOffset={weekOffset}
+              onWeekChange={setWeekOffset}
+              weekStartDate={weekStartDate}
+              weekEndDate={weekEndDate}
+            />
+          )}
+          {dashboardPrefs.alerts && <AlertsPanel alerts={alerts} />}
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="max-w-md">
-          <TodoListPanel
-            title="Weekly To-Do List"
-            prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
-            items={weeklyTodos}
-            onItemsChange={handleWeeklyTodosChange}
-            bonusEnabled={weeklyTodoBonusEnabled}
-            bonusPoints={weeklyTodoBonusPoints}
-            bonusAwarded={weeklyTodoBonusAwarded}
-            onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
-            onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
-            isDemo={useMockData}
-          />
-        </div>
-        <div className="max-w-md">
-          <DueDatesPanel
-            items={dueDates}
-            onItemsChange={handleDueDatesChange}
-          />
-        </div>
-        <div className="max-w-md">
-          <BoostersPanel boosters={boosters} />
-        </div>
+        {dashboardPrefs.weeklyTodos && (
+          <div className="max-w-md">
+            <TodoListPanel
+              title="Weekly To-Do List"
+              prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
+              items={weeklyTodos}
+              onItemsChange={handleWeeklyTodosChange}
+              bonusEnabled={weeklyTodoBonusEnabled}
+              bonusPoints={weeklyTodoBonusPoints}
+              bonusAwarded={weeklyTodoBonusAwarded}
+              onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
+              onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
+              isDemo={useMockData}
+            />
+          </div>
+        )}
+        {dashboardPrefs.dueDates && (
+          <div className="max-w-md">
+            <DueDatesPanel
+              items={dueDates}
+              onItemsChange={handleDueDatesChange}
+            />
+          </div>
+        )}
+        {dashboardPrefs.boosters && (
+          <div className="max-w-md">
+            <BoostersPanel boosters={boosters} />
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="max-w-md">
-          <MilestonesPanel
-            milestones={milestones}
-            onAdd={handleMilestoneAdd}
-            onEdit={handleMilestoneEdit}
-            onDelete={handleMilestoneDelete}
-            onToggleAchieved={handleMilestoneToggle}
-          />
-        </div>
-        <div className="max-w-lg lg:col-span-2">
-          <RecentWeeks
-            weeks={recentWeeks}
-            defaultGoal={weeklyGoal}
-            onWeekUpdate={handleWeekUpdate}
-          />
-        </div>
+        {dashboardPrefs.milestones && (
+          <div className="max-w-md">
+            <MilestonesPanel
+              milestones={milestones}
+              onAdd={handleMilestoneAdd}
+              onEdit={handleMilestoneEdit}
+              onDelete={handleMilestoneDelete}
+              onToggleAchieved={handleMilestoneToggle}
+            />
+          </div>
+        )}
+        {dashboardPrefs.recentWeeks && (
+          <div className="max-w-lg lg:col-span-2">
+            <RecentWeeks
+              weeks={recentWeeks}
+              defaultGoal={weeklyGoal}
+              onWeekUpdate={handleWeekUpdate}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {dashboardPrefs.circlesOverview && (
+          <div className="max-w-md">
+            <CirclesOverviewCard />
+          </div>
+        )}
+        {dashboardPrefs.journal && (
+          <div className="max-w-md">
+            <JournalCard />
+          </div>
+        )}
       </div>
     </div>
   );
