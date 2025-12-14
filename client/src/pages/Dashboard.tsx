@@ -1415,6 +1415,8 @@ export default function Dashboard() {
                   boosterPoints={boosterPoints}
                   weeklyGoal={weeklyGoal}
                   onGoalChange={handleGoalChange}
+                  days={days.map(d => ({ date: d.date, dayName: d.dayName, points: d.points }))}
+                  boosters={boosters.map(b => ({ id: b.id, name: b.name, points: b.points, achieved: b.achieved, isNegative: b.isNegative }))}
                 />
               );
             case "streaks":

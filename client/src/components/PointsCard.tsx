@@ -3,9 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TrendingUp, TrendingDown, Minus, Target, Pencil, Check, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown, Minus, Target, Pencil, Check, X, Zap, Calendar, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
+
+interface DayBreakdown {
+  date: string;
+  dayName: string;
+  points: number | null;
+}
+
+interface BoosterBreakdown {
+  id: string;
+  name: string;
+  points: number;
+  achieved: boolean;
+  isNegative: boolean;
+}
 
 interface PointsCardProps {
   weekTotal: number;
@@ -13,6 +28,8 @@ interface PointsCardProps {
   boosterPoints?: number;
   weeklyGoal?: number;
   onGoalChange?: (newGoal: number) => void;
+  days?: DayBreakdown[];
+  boosters?: BoosterBreakdown[];
 }
 
 function getPointsStatus(points: number, goal?: number) {
@@ -33,7 +50,7 @@ function getProgressColor(percentage: number) {
   return "bg-chart-3";
 }
 
-export default function PointsCard({ weekTotal, weekRange, boosterPoints = 0, weeklyGoal, onGoalChange }: PointsCardProps) {
+export default function PointsCard({ weekTotal, weekRange, boosterPoints = 0, weeklyGoal, onGoalChange, days = [], boosters = [] }: PointsCardProps) {
   const [isEditingGoal, setIsEditingGoal] = useState(false);
   const [goalInputValue, setGoalInputValue] = useState(weeklyGoal?.toString() || "350");
   
@@ -69,6 +86,16 @@ export default function PointsCard({ weekTotal, weekRange, boosterPoints = 0, we
     }
   };
 
+  const dailyTotal = days.reduce((sum, day) => sum + (day.points || 0), 0);
+  const achievedBoosters = boosters.filter(b => b.achieved);
+  const positiveBoosters = achievedBoosters.filter(b => !b.isNegative);
+  const negativeBoosters = achievedBoosters.filter(b => b.isNegative);
+  
+  const positiveBoosterTotal = positiveBoosters.reduce((sum, b) => sum + Math.abs(b.points), 0);
+  const negativeBoosterTotal = negativeBoosters.reduce((sum, b) => sum + Math.abs(b.points), 0);
+  const netBoosterDelta = positiveBoosterTotal - negativeBoosterTotal;
+  const computedTotal = dailyTotal + netBoosterDelta;
+
   return (
     <Card className={cn("border", status.borderColor, status.bgColor)}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
@@ -79,17 +106,111 @@ export default function PointsCard({ weekTotal, weekRange, boosterPoints = 0, we
         <Icon className={cn("h-5 w-5", status.color)} />
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <div className={cn("text-4xl font-mono font-bold", status.color)} data-testid="text-week-total">
-            {weekTotal}
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">{weekRange}</p>
-          {boosterPoints > 0 && (
-            <p className="text-xs text-chart-1 mt-2 font-medium">
-              +{boosterPoints} from boosters
-            </p>
-          )}
-        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <div className="cursor-pointer hover-elevate rounded-md -mx-1 px-1 py-0.5" data-testid="button-week-breakdown">
+              <div className="flex items-center gap-1">
+                <div className={cn("text-4xl font-mono font-bold", status.color)} data-testid="text-week-total">
+                  {weekTotal}
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">{weekRange}</p>
+              {boosterPoints > 0 && (
+                <p className="text-xs text-chart-1 mt-2 font-medium">
+                  +{boosterPoints} from boosters
+                </p>
+              )}
+            </div>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Week Total Breakdown</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>Daily Points</span>
+                </div>
+                <div className="space-y-1">
+                  {days.map((day) => (
+                    <div 
+                      key={day.date} 
+                      className="flex items-center justify-between py-1.5 px-2 rounded-md bg-muted/30"
+                      data-testid={`breakdown-day-${day.date}`}
+                    >
+                      <span className="text-sm">{day.dayName}</span>
+                      <span className={cn(
+                        "font-mono text-sm font-medium",
+                        day.points === null ? "text-muted-foreground" : "text-foreground"
+                      )}>
+                        {day.points === null ? "-" : day.points}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between py-2 px-2 border-t border-border mt-2">
+                    <span className="text-sm font-medium">Daily Subtotal</span>
+                    <span className="font-mono text-sm font-bold" data-testid="text-daily-subtotal">
+                      {dailyTotal}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {achievedBoosters.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Zap className="h-4 w-4" />
+                    <span>Boosters Applied</span>
+                  </div>
+                  <div className="space-y-1">
+                    {positiveBoosters.map((booster) => (
+                      <div 
+                        key={booster.id} 
+                        className="flex items-center justify-between py-1.5 px-2 rounded-md bg-chart-1/10"
+                        data-testid={`breakdown-booster-${booster.id}`}
+                      >
+                        <span className="text-sm">{booster.name}</span>
+                        <span className="font-mono text-sm font-medium text-chart-1">
+                          +{Math.abs(booster.points)}
+                        </span>
+                      </div>
+                    ))}
+                    {negativeBoosters.map((booster) => (
+                      <div 
+                        key={booster.id} 
+                        className="flex items-center justify-between py-1.5 px-2 rounded-md bg-chart-3/10"
+                        data-testid={`breakdown-penalty-${booster.id}`}
+                      >
+                        <span className="text-sm">{booster.name}</span>
+                        <span className="font-mono text-sm font-medium text-chart-3">
+                          -{Math.abs(booster.points)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between py-2 px-2 border-t border-border mt-2">
+                      <span className="text-sm font-medium">Booster Subtotal</span>
+                      <span className={cn(
+                        "font-mono text-sm font-bold",
+                        netBoosterDelta >= 0 ? "text-chart-1" : "text-chart-3"
+                      )} data-testid="text-booster-subtotal">
+                        {netBoosterDelta >= 0 ? "+" : ""}{netBoosterDelta}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between py-3 px-2 bg-muted/50 rounded-md border">
+                <span className="font-medium">Week Total</span>
+                <span className={cn("font-mono text-xl font-bold", status.color)} data-testid="text-breakdown-total">
+                  {computedTotal}
+                </span>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {weeklyGoal !== undefined && (
           <div className="space-y-2 pt-2 border-t border-border/50">
