@@ -200,7 +200,7 @@ export default function JournalCard({ useMockData = false }: JournalCardProps) {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{entry.title || "Untitled"}</p>
+                        <p className="text-xs font-medium truncate">{entry.title || format(new Date(entry.createdAt), "MMMM d, yyyy 'at' h:mm a")}</p>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(entry.createdAt), "MMM d, h:mm a")}
                         </p>

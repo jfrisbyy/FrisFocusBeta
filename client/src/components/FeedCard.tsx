@@ -97,7 +97,7 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
   const [postVisibility, setPostVisibility] = useState<"public" | "friends">("public");
 
   const { data: posts, isLoading: postsLoading, isError } = useQuery<FeedPost[]>({
-    queryKey: ["/api/community/feed", viewMode],
+    queryKey: ["/api/community/feed"],
     enabled: !useMockData,
     retry: 1,
   });

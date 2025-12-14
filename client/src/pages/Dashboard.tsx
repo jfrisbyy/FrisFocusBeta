@@ -758,9 +758,10 @@ export default function Dashboard() {
       const threshold = task.priority === "mustDo" ? 3 : 10;
       let daysMissing: number;
       
-      if (lastCompletedDate) {
-        lastCompletedDate.setHours(0, 0, 0, 0);
-        daysMissing = Math.floor((today.getTime() - lastCompletedDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (lastCompletedDate !== null) {
+        const completedDate = new Date(lastCompletedDate);
+        completedDate.setHours(0, 0, 0, 0);
+        daysMissing = Math.floor((today.getTime() - completedDate.getTime()) / (1000 * 60 * 60 * 24));
       } else {
         // Never completed - show high number
         daysMissing = 999;
@@ -1377,15 +1378,17 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <WelcomeMessage
-          userName={userName}
-          message={encouragementMessage}
-          useCustomMessage={useCustomMessage}
-          friendMessages={friendWelcomeMessages}
-          savedCustomMessages={savedCustomMessages}
-          selectedMessageIndex={selectedMessageIndex}
-          onDismissFriendMessage={handleDismissFriendMessage}
-        />
+        <div className="flex-1">
+          <WelcomeMessage
+            userName={userName}
+            message={encouragementMessage}
+            useCustomMessage={useCustomMessage}
+            friendMessages={friendWelcomeMessages}
+            savedCustomMessages={savedCustomMessages}
+            selectedMessageIndex={selectedMessageIndex}
+            onDismissFriendMessage={handleDismissFriendMessage}
+          />
+        </div>
         <DashboardSettingsDialog
           preferences={dashboardPrefs}
           onPreferencesChange={handlePreferencesChange}
