@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Sparkles, Plus, Trash2, Shuffle } from "lucide-react";
+import { Settings, Sparkles, Plus, Trash2, Shuffle, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { DashboardPreferences } from "@shared/schema";
+import type { DashboardPreferences, DashboardCardKey } from "@shared/schema";
+import { dashboardCardKeys } from "@shared/schema";
 
 interface WelcomeSettings {
   userName: string;
@@ -46,21 +47,23 @@ const defaultMessages = [
   "Today is another chance to be amazing!",
 ];
 
-const cardLabels: { key: keyof DashboardPreferences; label: string; description: string }[] = [
-  { key: "weekTotal", label: "Week Total Points", description: "Show weekly points summary card" },
-  { key: "streaks", label: "Streaks", description: "Show day and week streak counters" },
-  { key: "badges", label: "Earned Badges", description: "Show badges you've earned" },
-  { key: "weeklyTable", label: "Weekly Table", description: "Show daily points breakdown" },
-  { key: "alerts", label: "Alerts", description: "Show task priority alerts" },
-  { key: "weeklyTodos", label: "Weekly To-Do List", description: "Show weekly todo items" },
-  { key: "dueDates", label: "Due Dates", description: "Show upcoming due date items" },
-  { key: "boosters", label: "Boosters", description: "Show active boosters and penalties" },
-  { key: "milestones", label: "Milestones", description: "Show milestone goals" },
-  { key: "recentWeeks", label: "Recent Weeks", description: "Show history of recent weeks" },
-  { key: "circlesOverview", label: "Circles Overview", description: "Show circles scores and leaderboard" },
-  { key: "journal", label: "Quick Journal", description: "Show quick journaling card" },
-  { key: "feed", label: "Community Feed", description: "Show recent community posts" },
-];
+const cardLabels: Record<DashboardCardKey, { label: string; description: string }> = {
+  weekTotal: { label: "Week Total Points", description: "Show weekly points summary card" },
+  streaks: { label: "Streaks", description: "Show day and week streak counters" },
+  badges: { label: "Earned Badges", description: "Show badges you've earned" },
+  weeklyTable: { label: "Weekly Table", description: "Show daily points breakdown" },
+  alerts: { label: "Alerts", description: "Show task priority alerts" },
+  weeklyTodos: { label: "Weekly To-Do List", description: "Show weekly todo items" },
+  dueDates: { label: "Due Dates", description: "Show upcoming due date items" },
+  boosters: { label: "Boosters", description: "Show active boosters and penalties" },
+  milestones: { label: "Milestones", description: "Show milestone goals" },
+  recentWeeks: { label: "Recent Weeks", description: "Show history of recent weeks" },
+  circlesOverview: { label: "Circles Overview", description: "Show circles scores and leaderboard" },
+  journal: { label: "Quick Journal", description: "Show quick journaling card" },
+  feed: { label: "Community Feed", description: "Show recent community posts" },
+};
+
+const cardKeysArray = Object.keys(cardLabels) as DashboardCardKey[];
 
 export default function DashboardSettingsDialog({
   preferences,
@@ -78,6 +81,9 @@ export default function DashboardSettingsDialog({
   const [savedMessages, setSavedMessages] = useState<string[]>(welcomeSettings.savedCustomMessages);
   const [newMessageInput, setNewMessageInput] = useState("");
   const [selectedIndex, setSelectedIndex] = useState<number>(welcomeSettings.selectedMessageIndex);
+  const [cardOrder, setCardOrder] = useState<DashboardCardKey[]>(
+    (preferences.cardOrder?.length > 0 ? preferences.cardOrder : [...dashboardCardKeys]) as DashboardCardKey[]
+  );
 
   useEffect(() => {
     if (open) {
@@ -87,8 +93,9 @@ export default function DashboardSettingsDialog({
       setSavedMessages(welcomeSettings.savedCustomMessages);
       setSelectedIndex(welcomeSettings.selectedMessageIndex);
       setNewMessageInput("");
+      setCardOrder((preferences.cardOrder?.length > 0 ? preferences.cardOrder : [...dashboardCardKeys]) as DashboardCardKey[]);
     }
-  }, [open, welcomeSettings]);
+  }, [open, welcomeSettings, preferences.cardOrder]);
 
   const handleCardToggle = (key: keyof DashboardPreferences) => {
     onPreferencesChange({
@@ -98,19 +105,38 @@ export default function DashboardSettingsDialog({
   };
 
   const handleShowAll = () => {
-    const allTrue = cardLabels.reduce((acc, { key }) => {
+    const allTrue = cardKeysArray.reduce((acc, key) => {
       acc[key] = true;
       return acc;
     }, {} as DashboardPreferences);
-    onPreferencesChange(allTrue);
+    onPreferencesChange({ ...preferences, ...allTrue });
   };
 
   const handleHideAll = () => {
-    const allFalse = cardLabels.reduce((acc, { key }) => {
+    const allFalse = cardKeysArray.reduce((acc, key) => {
       acc[key] = false;
       return acc;
     }, {} as DashboardPreferences);
-    onPreferencesChange(allFalse);
+    onPreferencesChange({ ...preferences, ...allFalse });
+  };
+
+  const handleMoveCard = (key: DashboardCardKey, direction: "up" | "down") => {
+    const idx = cardOrder.indexOf(key);
+    if (idx === -1) return;
+    const newOrder = [...cardOrder];
+    if (direction === "up" && idx > 0) {
+      [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+    } else if (direction === "down" && idx < newOrder.length - 1) {
+      [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+    }
+    setCardOrder(newOrder);
+    onPreferencesChange({ ...preferences, cardOrder: newOrder });
+  };
+
+  const handleResetOrder = () => {
+    const defaultOrder = [...dashboardCardKeys] as DashboardCardKey[];
+    setCardOrder(defaultOrder);
+    onPreferencesChange({ ...preferences, cardOrder: defaultOrder });
   };
 
   const handleAddMessage = () => {
@@ -149,7 +175,7 @@ export default function DashboardSettingsDialog({
     setOpen(false);
   };
 
-  const visibleCount = Object.values(preferences).filter(Boolean).length;
+  const visibleCount = cardKeysArray.filter(key => preferences[key] === true).length;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -171,9 +197,10 @@ export default function DashboardSettingsDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="welcome" data-testid="tab-welcome">Welcome</TabsTrigger>
             <TabsTrigger value="cards" data-testid="tab-cards">Cards</TabsTrigger>
+            <TabsTrigger value="order" data-testid="tab-order">Order</TabsTrigger>
           </TabsList>
 
           <TabsContent value="welcome" className="flex-1 overflow-auto mt-4">
@@ -355,24 +382,24 @@ export default function DashboardSettingsDialog({
                   Hide All
                 </Button>
                 <span className="text-xs text-muted-foreground self-center ml-auto">
-                  {visibleCount} of {cardLabels.length} visible
+                  {visibleCount} of {cardKeysArray.length} visible
                 </span>
               </div>
               <div className="space-y-3">
-                {cardLabels.map(({ key, label, description }) => (
+                {cardKeysArray.map((key) => (
                   <div
                     key={key}
                     className="flex items-center justify-between gap-4"
                   >
                     <div className="flex-1">
                       <Label htmlFor={`toggle-${key}`} className="text-sm font-medium">
-                        {label}
+                        {cardLabels[key].label}
                       </Label>
-                      <p className="text-xs text-muted-foreground">{description}</p>
+                      <p className="text-xs text-muted-foreground">{cardLabels[key].description}</p>
                     </div>
                     <Switch
                       id={`toggle-${key}`}
-                      checked={preferences[key]}
+                      checked={preferences[key] as boolean}
                       onCheckedChange={() => handleCardToggle(key)}
                       disabled={isPending}
                       data-testid={`switch-card-${key}`}
@@ -380,6 +407,61 @@ export default function DashboardSettingsDialog({
                   </div>
                 ))}
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="order" className="flex-1 overflow-auto mt-4">
+            <div className="space-y-4">
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetOrder}
+                  disabled={isPending}
+                  data-testid="button-reset-order"
+                >
+                  Reset Order
+                </Button>
+                <span className="text-xs text-muted-foreground self-center ml-auto">
+                  Drag or use arrows to reorder
+                </span>
+              </div>
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-2 pr-4">
+                  {cardOrder.map((key, idx) => (
+                    <div
+                      key={key}
+                      className="flex items-center gap-2 p-2 rounded-md bg-muted/50"
+                      data-testid={`order-item-${key}`}
+                    >
+                      <GripVertical className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">{cardLabels[key].label}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleMoveCard(key, "up")}
+                          disabled={idx === 0 || isPending}
+                          data-testid={`button-move-up-${key}`}
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleMoveCard(key, "down")}
+                          disabled={idx === cardOrder.length - 1 || isPending}
+                          data-testid={`button-move-down-${key}`}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           </TabsContent>
         </Tabs>

@@ -21,8 +21,8 @@ import DashboardSettingsDialog from "@/components/DashboardSettingsDialog";
 import CirclesOverviewCard from "@/components/CirclesOverviewCard";
 import JournalCard from "@/components/JournalCard";
 import FeedCard from "@/components/FeedCard";
-import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels, DashboardPreferences } from "@shared/schema";
-import { defaultDashboardPreferences } from "@shared/schema";
+import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels, DashboardPreferences, DashboardCardKey } from "@shared/schema";
+import { defaultDashboardPreferences, dashboardCardKeys } from "@shared/schema";
 import {
   loadMilestonesFromStorage,
   saveMilestonesToStorage,
@@ -1398,120 +1398,136 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="lg:col-span-1 space-y-6">
-          {dashboardPrefs.weekTotal && (
-            <PointsCard
-              weekTotal={finalTotal}
-              weekRange={weekRange}
-              boosterPoints={boosterPoints}
-              weeklyGoal={weeklyGoal}
-              onGoalChange={handleGoalChange}
-            />
-          )}
-          {dashboardPrefs.streaks && (
-            <StreaksCard
-              dayStreak={dayStreak}
-              weekStreak={weekStreak}
-              longestDayStreak={longestDayStreak}
-              longestWeekStreak={longestWeekStreak}
-            />
-          )}
-          {dashboardPrefs.badges && <EarnedBadgesPanel badges={badges} />}
-        </div>
-        <div className="lg:col-span-2 space-y-6">
-          {dashboardPrefs.weeklyTable && (
-            <WeeklyTable 
-              days={days} 
-              onDayClick={handleDayClick} 
-              weekOffset={weekOffset}
-              onWeekChange={setWeekOffset}
-              weekStartDate={weekStartDate}
-              weekEndDate={weekEndDate}
-            />
-          )}
-          {dashboardPrefs.alerts && <AlertsPanel alerts={alerts} />}
-        </div>
-      </div>
+      {(() => {
+        const cardOrder = (dashboardPrefs.cardOrder?.length > 0 
+          ? dashboardPrefs.cardOrder 
+          : [...dashboardCardKeys]) as DashboardCardKey[];
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {dashboardPrefs.weeklyTodos && (
-          <div className="max-w-md">
-            <TodoListPanel
-              title="Weekly To-Do List"
-              prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
-              items={weeklyTodos}
-              onItemsChange={handleWeeklyTodosChange}
-              bonusEnabled={weeklyTodoBonusEnabled}
-              bonusPoints={weeklyTodoBonusPoints}
-              bonusAwarded={weeklyTodoBonusAwarded}
-              onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
-              onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
-              isDemo={useMockData}
-            />
-          </div>
-        )}
-        {dashboardPrefs.dueDates && (
-          <div className="max-w-md">
-            <DueDatesPanel
-              items={dueDates}
-              onItemsChange={handleDueDatesChange}
-            />
-          </div>
-        )}
-        {dashboardPrefs.boosters && (
-          <div className="max-w-md">
-            <BoostersPanel boosters={boosters} />
-          </div>
-        )}
-      </div>
+        const renderCard = (key: DashboardCardKey) => {
+          if (!dashboardPrefs[key]) return null;
+          
+          switch (key) {
+            case "weekTotal":
+              return (
+                <PointsCard
+                  weekTotal={finalTotal}
+                  weekRange={weekRange}
+                  boosterPoints={boosterPoints}
+                  weeklyGoal={weeklyGoal}
+                  onGoalChange={handleGoalChange}
+                />
+              );
+            case "streaks":
+              return (
+                <StreaksCard
+                  dayStreak={dayStreak}
+                  weekStreak={weekStreak}
+                  longestDayStreak={longestDayStreak}
+                  longestWeekStreak={longestWeekStreak}
+                />
+              );
+            case "badges":
+              return <EarnedBadgesPanel badges={badges} />;
+            case "weeklyTable":
+              return (
+                <WeeklyTable 
+                  days={days} 
+                  onDayClick={handleDayClick} 
+                  weekOffset={weekOffset}
+                  onWeekChange={setWeekOffset}
+                  weekStartDate={weekStartDate}
+                  weekEndDate={weekEndDate}
+                />
+              );
+            case "alerts":
+              return <AlertsPanel alerts={alerts} />;
+            case "weeklyTodos":
+              return (
+                <TodoListPanel
+                  title="Weekly To-Do List"
+                  prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
+                  items={weeklyTodos}
+                  onItemsChange={handleWeeklyTodosChange}
+                  bonusEnabled={weeklyTodoBonusEnabled}
+                  bonusPoints={weeklyTodoBonusPoints}
+                  bonusAwarded={weeklyTodoBonusAwarded}
+                  onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
+                  onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
+                  isDemo={useMockData}
+                />
+              );
+            case "dueDates":
+              return (
+                <DueDatesPanel
+                  items={dueDates}
+                  onItemsChange={handleDueDatesChange}
+                />
+              );
+            case "boosters":
+              return <BoostersPanel boosters={boosters} />;
+            case "milestones":
+              return (
+                <MilestonesPanel
+                  milestones={milestones}
+                  onAdd={handleMilestoneAdd}
+                  onEdit={handleMilestoneEdit}
+                  onDelete={handleMilestoneDelete}
+                  onToggleAchieved={handleMilestoneToggle}
+                />
+              );
+            case "recentWeeks":
+              return (
+                <RecentWeeks
+                  weeks={recentWeeks}
+                  defaultGoal={weeklyGoal}
+                  onWeekUpdate={handleWeekUpdate}
+                />
+              );
+            case "circlesOverview":
+              return (
+                <CirclesOverviewCard 
+                  useMockData={useMockData} 
+                  circleId={dashboardPrefs.selectedCircles?.[0]}
+                />
+              );
+            case "journal":
+              return <JournalCard useMockData={useMockData} />;
+            case "feed":
+              return (
+                <FeedCard 
+                  useMockData={useMockData} 
+                  onViewAll={() => navigate("/community")}
+                />
+              );
+            default:
+              return null;
+          }
+        };
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {dashboardPrefs.milestones && (
-          <div className="max-w-md">
-            <MilestonesPanel
-              milestones={milestones}
-              onAdd={handleMilestoneAdd}
-              onEdit={handleMilestoneEdit}
-              onDelete={handleMilestoneDelete}
-              onToggleAchieved={handleMilestoneToggle}
-            />
-          </div>
-        )}
-        {dashboardPrefs.recentWeeks && (
-          <div className="max-w-lg lg:col-span-2">
-            <RecentWeeks
-              weeks={recentWeeks}
-              defaultGoal={weeklyGoal}
-              onWeekUpdate={handleWeekUpdate}
-            />
-          </div>
-        )}
-      </div>
+        const getCardSize = (key: DashboardCardKey) => {
+          switch (key) {
+            case "weeklyTable":
+            case "recentWeeks":
+              return "lg:col-span-2";
+            default:
+              return "";
+          }
+        };
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {dashboardPrefs.circlesOverview && (
-          <div className="max-w-md">
-            <CirclesOverviewCard 
-              useMockData={useMockData} 
-              circleId={dashboardPrefs.selectedCircles?.[0]}
-            />
+        return (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {cardOrder.map((key) => {
+              const card = renderCard(key);
+              if (!card) return null;
+              return (
+                <div key={key} className={getCardSize(key)} data-testid={`dashboard-card-${key}`}>
+                  {card}
+                </div>
+              );
+            })}
           </div>
-        )}
-        {dashboardPrefs.journal && (
-          <div className="max-w-md">
-            <JournalCard useMockData={useMockData} />
-          </div>
-        )}
-        {dashboardPrefs.feed && (
-          <div className="max-w-md">
-            <FeedCard 
-              useMockData={useMockData} 
-              onViewAll={() => navigate("/community")}
-            />
-          </div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 }
