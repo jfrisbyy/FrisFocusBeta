@@ -1061,9 +1061,10 @@ export default function Dashboard() {
     setBoosters([...taskBoosters, ...negativeBoosters]);
   }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId]);
 
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const weekEnd = addDays(weekStart, 6);
-  const weekRange = `${format(weekStart, "MMM d")} - ${format(weekEnd, "MMM d")}`;
+  const baseWeekStartForRange = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStartForRange = addDays(baseWeekStartForRange, weekOffset * 7);
+  const weekEndForRange = addDays(weekStartForRange, 6);
+  const weekRange = `${format(weekStartForRange, "MMM d")} - ${format(weekEndForRange, "MMM d")}`;
 
   const weekTotal = days.reduce((sum, d) => sum + (d.points || 0), 0);
   const positiveBoosterPoints = boosters.filter(b => b.achieved && !b.isNegative).reduce((sum, b) => sum + b.points, 0);
