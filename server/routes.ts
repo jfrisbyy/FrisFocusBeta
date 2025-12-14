@@ -2257,6 +2257,67 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
 
   // ==================== COMMUNITY POSTS API ====================
 
+  // Get community feed (simplified endpoint for dashboard FeedCard)
+  app.get("/api/community/feed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get friends for filtering friends-only posts
+      const userFriendships = await db.select().from(friendships).where(
+        and(
+          eq(friendships.status, "accepted"),
+          or(
+            eq(friendships.requesterId, userId),
+            eq(friendships.addresseeId, userId)
+          )
+        )
+      );
+      const friendIds = userFriendships.map(f => 
+        f.requesterId === userId ? f.addresseeId : f.requesterId
+      );
+
+      // Get all posts that are either public or from friends with friends visibility
+      const allPosts = await db.select().from(communityPosts).orderBy(desc(communityPosts.createdAt)).limit(20);
+      
+      // Filter posts based on visibility
+      const visiblePosts = allPosts.filter(post => {
+        if (post.authorId === userId) return true;
+        if (post.visibility === "public") return true;
+        if (post.visibility === "friends" && friendIds.includes(post.authorId)) return true;
+        return false;
+      });
+
+      // Enrich with author info, like counts, and isLiked status
+      const enrichedPosts = await Promise.all(
+        visiblePosts.map(async (post) => {
+          const [author] = await db.select().from(users).where(eq(users.id, post.authorId));
+          const likes = await db.select().from(postLikes).where(eq(postLikes.postId, post.id));
+          const comments = await db.select().from(postComments).where(eq(postComments.postId, post.id));
+          const userLike = likes.find(l => l.userId === userId);
+
+          return {
+            ...post,
+            author: author ? {
+              id: author.id,
+              firstName: author.firstName,
+              lastName: author.lastName,
+              displayName: author.displayName,
+              profileImageUrl: author.profileImageUrl,
+            } : null,
+            likeCount: likes.length,
+            commentCount: comments.length,
+            isLiked: !!userLike,
+          };
+        })
+      );
+
+      res.json(enrichedPosts);
+    } catch (error) {
+      console.error("Error fetching community feed:", error);
+      res.status(500).json({ error: "Failed to fetch community feed" });
+    }
+  });
+
   // Get all community posts (public + friends' posts)
   app.get("/api/community/posts", isAuthenticated, async (req: any, res) => {
     try {
@@ -2655,6 +2716,36 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     } catch (error) {
       console.error("Error fetching circles:", error);
       res.status(500).json({ error: "Failed to fetch circles" });
+    }
+  });
+
+  // Get user's circles (simplified list for dashboard selection)
+  app.get("/api/circles/user", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      // Get circles user is a member of
+      const memberships = await db.select().from(circleMembers).where(eq(circleMembers.userId, userId));
+      const memberCircleIds = memberships.map(m => m.circleId);
+
+      if (memberCircleIds.length === 0) {
+        return res.json([]);
+      }
+
+      const circleList = await db.select().from(circles).where(
+        inArray(circles.id, memberCircleIds)
+      );
+
+      // Return simplified list with just id and name
+      const simplifiedCircles = circleList.map(circle => ({
+        id: circle.id,
+        name: circle.name,
+      }));
+
+      res.json(simplifiedCircles);
+    } catch (error) {
+      console.error("Error fetching user circles:", error);
+      res.status(500).json({ error: "Failed to fetch user circles" });
     }
   });
 
