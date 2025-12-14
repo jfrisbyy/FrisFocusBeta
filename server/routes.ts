@@ -2749,6 +2749,99 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     }
   });
 
+  // Get circle overview data for dashboard card
+  app.get("/api/circles/:circleId/overview", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { circleId } = req.params;
+
+      // Get circle by id
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      // Check if user is a member of this circle
+      const [membership] = await db.select().from(circleMembers)
+        .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId)));
+      if (!membership) {
+        return res.status(403).json({ error: "Not a member of this circle" });
+      }
+
+      // Get all members of the circle
+      const members = await db.select().from(circleMembers).where(eq(circleMembers.circleId, circleId));
+      const memberIds = members.map(m => m.userId);
+
+      // Calculate current ISO week string (e.g., "2024-W50")
+      // Use ISO week: week 1 is the week containing the first Thursday of the year
+      const now = new Date();
+      const { getISOWeek, getISOWeekYear } = await import("date-fns");
+      const isoWeekNum = getISOWeek(now);
+      const isoYear = getISOWeekYear(now);
+      const currentWeek = `${isoYear}-W${isoWeekNum.toString().padStart(2, '0')}`;
+
+      // Get member stats for this circle - only for current members
+      const memberStatsRecords = memberIds.length > 0
+        ? await db.select().from(circleMemberStats)
+            .where(and(
+              eq(circleMemberStats.circleId, circleId),
+              inArray(circleMemberStats.userId, memberIds)
+            ))
+        : [];
+
+      // Get user info for all members
+      const memberUsers = memberIds.length > 0
+        ? await db.select().from(users).where(inArray(users.id, memberIds))
+        : [];
+
+      // Calculate weekly points for each member and total
+      let totalWeeklyPoints = 0;
+      const memberWeeklyPoints: Array<{
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        profileImageUrl: string | null;
+        weeklyPoints: number;
+      }> = [];
+
+      for (const user of memberUsers) {
+        const stats = memberStatsRecords.find(s => s.userId === user.id);
+        let weeklyPoints = 0;
+
+        if (stats && stats.weeklyHistory) {
+          const weeklyHistory = stats.weeklyHistory as Array<{ week: string; points: number }>;
+          const currentWeekEntry = weeklyHistory.find(w => w.week === currentWeek);
+          weeklyPoints = currentWeekEntry?.points || 0;
+        }
+
+        totalWeeklyPoints += weeklyPoints;
+        memberWeeklyPoints.push({
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
+          weeklyPoints,
+        });
+      }
+
+      // Sort by weekly points and get top 3
+      memberWeeklyPoints.sort((a, b) => b.weeklyPoints - a.weeklyPoints);
+      const leaderboard = memberWeeklyPoints.slice(0, 3);
+
+      res.json({
+        id: circle.id,
+        name: circle.name,
+        description: circle.description,
+        memberCount: members.length,
+        weeklyPoints: totalWeeklyPoints,
+        leaderboard,
+      });
+    } catch (error) {
+      console.error("Error fetching circle overview:", error);
+      res.status(500).json({ error: "Failed to fetch circle overview" });
+    }
+  });
+
   // Get public circles for browsing (circles user can join)
   app.get("/api/circles/public", isAuthenticated, async (req: any, res) => {
     try {

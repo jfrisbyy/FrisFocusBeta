@@ -68,46 +68,50 @@ const mockCircles: CircleData[] = [
 ];
 
 export default function CirclesOverviewCard({ circleId, useMockData = false }: CirclesOverviewCardProps) {
-  const { data: circleData, isLoading } = useQuery<CircleData>({
-    queryKey: ["/api/circles", circleId, "overview"],
-    enabled: !useMockData && !!circleId,
+  // First fetch user's circles list
+  const { data: userCircles, isLoading: userCirclesLoading } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/circles/user"],
+    enabled: !useMockData,
   });
 
-  const { data: userCircles } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ["/api/circles/user"],
-    enabled: !useMockData && !circleId,
+  // Determine which circle to show - use provided circleId or first user circle
+  const effectiveCircleId = circleId || (userCircles && userCircles.length > 0 ? userCircles[0].id : undefined);
+
+  // Fetch circle overview data
+  const { data: circleData, isLoading: circleDataLoading } = useQuery<CircleData>({
+    queryKey: ["/api/circles", effectiveCircleId, "overview"],
+    enabled: !useMockData && !!effectiveCircleId,
   });
 
   const circle = useMockData
     ? mockCircles.find(c => c.id === circleId) || mockCircles[0]
     : circleData;
 
-  const allCircles = useMockData ? mockCircles : userCircles;
+  const isLoading = userCirclesLoading || circleDataLoading;
 
-  if (!circleId && !useMockData) {
-    if (!userCircles || userCircles.length === 0) {
-      return (
-        <Card data-testid="card-circles-overview">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Circles Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              Join or create a circle to see scores and compete with friends.
-            </p>
-            <Button size="sm" variant="outline" asChild>
-              <Link href="/community">
-                <Users className="h-3 w-3 mr-1" />
-                Explore Circles
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      );
-    }
+  // Show "no circles" message if user has no circles
+  if (!useMockData && !userCirclesLoading && (!userCircles || userCircles.length === 0)) {
+    return (
+      <Card data-testid="card-circles-overview">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Circles Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">
+            Join or create a circle to see scores and compete with friends.
+          </p>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/community">
+              <Users className="h-3 w-3 mr-1" />
+              Explore Circles
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (isLoading && !useMockData) {
