@@ -1467,6 +1467,24 @@ export type FpActivityDisplay = z.infer<typeof fpActivityDisplaySchema>;
 
 // ==================== DASHBOARD PREFERENCES ====================
 
+// Dashboard card keys for ordering
+export const dashboardCardKeys = [
+  "weekTotal",
+  "streaks", 
+  "badges",
+  "weeklyTable",
+  "alerts",
+  "weeklyTodos",
+  "dueDates",
+  "boosters",
+  "milestones",
+  "recentWeeks",
+  "circlesOverview",
+  "journal",
+  "feed",
+] as const;
+export type DashboardCardKey = typeof dashboardCardKeys[number];
+
 // Dashboard card visibility preferences
 export const dashboardPreferencesSchema = z.object({
   weekTotal: z.boolean().default(true),
@@ -1483,6 +1501,7 @@ export const dashboardPreferencesSchema = z.object({
   journal: z.boolean().default(true),
   feed: z.boolean().default(true),
   selectedCircles: z.array(z.string()).default([]),
+  cardOrder: z.array(z.string()).default([]),
 });
 export type DashboardPreferences = z.infer<typeof dashboardPreferencesSchema>;
 
@@ -1502,6 +1521,7 @@ export const defaultDashboardPreferences: DashboardPreferences = {
   journal: true,
   feed: true,
   selectedCircles: [],
+  cardOrder: [...dashboardCardKeys],
 };
 
 // Dashboard preferences table - stores user dashboard card visibility settings
