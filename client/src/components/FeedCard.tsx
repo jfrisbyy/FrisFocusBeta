@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { MessageSquare, Send, Image, ExternalLink, ChevronRight } from "lucide-react";
+import { MessageSquare, Send, ExternalLink, ChevronRight, Globe, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -58,7 +58,7 @@ const mockPosts: FeedPost[] = [
     authorId: "user-2",
     content: "Completed all my morning habits before 7am today!",
     imageUrl: null,
-    visibility: "public",
+    visibility: "friends",
     createdAt: new Date(Date.now() - 7200000).toISOString(),
     author: {
       id: "user-2",
@@ -93,19 +93,18 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
   const { toast } = useToast();
   const [newPostContent, setNewPostContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<"public" | "friends">("public");
+  const [postVisibility, setPostVisibility] = useState<"public" | "friends">("public");
 
   const { data: posts, isLoading: postsLoading, isError } = useQuery<FeedPost[]>({
-    queryKey: ["/api/community/feed"],
+    queryKey: ["/api/community/feed", viewMode],
     enabled: !useMockData,
     retry: 1,
   });
 
   const createPostMutation = useMutation({
-    mutationFn: async (content: string) => {
-      const response = await apiRequest("POST", "/api/community/posts", {
-        content,
-        visibility: "public",
-      });
+    mutationFn: async (data: { content: string; visibility: string }) => {
+      const response = await apiRequest("POST", "/api/community/posts", data);
       return response.json();
     },
     onSuccess: () => {
@@ -134,13 +133,24 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
         });
         setNewPostContent("");
       } else {
-        createPostMutation.mutate(newPostContent.trim());
+        createPostMutation.mutate({
+          content: newPostContent.trim(),
+          visibility: postVisibility,
+        });
       }
     }
   };
 
   const displayPosts = useMockData ? mockPosts : (posts || []);
-  const visiblePosts = isExpanded ? displayPosts.slice(0, 5) : displayPosts.slice(0, 3);
+  
+  // Filter posts based on view mode
+  const filteredPosts = displayPosts.filter(post => {
+    if (viewMode === "public") return post.visibility === "public";
+    if (viewMode === "friends") return post.visibility === "friends";
+    return true;
+  });
+  
+  const visiblePosts = isExpanded ? filteredPosts.slice(0, 5) : filteredPosts.slice(0, 3);
 
   const getInitials = (firstName: string | null, lastName: string | null) => {
     const first = firstName?.charAt(0) || "";
@@ -169,20 +179,47 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
           <MessageSquare className="h-4 w-4" />
           Community Feed
         </CardTitle>
-        {onViewAll && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onViewAll}
-            className="text-xs gap-1"
-            data-testid="button-view-all-feed"
-          >
-            View All
-            <ExternalLink className="h-3 w-3" />
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          {onViewAll && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onViewAll}
+              className="text-xs gap-1"
+              data-testid="button-view-all-feed"
+            >
+              View All
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-md">
+          <Button
+            size="sm"
+            variant={viewMode === "public" ? "default" : "ghost"}
+            className="flex-1 gap-1 text-xs"
+            onClick={() => setViewMode("public")}
+            data-testid="button-feed-public"
+          >
+            <Globe className="h-3 w-3" />
+            Public
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === "friends" ? "default" : "ghost"}
+            className="flex-1 gap-1 text-xs"
+            onClick={() => setViewMode("friends")}
+            data-testid="button-feed-friends"
+          >
+            <Users className="h-3 w-3" />
+            Friends
+          </Button>
+        </div>
+
+        {/* Post Input */}
         <div className="space-y-2">
           <Textarea
             placeholder="Share an update with the community..."
@@ -192,7 +229,29 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
             className="resize-none text-sm"
             data-testid="input-new-post"
           />
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant={postVisibility === "public" ? "secondary" : "ghost"}
+                className="text-xs gap-1"
+                onClick={() => setPostVisibility("public")}
+                data-testid="button-post-visibility-public"
+              >
+                <Globe className="h-3 w-3" />
+                Public
+              </Button>
+              <Button
+                size="sm"
+                variant={postVisibility === "friends" ? "secondary" : "ghost"}
+                className="text-xs gap-1"
+                onClick={() => setPostVisibility("friends")}
+                data-testid="button-post-visibility-friends"
+              >
+                <Users className="h-3 w-3" />
+                Friends
+              </Button>
+            </div>
             <Button
               size="sm"
               onClick={handleSubmitPost}
@@ -224,7 +283,9 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
             </p>
           ) : visiblePosts.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
-              No posts yet. Be the first to share!
+              {viewMode === "friends" 
+                ? "No posts from friends yet. Add friends to see their updates!"
+                : "No public posts yet. Be the first to share!"}
             </p>
           ) : (
             <div className="space-y-3">
@@ -248,6 +309,9 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
                       <span className="text-xs text-muted-foreground">
                         {formatTimeAgo(post.createdAt)}
                       </span>
+                      {post.visibility === "friends" && (
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                       {post.content}
@@ -262,7 +326,7 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
             </div>
           )}
 
-          {displayPosts.length > 3 && (
+          {filteredPosts.length > 3 && (
             <Button
               variant="ghost"
               size="sm"
@@ -270,7 +334,7 @@ export default function FeedCard({ useMockData = false, onViewAll }: FeedCardPro
               className="w-full mt-2 text-xs"
               data-testid="button-toggle-feed-expand"
             >
-              {isExpanded ? "Show Less" : `Show ${displayPosts.length - 3} More`}
+              {isExpanded ? "Show Less" : `Show ${filteredPosts.length - 3} More`}
               <ChevronRight className={`h-3 w-3 ml-1 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
             </Button>
           )}
