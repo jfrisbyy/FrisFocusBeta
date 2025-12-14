@@ -99,6 +99,11 @@ import {
   insertUserDashboardPreferencesSchema,
   defaultDashboardPreferences,
   dashboardPreferencesSchema,
+  userScheduleTemplates,
+  userDailySchedules,
+  insertUserScheduleTemplateSchema,
+  insertUserDailyScheduleSchema,
+  timeBlockSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray } from "drizzle-orm";
@@ -5549,6 +5554,211 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     } catch (error) {
       console.error("Error updating dashboard preferences:", error);
       res.status(400).json({ error: "Failed to update dashboard preferences" });
+    }
+  });
+
+  // ==================== SCHEDULE TEMPLATES ROUTES ====================
+
+  // Get all schedule templates for user
+  app.get("/api/habit/schedule-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templates = await db.select().from(userScheduleTemplates)
+        .where(eq(userScheduleTemplates.userId, userId))
+        .orderBy(userScheduleTemplates.name);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching schedule templates:", error);
+      res.status(500).json({ error: "Failed to fetch schedule templates" });
+    }
+  });
+
+  // Get a single schedule template
+  app.get("/api/habit/schedule-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templateId = req.params.id;
+      const [template] = await db.select().from(userScheduleTemplates)
+        .where(and(eq(userScheduleTemplates.id, templateId), eq(userScheduleTemplates.userId, userId)));
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching schedule template:", error);
+      res.status(500).json({ error: "Failed to fetch schedule template" });
+    }
+  });
+
+  // Create a new schedule template
+  app.post("/api/habit/schedule-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description, timeBlocks } = req.body;
+      
+      // Validate time blocks if provided
+      if (timeBlocks) {
+        z.array(timeBlockSchema).parse(timeBlocks);
+      }
+
+      const parsed = insertUserScheduleTemplateSchema.parse({
+        userId,
+        name,
+        description,
+        timeBlocks: timeBlocks || [],
+      });
+      const [template] = await db.insert(userScheduleTemplates).values(parsed).returning();
+      res.json(template);
+    } catch (error) {
+      console.error("Error creating schedule template:", error);
+      res.status(400).json({ error: "Failed to create schedule template" });
+    }
+  });
+
+  // Update a schedule template
+  app.put("/api/habit/schedule-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templateId = req.params.id;
+      
+      // Validate the entire body using the schema
+      const updateSchema = z.object({
+        name: z.string().min(1, "Name is required"),
+        description: z.string().optional(),
+        timeBlocks: z.array(timeBlockSchema).optional(),
+      });
+      
+      const parsed = updateSchema.parse(req.body);
+
+      const [template] = await db.update(userScheduleTemplates)
+        .set({ 
+          name: parsed.name, 
+          description: parsed.description || null, 
+          timeBlocks: parsed.timeBlocks || [], 
+          updatedAt: new Date() 
+        })
+        .where(and(eq(userScheduleTemplates.id, templateId), eq(userScheduleTemplates.userId, userId)))
+        .returning();
+
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating schedule template:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message || "Validation failed" });
+      }
+      res.status(400).json({ error: "Failed to update schedule template" });
+    }
+  });
+
+  // Delete a schedule template
+  app.delete("/api/habit/schedule-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templateId = req.params.id;
+
+      // First, clear references in daily schedules to prevent dangling references
+      await db.update(userDailySchedules)
+        .set({ templateId: null, updatedAt: new Date() })
+        .where(and(eq(userDailySchedules.userId, userId), eq(userDailySchedules.templateId, templateId)));
+
+      const [deleted] = await db.delete(userScheduleTemplates)
+        .where(and(eq(userScheduleTemplates.id, templateId), eq(userScheduleTemplates.userId, userId)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting schedule template:", error);
+      res.status(400).json({ error: "Failed to delete schedule template" });
+    }
+  });
+
+  // ==================== DAILY SCHEDULE ASSIGNMENT ROUTES ====================
+
+  // Get daily schedule for a specific date
+  app.get("/api/habit/daily-schedules/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+
+      const [schedule] = await db.select().from(userDailySchedules)
+        .where(and(eq(userDailySchedules.userId, userId), eq(userDailySchedules.date, date)));
+      
+      if (!schedule) {
+        return res.json(null);
+      }
+
+      // If there's a template ID, fetch the template details
+      if (schedule.templateId) {
+        const [template] = await db.select().from(userScheduleTemplates)
+          .where(eq(userScheduleTemplates.id, schedule.templateId));
+        return res.json({ ...schedule, template });
+      }
+
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error fetching daily schedule:", error);
+      res.status(500).json({ error: "Failed to fetch daily schedule" });
+    }
+  });
+
+  // Assign or update schedule for a specific date
+  app.put("/api/habit/daily-schedules/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+      const { templateId } = req.body;
+
+      // Check if an assignment already exists for this date
+      const [existing] = await db.select().from(userDailySchedules)
+        .where(and(eq(userDailySchedules.userId, userId), eq(userDailySchedules.date, date)));
+
+      let schedule;
+      if (existing) {
+        // Update existing
+        [schedule] = await db.update(userDailySchedules)
+          .set({ templateId, updatedAt: new Date() })
+          .where(eq(userDailySchedules.id, existing.id))
+          .returning();
+      } else {
+        // Create new
+        const parsed = insertUserDailyScheduleSchema.parse({ userId, date, templateId });
+        [schedule] = await db.insert(userDailySchedules).values(parsed).returning();
+      }
+
+      // Fetch the template details if assigned
+      if (schedule.templateId) {
+        const [template] = await db.select().from(userScheduleTemplates)
+          .where(eq(userScheduleTemplates.id, schedule.templateId));
+        return res.json({ ...schedule, template });
+      }
+
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error assigning daily schedule:", error);
+      res.status(400).json({ error: "Failed to assign daily schedule" });
+    }
+  });
+
+  // Remove schedule assignment for a date
+  app.delete("/api/habit/daily-schedules/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const date = req.params.date;
+
+      const [deleted] = await db.delete(userDailySchedules)
+        .where(and(eq(userDailySchedules.userId, userId), eq(userDailySchedules.date, date)))
+        .returning();
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing daily schedule:", error);
+      res.status(400).json({ error: "Failed to remove daily schedule" });
     }
   });
 

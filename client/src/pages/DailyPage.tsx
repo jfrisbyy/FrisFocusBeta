@@ -5,6 +5,7 @@ import DatePicker from "@/components/DatePicker";
 import TaskCheckbox from "@/components/TaskCheckbox";
 import DailySummary from "@/components/DailySummary";
 import TodoListPanel from "@/components/TodoListPanel";
+import ScheduleCard from "@/components/ScheduleCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -547,6 +548,8 @@ export default function DailyPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
+          <ScheduleCard date={date} isDemo={isDemo} />
+          
           <TodoListPanel
             title="Today's To-Do List"
             prompt="Add tasks that aren't recurring habits but still matter today. Think: &quot;Call Debby,&quot; &quot;Order new headphones,&quot; &quot;Schedule dentist,&quot; or &quot;Hit the farmer's market.&quot;"
