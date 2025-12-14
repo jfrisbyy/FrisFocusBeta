@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Trophy, ChevronRight, Crown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -68,14 +70,16 @@ const mockCircles: CircleData[] = [
 ];
 
 export default function CirclesOverviewCard({ circleId, useMockData = false }: CirclesOverviewCardProps) {
-  // First fetch user's circles list
+  const [selectedCircleId, setSelectedCircleId] = useState<string | undefined>(circleId);
+
+  // Fetch user's circles list
   const { data: userCircles, isLoading: userCirclesLoading } = useQuery<{ id: string; name: string }[]>({
     queryKey: ["/api/circles/user"],
     enabled: !useMockData,
   });
 
-  // Determine which circle to show - use provided circleId or first user circle
-  const effectiveCircleId = circleId || (userCircles && userCircles.length > 0 ? userCircles[0].id : undefined);
+  // Determine which circle to show - use selected, provided, or first user circle
+  const effectiveCircleId = selectedCircleId || circleId || (userCircles && userCircles.length > 0 ? userCircles[0].id : undefined);
 
   // Fetch circle overview data
   const { data: circleData, isLoading: circleDataLoading } = useQuery<CircleData>({
@@ -84,9 +88,11 @@ export default function CirclesOverviewCard({ circleId, useMockData = false }: C
   });
 
   const circle = useMockData
-    ? mockCircles.find(c => c.id === circleId) || mockCircles[0]
+    ? mockCircles.find(c => c.id === (selectedCircleId || circleId)) || mockCircles[0]
     : circleData;
 
+  const circlesList = useMockData ? mockCircles : userCircles;
+  const hasMultipleCircles = circlesList && circlesList.length > 1;
   const isLoading = userCirclesLoading || circleDataLoading;
 
   // Show "no circles" message if user has no circles
@@ -157,7 +163,32 @@ export default function CirclesOverviewCard({ circleId, useMockData = false }: C
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Users className="h-4 w-4" />
-            {circle.name}
+            {hasMultipleCircles ? (
+              <Select
+                value={effectiveCircleId}
+                onValueChange={setSelectedCircleId}
+              >
+                <SelectTrigger 
+                  className="h-auto py-0 px-1 border-0 bg-transparent text-sm font-medium"
+                  data-testid="select-circle"
+                >
+                  <SelectValue placeholder="Select circle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {circlesList.map((c) => (
+                    <SelectItem 
+                      key={c.id} 
+                      value={c.id}
+                      data-testid={`select-circle-option-${c.id}`}
+                    >
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              circle.name
+            )}
           </CardTitle>
           <Badge variant="secondary" className="text-xs">
             {circle.memberCount} members
