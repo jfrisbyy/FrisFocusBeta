@@ -5626,7 +5626,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         try {
           const { awardFp, awardLoggingStreakMilestones, awardDailyGoalStreakMilestones, checkAndAwardWeeklyTriggers } = await import("./fpService");
           const [settings] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
-          const dailyGoal = settings?.dailyGoal || 14;
+          const dailyGoal = settings?.dailyGoal || 50;
           const totalPoints = (todoPoints || 0) + (taskPoints || 0) - (penaltyPoints || 0);
           if (totalPoints >= dailyGoal) {
             await awardFp(userId, "hit_daily_goal", { checkDuplicate: true });
@@ -5691,7 +5691,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           
           // Check if user hit daily goal and award FP
           const [settings] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
-          const dailyGoal = settings?.dailyGoal || 14;
+          const dailyGoal = settings?.dailyGoal || 50;
           const totalPoints = (todoPoints || 0) + (taskPoints || 0) - (penaltyPoints || 0);
           if (totalPoints >= dailyGoal) {
             await awardFp(userId, "hit_daily_goal", { checkDuplicate: true });

@@ -1536,3 +1536,44 @@ export const userDashboardPreferences = pgTable("user_dashboard_preferences", {
 export const insertUserDashboardPreferencesSchema = createInsertSchema(userDashboardPreferences).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUserDashboardPreferences = z.infer<typeof insertUserDashboardPreferencesSchema>;
 export type UserDashboardPreferences = typeof userDashboardPreferences.$inferSelect;
+
+// ==================== DAILY SCHEDULES ====================
+
+// Time block schema for schedule templates
+export const timeBlockSchema = z.object({
+  id: z.string(),
+  startTime: z.string(), // HH:MM format (24-hour)
+  endTime: z.string(), // HH:MM format (24-hour)
+  activity: z.string(),
+  category: z.string().optional(), // Optional color/category
+});
+export type TimeBlock = z.infer<typeof timeBlockSchema>;
+
+// Schedule templates - reusable day templates
+export const userScheduleTemplates = pgTable("user_schedule_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  timeBlocks: jsonb("time_blocks").default([]), // Array of TimeBlock
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserScheduleTemplateSchema = createInsertSchema(userScheduleTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserScheduleTemplate = z.infer<typeof insertUserScheduleTemplateSchema>;
+export type UserScheduleTemplate = typeof userScheduleTemplates.$inferSelect;
+
+// Daily schedule assignments - which template to use for a specific day
+export const userDailySchedules = pgTable("user_daily_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  templateId: varchar("template_id").references(() => userScheduleTemplates.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserDailyScheduleSchema = createInsertSchema(userDailySchedules).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserDailySchedule = z.infer<typeof insertUserDailyScheduleSchema>;
+export type UserDailySchedule = typeof userDailySchedules.$inferSelect;
