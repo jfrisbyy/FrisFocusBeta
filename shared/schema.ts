@@ -518,6 +518,7 @@ export const seasonTasks = pgTable("season_tasks", {
   priority: varchar("priority").notNull().default("shouldDo"),
   boosterRule: jsonb("booster_rule"),
   penaltyRule: jsonb("penalty_rule"),
+  tiers: jsonb("tiers"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1010,6 +1011,7 @@ export const userTasks = pgTable("user_tasks", {
   boostThreshold: integer("boost_threshold"),
   boostPeriod: varchar("boost_period"),
   boostPoints: integer("boost_points"),
+  tiers: jsonb("tiers"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
