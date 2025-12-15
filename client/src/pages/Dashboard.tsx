@@ -1130,24 +1130,10 @@ export default function Dashboard() {
     } : null;
 
     // Task 5: +10 FP bonus for achieving 15% above weekly goal (current week only)
-    const currentWeekTotal = Object.entries(dailyLogs)
-      .filter(([dateStr]) => {
-        const logDate = new Date(dateStr);
-        const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-        const currentWeekEnd = addDays(currentWeekStart, 7);
-        return logDate >= currentWeekStart && logDate < currentWeekEnd;
-      })
-      .reduce((sum, [, log]) => {
-        return sum + log.completedTaskIds.reduce((taskSum, taskId) => {
-          const task = tasks.find(t => t.id === taskId);
-          const penalty = penalties.find(p => p.id === taskId);
-          if (task) return taskSum + task.value;
-          if (penalty) return taskSum - penalty.value;
-          return taskSum;
-        }, 0);
-      }, 0);
+    // Use currentWeekDays which matches the displayed week total
+    const displayedWeekTotal = currentWeekDays.reduce((sum, d) => sum + (d.points || 0), 0);
     
-    const overAchieverBonus: UnifiedBooster | null = (weekOffset === 0 && currentWeekTotal >= weeklyGoalValue * 1.15) ? {
+    const overAchieverBonus: UnifiedBooster | null = (weekOffset === 0 && displayedWeekTotal >= weeklyGoalValue * 1.15) ? {
       id: "bonus-over-achiever",
       name: "Over Achiever",
       description: "15% above weekly goal",
