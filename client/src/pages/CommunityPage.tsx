@@ -89,6 +89,7 @@ import type {
   StoredBadgeRequest,
   StoredChallengeRequest,
   RequestVote,
+  StoredTaskTier,
 } from "@/lib/storage";
 // Note: localStorage functions removed - API endpoints handle data persistence in non-demo mode
 
@@ -2041,7 +2042,7 @@ export default function CommunityPage() {
 
   // Circle task mutations
   const createCircleTaskMutation = useMutation({
-    mutationFn: async (data: { circleId: string; task: { name: string; value: number; taskType: CircleTaskType; category?: string } }) => {
+    mutationFn: async (data: { circleId: string; task: { name: string; value: number; taskType: CircleTaskType; category?: string; isPenalty?: boolean; tiers?: StoredTaskTier[] } }) => {
       const res = await apiRequest("POST", `/api/circles/${data.circleId}/tasks`, data.task);
       if (!res.ok) {
         const err = await res.json();
@@ -2509,6 +2510,8 @@ export default function CommunityPage() {
   const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
   const [newTaskNote, setNewTaskNote] = useState("");
   const [newTaskIsPenalty, setNewTaskIsPenalty] = useState(false);
+  const [newTaskTiersEnabled, setNewTaskTiersEnabled] = useState(false);
+  const [newTaskTiers, setNewTaskTiers] = useState<StoredTaskTier[]>([]);
   const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>({});
   
   // Request Edit Task state (for regular members)
@@ -4116,6 +4119,11 @@ export default function CommunityPage() {
     const baseValue = parseInt(newTaskValue) || 10;
     const actualValue = newTaskIsPenalty ? -Math.abs(baseValue) : Math.abs(baseValue);
     
+    // Prepare tiers if enabled
+    const tiersToSave = newTaskTiersEnabled && newTaskTiers.length > 0 
+      ? newTaskTiers.filter(t => t.name.trim() !== "") 
+      : undefined;
+
     // Use API for non-demo mode
     if (!isDemo) {
       createCircleTaskMutation.mutate({
@@ -4125,6 +4133,7 @@ export default function CommunityPage() {
           value: actualValue,
           taskType: newTaskType,
           isPenalty: newTaskIsPenalty,
+          tiers: tiersToSave,
         }
       }, {
         onSuccess: () => {
@@ -4136,6 +4145,8 @@ export default function CommunityPage() {
       setNewTaskValue("10");
       setNewTaskType("per_person");
       setNewTaskIsPenalty(false);
+      setNewTaskTiersEnabled(false);
+      setNewTaskTiers([]);
       return;
     }
     
@@ -4150,6 +4161,7 @@ export default function CommunityPage() {
         requiresApproval: false,
         approvalStatus: "approved",
         isPenalty: newTaskIsPenalty,
+        tiers: tiersToSave,
       };
       const current = circleTasks[selectedCircle.id] || [];
       setCircleTasks({ ...circleTasks, [selectedCircle.id]: [...current, newTask] });
@@ -4161,7 +4173,7 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "add",
-        taskData: { name: newTaskName.trim(), value: actualValue, taskType: newTaskType, isPenalty: newTaskIsPenalty },
+        taskData: { name: newTaskName.trim(), value: actualValue, taskType: newTaskType, isPenalty: newTaskIsPenalty, tiers: tiersToSave },
         status: "pending",
         createdAt: new Date().toISOString(),
         note: newTaskNote.trim() || undefined,
@@ -4177,6 +4189,8 @@ export default function CommunityPage() {
     setNewTaskType("per_person");
     setNewTaskNote("");
     setNewTaskIsPenalty(false);
+    setNewTaskTiersEnabled(false);
+    setNewTaskTiers([]);
   };
 
   const handleApproveRequest = async (requestId: string) => {
@@ -7655,6 +7669,73 @@ export default function CommunityPage() {
                                   data-testid="switch-task-penalty"
                                 />
                               </div>
+                              <div className="flex items-center justify-between gap-2 py-2">
+                                <div className="space-y-0.5">
+                                  <Label>Tiers</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    Add higher levels for bonus points
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={newTaskTiersEnabled}
+                                  onCheckedChange={setNewTaskTiersEnabled}
+                                  data-testid="switch-task-tiers"
+                                />
+                              </div>
+                              {newTaskTiersEnabled && (
+                                <div className="space-y-2 pl-2 border-l-2 border-muted">
+                                  {newTaskTiers.map((tier, index) => (
+                                    <div key={tier.id} className="flex items-center gap-2">
+                                      <Input
+                                        placeholder={`Tier ${index + 1} (e.g., 15k steps)`}
+                                        value={tier.name}
+                                        onChange={(e) => {
+                                          const updated = [...newTaskTiers];
+                                          updated[index] = { ...updated[index], name: e.target.value };
+                                          setNewTaskTiers(updated);
+                                        }}
+                                        className="flex-1"
+                                        data-testid={`input-circle-tier-name-${index}`}
+                                      />
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-muted-foreground">+</span>
+                                        <Input
+                                          type="number"
+                                          value={tier.bonusPoints}
+                                          onChange={(e) => {
+                                            const updated = [...newTaskTiers];
+                                            updated[index] = { ...updated[index], bonusPoints: parseInt(e.target.value) || 0 };
+                                            setNewTaskTiers(updated);
+                                          }}
+                                          className="w-16"
+                                          data-testid={`input-circle-tier-bonus-${index}`}
+                                        />
+                                        <span className="text-xs text-muted-foreground">pts</span>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setNewTaskTiers(newTaskTiers.filter((_, i) => i !== index))}
+                                        data-testid={`button-remove-circle-tier-${index}`}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setNewTaskTiers([...newTaskTiers, { id: `tier-${Date.now()}`, name: "", bonusPoints: 5 }])}
+                                    className="w-full"
+                                    data-testid="button-add-circle-tier"
+                                  >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add Tier
+                                  </Button>
+                                </div>
+                              )}
                               {!isOwnerOrAdmin(selectedCircle.id) && (
                                 <div className="space-y-2">
                                   <Label>Note (Optional)</Label>
