@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Save, Check } from "lucide-react";
+import { Save, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
@@ -36,6 +36,7 @@ export default function DailySummary({
 }: DailySummaryProps) {
   const netTotal = positivePoints + negativePoints + todoPoints + checkInBonus;
   const positiveTasks = completedTasks.filter(t => t.value > 0);
+  const negativeTasks = completedTasks.filter(t => t.value < 0);
 
   return (
     <Card className="sticky top-20">
@@ -81,6 +82,17 @@ export default function DailySummary({
             <span className="text-muted-foreground">Penalties</span>
             <span className="font-mono font-semibold text-chart-3">{negativePoints}</span>
           </div>
+          {negativeTasks.length > 0 && (
+            <div className="pl-2 space-y-1">
+              {negativeTasks.map(task => (
+                <div key={task.id} className="flex items-center gap-2 text-xs text-muted-foreground" data-testid={`penalty-task-${task.id}`}>
+                  <X className="h-3 w-3 text-chart-3 flex-shrink-0" />
+                  <span className="truncate">{task.name}</span>
+                  <span className="font-mono text-chart-3 ml-auto flex-shrink-0">{task.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="border-t pt-2 flex items-center justify-between">
             <span className="font-medium">Total</span>
             <span

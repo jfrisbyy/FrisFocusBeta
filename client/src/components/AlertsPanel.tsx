@@ -1,9 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock, CheckCircle, MessageCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, Clock, CheckCircle, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TaskAlert } from "@shared/schema";
+
+const ALERTS_PER_PAGE = 4;
 
 interface AlertsPanelProps {
   alerts: TaskAlert[];
@@ -57,6 +60,13 @@ function getAlertMessage(alerts: TaskAlert[]): string {
 
 export default function AlertsPanel({ alerts }: AlertsPanelProps) {
   const message = useMemo(() => getAlertMessage(alerts), [alerts]);
+  const [currentPage, setCurrentPage] = useState(0);
+  
+  const totalPages = Math.ceil(alerts.length / ALERTS_PER_PAGE);
+  const paginatedAlerts = alerts.slice(
+    currentPage * ALERTS_PER_PAGE,
+    (currentPage + 1) * ALERTS_PER_PAGE
+  );
 
   if (alerts.length === 0) {
     return (
@@ -98,7 +108,7 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
           </div>
         </div>
         <div className="divide-y">
-          {alerts.map((alert) => (
+          {paginatedAlerts.map((alert) => (
             <div
               key={alert.taskId}
               className="flex items-center justify-between gap-4 px-6 py-3"
@@ -130,6 +140,31 @@ export default function AlertsPanel({ alerts }: AlertsPanelProps) {
             </div>
           ))}
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-2 border-t bg-muted/20">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              data-testid="button-alerts-prev"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {currentPage + 1} of {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage === totalPages - 1}
+              data-testid="button-alerts-next"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
