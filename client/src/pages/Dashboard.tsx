@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
-import RecentWeeks, { WeekData, DayData } from "@/components/RecentWeeks";
+import RecentWeeks, { WeekData, DayData, DayTaskData } from "@/components/RecentWeeks";
 import StreaksCard from "@/components/StreaksCard";
 import AlertsPanel from "@/components/AlertsPanel";
 import WelcomeMessage from "@/components/WelcomeMessage";
@@ -149,12 +149,24 @@ const getMockBoosters = (): UnifiedBooster[] => [
 const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
   const today = new Date();
   
+  // Sample tasks for demo mode day breakdowns
+  const sampleTasks: DayTaskData[][] = [
+    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t2", name: "Morning workout", value: 20 }, { id: "t3", name: "Read 30 min", value: 10 }],
+    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t4", name: "Meal prep", value: 12 }, { id: "t5", name: "Meditate", value: 8 }],
+    [{ id: "t2", name: "Morning workout", value: 20 }, { id: "t5", name: "Meditate", value: 8 }, { id: "t6", name: "Journal", value: 7 }],
+    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t2", name: "Morning workout", value: 20 }, { id: "t3", name: "Read 30 min", value: 10 }, { id: "t5", name: "Meditate", value: 8 }],
+    [{ id: "t4", name: "Meal prep", value: 12 }, { id: "t3", name: "Read 30 min", value: 10 }, { id: "t6", name: "Journal", value: 7 }],
+    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t5", name: "Meditate", value: 8 }, { id: "t7", name: "Stretch", value: 5 }],
+    [{ id: "t2", name: "Morning workout", value: 20 }, { id: "t6", name: "Journal", value: 7 }],
+  ];
+  
   const generateDays = (weekOffset: number, points: number[]): DayData[] => {
     const weekStart = startOfWeek(subWeeks(today, weekOffset), { weekStartsOn: 1 });
     return points.map((p, i) => ({
       date: format(addDays(weekStart, i), "MMM d"),
       dayName: format(addDays(weekStart, i), "EEE"),
       points: p,
+      completedTasks: sampleTasks[(i + weekOffset) % sampleTasks.length],
     }));
   };
 
@@ -872,6 +884,7 @@ export default function Dashboard() {
         const log = dailyLogs[dateKey];
         
         let dayPoints: number | null = null;
+        let completedTasks: DayTaskData[] = [];
         if (log) {
           weekHasLogs = true;
           // Use stored taskPoints if available (frozen at save time), otherwise calculate from completedTaskIds
@@ -883,12 +896,38 @@ export default function Dashboard() {
           // Add todoPoints, subtract penaltyPoints, and add +3 check-in bonus if awarded
           const checkInBonus = log.checkInBonusAwarded ? 3 : 0;
           dayPoints = taskPoints + (log.todoPoints || 0) - (log.penaltyPoints || 0) + checkInBonus;
+          
+          // Build completed tasks list for day breakdown
+          completedTasks = log.completedTaskIds
+            .map(taskId => {
+              const task = tasks.find(t => t.id === taskId);
+              const penalty = penalties.find(p => p.id === taskId);
+              if (task) {
+                return { id: task.id, name: task.name, value: task.value };
+              } else if (penalty) {
+                return { id: penalty.id, name: penalty.name, value: -penalty.value };
+              }
+              return null;
+            })
+            .filter((t): t is DayTaskData => t !== null);
+          
+          // Add todo points and penalty points as special items if present
+          if (log.todoPoints && log.todoPoints > 0) {
+            completedTasks.push({ id: 'todo-points', name: 'Todo Items', value: log.todoPoints });
+          }
+          if (log.penaltyPoints && log.penaltyPoints > 0) {
+            completedTasks.push({ id: 'penalty-points', name: 'Penalties', value: -log.penaltyPoints });
+          }
+          if (checkInBonus > 0) {
+            completedTasks.push({ id: 'checkin-bonus', name: 'Check-in Bonus', value: checkInBonus });
+          }
         }
         
         weekDays.push({
           date: format(date, "MMM d"),
           dayName: format(date, "EEE"),
           points: dayPoints,
+          completedTasks: completedTasks.length > 0 ? completedTasks : undefined,
         });
       }
       
