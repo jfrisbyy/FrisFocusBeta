@@ -1966,6 +1966,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           priority: t.priority || "shouldDo",
           boosterRule: t.boosterRule || null,
           penaltyRule: t.penaltyRule || null,
+          tiers: t.tiers || null,
         }));
         await db.insert(seasonTasks).values(taskValues);
       }

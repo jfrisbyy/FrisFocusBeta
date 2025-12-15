@@ -40,7 +40,7 @@ import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Ta
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
-import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season, SeasonWithData } from "@shared/schema";
+import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season, SeasonWithData, TaskTier } from "@shared/schema";
 
 interface Task {
   id: string;
@@ -51,6 +51,7 @@ interface Task {
   group?: string;
   boosterRule?: BoosterRule;
   penaltyRule?: PenaltyRule;
+  tiers?: TaskTier[];
 }
 
 // Sample data for onboarding mode only
@@ -490,6 +491,7 @@ export default function TasksPage() {
         boostThreshold: task.boosterRule?.timesRequired || null,
         boostPeriod: task.boosterRule?.period || null,
         boostPoints: task.boosterRule?.bonusPoints || null,
+        tiers: task.tiers || null,
       });
       return res.json();
     },
@@ -525,6 +527,7 @@ export default function TasksPage() {
         boostThreshold: task.boosterRule?.timesRequired || null,
         boostPeriod: task.boosterRule?.period || null,
         boostPoints: task.boosterRule?.bonusPoints || null,
+        tiers: task.tiers || null,
       });
       return res.json();
     },
@@ -680,6 +683,7 @@ export default function TasksPage() {
       priority: t.priority as TaskPriority,
       boosterRule: t.boosterRule as BoosterRule | undefined,
       penaltyRule: t.penaltyRule as PenaltyRule | undefined,
+      tiers: (t as any).tiers as TaskTier[] | undefined,
     }));
     setTasks(seasonTasks);
     
@@ -723,6 +727,7 @@ export default function TasksPage() {
       priority: t.priority,
       boosterRule: t.boosterRule,
       penaltyRule: t.penaltyRule,
+      tiers: t.tiers,
     }));
     
     saveTasksToSeasonMutation.mutate({ seasonId: activeSeason.id, tasks: tasksToSave });

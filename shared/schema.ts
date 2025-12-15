@@ -574,6 +574,7 @@ export const seasonWithDataSchema = z.object({
     priority: z.string(),
     boosterRule: z.any().nullable(),
     penaltyRule: z.any().nullable(),
+    tiers: z.array(taskTierSchema).nullable().optional(),
   })),
   categories: z.array(z.object({
     id: z.string(),
