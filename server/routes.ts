@@ -5821,7 +5821,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     try {
       const userId = req.user.claims.sub;
       const date = req.params.date;
-      const { completedTaskIds, notes, todoPoints, penaltyPoints, taskPoints, seasonId, taskNotes } = req.body;
+      const { completedTaskIds, notes, todoPoints, penaltyPoints, taskPoints, seasonId, taskNotes, taskTiers } = req.body;
 
       // Check if log exists for this date
       const [existing] = await db.select().from(userDailyLogs)
@@ -5838,6 +5838,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
             seasonId: seasonId || null,
             notes,
             taskNotes: taskNotes || null,
+            taskTiers: taskTiers || null,
             updatedAt: new Date()
           })
           .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)))
@@ -5900,7 +5901,8 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           checkInBonusAwarded: true,
           seasonId: seasonId || null,
           notes,
-          taskNotes: taskNotes || null
+          taskNotes: taskNotes || null,
+          taskTiers: taskTiers || null
         });
         const [log] = await db.insert(userDailyLogs).values(parsed).returning();
         
