@@ -928,22 +928,39 @@ const demoCircleMembers: Record<string, StoredCircleMember[]> = {
 
 const demoCircleTasks: Record<string, StoredCircleTask[]> = {
   "circle-1": [
-    { id: "ct1", circleId: "circle-1", name: "5K Training Run", value: 20, category: "Cardio", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
-    { id: "ct2", circleId: "circle-1", name: "Strength Training", value: 15, category: "Strength", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct1", circleId: "circle-1", name: "5K Training Run", value: 20, category: "Cardio", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct1-1", name: "Fast Pace", bonusPoints: 10 },
+      { id: "tier-ct1-2", name: "Race Pace", bonusPoints: 20 },
+    ] },
+    { id: "ct2", circleId: "circle-1", name: "Strength Training", value: 15, category: "Strength", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct2-1", name: "Heavy Weights", bonusPoints: 10 },
+    ] },
     { id: "ct3", circleId: "circle-1", name: "Stretching Session", value: 10, category: "Recovery", taskType: "per_person", createdById: "u3", requiresApproval: false, approvalStatus: "approved" },
-    { id: "ct4", circleId: "circle-1", name: "Long Run (10K+)", value: 30, category: "Cardio", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct4", circleId: "circle-1", name: "Long Run (10K+)", value: 30, category: "Cardio", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct4-1", name: "15K Run", bonusPoints: 15 },
+      { id: "tier-ct4-2", name: "Half Marathon", bonusPoints: 30 },
+    ] },
     { id: "ct5", circleId: "circle-1", name: "Rest Day (Active Recovery)", value: 5, category: "Recovery", taskType: "per_person", createdById: "u1", requiresApproval: false, approvalStatus: "approved" },
   ],
   "circle-2": [
-    { id: "ct6", circleId: "circle-2", name: "Clean Room", value: 10, category: "Cleaning", taskType: "per_person", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
-    { id: "ct7", circleId: "circle-2", name: "Do Dishes", value: 5, category: "Kitchen", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct6", circleId: "circle-2", name: "Clean Room", value: 10, category: "Cleaning", taskType: "per_person", createdById: "you", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct6-1", name: "Deep Clean", bonusPoints: 10 },
+    ] },
+    { id: "ct7", circleId: "circle-2", name: "Do Dishes", value: 5, category: "Kitchen", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct7-1", name: "Full Kitchen Clean", bonusPoints: 5 },
+    ] },
     { id: "ct8", circleId: "circle-2", name: "Take Out Trash", value: 5, category: "Cleaning", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
-    { id: "ct9", circleId: "circle-2", name: "Mow Lawn", value: 20, category: "Yard", taskType: "circle_task", createdById: "u4", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct9", circleId: "circle-2", name: "Mow Lawn", value: 20, category: "Yard", taskType: "circle_task", createdById: "u4", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct9-1", name: "Edge Trimming", bonusPoints: 10 },
+      { id: "tier-ct9-2", name: "Full Yard Work", bonusPoints: 20 },
+    ] },
     { id: "ct10", circleId: "circle-2", name: "Homework Done", value: 15, category: "School", taskType: "per_person", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
     { id: "ct11", circleId: "circle-2", name: "Walk the Dog", value: 10, category: "Pets", taskType: "circle_task", createdById: "you", requiresApproval: false, approvalStatus: "approved" },
   ],
   "circle-3": [
-    { id: "ct12", circleId: "circle-3", name: "Read 30 minutes", value: 10, category: "Reading", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
+    { id: "ct12", circleId: "circle-3", name: "Read 30 minutes", value: 10, category: "Reading", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved", tiers: [
+      { id: "tier-ct12-1", name: "Read 1 hour", bonusPoints: 10 },
+    ] },
     { id: "ct13", circleId: "circle-3", name: "Write Book Review", value: 25, category: "Writing", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
     { id: "ct14", circleId: "circle-3", name: "Attend Discussion", value: 15, category: "Social", taskType: "circle_task", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },
     { id: "ct15", circleId: "circle-3", name: "Finish Book Chapter", value: 20, category: "Reading", taskType: "per_person", createdById: "u8", requiresApproval: false, approvalStatus: "approved" },

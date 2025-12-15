@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Settings } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import type { DashboardPreferences } from "@shared/schema";
 
 interface DashboardSettingsProps {
@@ -19,7 +20,9 @@ interface DashboardSettingsProps {
   isPending?: boolean;
 }
 
-const cardLabels: { key: keyof DashboardPreferences; label: string; description: string }[] = [
+type BooleanPreferenceKeys = "weekTotal" | "streaks" | "badges" | "weeklyTable" | "alerts" | "weeklyTodos" | "dueDates" | "boosters" | "milestones" | "recentWeeks" | "circlesOverview" | "journal";
+
+const cardLabels: { key: BooleanPreferenceKeys; label: string; description: string }[] = [
   { key: "weekTotal", label: "Week Total Points", description: "Show weekly points summary card" },
   { key: "streaks", label: "Streaks", description: "Show day and week streak counters" },
   { key: "badges", label: "Earned Badges", description: "Show badges you've earned" },
@@ -40,8 +43,25 @@ export default function DashboardSettings({
   isPending = false,
 }: DashboardSettingsProps) {
   const [open, setOpen] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("theme");
+      return stored === "light";
+    }
+    return false;
+  });
 
-  const handleToggle = (key: keyof DashboardPreferences) => {
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    }
+  }, [isLightMode]);
+
+  const handleToggle = (key: BooleanPreferenceKeys) => {
     onPreferencesChange({
       ...preferences,
       [key]: !preferences[key],
@@ -49,22 +69,22 @@ export default function DashboardSettings({
   };
 
   const handleShowAll = () => {
-    const allTrue = cardLabels.reduce((acc, { key }) => {
-      acc[key] = true;
-      return acc;
-    }, {} as DashboardPreferences);
-    onPreferencesChange(allTrue);
+    const updated = { ...preferences };
+    cardLabels.forEach(({ key }) => {
+      updated[key] = true;
+    });
+    onPreferencesChange(updated);
   };
 
   const handleHideAll = () => {
-    const allFalse = cardLabels.reduce((acc, { key }) => {
-      acc[key] = false;
-      return acc;
-    }, {} as DashboardPreferences);
-    onPreferencesChange(allFalse);
+    const updated = { ...preferences };
+    cardLabels.forEach(({ key }) => {
+      updated[key] = false;
+    });
+    onPreferencesChange(updated);
   };
 
-  const visibleCount = Object.values(preferences).filter(Boolean).length;
+  const visibleCount = cardLabels.filter(({ key }) => preferences[key]).length;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -79,52 +99,79 @@ export default function DashboardSettings({
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Customize Dashboard</DialogTitle>
+          <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
-            Choose which cards to show on your dashboard ({visibleCount} of {cardLabels.length} visible)
+            Customize your dashboard and appearance
           </DialogDescription>
         </DialogHeader>
-        <div className="flex gap-2 mb-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShowAll}
-            disabled={isPending}
-            data-testid="button-show-all-cards"
-          >
-            Show All
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleHideAll}
-            disabled={isPending}
-            data-testid="button-hide-all-cards"
-          >
-            Hide All
-          </Button>
-        </div>
+        
         <div className="space-y-4">
-          {cardLabels.map(({ key, label, description }) => (
-            <div
-              key={key}
-              className="flex items-center justify-between gap-4"
-            >
-              <div className="flex-1">
-                <Label htmlFor={`toggle-${key}`} className="text-sm font-medium">
-                  {label}
-                </Label>
-                <p className="text-xs text-muted-foreground">{description}</p>
-              </div>
-              <Switch
-                id={`toggle-${key}`}
-                checked={preferences[key]}
-                onCheckedChange={() => handleToggle(key)}
-                disabled={isPending}
-                data-testid={`switch-card-${key}`}
-              />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <Label htmlFor="toggle-theme" className="text-sm font-medium flex items-center gap-2">
+                {isLightMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                Light Mode
+              </Label>
+              <p className="text-xs text-muted-foreground">Switch between dark and light themes</p>
             </div>
-          ))}
+            <Switch
+              id="toggle-theme"
+              checked={isLightMode}
+              onCheckedChange={setIsLightMode}
+              data-testid="switch-light-mode"
+            />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        <div>
+          <h3 className="text-sm font-medium mb-2">Dashboard Cards</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Choose which cards to show ({visibleCount} of {cardLabels.length} visible)
+          </p>
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShowAll}
+              disabled={isPending}
+              data-testid="button-show-all-cards"
+            >
+              Show All
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleHideAll}
+              disabled={isPending}
+              data-testid="button-hide-all-cards"
+            >
+              Hide All
+            </Button>
+          </div>
+          <div className="space-y-4">
+            {cardLabels.map(({ key, label, description }) => (
+              <div
+                key={key}
+                className="flex items-center justify-between gap-4"
+              >
+                <div className="flex-1">
+                  <Label htmlFor={`toggle-${key}`} className="text-sm font-medium">
+                    {label}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">{description}</p>
+                </div>
+                <Switch
+                  id={`toggle-${key}`}
+                  checked={preferences[key] === true}
+                  onCheckedChange={() => handleToggle(key)}
+                  disabled={isPending}
+                  data-testid={`switch-card-${key}`}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
