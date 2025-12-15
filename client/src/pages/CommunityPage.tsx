@@ -2539,6 +2539,9 @@ export default function CommunityPage() {
   // Data: who completed which tasks today
   const [circleTaskCompletions, setCircleTaskCompletions] = useState<Record<string, Record<string, { userId: string; userName: string; completedAt: string }[]>>>({});
   
+  // Track selected tier for each circle task (circleId -> taskId -> tierId, empty string for base)
+  const [circleTaskTiers, setCircleTaskTiers] = useState<Record<string, Record<string, string>>>({});
+  
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   
   // Leaderboard view mode (day/week/all time)
@@ -4962,13 +4965,19 @@ export default function CommunityPage() {
       setCircleMembers({ ...circleMembers, [circleId]: updatedMembers });
     };
     
+    // Get selected tier for this task to calculate bonus points
+    const selectedTierId = circleTaskTiers[circleId]?.[taskId] || "";
+    const selectedTier = task.tiers?.find(t => t.id === selectedTierId);
+    const tierBonus = selectedTier?.bonusPoints || 0;
+    const totalPoints = task.value + tierBonus;
+
     if (isCompleted) {
       // Remove completion
       setMyCompletedTasks({ ...myCompletedTasks, [circleId]: myCompleted.filter(id => id !== taskId) });
       const circleCompletions = circleTaskCompletions[circleId] || {};
       const taskCompletions = (circleCompletions[taskId] || []).filter(c => c.userId !== currentUserId);
       setCircleTaskCompletions({ ...circleTaskCompletions, [circleId]: { ...circleCompletions, [taskId]: taskCompletions } });
-      updateMemberPoints(-task.value);
+      updateMemberPoints(-totalPoints);
     } else {
       // Add completion
       setMyCompletedTasks({ ...myCompletedTasks, [circleId]: [...myCompleted, taskId] });
@@ -4981,8 +4990,9 @@ export default function CommunityPage() {
           [taskId]: [...taskCompletions, { userId: currentUserId || "you", userName: currentUserName, completedAt: new Date().toISOString() }]
         }
       });
-      updateMemberPoints(task.value);
-      toast({ title: "Task completed!", description: `+${task.value} points` });
+      updateMemberPoints(totalPoints);
+      const tierText = selectedTier ? ` (${selectedTier.name})` : "";
+      toast({ title: "Task completed!", description: `+${totalPoints} points${tierText}` });
     }
   };
 
@@ -4992,6 +5002,31 @@ export default function CommunityPage() {
 
   const isTaskCompletedByMe = (circleId: string, taskId: string) => {
     return (myCompletedTasks[circleId] || []).includes(taskId);
+  };
+
+  const getSelectedCircleTaskTier = (circleId: string, taskId: string): string => {
+    return circleTaskTiers[circleId]?.[taskId] || "";
+  };
+
+  const setSelectedCircleTaskTier = (circleId: string, taskId: string, tierId: string) => {
+    setCircleTaskTiers(prev => ({
+      ...prev,
+      [circleId]: {
+        ...(prev[circleId] || {}),
+        [taskId]: tierId
+      }
+    }));
+  };
+
+  const getCircleTaskTotalPoints = (task: StoredCircleTask, tierId: string): number => {
+    let points = task.value;
+    if (tierId && task.tiers) {
+      const tier = task.tiers.find(t => t.id === tierId);
+      if (tier) {
+        points += tier.bonusPoints;
+      }
+    }
+    return points;
   };
 
   const incomingRequests = requests.filter((r) => r.direction === "incoming");
@@ -7914,6 +7949,10 @@ export default function CommunityPage() {
                             const completions = getTaskCompletions(selectedCircle.id, task.id);
                             const isCompleted = isTaskCompletedByMe(selectedCircle.id, task.id);
                             const isExpanded = expandedTaskId === task.id;
+                            const hasTiers = task.tiers && task.tiers.length > 0;
+                            const selectedTierId = getSelectedCircleTaskTier(selectedCircle.id, task.id);
+                            const selectedTier = task.tiers?.find(t => t.id === selectedTierId);
+                            const displayPoints = task.value + (selectedTier?.bonusPoints || 0);
                             return (
                               <div key={task.id} className="space-y-1">
                                 <div
@@ -7928,7 +7967,36 @@ export default function CommunityPage() {
                                       onClick={(e) => { e.stopPropagation(); handleToggleTaskComplete(selectedCircle.id, task.id, task); }}
                                       data-testid={`checkbox-${task.id}`}
                                     />
-                                    <span className={isCompleted ? "line-through text-muted-foreground" : ""}>{task.name}</span>
+                                    <div className="flex flex-col gap-1">
+                                      <span className={isCompleted ? "line-through text-muted-foreground" : ""}>{task.name}</span>
+                                      {hasTiers && !isCompleted && (
+                                        <Select
+                                          value={selectedTierId}
+                                          onValueChange={(value) => {
+                                            setSelectedCircleTaskTier(selectedCircle.id, task.id, value);
+                                          }}
+                                        >
+                                          <SelectTrigger 
+                                            className="h-7 text-xs w-auto min-w-[120px]" 
+                                            onClick={(e) => e.stopPropagation()}
+                                            data-testid={`select-tier-${task.id}`}
+                                          >
+                                            <SelectValue placeholder="Select tier" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="">Base ({task.value} pts)</SelectItem>
+                                            {task.tiers!.map((tier) => (
+                                              <SelectItem key={tier.id} value={tier.id}>
+                                                {tier.name} (+{tier.bonusPoints} pts)
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                      {hasTiers && isCompleted && selectedTier && (
+                                        <Badge variant="secondary" className="text-xs w-fit">{selectedTier.name}</Badge>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {completions.length > 0 && (
@@ -7943,7 +8011,7 @@ export default function CommunityPage() {
                                         )}
                                       </div>
                                     )}
-                                    <Badge variant="outline">{task.value} pts</Badge>
+                                    <Badge variant="outline">{displayPoints} pts</Badge>
                                     {isOwnerOrAdmin(selectedCircle.id) ? (
                                       <div className="flex gap-1">
                                         <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); startEditTask(task); }} data-testid={`button-edit-task-${task.id}`}>
@@ -8000,6 +8068,10 @@ export default function CommunityPage() {
                             const isCompletedByAnyone = completions.length > 0;
                             const isCompletedByMe = (myCompletedTasks[selectedCircle.id] || []).includes(task.id);
                             const isExpanded = expandedTaskId === task.id;
+                            const hasTiers = task.tiers && task.tiers.length > 0;
+                            const selectedTierId = getSelectedCircleTaskTier(selectedCircle.id, task.id);
+                            const selectedTier = task.tiers?.find(t => t.id === selectedTierId);
+                            const displayPoints = task.value + (selectedTier?.bonusPoints || 0);
                             return (
                               <div key={task.id} className="space-y-1">
                                 <div
@@ -8014,11 +8086,38 @@ export default function CommunityPage() {
                                       onClick={(e) => { e.stopPropagation(); handleToggleTaskComplete(selectedCircle.id, task.id, task); }}
                                       data-testid={`checkbox-${task.id}`}
                                     />
-                                    <div>
+                                    <div className="flex flex-col gap-1">
                                       <span className={isCompletedByAnyone ? "line-through text-muted-foreground" : ""}>{task.name}</span>
                                       <p className="text-xs text-muted-foreground">
                                         {isCompletedByAnyone ? `Done by ${completions[0].userName}` : "One completion per day"}
                                       </p>
+                                      {hasTiers && !isCompletedByAnyone && (
+                                        <Select
+                                          value={selectedTierId}
+                                          onValueChange={(value) => {
+                                            setSelectedCircleTaskTier(selectedCircle.id, task.id, value);
+                                          }}
+                                        >
+                                          <SelectTrigger 
+                                            className="h-7 text-xs w-auto min-w-[120px]" 
+                                            onClick={(e) => e.stopPropagation()}
+                                            data-testid={`select-tier-${task.id}`}
+                                          >
+                                            <SelectValue placeholder="Select tier" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="">Base ({task.value} pts)</SelectItem>
+                                            {task.tiers!.map((tier) => (
+                                              <SelectItem key={tier.id} value={tier.id}>
+                                                {tier.name} (+{tier.bonusPoints} pts)
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      )}
+                                      {hasTiers && isCompletedByAnyone && selectedTier && (
+                                        <Badge variant="secondary" className="text-xs w-fit">{selectedTier.name}</Badge>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -8027,7 +8126,7 @@ export default function CommunityPage() {
                                         <AvatarFallback className="text-xs">{completions[0].userName.charAt(0)}</AvatarFallback>
                                       </Avatar>
                                     )}
-                                    <Badge variant="outline">{task.value} pts</Badge>
+                                    <Badge variant="outline">{displayPoints} pts</Badge>
                                     {isOwnerOrAdmin(selectedCircle.id) ? (
                                       <div className="flex gap-1">
                                         <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); startEditTask(task); }} data-testid={`button-edit-task-${task.id}`}>
