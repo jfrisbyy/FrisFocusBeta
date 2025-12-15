@@ -737,53 +737,59 @@ export default function Dashboard() {
     // Compute task alerts based on priority thresholds
     // mustDo: alert if not done in 3+ days
     // shouldDo: alert if not done in 10+ days
+    // Only show alerts after user has logged at least one day
     const computedAlerts: TaskAlert[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    for (const task of tasks) {
-      if (task.priority === "couldDo" || !task.priority) continue;
-      
-      // Find the most recent date this task was completed
-      let lastCompletedDate: Date | null = null;
-      Object.entries(dailyLogs).forEach(([dateStr, log]) => {
-        if (log.completedTaskIds?.includes(task.id)) {
-          const logDate = new Date(dateStr);
-          if (!lastCompletedDate || logDate > lastCompletedDate) {
-            lastCompletedDate = logDate;
-          }
-        }
-      });
-      
-      const threshold = task.priority === "mustDo" ? 3 : 10;
-      let daysMissing: number;
-      
-      if (lastCompletedDate !== null) {
-        const completedDate = new Date(lastCompletedDate);
-        completedDate.setHours(0, 0, 0, 0);
-        daysMissing = Math.floor((today.getTime() - completedDate.getTime()) / (1000 * 60 * 60 * 24));
-      } else {
-        // Never completed - show high number
-        daysMissing = 999;
-      }
-      
-      if (daysMissing >= threshold) {
-        computedAlerts.push({
-          taskId: task.id,
-          taskName: task.name,
-          priority: task.priority,
-          daysMissing: daysMissing > 999 ? 999 : daysMissing,
-          threshold,
-        });
-      }
-    }
+    // Only calculate alerts if user has logged at least one day
+    const hasLogs = Object.keys(dailyLogs).length > 0;
     
-    // Sort alerts: mustDo first, then by daysMissing descending
-    computedAlerts.sort((a, b) => {
-      if (a.priority === "mustDo" && b.priority !== "mustDo") return -1;
-      if (a.priority !== "mustDo" && b.priority === "mustDo") return 1;
-      return b.daysMissing - a.daysMissing;
-    });
+    if (hasLogs) {
+      for (const task of tasks) {
+        if (task.priority === "couldDo" || !task.priority) continue;
+        
+        // Find the most recent date this task was completed
+        let lastCompletedDate: Date | null = null;
+        Object.entries(dailyLogs).forEach(([dateStr, log]) => {
+          if (log.completedTaskIds?.includes(task.id)) {
+            const logDate = new Date(dateStr);
+            if (!lastCompletedDate || logDate > lastCompletedDate) {
+              lastCompletedDate = logDate;
+            }
+          }
+        });
+        
+        const threshold = task.priority === "mustDo" ? 3 : 10;
+        let daysMissing: number;
+        
+        if (lastCompletedDate !== null) {
+          const completedDate = new Date(lastCompletedDate);
+          completedDate.setHours(0, 0, 0, 0);
+          daysMissing = Math.floor((today.getTime() - completedDate.getTime()) / (1000 * 60 * 60 * 24));
+        } else {
+          // Never completed - show high number
+          daysMissing = 999;
+        }
+        
+        if (daysMissing >= threshold) {
+          computedAlerts.push({
+            taskId: task.id,
+            taskName: task.name,
+            priority: task.priority,
+            daysMissing: daysMissing > 999 ? 999 : daysMissing,
+            threshold,
+          });
+        }
+      }
+      
+      // Sort alerts: mustDo first, then by daysMissing descending
+      computedAlerts.sort((a, b) => {
+        if (a.priority === "mustDo" && b.priority !== "mustDo") return -1;
+        if (a.priority !== "mustDo" && b.priority === "mustDo") return 1;
+        return b.daysMissing - a.daysMissing;
+      });
+    }
     
     setAlerts(computedAlerts);
 
@@ -1417,7 +1423,10 @@ export default function Dashboard() {
                   weeklyGoal={weeklyGoal}
                   onGoalChange={handleGoalChange}
                   days={days.map(d => ({ date: d.date, dayName: d.dayName, points: d.points }))}
-                  boosters={boosters.map(b => ({ id: b.id, name: b.name, points: b.points, achieved: b.achieved, isNegative: b.isNegative }))}
+                  boosters={[
+                    ...boosters.map(b => ({ id: b.id, name: b.name, points: b.points, achieved: b.achieved, isNegative: b.isNegative })),
+                    ...milestones.filter(m => m.achieved).map(m => ({ id: m.id, name: m.name, points: m.points, achieved: true, isNegative: false }))
+                  ]}
                 />
               );
             case "streaks":
