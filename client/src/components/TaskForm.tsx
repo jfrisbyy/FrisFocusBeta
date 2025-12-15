@@ -29,10 +29,15 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Plus, X, Layers } from "lucide-react";
 import BoosterRuleConfig, { defaultBoosterRule } from "./BoosterRuleConfig";
 import PenaltyRuleConfig, { defaultPenaltyRule } from "./PenaltyRuleConfig";
 import type { BoosterRule } from "./BoosterRuleConfig";
 import type { TaskPriority, PenaltyRule } from "@shared/schema";
+import type { StoredTaskTier } from "@/lib/storage";
 
 const taskFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -47,6 +52,7 @@ type TaskFormValues = z.infer<typeof taskFormSchema>;
 export interface TaskWithRules extends TaskFormValues {
   boosterRule?: BoosterRule;
   penaltyRule?: PenaltyRule;
+  tiers?: StoredTaskTier[];
 }
 
 interface TaskFormProps {
@@ -92,6 +98,12 @@ export default function TaskForm({
   const [penaltyRule, setPenaltyRule] = useState<PenaltyRule>(
     defaultValues?.penaltyRule || defaultPenaltyRule
   );
+  const [tiersEnabled, setTiersEnabled] = useState<boolean>(
+    (defaultValues?.tiers && defaultValues.tiers.length > 0) || false
+  );
+  const [tiers, setTiers] = useState<StoredTaskTier[]>(
+    defaultValues?.tiers || []
+  );
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -118,20 +130,44 @@ export default function TaskForm({
       });
       setBoosterRule(defaultValues?.boosterRule || defaultBoosterRule);
       setPenaltyRule(defaultValues?.penaltyRule || defaultPenaltyRule);
+      setTiersEnabled((defaultValues?.tiers && defaultValues.tiers.length > 0) || false);
+      setTiers(defaultValues?.tiers || []);
     }
   }, [open, defaultValues, form]);
 
   const taskName = form.watch("name");
+
+  const addTier = () => {
+    const newTier: StoredTaskTier = {
+      id: `tier-${Date.now()}`,
+      name: "",
+      bonusPoints: 5,
+    };
+    setTiers([...tiers, newTier]);
+  };
+
+  const updateTier = (index: number, field: keyof StoredTaskTier, value: string | number) => {
+    const updated = [...tiers];
+    updated[index] = { ...updated[index], [field]: value };
+    setTiers(updated);
+  };
+
+  const removeTier = (index: number) => {
+    setTiers(tiers.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = (values: TaskFormValues) => {
     onSubmit({
       ...values,
       boosterRule: boosterRule.enabled ? boosterRule : undefined,
       penaltyRule: priority === "mustDo" && penaltyRule.enabled ? penaltyRule : undefined,
+      tiers: tiersEnabled && tiers.length > 0 ? tiers.filter(t => t.name.trim() !== "") : undefined,
     });
     form.reset();
     setBoosterRule(defaultBoosterRule);
     setPenaltyRule(defaultPenaltyRule);
+    setTiersEnabled(false);
+    setTiers([]);
     onOpenChange(false);
   };
 
@@ -246,6 +282,71 @@ export default function TaskForm({
                   </FormItem>
                 )}
               />
+
+              <Card className="border-dashed">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Tiers</CardTitle>
+                    </div>
+                    <Switch
+                      checked={tiersEnabled}
+                      onCheckedChange={setTiersEnabled}
+                      data-testid="switch-tiers-enabled"
+                    />
+                  </div>
+                </CardHeader>
+                {tiersEnabled && (
+                  <CardContent className="pt-0 px-4 pb-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Add higher achievement levels for bonus points (e.g., 15k steps for +5 pts)
+                    </p>
+                    {tiers.map((tier, index) => (
+                      <div key={tier.id} className="flex items-center gap-2">
+                        <Input
+                          placeholder={`Tier ${index + 1} name (e.g., 15k steps)`}
+                          value={tier.name}
+                          onChange={(e) => updateTier(index, "name", e.target.value)}
+                          className="flex-1"
+                          data-testid={`input-tier-name-${index}`}
+                        />
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">+</span>
+                          <Input
+                            type="number"
+                            value={tier.bonusPoints}
+                            onChange={(e) => updateTier(index, "bonusPoints", parseInt(e.target.value) || 0)}
+                            className="w-16"
+                            data-testid={`input-tier-bonus-${index}`}
+                          />
+                          <span className="text-xs text-muted-foreground">pts</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeTier(index)}
+                          data-testid={`button-remove-tier-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addTier}
+                      className="w-full"
+                      data-testid="button-add-tier"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Tier
+                    </Button>
+                  </CardContent>
+                )}
+              </Card>
               
               <BoosterRuleConfig
                 rule={boosterRule}

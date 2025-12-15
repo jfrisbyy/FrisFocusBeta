@@ -54,6 +54,14 @@ export const penaltyRuleSchema = z.object({
 });
 export type PenaltyRule = z.infer<typeof penaltyRuleSchema>;
 
+// Task tier schema (for tiered tasks)
+export const taskTierSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  bonusPoints: z.number().int().min(1),
+});
+export type TaskTier = z.infer<typeof taskTierSchema>;
+
 // Task schema (for frontend use)
 export const taskSchema = z.object({
   id: z.string(),
@@ -66,6 +74,7 @@ export const taskSchema = z.object({
   penaltyRule: penaltyRuleSchema.optional(),
   lastCompletedAt: z.string().optional(),
   seasonId: z.string().optional(),
+  tiers: z.array(taskTierSchema).optional(),
 });
 export type Task = z.infer<typeof taskSchema>;
 
