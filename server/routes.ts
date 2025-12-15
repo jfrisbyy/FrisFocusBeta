@@ -5219,7 +5219,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         return res.status(400).json({ error: "No active season. Please create a season first." });
       }
       
-      const { name, value, category, priority, boosterRule, penaltyRule } = req.body;
+      const { name, value, category, priority, boosterRule, penaltyRule, tiers } = req.body;
       const [task] = await db.insert(seasonTasks).values({
         seasonId: activeSeason.id,
         name,
@@ -5228,6 +5228,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         priority: priority || "shouldDo",
         boosterRule: boosterRule || null,
         penaltyRule: penaltyRule || null,
+        tiers: tiers || null,
       }).returning();
       
       // Award first_task one-time bonus
@@ -5258,7 +5259,7 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         return res.status(400).json({ error: "No active season" });
       }
       
-      const { name, value, category, priority, boosterRule, penaltyRule } = req.body;
+      const { name, value, category, priority, boosterRule, penaltyRule, tiers } = req.body;
 
       const [task] = await db.update(seasonTasks)
         .set({ 
@@ -5267,7 +5268,8 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
           category, 
           priority,
           boosterRule,
-          penaltyRule
+          penaltyRule,
+          tiers
         })
         .where(and(eq(seasonTasks.id, taskId), eq(seasonTasks.seasonId, activeSeason.id)))
         .returning();
