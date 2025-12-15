@@ -1132,8 +1132,10 @@ export default function Dashboard() {
     // Task 5: +10 FP bonus for achieving 15% above weekly goal (current week only)
     // Use currentWeekDays which matches the displayed week total
     const displayedWeekTotal = currentWeekDays.reduce((sum, d) => sum + (d.points || 0), 0);
+    // Use the same goal source as displayed: active season's goal takes priority
+    const displayedWeeklyGoal = activeSeason?.weeklyGoal ?? activeSeasonData?.weeklyGoal ?? weeklyGoalValue;
     
-    const overAchieverBonus: UnifiedBooster | null = (weekOffset === 0 && displayedWeekTotal >= weeklyGoalValue * 1.15) ? {
+    const overAchieverBonus: UnifiedBooster | null = (weekOffset === 0 && displayedWeeklyGoal > 0 && displayedWeekTotal >= displayedWeeklyGoal * 1.15) ? {
       id: "bonus-over-achiever",
       name: "Over Achiever",
       description: "15% above weekly goal",
