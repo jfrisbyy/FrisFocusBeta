@@ -37,10 +37,17 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export interface DayTaskData {
+  id: string;
+  name: string;
+  value: number;
+}
+
 export interface DayData {
   date: string;
   dayName: string;
   points: number | null;
+  completedTasks?: DayTaskData[];
 }
 
 export interface WeekBooster {
@@ -118,6 +125,7 @@ export default function RecentWeeks({
   const [useCustomGoal, setUseCustomGoal] = useState(false);
   const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [expandedWeekId, setExpandedWeekId] = useState<string | null>(null);
+  const [expandedDayIndex, setExpandedDayIndex] = useState<number | null>(null);
 
   const displayedWeeks = showAllWeeks ? weeks : weeks.slice(0, initialDisplayCount);
   const hasMoreWeeks = weeks.length > initialDisplayCount;
@@ -194,7 +202,10 @@ export default function RecentWeeks({
                 <Collapsible
                   key={week.id}
                   open={isExpanded}
-                  onOpenChange={(open) => setExpandedWeekId(open ? week.id : null)}
+                  onOpenChange={(open) => {
+                    setExpandedWeekId(open ? week.id : null);
+                    setExpandedDayIndex(null);
+                  }}
                 >
                   <div
                     className="flex flex-col gap-2 px-6 py-4"
@@ -271,23 +282,58 @@ export default function RecentWeeks({
                           <div className="grid grid-cols-7 gap-1">
                             {week.days.map((day, index) => {
                               const dayStatus = getDayStatus(day.points, dailyGoal);
+                              const hasTasks = day.completedTasks && day.completedTasks.length > 0;
+                              const isDayExpanded = expandedWeekId === week.id && expandedDayIndex === index;
                               return (
                                 <div 
                                   key={index}
                                   className={cn(
-                                    "flex flex-col items-center p-2 rounded-md",
-                                    dayStatus.bgColor
+                                    "flex flex-col items-center p-2 rounded-md transition-colors",
+                                    dayStatus.bgColor,
+                                    hasTasks && "cursor-pointer hover-elevate"
                                   )}
+                                  onClick={() => {
+                                    if (hasTasks) {
+                                      setExpandedDayIndex(isDayExpanded ? null : index);
+                                    }
+                                  }}
                                   data-testid={`day-${week.id}-${index}`}
                                 >
                                   <span className="text-[10px] text-muted-foreground">{day.dayName}</span>
                                   <span className={cn("text-xs font-mono font-semibold", dayStatus.color)}>
                                     {day.points !== null ? day.points : "-"}
                                   </span>
+                                  {hasTasks && (
+                                    <span className="text-[9px] text-muted-foreground mt-0.5">
+                                      {isDayExpanded ? "▲" : "▼"}
+                                    </span>
+                                  )}
                                 </div>
                               );
                             })}
                           </div>
+                          {expandedDayIndex !== null && week.days[expandedDayIndex]?.completedTasks && (
+                            <div className="bg-background/50 rounded-md p-3 space-y-1 border">
+                              <p className="text-xs font-medium text-muted-foreground mb-2">
+                                {week.days[expandedDayIndex].dayName} - {week.days[expandedDayIndex].date}
+                              </p>
+                              {week.days[expandedDayIndex].completedTasks!.map((task) => (
+                                <div 
+                                  key={task.id} 
+                                  className="flex items-center justify-between text-xs"
+                                  data-testid={`day-task-${task.id}`}
+                                >
+                                  <span className="text-muted-foreground truncate">{task.name}</span>
+                                  <span className={cn(
+                                    "font-mono ml-2 flex-shrink-0",
+                                    task.value > 0 ? "text-chart-1" : "text-chart-3"
+                                  )}>
+                                    {task.value > 0 ? `+${task.value}` : task.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
 

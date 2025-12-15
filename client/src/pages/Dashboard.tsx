@@ -1119,7 +1119,47 @@ export default function Dashboard() {
         })
       : []; // No penalties for current week - only calculated after week ends
 
-    setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties]);
+    // Task 4: +10 FP bonus for having at least 10 tasks
+    const taskCountBonus: UnifiedBooster | null = tasks.length >= 10 ? {
+      id: "bonus-10-tasks",
+      name: "Task Master",
+      description: "Added at least 10 tasks",
+      points: 10,
+      achieved: true,
+      isNegative: false,
+    } : null;
+
+    // Task 5: +10 FP bonus for achieving 15% above weekly goal (current week only)
+    const currentWeekTotal = Object.entries(dailyLogs)
+      .filter(([dateStr]) => {
+        const logDate = new Date(dateStr);
+        const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+        const currentWeekEnd = addDays(currentWeekStart, 7);
+        return logDate >= currentWeekStart && logDate < currentWeekEnd;
+      })
+      .reduce((sum, [, log]) => {
+        return sum + log.completedTaskIds.reduce((taskSum, taskId) => {
+          const task = tasks.find(t => t.id === taskId);
+          const penalty = penalties.find(p => p.id === taskId);
+          if (task) return taskSum + task.value;
+          if (penalty) return taskSum - penalty.value;
+          return taskSum;
+        }, 0);
+      }, 0);
+    
+    const overAchieverBonus: UnifiedBooster | null = (weekOffset === 0 && currentWeekTotal >= weeklyGoalValue * 1.15) ? {
+      id: "bonus-over-achiever",
+      name: "Over Achiever",
+      description: "15% above weekly goal",
+      points: 10,
+      achieved: true,
+      isNegative: false,
+    } : null;
+
+    // Combine all boosters, filtering out null values
+    const additionalBonuses = [taskCountBonus, overAchieverBonus].filter(Boolean) as UnifiedBooster[];
+    
+    setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties, ...additionalBonuses]);
   }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId]);
 
   const baseWeekStartForRange = startOfWeek(new Date(), { weekStartsOn: 1 });
