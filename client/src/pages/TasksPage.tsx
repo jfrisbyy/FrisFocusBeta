@@ -282,6 +282,21 @@ export default function TasksPage() {
     },
   });
 
+  // Update season settings mutation (for weeklyGoal)
+  const updateSeasonSettingsMutation = useMutation({
+    mutationFn: async (data: { seasonId: string; weeklyGoal: number }) => {
+      const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}/settings`, { weeklyGoal: data.weeklyGoal });
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons", variables.seasonId, "data"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update season goal", variant: "destructive" });
+    },
+  });
+
   // Import tasks to season mutation
   const importToSeasonMutation = useMutation({
     mutationFn: async (data: { seasonId: string; fromSeasonId: string; taskIds: string[]; categoryIds: string[]; penaltyIds: string[] }) => {
@@ -804,7 +819,11 @@ export default function TasksPage() {
     const newGoal = parseInt(goalInput, 10);
     if (!isNaN(newGoal) && newGoal > 0) {
       setDailyGoal(newGoal);
-      if (!activeSeason && !useMockData) {
+      if (activeSeason && !useMockData) {
+        // Update season's weeklyGoal when a season is active
+        updateSeasonSettingsMutation.mutate({ seasonId: activeSeason.id, weeklyGoal: newGoal * 7 });
+      } else if (!useMockData) {
+        // Update global settings when no season is active
         updateSettingsMutation.mutate({ dailyGoal: newGoal, weeklyGoal: newGoal * 7 });
       }
       toast({

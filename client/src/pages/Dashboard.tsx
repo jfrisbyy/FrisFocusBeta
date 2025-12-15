@@ -746,6 +746,15 @@ export default function Dashboard() {
     const hasLogs = Object.keys(dailyLogs).length > 0;
     
     if (hasLogs) {
+      // Find the earliest logged date to use for tasks never completed
+      let firstLoggedDate: Date | null = null;
+      Object.keys(dailyLogs).forEach(dateStr => {
+        const logDate = new Date(dateStr);
+        if (!firstLoggedDate || logDate < firstLoggedDate) {
+          firstLoggedDate = logDate;
+        }
+      });
+      
       for (const task of tasks) {
         if (task.priority === "couldDo" || !task.priority) continue;
         
@@ -767,9 +776,14 @@ export default function Dashboard() {
           const completedDate = new Date(lastCompletedDate);
           completedDate.setHours(0, 0, 0, 0);
           daysMissing = Math.floor((today.getTime() - completedDate.getTime()) / (1000 * 60 * 60 * 24));
+        } else if (firstLoggedDate) {
+          // Never completed - calculate days since user started logging
+          const firstDate = new Date(firstLoggedDate);
+          firstDate.setHours(0, 0, 0, 0);
+          daysMissing = Math.floor((today.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
         } else {
-          // Never completed - show high number
-          daysMissing = 999;
+          // No logs at all - skip this task
+          continue;
         }
         
         if (daysMissing >= threshold) {
@@ -777,7 +791,7 @@ export default function Dashboard() {
             taskId: task.id,
             taskName: task.name,
             priority: task.priority,
-            daysMissing: daysMissing > 999 ? 999 : daysMissing,
+            daysMissing,
             threshold,
           });
         }
