@@ -1079,40 +1079,45 @@ export default function Dashboard() {
       });
 
     // Calculate task penalty rules (penalties for not completing tasks enough times)
-    const taskPenalties: UnifiedBooster[] = tasks
-      .filter(t => t.penaltyRule?.enabled && t.penaltyRule?.timesThreshold !== undefined && t.penaltyRule?.penaltyPoints)
-      .map(t => {
-        const rule = t.penaltyRule!;
-        // Count completions in the current week
-        const periodStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-        let completions = 0;
-        
-        Object.entries(dailyLogs).forEach(([dateStr, log]) => {
-          const logDate = new Date(dateStr);
-          if (logDate >= periodStart && log.completedTaskIds.includes(t.id)) {
-            completions++;
-          }
-        });
-        
-        // Check if penalty is triggered based on condition
-        const isTriggered = rule.condition === "lessThan" 
-          ? completions < rule.timesThreshold
-          : completions > rule.timesThreshold;
-        
-        const conditionText = rule.condition === "lessThan" ? "less than" : "more than";
-        
-        return {
-          id: `task-penalty-${t.id}`,
-          name: t.name,
-          description: `If done ${conditionText} ${rule.timesThreshold}x per week`,
-          points: -rule.penaltyPoints,
-          achieved: isTriggered,
-          progress: completions,
-          required: rule.timesThreshold,
-          period: "week" as const,
-          isNegative: true,
-        };
-      });
+    // Only calculate penalties for past weeks (weekOffset < 0), not the current week
+    const taskPenalties: UnifiedBooster[] = weekOffset < 0 
+      ? tasks
+        .filter(t => t.penaltyRule?.enabled && t.penaltyRule?.timesThreshold !== undefined && t.penaltyRule?.penaltyPoints)
+        .map(t => {
+          const rule = t.penaltyRule!;
+          // Count completions in the viewed week (past week)
+          const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+          const periodStart = addDays(baseWeekStart, weekOffset * 7);
+          const periodEnd = addDays(periodStart, 7);
+          let completions = 0;
+          
+          Object.entries(dailyLogs).forEach(([dateStr, log]) => {
+            const logDate = new Date(dateStr);
+            if (logDate >= periodStart && logDate < periodEnd && log.completedTaskIds.includes(t.id)) {
+              completions++;
+            }
+          });
+          
+          // Check if penalty is triggered based on condition
+          const isTriggered = rule.condition === "lessThan" 
+            ? completions < rule.timesThreshold
+            : completions > rule.timesThreshold;
+          
+          const conditionText = rule.condition === "lessThan" ? "less than" : "more than";
+          
+          return {
+            id: `task-penalty-${t.id}`,
+            name: t.name,
+            description: `If done ${conditionText} ${rule.timesThreshold}x per week`,
+            points: -rule.penaltyPoints,
+            achieved: isTriggered,
+            progress: completions,
+            required: rule.timesThreshold,
+            period: "week" as const,
+            isNegative: true,
+          };
+        })
+      : []; // No penalties for current week - only calculated after week ends
 
     setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties]);
   }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId]);
