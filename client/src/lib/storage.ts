@@ -47,6 +47,13 @@ function saveToStorage<T>(key: string, data: T): void {
   }
 }
 
+// ============ TASK TIERS ============
+export interface StoredTaskTier {
+  id: string;
+  name: string;
+  bonusPoints: number;
+}
+
 // ============ TASKS ============
 export interface StoredTask {
   id: string;
@@ -59,6 +66,7 @@ export interface StoredTask {
   boostPeriod?: "week" | "month";
   boostPoints?: number;
   seasonId?: string;
+  tiers?: StoredTaskTier[];
 }
 
 export function loadTasksFromStorage(): StoredTask[] {
@@ -145,6 +153,7 @@ export interface StoredDailyLog {
   todoPoints?: number; // Points earned from daily todo list
   penaltyPoints?: number; // Negative points from penalties (stored as negative value)
   taskNotes?: Record<string, string>; // Per-task notes (taskId -> note)
+  taskTiers?: Record<string, string>; // Per-task tier selection (taskId -> tierId, empty string for base)
 }
 
 export function loadDailyLogsFromStorage(): Record<string, StoredDailyLog> {
@@ -529,6 +538,7 @@ export interface StoredCircleTask {
   requiresApproval: boolean;
   approvalStatus: ApprovalStatus;
   isPenalty?: boolean;
+  tiers?: StoredTaskTier[];
 }
 
 export interface StoredCircleDailySubmission {
