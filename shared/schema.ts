@@ -1081,6 +1081,7 @@ export const userDailyLogs = pgTable("user_daily_logs", {
   seasonId: varchar("season_id"), // Season active when log was created (for reference)
   notes: text("notes"),
   taskNotes: jsonb("task_notes"), // Per-task notes (taskId -> note string)
+  taskTiers: jsonb("task_tiers"), // Per-task selected tiers (taskId -> tierId string)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
