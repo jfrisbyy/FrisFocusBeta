@@ -32,12 +32,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, X, Layers } from "lucide-react";
+import { Plus, X, Layers, ChevronRight } from "lucide-react";
 import BoosterRuleConfig, { defaultBoosterRule } from "./BoosterRuleConfig";
 import PenaltyRuleConfig, { defaultPenaltyRule } from "./PenaltyRuleConfig";
 import type { BoosterRule } from "./BoosterRuleConfig";
 import type { TaskPriority, PenaltyRule } from "@shared/schema";
-import type { StoredTaskTier } from "@/lib/storage";
+import type { StoredTaskTier, StoredTaskTierBoosterRule } from "@/lib/storage";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, Zap } from "lucide-react";
 
 const taskFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -137,6 +139,13 @@ export default function TaskForm({
 
   const taskName = form.watch("name");
 
+  const defaultTierBoosterRule: StoredTaskTierBoosterRule = {
+    enabled: false,
+    timesRequired: 3,
+    period: "week",
+    bonusPoints: 10,
+  };
+
   const addTier = () => {
     const newTier: StoredTaskTier = {
       id: `tier-${Date.now()}`,
@@ -146,9 +155,15 @@ export default function TaskForm({
     setTiers([...tiers, newTier]);
   };
 
-  const updateTier = (index: number, field: keyof StoredTaskTier, value: string | number) => {
+  const updateTier = (index: number, field: keyof StoredTaskTier, value: string | number | StoredTaskTierBoosterRule | undefined) => {
     const updated = [...tiers];
     updated[index] = { ...updated[index], [field]: value };
+    setTiers(updated);
+  };
+
+  const updateTierBooster = (index: number, boosterRule: StoredTaskTierBoosterRule | undefined) => {
+    const updated = [...tiers];
+    updated[index] = { ...updated[index], boosterRule };
     setTiers(updated);
   };
 
@@ -303,34 +318,89 @@ export default function TaskForm({
                       Add higher achievement levels for bonus points (e.g., 15k steps for +5 pts)
                     </p>
                     {tiers.map((tier, index) => (
-                      <div key={tier.id} className="flex items-center gap-2">
-                        <Input
-                          placeholder={`Tier ${index + 1} name (e.g., 15k steps)`}
-                          value={tier.name}
-                          onChange={(e) => updateTier(index, "name", e.target.value)}
-                          className="flex-1"
-                          data-testid={`input-tier-name-${index}`}
-                        />
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">+</span>
+                      <div key={tier.id} className="space-y-2 border rounded-md p-3">
+                        <div className="flex items-center gap-2">
                           <Input
-                            type="number"
-                            value={tier.bonusPoints}
-                            onChange={(e) => updateTier(index, "bonusPoints", parseInt(e.target.value) || 0)}
-                            className="w-16"
-                            data-testid={`input-tier-bonus-${index}`}
+                            placeholder={`Tier ${index + 1} name (e.g., 15k steps)`}
+                            value={tier.name}
+                            onChange={(e) => updateTier(index, "name", e.target.value)}
+                            className="flex-1"
+                            data-testid={`input-tier-name-${index}`}
                           />
-                          <span className="text-xs text-muted-foreground">pts</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">+</span>
+                            <Input
+                              type="number"
+                              value={tier.bonusPoints}
+                              onChange={(e) => updateTier(index, "bonusPoints", parseInt(e.target.value) || 0)}
+                              className="w-16"
+                              data-testid={`input-tier-bonus-${index}`}
+                            />
+                            <span className="text-xs text-muted-foreground">pts</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeTier(index)}
+                            data-testid={`button-remove-tier-${index}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeTier(index)}
-                          data-testid={`button-remove-tier-${index}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2 pt-1">
+                          <Switch
+                            checked={tier.boosterRule?.enabled || false}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                updateTierBooster(index, { ...defaultTierBoosterRule, enabled: true });
+                              } else {
+                                updateTierBooster(index, undefined);
+                              }
+                            }}
+                            data-testid={`switch-tier-booster-${index}`}
+                          />
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Zap className="h-3 w-3" />
+                            Tier Booster
+                          </Label>
+                        </div>
+                        {tier.boosterRule?.enabled && (
+                          <div className="flex flex-wrap items-center gap-2 text-xs pl-1">
+                            <span className="text-muted-foreground">If hit</span>
+                            <Input
+                              type="number"
+                              value={tier.boosterRule.timesRequired}
+                              onChange={(e) => updateTierBooster(index, { ...tier.boosterRule!, timesRequired: parseInt(e.target.value) || 1 })}
+                              className="w-14 h-7 text-xs"
+                              min={1}
+                              data-testid={`input-tier-booster-times-${index}`}
+                            />
+                            <span className="text-muted-foreground">times per</span>
+                            <Select
+                              value={tier.boosterRule.period}
+                              onValueChange={(val) => updateTierBooster(index, { ...tier.boosterRule!, period: val as "week" | "month" })}
+                            >
+                              <SelectTrigger className="w-20 h-7 text-xs" data-testid={`select-tier-booster-period-${index}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="week">week</SelectItem>
+                                <SelectItem value="month">month</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <span className="text-muted-foreground">earn</span>
+                            <Input
+                              type="number"
+                              value={tier.boosterRule.bonusPoints}
+                              onChange={(e) => updateTierBooster(index, { ...tier.boosterRule!, bonusPoints: parseInt(e.target.value) || 1 })}
+                              className="w-14 h-7 text-xs"
+                              min={1}
+                              data-testid={`input-tier-booster-bonus-${index}`}
+                            />
+                            <span className="text-muted-foreground">bonus pts</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                     <Button

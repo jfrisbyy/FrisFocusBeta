@@ -59,6 +59,7 @@ export const taskTierSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   bonusPoints: z.number().int().min(1),
+  boosterRule: boosterRuleSchema.optional(),
 });
 export type TaskTier = z.infer<typeof taskTierSchema>;
 

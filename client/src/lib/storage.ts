@@ -48,10 +48,18 @@ function saveToStorage<T>(key: string, data: T): void {
 }
 
 // ============ TASK TIERS ============
+export interface StoredTaskTierBoosterRule {
+  enabled: boolean;
+  timesRequired: number;
+  period: "week" | "month";
+  bonusPoints: number;
+}
+
 export interface StoredTaskTier {
   id: string;
   name: string;
   bonusPoints: number;
+  boosterRule?: StoredTaskTierBoosterRule;
 }
 
 // ============ TASKS ============
