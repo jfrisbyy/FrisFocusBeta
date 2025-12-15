@@ -3572,9 +3572,17 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
         return res.status(403).json({ error: "Not authorized to update this task" });
       }
 
-      const { name, value, category, taskType, requiresApproval } = req.body;
+      const { name, value, category, taskType, requiresApproval, tiers } = req.body;
+      // Build update data, only including tiers if explicitly provided
+      const updateData: Record<string, any> = { name, value, category, taskType, requiresApproval };
+      if (tiers !== undefined) {
+        const tiersValidation = insertCircleTaskSchema.pick({ tiers: true }).safeParse({ tiers });
+        if (tiersValidation.success) {
+          updateData.tiers = tiersValidation.data.tiers ?? null;
+        }
+      }
       const [task] = await db.update(circleTasks)
-        .set({ name, value, category, taskType, requiresApproval })
+        .set(updateData)
         .where(eq(circleTasks.id, taskId))
         .returning();
       res.json(task);

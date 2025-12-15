@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Sparkles, Plus, Trash2, Shuffle, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
+import { Settings, Sparkles, Plus, Trash2, Shuffle, ChevronUp, ChevronDown, GripVertical, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -74,6 +74,23 @@ export default function DashboardSettingsDialog({
 }: DashboardSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("welcome");
+  const [isLightMode, setIsLightMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("theme");
+      return stored === "light";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    }
+  }, [isLightMode]);
 
   const [nameInput, setNameInput] = useState(welcomeSettings.userName);
   const [messageInput, setMessageInput] = useState(welcomeSettings.message);
@@ -197,10 +214,11 @@ export default function DashboardSettingsDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="welcome" data-testid="tab-welcome">Welcome</TabsTrigger>
             <TabsTrigger value="cards" data-testid="tab-cards">Cards</TabsTrigger>
             <TabsTrigger value="order" data-testid="tab-order">Order</TabsTrigger>
+            <TabsTrigger value="appearance" data-testid="tab-appearance">Theme</TabsTrigger>
           </TabsList>
 
           <TabsContent value="welcome" className="flex-1 overflow-auto mt-4">
@@ -462,6 +480,26 @@ export default function DashboardSettingsDialog({
                   ))}
                 </div>
               </ScrollArea>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="appearance" className="flex-1 overflow-auto mt-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50">
+                <div className="space-y-0.5">
+                  <Label htmlFor="toggle-theme" className="text-sm font-medium flex items-center gap-2">
+                    {isLightMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    Light Mode
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Switch between dark and light themes</p>
+                </div>
+                <Switch
+                  id="toggle-theme"
+                  checked={isLightMode}
+                  onCheckedChange={setIsLightMode}
+                  data-testid="switch-light-mode"
+                />
+              </div>
             </div>
           </TabsContent>
         </Tabs>

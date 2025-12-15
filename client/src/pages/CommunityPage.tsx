@@ -5022,22 +5022,24 @@ export default function CommunityPage() {
   };
 
   const getSelectedCircleTaskTier = (circleId: string, taskId: string): string => {
-    return circleTaskTiers[circleId]?.[taskId] || "";
+    return circleTaskTiers[circleId]?.[taskId] || "base";
   };
 
   const setSelectedCircleTaskTier = (circleId: string, taskId: string, tierId: string) => {
+    // Normalize "base" to empty string for storage (base tier = no tier selected)
+    const normalizedTierId = tierId === "base" ? "" : tierId;
     setCircleTaskTiers(prev => ({
       ...prev,
       [circleId]: {
         ...(prev[circleId] || {}),
-        [taskId]: tierId
+        [taskId]: normalizedTierId
       }
     }));
   };
 
   const getCircleTaskTotalPoints = (task: StoredCircleTask, tierId: string): number => {
     let points = task.value;
-    if (tierId && task.tiers) {
+    if (tierId && tierId !== "base" && task.tiers) {
       const tier = task.tiers.find(t => t.id === tierId);
       if (tier) {
         points += tier.bonusPoints;
@@ -8001,7 +8003,7 @@ export default function CommunityPage() {
                                             <SelectValue placeholder="Select tier" />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            <SelectItem value="">Base ({task.value} pts)</SelectItem>
+                                            <SelectItem value="base">Base ({task.value} pts)</SelectItem>
                                             {task.tiers!.map((tier) => (
                                               <SelectItem key={tier.id} value={tier.id}>
                                                 {tier.name} (+{tier.bonusPoints} pts)
@@ -8123,7 +8125,7 @@ export default function CommunityPage() {
                                             <SelectValue placeholder="Select tier" />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            <SelectItem value="">Base ({task.value} pts)</SelectItem>
+                                            <SelectItem value="base">Base ({task.value} pts)</SelectItem>
                                             {task.tiers!.map((tier) => (
                                               <SelectItem key={tier.id} value={tier.id}>
                                                 {tier.name} (+{tier.bonusPoints} pts)
