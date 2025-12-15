@@ -564,6 +564,21 @@ export default function Dashboard() {
     },
   });
 
+  // Ref to track last FP bonus check (to prevent duplicate calls)
+  const lastFpBonusCheckRef = useRef<string | null>(null);
+
+  // Mutation for checking and awarding FP bonuses (Task Master, Over Achiever)
+  const checkFpBonusesMutation = useMutation({
+    mutationFn: async (data: { taskCount: number; weeklyTotal: number; weeklyGoal: number }) => {
+      const response = await apiRequest("POST", "/api/fp/check-weekly-bonuses", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      // Refresh FP total after awarding
+      queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
+    },
+  });
+
   // Load data from localStorage on mount or when API data changes
   useEffect(() => {
     // Use mock data during demo/onboarding, otherwise load from storage
@@ -1119,34 +1134,10 @@ export default function Dashboard() {
         })
       : []; // No penalties for current week - only calculated after week ends
 
-    // Task 4: +10 FP bonus for having at least 10 tasks
-    const taskCountBonus: UnifiedBooster | null = tasks.length >= 10 ? {
-      id: "bonus-10-tasks",
-      name: "Task Master",
-      description: "Added at least 10 tasks",
-      points: 10,
-      achieved: true,
-      isNegative: false,
-    } : null;
-
-    // Task 5: +10 FP bonus for achieving 15% above weekly goal (current week only)
-    // Use currentWeekDays which matches the displayed week total
-    const displayedWeekTotal = currentWeekDays.reduce((sum, d) => sum + (d.points || 0), 0);
-    // Weekly goal is a separate user setting (NOT tied to seasons) - use apiSettings or localStorage only
+    // Task Master and Over Achiever bonuses now award FP instead of weekly points
+    // They are handled separately via the /api/fp/check-weekly-bonuses endpoint
     
-    const overAchieverBonus: UnifiedBooster | null = (weekOffset === 0 && weeklyGoalValue > 0 && displayedWeekTotal >= weeklyGoalValue * 1.15) ? {
-      id: "bonus-over-achiever",
-      name: "Over Achiever",
-      description: "15% above weekly goal",
-      points: 10,
-      achieved: true,
-      isNegative: false,
-    } : null;
-
-    // Combine all boosters, filtering out null values
-    const additionalBonuses = [taskCountBonus, overAchieverBonus].filter(Boolean) as UnifiedBooster[];
-    
-    setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties, ...additionalBonuses]);
+    setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties]);
   }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId]);
 
   const baseWeekStartForRange = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -1213,6 +1204,38 @@ export default function Dashboard() {
     lastSyncedStatsRef.current = payloadKey;
     syncStatsMutation.mutate(payload);
   }, [useMockData, apiQueriesReady, finalTotal, dayStreak, weekStreak, longestDayStreak, longestWeekStreak, badges]);
+
+  // Check and award FP bonuses (Task Master, Over Achiever) - once per week
+  useEffect(() => {
+    if (useMockData) return;
+    if (!apiQueriesReady) return;
+    if (weekOffset !== 0) return; // Only check for current week
+    
+    // Get tasks from active season or API
+    const tasks = activeSeason && activeSeasonData?.tasks 
+      ? activeSeasonData.tasks 
+      : (apiTasks || []);
+    
+    // Create a key to detect changes and prevent duplicate calls
+    const bonusCheckKey = `${currentWeekId}-${tasks.length}-${weekTotal}-${weeklyGoal}`;
+    
+    if (lastFpBonusCheckRef.current === bonusCheckKey) {
+      return;
+    }
+    
+    // Check if conditions are met for either bonus
+    const hasTaskMaster = tasks.length >= 10;
+    const hasOverAchiever = weeklyGoal > 0 && weekTotal >= weeklyGoal * 1.15;
+    
+    if (hasTaskMaster || hasOverAchiever) {
+      lastFpBonusCheckRef.current = bonusCheckKey;
+      checkFpBonusesMutation.mutate({
+        taskCount: tasks.length,
+        weeklyTotal: weekTotal,
+        weeklyGoal: weeklyGoal,
+      });
+    }
+  }, [useMockData, apiQueriesReady, weekOffset, currentWeekId, weekTotal, weeklyGoal, activeSeason, activeSeasonData, apiTasks]);
 
   const handleDayClick = () => {
     navigate("/daily");

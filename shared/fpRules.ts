@@ -337,6 +337,16 @@ export const fpRules: Record<FpEventType, FpRule> = {
     fpAmount: 10,
     description: "Created your first circle",
   },
+  task_master: {
+    eventType: "task_master",
+    fpAmount: 10,
+    description: "Task Master: Created 10+ tasks",
+  },
+  over_achiever: {
+    eventType: "over_achiever",
+    fpAmount: 10,
+    description: "Over Achiever: Exceeded weekly goal by 15%",
+  },
 };
 
 export function getFpRule(eventType: FpEventType): FpRule {

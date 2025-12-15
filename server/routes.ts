@@ -6711,6 +6711,90 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     }
   });
 
+  // Check and award weekly FP bonuses (Task Master, Over Achiever)
+  // Server verifies eligibility from database to prevent forged requests
+  app.post("/api/fp/check-weekly-bonuses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const { awardFp } = await import("./fpService");
+      const results: any[] = [];
+      
+      // Get task count from database (check active season first, then regular tasks)
+      const activeSeasonResult = await db.select()
+        .from(userSeasons)
+        .where(and(eq(userSeasons.userId, userId), eq(userSeasons.isActive, true), eq(userSeasons.isArchived, false)))
+        .limit(1);
+      
+      let serverTaskCount = 0;
+      if (activeSeasonResult.length > 0 && activeSeasonResult[0].tasks) {
+        serverTaskCount = (activeSeasonResult[0].tasks as any[]).length;
+      } else {
+        const taskCountResult = await db.select({ count: sql<number>`count(*)` })
+          .from(userHabitTasks)
+          .where(eq(userHabitTasks.userId, userId));
+        serverTaskCount = Number(taskCountResult[0]?.count || 0);
+      }
+      
+      // Get weekly goal from settings
+      const settingsResult = await db.select({ weeklyGoal: userHabitSettings.weeklyGoal })
+        .from(userHabitSettings)
+        .where(eq(userHabitSettings.userId, userId))
+        .limit(1);
+      const serverWeeklyGoal = settingsResult[0]?.weeklyGoal || 0;
+      
+      // Calculate current week's total from daily logs
+      const today = new Date();
+      const dayOfWeek = today.getDay();
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const weekStart = new Date(today);
+      weekStart.setDate(weekStart.getDate() + diff);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      
+      const logsResult = await db.select({
+        taskPoints: userDailyLogs.taskPoints,
+        todoPoints: userDailyLogs.todoPoints,
+        penaltyPoints: userDailyLogs.penaltyPoints
+      })
+        .from(userDailyLogs)
+        .where(and(
+          eq(userDailyLogs.userId, userId),
+          gte(userDailyLogs.date, weekStartStr),
+          sql`${userDailyLogs.date} < ${weekEndStr}`
+        ));
+      
+      const serverWeeklyTotal = logsResult.reduce((sum, log) => {
+        return sum + (log.taskPoints || 0) + (log.todoPoints || 0) + (log.penaltyPoints || 0);
+      }, 0);
+      
+      // Task Master: Award +10 FP when user has 10+ tasks (once per week)
+      if (serverTaskCount >= 10) {
+        const taskMasterResult = await awardFp(userId, "task_master", { checkDuplicate: true });
+        if (taskMasterResult.success) {
+          results.push(taskMasterResult);
+        }
+      }
+      
+      // Over Achiever: Award +10 FP when week total >= goal * 1.15 (once per week)
+      if (serverWeeklyGoal > 0 && serverWeeklyTotal >= serverWeeklyGoal * 1.15) {
+        const overAchieverResult = await awardFp(userId, "over_achiever", { checkDuplicate: true });
+        if (overAchieverResult.success) {
+          results.push(overAchieverResult);
+        }
+      }
+      
+      res.json({ success: true, awards: results });
+    } catch (error) {
+      console.error("Error checking weekly FP bonuses:", error);
+      res.status(500).json({ error: "Failed to check weekly bonuses" });
+    }
+  });
+
   // ==================== GITHUB ROUTES ====================
 
   // Get GitHub authenticated user

@@ -125,7 +125,7 @@ async function checkDuplicateAward(
     return existing.length > 0;
   }
 
-  const weeklyEvents: FpEventType[] = ["hit_weekly_goal", "no_penalties_week"];
+  const weeklyEvents: FpEventType[] = ["hit_weekly_goal", "no_penalties_week", "task_master", "over_achiever"];
   
   if (weeklyEvents.includes(eventType)) {
     const startOfWeek = new Date(today);
