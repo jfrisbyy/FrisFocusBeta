@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DatePicker from "@/components/DatePicker";
@@ -93,6 +93,9 @@ export default function DailyPage() {
   const [taskTiers, setTaskTiers] = useState<Record<string, string>>({});
   const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // Track which date we've already loaded log data for to prevent re-running
+  const loadedLogDateRef = useRef<string | null>(null);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
@@ -265,6 +268,11 @@ export default function DailyPage() {
     }
   }, [isDemo, apiTasks, apiPenalties, apiCategories, apiQueriesReady, activeSeason, activeSeasonData]);
 
+  // Reset the loaded log date ref when date changes
+  useEffect(() => {
+    loadedLogDateRef.current = null;
+  }, [dateStr]);
+
   // Load daily log from API or localStorage when date changes
   useEffect(() => {
     if (isDemo) return;
@@ -273,6 +281,12 @@ export default function DailyPage() {
     if (!dailyLogFetched) {
       return;
     }
+
+    // Only load once per date to prevent race conditions from resetting state
+    if (loadedLogDateRef.current === dateStr) {
+      return;
+    }
+    loadedLogDateRef.current = dateStr;
 
     // If we have API data for this date, use it
     if (apiDailyLog) {
