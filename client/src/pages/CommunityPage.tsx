@@ -3133,6 +3133,8 @@ export default function CommunityPage() {
   const [editTaskName, setEditTaskName] = useState("");
   const [editTaskValue, setEditTaskValue] = useState("10");
   const [editTaskType, setEditTaskType] = useState<CircleTaskType>("per_person");
+  const [editTaskTiersEnabled, setEditTaskTiersEnabled] = useState(false);
+  const [editTaskTiers, setEditTaskTiers] = useState<StoredTaskTier[]>([]);
 
   const [editingBadge, setEditingBadge] = useState<CircleBadge | null>(null);
   const [editBadgeName, setEditBadgeName] = useState("");
