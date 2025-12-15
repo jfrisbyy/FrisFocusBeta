@@ -1,15 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Save, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
+
+interface CompletedTask {
+  id: string;
+  name: string;
+  value: number;
+}
 
 interface DailySummaryProps {
   positivePoints: number;
   negativePoints: number;
   todoPoints?: number;
   checkInBonus?: number;
+  completedTasks?: CompletedTask[];
   notes: string;
   onNotesChange: (notes: string) => void;
   onSave: () => void;
@@ -21,12 +28,14 @@ export default function DailySummary({
   negativePoints,
   todoPoints = 0,
   checkInBonus = 0,
+  completedTasks = [],
   notes,
   onNotesChange,
   onSave,
   isSaving,
 }: DailySummaryProps) {
   const netTotal = positivePoints + negativePoints + todoPoints + checkInBonus;
+  const positiveTasks = completedTasks.filter(t => t.value > 0);
 
   return (
     <Card className="sticky top-20">
@@ -42,6 +51,17 @@ export default function DailySummary({
             <span className="text-muted-foreground">Tasks</span>
             <span className="font-mono font-semibold text-chart-1">+{positivePoints}</span>
           </div>
+          {positiveTasks.length > 0 && (
+            <div className="pl-2 space-y-1">
+              {positiveTasks.map(task => (
+                <div key={task.id} className="flex items-center gap-2 text-xs text-muted-foreground" data-testid={`completed-task-${task.id}`}>
+                  <Check className="h-3 w-3 text-chart-1 flex-shrink-0" />
+                  <span className="truncate">{task.name}</span>
+                  <span className="font-mono text-chart-1 ml-auto flex-shrink-0">+{task.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {todoPoints > 0 && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">To-Do List</span>

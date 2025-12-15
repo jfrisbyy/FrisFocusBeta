@@ -646,6 +646,7 @@ export default function DailyPage() {
             negativePoints={negativePoints}
             todoPoints={totalTodoPoints}
             checkInBonus={apiDailyLog?.checkInBonusAwarded ? 3 : 0}
+            completedTasks={allTasks.filter(t => completedIds.has(t.id)).map(t => ({ id: t.id, name: t.name, value: t.value }))}
             notes={notes}
             onNotesChange={setNotes}
             onSave={handleSave}
