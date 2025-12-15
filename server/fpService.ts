@@ -456,7 +456,7 @@ export async function getWeeklyGoalStreak(userId: string): Promise<number> {
   return streak;
 }
 
-export async function getNoPenaltyStreak(userId: string): Promise<number> {
+export async function getNoPenaltyStreak(userId: string, excludeCurrentWeek: boolean = false): Promise<number> {
   const thirtyWeeksAgo = new Date();
   thirtyWeeksAgo.setDate(thirtyWeeksAgo.getDate() - 210);
   
@@ -470,9 +470,15 @@ export async function getNoPenaltyStreak(userId: string): Promise<number> {
   
   if (logs.length === 0) return 0;
   
+  const currentWeekStart = formatDateString(getStartOfWeek(new Date()));
+  
   const weekPenalties = new Map<string, number>();
   for (const log of logs) {
     const weekStart = formatDateString(getStartOfWeek(new Date(log.date)));
+    // Skip current week if excludeCurrentWeek is true (for awarding FP - only count completed weeks)
+    if (excludeCurrentWeek && weekStart === currentWeekStart) {
+      continue;
+    }
     weekPenalties.set(weekStart, (weekPenalties.get(weekStart) || 0) + Math.abs(log.penaltyPoints || 0));
   }
   
@@ -481,12 +487,18 @@ export async function getNoPenaltyStreak(userId: string): Promise<number> {
   
   if (sortedWeeks.length === 0) return 0;
   
-  const currentWeekStart = formatDateString(getStartOfWeek(new Date()));
   const lastWeekStart = formatDateString(getStartOfWeek(new Date(Date.now() - 7 * 86400000)));
   
   const mostRecentWeek = sortedWeeks[0][0];
-  if (mostRecentWeek !== currentWeekStart && mostRecentWeek !== lastWeekStart) {
-    return 0;
+  // When excluding current week, most recent should be last week; otherwise current or last week
+  if (excludeCurrentWeek) {
+    if (mostRecentWeek !== lastWeekStart) {
+      return 0;
+    }
+  } else {
+    if (mostRecentWeek !== currentWeekStart && mostRecentWeek !== lastWeekStart) {
+      return 0;
+    }
   }
   
   let streak = 0;
@@ -621,7 +633,8 @@ export async function awardWeeklyGoalStreakMilestones(userId: string): Promise<F
 }
 
 export async function awardNoPenaltyStreakMilestones(userId: string): Promise<FpAwardResult[]> {
-  const streak = await getNoPenaltyStreak(userId);
+  // Only count completed weeks when awarding FP (excludeCurrentWeek = true)
+  const streak = await getNoPenaltyStreak(userId, true);
   const results: FpAwardResult[] = [];
   
   for (const milestone of noPenaltyStreakMilestones) {
