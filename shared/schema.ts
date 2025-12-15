@@ -769,6 +769,7 @@ export const circleTasks = pgTable("circle_tasks", {
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   requiresApproval: boolean("requires_approval").default(false),
   approvalStatus: varchar("approval_status").notNull().default("approved"), // "approved", "pending", "rejected"
+  isPenalty: boolean("is_penalty").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

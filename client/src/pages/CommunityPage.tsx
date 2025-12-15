@@ -2508,6 +2508,7 @@ export default function CommunityPage() {
   const [newTaskValue, setNewTaskValue] = useState("10");
   const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
   const [newTaskNote, setNewTaskNote] = useState("");
+  const [newTaskIsPenalty, setNewTaskIsPenalty] = useState(false);
   const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>({});
   
   // Request Edit Task state (for regular members)
@@ -4111,24 +4112,30 @@ export default function CommunityPage() {
     if (!selectedCircle || !newTaskName.trim()) return;
     const canApproveInstantly = isOwnerOrAdmin(selectedCircle.id);
     
+    // Calculate the actual value (negative if penalty)
+    const baseValue = parseInt(newTaskValue) || 10;
+    const actualValue = newTaskIsPenalty ? -Math.abs(baseValue) : Math.abs(baseValue);
+    
     // Use API for non-demo mode
     if (!isDemo) {
       createCircleTaskMutation.mutate({
         circleId: selectedCircle.id,
         task: {
           name: newTaskName.trim(),
-          value: parseInt(newTaskValue) || 10,
+          value: actualValue,
           taskType: newTaskType,
+          isPenalty: newTaskIsPenalty,
         }
       }, {
         onSuccess: () => {
-          toast({ title: "Task added" });
+          toast({ title: newTaskIsPenalty ? "Penalty added" : "Task added" });
         }
       });
       setShowAddTask(false);
       setNewTaskName("");
       setNewTaskValue("10");
       setNewTaskType("per_person");
+      setNewTaskIsPenalty(false);
       return;
     }
     
@@ -4137,15 +4144,16 @@ export default function CommunityPage() {
         id: `ct-${Date.now()}`,
         circleId: selectedCircle.id,
         name: newTaskName.trim(),
-        value: parseInt(newTaskValue) || 10,
+        value: actualValue,
         taskType: newTaskType,
         createdById: "you",
         requiresApproval: false,
         approvalStatus: "approved",
+        isPenalty: newTaskIsPenalty,
       };
       const current = circleTasks[selectedCircle.id] || [];
       setCircleTasks({ ...circleTasks, [selectedCircle.id]: [...current, newTask] });
-      toast({ title: "Task added" });
+      toast({ title: newTaskIsPenalty ? "Penalty added" : "Task added" });
     } else {
       const request: StoredCircleTaskAdjustmentRequest = {
         id: `req-${Date.now()}`,
@@ -4153,14 +4161,14 @@ export default function CommunityPage() {
         requesterId: "you",
         requesterName: "You",
         type: "add",
-        taskData: { name: newTaskName.trim(), value: parseInt(newTaskValue) || 10, taskType: newTaskType },
+        taskData: { name: newTaskName.trim(), value: actualValue, taskType: newTaskType, isPenalty: newTaskIsPenalty },
         status: "pending",
         createdAt: new Date().toISOString(),
         note: newTaskNote.trim() || undefined,
         votes: [],
       };
       setTaskRequests([...taskRequests, request]);
-      toast({ title: "Task request submitted", description: "Waiting for owner/admin approval" });
+      toast({ title: "Request submitted", description: "Waiting for owner/admin approval" });
     }
     
     setShowAddTask(false);
@@ -4168,6 +4176,7 @@ export default function CommunityPage() {
     setNewTaskValue("10");
     setNewTaskType("per_person");
     setNewTaskNote("");
+    setNewTaskIsPenalty(false);
   };
 
   const handleApproveRequest = async (requestId: string) => {
@@ -7633,6 +7642,19 @@ export default function CommunityPage() {
                                   </SelectContent>
                                 </Select>
                               </div>
+                              <div className="flex items-center justify-between gap-2 py-2">
+                                <div className="space-y-0.5">
+                                  <Label>Penalty</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    Mark this as a penalty (deducts points)
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={newTaskIsPenalty}
+                                  onCheckedChange={setNewTaskIsPenalty}
+                                  data-testid="switch-task-penalty"
+                                />
+                              </div>
                               {!isOwnerOrAdmin(selectedCircle.id) && (
                                 <div className="space-y-2">
                                   <Label>Note (Optional)</Label>
@@ -7649,7 +7671,9 @@ export default function CommunityPage() {
                             <DialogFooter>
                               <Button variant="outline" onClick={() => setShowAddTask(false)}>Cancel</Button>
                               <Button onClick={handleAddTask} data-testid="button-submit-task">
-                                {isOwnerOrAdmin(selectedCircle.id) ? "Add Task" : "Submit Request"}
+                                {isOwnerOrAdmin(selectedCircle.id) 
+                                  ? (newTaskIsPenalty ? "Add Penalty" : "Add Task") 
+                                  : "Submit Request"}
                               </Button>
                             </DialogFooter>
                           </DialogContent>

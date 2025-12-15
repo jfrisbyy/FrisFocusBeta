@@ -528,6 +528,7 @@ export interface StoredCircleTask {
   createdById: string;
   requiresApproval: boolean;
   approvalStatus: ApprovalStatus;
+  isPenalty?: boolean;
 }
 
 export interface StoredCircleDailySubmission {
