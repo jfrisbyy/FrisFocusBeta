@@ -267,25 +267,16 @@ export default function DailyPage() {
 
   // Load daily log from API or localStorage when date changes
   useEffect(() => {
-    console.log('[DailyPage] Log effect triggered', { 
-      isDemo, dailyLogFetched, 
-      hasApiDailyLog: !!apiDailyLog,
-      completedCount: apiDailyLog?.completedTaskIds?.length,
-      dateStr 
-    });
-    
     if (isDemo) return;
 
     // Wait for the daily log query to complete before deciding data source
     if (!dailyLogFetched) {
-      console.log('[DailyPage] Waiting for log to fetch');
       return;
     }
 
     // If we have API data for this date, use it
     if (apiDailyLog) {
       const savedIds = apiDailyLog.completedTaskIds || [];
-      console.log('[DailyPage] Setting completedIds from API:', savedIds.length, 'tasks', savedIds);
       setCompletedIds(new Set(savedIds));
       setSavedCompletedIds(savedIds);
       setNotes(apiDailyLog.notes || "");
@@ -293,7 +284,6 @@ export default function DailyPage() {
       setTaskTiers(apiDailyLog.taskTiers || {});
     } else {
       // API returned null (no log for this date) - start fresh
-      console.log('[DailyPage] No log data for date, resetting completedIds');
       setCompletedIds(new Set());
       setSavedCompletedIds([]);
       setNotes("");
