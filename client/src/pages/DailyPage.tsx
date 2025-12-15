@@ -27,6 +27,7 @@ import {
   type StoredPenalty,
   type StoredJournalEntry,
   type StoredTodoItem,
+  type StoredTaskTier,
 } from "@/lib/storage";
 
 interface DisplayTask {
@@ -35,6 +36,7 @@ interface DisplayTask {
   value: number;
   category: string;
   isBooster?: boolean;
+  tiers?: StoredTaskTier[];
 }
 
 const sampleTasks: DisplayTask[] = [
@@ -88,6 +90,7 @@ export default function DailyPage() {
   const [todoBonusPoints, setTodoBonusPoints] = useState(10);
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
   const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
+  const [taskTiers, setTaskTiers] = useState<Record<string, string>>({});
   const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -140,7 +143,7 @@ export default function DailyPage() {
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
-    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number; taskPoints: number; seasonId: string | null; taskNotes: Record<string, string> }) => {
+    mutationFn: async (data: { date: string; completedTaskIds: string[]; notes: string; todoPoints: number; penaltyPoints: number; taskPoints: number; seasonId: string | null; taskNotes: Record<string, string>; taskTiers: Record<string, string> }) => {
       const response = await apiRequest("PUT", `/api/habit/logs/${data.date}`, {
         completedTaskIds: data.completedTaskIds,
         notes: data.notes,
@@ -149,6 +152,7 @@ export default function DailyPage() {
         taskPoints: data.taskPoints,
         seasonId: data.seasonId,
         taskNotes: data.taskNotes,
+        taskTiers: data.taskTiers,
       });
       return response.json();
     },
@@ -196,6 +200,7 @@ export default function DailyPage() {
         value: task.value,
         category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
         isBooster: !!task.boosterRule,
+        tiers: task.tiers,
       }));
 
       const penaltyItems: DisplayTask[] = activeSeasonData.penalties.map((penalty: any) => ({
@@ -221,6 +226,7 @@ export default function DailyPage() {
         value: task.value,
         category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
         isBooster: task.boostEnabled,
+        tiers: task.tiers,
       }));
 
       const penaltyItems: DisplayTask[] = (apiPenalties || []).map((penalty: any) => ({
@@ -245,6 +251,7 @@ export default function DailyPage() {
         value: task.value,
         category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
         isBooster: task.boostEnabled,
+        tiers: task.tiers,
       }));
 
       const penaltyItems: DisplayTask[] = storedPenalties.map((penalty: StoredPenalty) => ({
@@ -274,12 +281,14 @@ export default function DailyPage() {
       setSavedCompletedIds(savedIds);
       setNotes(apiDailyLog.notes || "");
       setTaskNotes(apiDailyLog.taskNotes || {});
+      setTaskTiers(apiDailyLog.taskTiers || {});
     } else {
       // API returned null (no log for this date) - start fresh
       setCompletedIds(new Set());
       setSavedCompletedIds([]);
       setNotes("");
       setTaskNotes({});
+      setTaskTiers({});
     }
   }, [dateStr, isDemo, apiDailyLog, dailyLogFetched]);
 
@@ -350,9 +359,29 @@ export default function DailyPage() {
     });
   };
 
+  const handleTierChange = (taskId: string, tierId: string | undefined) => {
+    setTaskTiers((prev) => {
+      const next = { ...prev };
+      if (tierId) {
+        next[taskId] = tierId;
+      } else {
+        delete next[taskId];
+      }
+      return next;
+    });
+  };
+
+  // Calculate tier bonus for a task
+  const getTierBonus = (task: DisplayTask): number => {
+    const selectedTierId = taskTiers[task.id];
+    if (!selectedTierId || !task.tiers) return 0;
+    const tier = task.tiers.find(t => t.id === selectedTierId);
+    return tier?.bonusPoints || 0;
+  };
+
   const positivePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value > 0)
-    .reduce((sum, t) => sum + t.value, 0);
+    .reduce((sum, t) => sum + t.value + getTierBonus(t), 0);
 
   const negativePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value < 0)
@@ -466,6 +495,7 @@ export default function DailyPage() {
         taskPoints: computedTaskPoints,
         seasonId: activeSeason?.id || null,
         taskNotes,
+        taskTiers,
       });
 
       // Also save to localStorage as backup (include todoPoints and penaltyPoints)
@@ -476,6 +506,7 @@ export default function DailyPage() {
         todoPoints: totalTodoPoints,
         penaltyPoints: Math.abs(negativePoints),
         taskNotes,
+        taskTiers,
       });
 
       // Update badge progress for completed tasks (only count the difference)
@@ -504,6 +535,7 @@ export default function DailyPage() {
         todoPoints: totalTodoPoints,
         penaltyPoints: Math.abs(negativePoints),
         taskNotes,
+        taskTiers,
       });
       setNotes("");
       toast({
@@ -625,6 +657,9 @@ export default function DailyPage() {
                         onChange={(checked) => handleTaskToggle(task.id, checked)}
                         note={taskNotes?.[task.id]}
                         onNoteChange={(note) => handleTaskNoteChange(task.id, note)}
+                        tiers={task.tiers}
+                        selectedTierId={taskTiers[task.id]}
+                        onTierChange={(tierId) => handleTierChange(task.id, tierId)}
                       />
                     ))}
                   </div>
