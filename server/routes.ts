@@ -106,7 +106,7 @@ import {
   timeBlockSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
-import { and, or, desc, inArray } from "drizzle-orm";
+import { and, or, desc, inArray, gte } from "drizzle-orm";
 import { lt } from "drizzle-orm";
 import { getGitHubUser, listRepositories, createRepository, getRepository, listCommits } from "./github";
 
@@ -6735,17 +6735,23 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
       
       // Get task count from database (check active season first, then regular tasks)
       const activeSeasonResult = await db.select()
-        .from(userSeasons)
-        .where(and(eq(userSeasons.userId, userId), eq(userSeasons.isActive, true), eq(userSeasons.isArchived, false)))
+        .from(seasons)
+        .where(and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false)))
         .limit(1);
       
       let serverTaskCount = 0;
-      if (activeSeasonResult.length > 0 && activeSeasonResult[0].tasks) {
-        serverTaskCount = (activeSeasonResult[0].tasks as any[]).length;
+      if (activeSeasonResult.length > 0) {
+        // Count tasks from the active season's seasonTasks table
+        const seasonId = activeSeasonResult[0].id;
+        const seasonTaskCountResult = await db.select({ count: sql<number>`count(*)` })
+          .from(seasonTasks)
+          .where(eq(seasonTasks.seasonId, seasonId));
+        serverTaskCount = Number(seasonTaskCountResult[0]?.count || 0);
       } else {
+        // Fall back to user's non-season tasks
         const taskCountResult = await db.select({ count: sql<number>`count(*)` })
-          .from(userHabitTasks)
-          .where(eq(userHabitTasks.userId, userId));
+          .from(userTasks)
+          .where(eq(userTasks.userId, userId));
         serverTaskCount = Number(taskCountResult[0]?.count || 0);
       }
       
