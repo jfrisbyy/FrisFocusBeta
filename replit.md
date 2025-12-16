@@ -9,6 +9,8 @@ The application provides three main views:
 - **Daily**: Date-based task completion with real-time point calculations
 - **Tasks**: CRUD interface for managing tasks and configuring custom booster rules
 
+**AI Task Generation**: Users can describe their ideal life and goals for the next 6 months, and the AI generates personalized tasks, penalties, and categories. Available via "Generate with AI" button on the Tasks page when a season is active.
+
 The system emphasizes visual feedback through color-coded point thresholds and progress indicators, motivating users to maintain focus and build lasting habits.
 
 ## User Preferences
@@ -145,6 +147,12 @@ users {
 - Express for HTTP server
 - express-session (installed but unused)
 - nanoid for ID generation
+
+**AI Integration**:
+- OpenAI GPT-4o for intelligent task generation
+- POST /api/ai/generate-tasks endpoint for vision-to-tasks conversion
+- Structured JSON response format with Zod validation
+- AI schemas defined in shared/schema.ts (AIGenerateTasksRequest/Response)
 
 **Testing Attributes**: Component test IDs (data-testid) throughout for potential E2E testing setup.
 

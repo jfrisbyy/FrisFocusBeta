@@ -36,11 +36,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2 } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
-import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season, SeasonWithData, TaskTier } from "@shared/schema";
+import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season, SeasonWithData, TaskTier, AIGenerateTasksResponse, AIGeneratedTask, AIGeneratedPenalty, AIGeneratedCategory } from "@shared/schema";
 
 interface Task {
   id: string;
@@ -168,6 +168,16 @@ export default function TasksPage() {
   const [importCategories, setImportCategories] = useState<string[]>([]);
   const [importPenalties, setImportPenalties] = useState<string[]>([]);
   const [archiveSeasonId, setArchiveSeasonId] = useState<string | null>(null);
+
+  // AI task generation state
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiDialogStep, setAiDialogStep] = useState<"prompt" | "preview">("prompt");
+  const [aiVisionStatement, setAiVisionStatement] = useState("");
+  const [aiTimeAvailability, setAiTimeAvailability] = useState<"minimal" | "moderate" | "dedicated">("moderate");
+  const [aiGeneratedData, setAiGeneratedData] = useState<AIGenerateTasksResponse | null>(null);
+  const [aiSelectedTasks, setAiSelectedTasks] = useState<Set<number>>(new Set());
+  const [aiSelectedPenalties, setAiSelectedPenalties] = useState<Set<number>>(new Set());
+  const [aiSelectedCategories, setAiSelectedCategories] = useState<Set<number>>(new Set());
 
   // Fetch seasons from API (available to all authenticated users)
   const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Season[]>({
@@ -358,6 +368,172 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/habit/penalties"] });
     },
   });
+
+  // AI task generation mutation
+  const generateAiTasksMutation = useMutation({
+    mutationFn: async (data: { visionStatement: string; timeAvailability?: "minimal" | "moderate" | "dedicated"; existingCategories?: string[] }) => {
+      const res = await apiRequest("POST", "/api/ai/generate-tasks", data);
+      return res.json() as Promise<AIGenerateTasksResponse>;
+    },
+    onSuccess: (data) => {
+      setAiGeneratedData(data);
+      setAiSelectedTasks(new Set(data.tasks.map((_, i) => i)));
+      setAiSelectedPenalties(new Set(data.penalties.map((_, i) => i)));
+      setAiSelectedCategories(new Set(data.categories.map((_, i) => i)));
+      setAiDialogStep("preview");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to generate tasks. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleOpenAiDialog = () => {
+    setAiVisionStatement("");
+    setAiTimeAvailability("moderate");
+    setAiGeneratedData(null);
+    setAiDialogStep("prompt");
+    setAiSelectedTasks(new Set());
+    setAiSelectedPenalties(new Set());
+    setAiSelectedCategories(new Set());
+    setAiDialogOpen(true);
+  };
+
+  const handleGenerateWithAi = () => {
+    if (!aiVisionStatement.trim()) return;
+    generateAiTasksMutation.mutate({
+      visionStatement: aiVisionStatement.trim(),
+      timeAvailability: aiTimeAvailability,
+      existingCategories: categories.map(c => c.name),
+    });
+  };
+
+  const handleApplyAiResults = async () => {
+    if (!aiGeneratedData || !activeSeason) return;
+    
+    // Build new data from AI selections
+    const newCategories: Category[] = [];
+    aiSelectedCategories.forEach((idx) => {
+      const cat = aiGeneratedData.categories[idx];
+      if (cat && !categories.some(c => c.name === cat.name)) {
+        newCategories.push({ id: String(Date.now() + Math.random()), name: cat.name });
+      }
+    });
+    
+    const newTasks: Task[] = [];
+    aiSelectedTasks.forEach((idx) => {
+      const task = aiGeneratedData.tasks[idx];
+      if (task) {
+        newTasks.push({
+          id: String(Date.now() + Math.random()),
+          name: task.name,
+          value: task.value,
+          category: task.category,
+          priority: task.priority,
+        });
+      }
+    });
+    
+    const newPenalties: PenaltyItem[] = [];
+    aiSelectedPenalties.forEach((idx) => {
+      const penalty = aiGeneratedData.penalties[idx];
+      if (penalty) {
+        newPenalties.push({
+          id: String(Date.now() + Math.random()),
+          name: penalty.name,
+          value: penalty.value,
+          category: "Penalties",
+          negativeBoostEnabled: false,
+          currentCount: 0,
+          triggered: false,
+        });
+      }
+    });
+    
+    // Update local state
+    const updatedCategories = [...categories, ...newCategories];
+    const updatedTasks = [...tasks, ...newTasks];
+    const updatedPenalties = [...penalties, ...newPenalties];
+    
+    setCategories(updatedCategories);
+    setTasks(updatedTasks);
+    setPenalties(updatedPenalties);
+    
+    // Directly call mutations to persist data (don't rely on auto-save)
+    try {
+      if (newCategories.length > 0) {
+        const categoriesToSave = updatedCategories.map(c => ({ name: c.name }));
+        await saveCategoriesToSeasonMutation.mutateAsync({ seasonId: activeSeason.id, categories: categoriesToSave });
+      }
+      
+      if (newTasks.length > 0) {
+        const tasksToSave = updatedTasks.map(t => ({
+          name: t.name,
+          value: t.value,
+          category: t.category,
+          priority: t.priority,
+          boosterRule: t.boosterRule,
+          penaltyRule: t.penaltyRule,
+          tiers: t.tiers,
+        }));
+        await saveTasksToSeasonMutation.mutateAsync({ seasonId: activeSeason.id, tasks: tasksToSave });
+      }
+      
+      if (newPenalties.length > 0) {
+        const penaltiesToSave = updatedPenalties.map(p => ({
+          name: p.name,
+          value: p.value,
+          negativeBoostEnabled: p.negativeBoostEnabled,
+          timesThreshold: p.timesThreshold,
+          period: p.period,
+          boostPenaltyPoints: p.boostPenaltyPoints,
+        }));
+        await savePenaltiesToSeasonMutation.mutateAsync({ seasonId: activeSeason.id, penalties: penaltiesToSave });
+      }
+      
+      toast({ 
+        title: "Tasks added", 
+        description: `Added ${newTasks.length} tasks, ${newPenalties.length} penalties, and ${newCategories.length} categories from AI suggestions` 
+      });
+    } catch (error) {
+      toast({ 
+        title: "Error saving", 
+        description: "Some items may not have been saved. Please try again.", 
+        variant: "destructive" 
+      });
+    }
+    
+    setAiDialogOpen(false);
+  };
+
+  const toggleAiTask = (idx: number) => {
+    const newSet = new Set(aiSelectedTasks);
+    if (newSet.has(idx)) {
+      newSet.delete(idx);
+    } else {
+      newSet.add(idx);
+    }
+    setAiSelectedTasks(newSet);
+  };
+
+  const toggleAiPenalty = (idx: number) => {
+    const newSet = new Set(aiSelectedPenalties);
+    if (newSet.has(idx)) {
+      newSet.delete(idx);
+    } else {
+      newSet.add(idx);
+    }
+    setAiSelectedPenalties(newSet);
+  };
+
+  const toggleAiCategory = (idx: number) => {
+    const newSet = new Set(aiSelectedCategories);
+    if (newSet.has(idx)) {
+      newSet.delete(idx);
+    } else {
+      newSet.add(idx);
+    }
+    setAiSelectedCategories(newSet);
+  };
 
   const handleOpenCreateSeason = () => {
     setSeasonName("");
@@ -1225,6 +1401,23 @@ export default function TasksPage() {
         </Card>
       </div>
 
+      {activeSeason && !isActiveSeasonArchived && !isDemo && (
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleOpenAiDialog}
+            disabled={generateAiTasksMutation.isPending}
+            data-testid="button-generate-ai"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Generate with AI
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Describe your ideal life and let AI create tasks for you
+          </span>
+        </div>
+      )}
+
       <TaskList
         tasks={tasks}
         onAdd={handleAdd}
@@ -1719,6 +1912,209 @@ export default function TasksPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              {aiDialogStep === "prompt" ? "Generate Tasks with AI" : "Review AI Suggestions"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {aiDialogStep === "prompt" ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="ai-vision">Describe your ideal life for the next 6 months</Label>
+                <Textarea
+                  id="ai-vision"
+                  value={aiVisionStatement}
+                  onChange={(e) => setAiVisionStatement(e.target.value)}
+                  placeholder="Tell me about your goals, the habits you want to build, what success looks like for you, and any specific areas you want to focus on..."
+                  rows={6}
+                  data-testid="input-ai-vision"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Be specific! Mention health goals, career aspirations, relationships, hobbies, spiritual practices, or anything else important to you.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>How much time can you dedicate to daily habits?</Label>
+                <RadioGroup
+                  value={aiTimeAvailability}
+                  onValueChange={(v) => setAiTimeAvailability(v as "minimal" | "moderate" | "dedicated")}
+                  className="flex gap-4 flex-wrap"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="minimal" id="time-minimal" data-testid="radio-time-minimal" />
+                    <Label htmlFor="time-minimal" className="font-normal cursor-pointer">
+                      Minimal (4-6 tasks)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="moderate" id="time-moderate" data-testid="radio-time-moderate" />
+                    <Label htmlFor="time-moderate" className="font-normal cursor-pointer">
+                      Moderate (8-12 tasks)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="dedicated" id="time-dedicated" data-testid="radio-time-dedicated" />
+                    <Label htmlFor="time-dedicated" className="font-normal cursor-pointer">
+                      Dedicated (12-18 tasks)
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleGenerateWithAi}
+                  disabled={!aiVisionStatement.trim() || generateAiTasksMutation.isPending}
+                  data-testid="button-generate-tasks"
+                >
+                  {generateAiTasksMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate Tasks
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : aiGeneratedData ? (
+            <div className="space-y-4 py-2">
+              {aiGeneratedData.seasonTheme && (
+                <div className="bg-muted p-3 rounded-md">
+                  <p className="text-sm font-medium">Suggested Season Theme</p>
+                  <p className="text-lg font-semibold">{aiGeneratedData.seasonTheme}</p>
+                </div>
+              )}
+
+              <p className="text-sm text-muted-foreground">{aiGeneratedData.summary}</p>
+
+              {aiGeneratedData.categories.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Categories</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {aiGeneratedData.categories.map((cat, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs cursor-pointer border ${
+                          aiSelectedCategories.has(idx)
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-secondary border-transparent"
+                        }`}
+                        onClick={() => toggleAiCategory(idx)}
+                        data-testid={`ai-category-${idx}`}
+                      >
+                        <Checkbox checked={aiSelectedCategories.has(idx)} className="h-3 w-3" />
+                        <span>{cat.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {aiGeneratedData.tasks.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Tasks ({aiSelectedTasks.size}/{aiGeneratedData.tasks.length} selected)</Label>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setAiSelectedTasks(new Set(aiGeneratedData.tasks.map((_, i) => i)))}>
+                        Select All
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAiSelectedTasks(new Set())}>
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 max-h-48 overflow-y-auto">
+                    {aiGeneratedData.tasks.map((task, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
+                          aiSelectedTasks.has(idx) ? "bg-secondary border-primary/50" : "border-transparent"
+                        }`}
+                        onClick={() => toggleAiTask(idx)}
+                        data-testid={`ai-task-${idx}`}
+                      >
+                        <Checkbox checked={aiSelectedTasks.has(idx)} className="mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{task.name}</span>
+                            <Badge variant="secondary" className="text-xs">{task.category}</Badge>
+                            <span className="text-xs text-muted-foreground">{task.priority}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-mono text-chart-1">+{task.value} pts</span>
+                            {task.description && (
+                              <span className="text-xs text-muted-foreground">{task.description}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {aiGeneratedData.penalties.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Penalties ({aiSelectedPenalties.size}/{aiGeneratedData.penalties.length} selected)</Label>
+                  </div>
+                  <div className="grid gap-2 max-h-32 overflow-y-auto">
+                    {aiGeneratedData.penalties.map((penalty, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
+                          aiSelectedPenalties.has(idx) ? "bg-secondary border-chart-3/50" : "border-transparent"
+                        }`}
+                        onClick={() => toggleAiPenalty(idx)}
+                        data-testid={`ai-penalty-${idx}`}
+                      >
+                        <Checkbox checked={aiSelectedPenalties.has(idx)} className="mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{penalty.name}</span>
+                            <span className="text-xs font-mono text-chart-3">{penalty.value} pts</span>
+                          </div>
+                          {penalty.description && (
+                            <span className="text-xs text-muted-foreground">{penalty.description}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setAiDialogStep("prompt")}>
+                  Back
+                </Button>
+                <Button
+                  onClick={handleApplyAiResults}
+                  disabled={aiSelectedTasks.size === 0 && aiSelectedPenalties.size === 0 && aiSelectedCategories.size === 0}
+                  data-testid="button-apply-ai-results"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Add {aiSelectedTasks.size} Tasks, {aiSelectedPenalties.size} Penalties
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

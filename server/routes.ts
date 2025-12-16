@@ -104,9 +104,12 @@ import {
   insertUserScheduleTemplateSchema,
   insertUserDailyScheduleSchema,
   timeBlockSchema,
+  aiGenerateTasksRequestSchema,
+  aiGenerateTasksResponseSchema,
+  type AIGenerateTasksResponse,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
-import { and, or, desc, inArray, gte } from "drizzle-orm";
+import { and, or, desc, inArray, gte, sql } from "drizzle-orm";
 import { lt } from "drizzle-orm";
 import { getGitHubUser, listRepositories, createRepository, getRepository, listCommits } from "./github";
 
@@ -865,6 +868,98 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
     } catch (error) {
       console.error("AI insights error:", error);
       res.status(500).json({ error: "Failed to get AI response" });
+    }
+  });
+
+  // AI-powered task generation from user's vision/goals
+  app.post("/api/ai/generate-tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Validate request body
+      const parseResult = aiGenerateTasksRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+      
+      const { visionStatement, focusAreas, timeAvailability, existingCategories } = parseResult.data;
+      
+      // Build the prompt for AI
+      const systemPrompt = `You are an expert habit coach and life design specialist. Your task is to analyze a user's vision for their ideal life and generate practical, achievable daily habits and tasks.
+
+Guidelines for generating tasks:
+- Create 8-15 specific, actionable daily habits
+- Assign realistic point values (5-30 points based on effort/impact)
+- Group tasks into meaningful categories (Health, Productivity, Spiritual, Social, Learning, etc.)
+- Set appropriate priorities: mustDo (critical habits), shouldDo (important), couldDo (nice to have)
+- Consider the user's time availability when setting task counts
+- Create 2-5 penalty items for behaviors to avoid (negative point values from -5 to -15)
+- Suggest relevant categories that align with their goals
+
+Time availability guidelines:
+- minimal: 4-6 tasks, focus on essentials only
+- moderate: 8-12 tasks, balanced approach
+- dedicated: 12-18 tasks, comprehensive habit system
+
+Return a JSON object with this exact structure:
+{
+  "seasonTheme": "A short inspiring name for this life season (2-4 words)",
+  "summary": "Brief 1-2 sentence summary of the recommended approach",
+  "tasks": [
+    {"name": "Task name", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why this matters"}
+  ],
+  "penalties": [
+    {"name": "Penalty name", "value": -5, "description": "Why to avoid this"}
+  ],
+  "categories": [
+    {"name": "Category name"}
+  ]
+}`;
+
+      const userPrompt = `Here is my vision for the next 6 months:
+
+${visionStatement}
+
+${focusAreas && focusAreas.length > 0 ? `\nMy key focus areas: ${focusAreas.join(", ")}` : ""}
+${timeAvailability ? `\nMy time availability for habits: ${timeAvailability}` : ""}
+${existingCategories && existingCategories.length > 0 ? `\nI already have these categories: ${existingCategories.join(", ")}` : ""}
+
+Please analyze my goals and generate a personalized set of daily habits, penalties to avoid, and categories. Return valid JSON only.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 2000,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      // Parse and validate the AI response
+      let aiResponse: AIGenerateTasksResponse;
+      try {
+        const parsed = JSON.parse(rawContent);
+        const validated = aiGenerateTasksResponseSchema.safeParse(parsed);
+        if (!validated.success) {
+          console.error("AI response validation failed:", validated.error.issues);
+          return res.status(500).json({ error: "AI response format was invalid", details: validated.error.issues });
+        }
+        aiResponse = validated.data;
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", parseError);
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      res.json(aiResponse);
+    } catch (error) {
+      console.error("AI task generation error:", error);
+      res.status(500).json({ error: "Failed to generate tasks" });
     }
   });
 

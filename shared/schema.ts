@@ -1595,3 +1595,48 @@ export const userDailySchedules = pgTable("user_daily_schedules", {
 export const insertUserDailyScheduleSchema = createInsertSchema(userDailySchedules).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUserDailySchedule = z.infer<typeof insertUserDailyScheduleSchema>;
 export type UserDailySchedule = typeof userDailySchedules.$inferSelect;
+
+// ==================== AI TASK GENERATION ====================
+
+// AI-generated task suggestion schema
+export const aiGeneratedTaskSchema = z.object({
+  name: z.string().min(1),
+  value: z.number().int().min(1).max(50),
+  category: z.string().min(1),
+  priority: taskPriorityEnum,
+  description: z.string().optional(),
+});
+export type AIGeneratedTask = z.infer<typeof aiGeneratedTaskSchema>;
+
+// AI-generated penalty suggestion schema
+export const aiGeneratedPenaltySchema = z.object({
+  name: z.string().min(1),
+  value: z.number().int().max(-1),
+  description: z.string().optional(),
+});
+export type AIGeneratedPenalty = z.infer<typeof aiGeneratedPenaltySchema>;
+
+// AI-generated category suggestion schema
+export const aiGeneratedCategorySchema = z.object({
+  name: z.string().min(1),
+});
+export type AIGeneratedCategory = z.infer<typeof aiGeneratedCategorySchema>;
+
+// Request schema for AI task generation
+export const aiGenerateTasksRequestSchema = z.object({
+  visionStatement: z.string().min(10).max(2000),
+  focusAreas: z.array(z.string()).optional(),
+  timeAvailability: z.enum(["minimal", "moderate", "dedicated"]).optional(),
+  existingCategories: z.array(z.string()).optional(),
+});
+export type AIGenerateTasksRequest = z.infer<typeof aiGenerateTasksRequestSchema>;
+
+// Response schema for AI task generation
+export const aiGenerateTasksResponseSchema = z.object({
+  seasonTheme: z.string().optional(),
+  summary: z.string(),
+  tasks: z.array(aiGeneratedTaskSchema),
+  penalties: z.array(aiGeneratedPenaltySchema),
+  categories: z.array(aiGeneratedCategorySchema),
+});
+export type AIGenerateTasksResponse = z.infer<typeof aiGenerateTasksResponseSchema>;
