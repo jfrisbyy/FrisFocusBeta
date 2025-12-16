@@ -159,7 +159,13 @@ export default function DailyPage() {
       });
       return response.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
+      // Update local state immediately from the returned data
+      // This prevents the ref guard from blocking the update after cache invalidation
+      if (result && result.completedTaskIds) {
+        setCompletedIds(new Set(result.completedTaskIds));
+        setSavedCompletedIds(result.completedTaskIds);
+      }
       // Invalidate both the list query and the date-specific query
       queryClient.invalidateQueries({ queryKey: ["/api/habit/logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/habit/logs", variables.date] });
