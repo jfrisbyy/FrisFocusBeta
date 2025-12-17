@@ -1598,6 +1598,63 @@ export type UserDailySchedule = typeof userDailySchedules.$inferSelect;
 
 // ==================== AI TASK GENERATION ====================
 
+// Conversation step enum - tracks where we are in the flow
+export const aiConversationStepEnum = z.enum([
+  "vision",       // Initial vision/goals question
+  "priorities",   // Which goals matter most
+  "challenges",   // What's difficult for you
+  "habits",       // Bad habits to address
+  "time",         // Time availability
+  "confirm",      // Review and confirm before generating
+  "complete"      // Conversation done, ready to generate
+]);
+export type AIConversationStep = z.infer<typeof aiConversationStepEnum>;
+
+// Message in the conversation
+export const aiConversationMessageSchema = z.object({
+  role: z.enum(["assistant", "user"]),
+  content: z.string(),
+  timestamp: z.number().optional(),
+});
+export type AIConversationMessage = z.infer<typeof aiConversationMessageSchema>;
+
+// Accumulated state from the conversation
+export const aiConversationStateSchema = z.object({
+  currentStep: aiConversationStepEnum,
+  goals: z.array(z.object({
+    description: z.string(),
+    priority: z.number().optional(), // 1 = highest priority
+  })).default([]),
+  challenges: z.array(z.string()).default([]), // Tasks that are hard for the person
+  badHabits: z.array(z.string()).default([]),  // Habits to address as penalties
+  timeAvailability: z.enum(["minimal", "moderate", "dedicated"]).optional(),
+  additionalContext: z.string().optional(), // Any other context gathered
+});
+export type AIConversationState = z.infer<typeof aiConversationStateSchema>;
+
+// Request to continue the conversation
+export const aiConversationRequestSchema = z.object({
+  message: z.string().min(1).max(2000),
+  conversationState: aiConversationStateSchema,
+  messageHistory: z.array(aiConversationMessageSchema).default([]),
+});
+export type AIConversationRequest = z.infer<typeof aiConversationRequestSchema>;
+
+// Response from the conversation endpoint
+export const aiConversationResponseSchema = z.object({
+  assistantMessage: z.string(),
+  updatedState: aiConversationStateSchema,
+  isComplete: z.boolean(), // True when ready to generate tasks
+});
+export type AIConversationResponse = z.infer<typeof aiConversationResponseSchema>;
+
+// Finalize request - generate tasks from conversation state
+export const aiFinalizeRequestSchema = z.object({
+  conversationState: aiConversationStateSchema,
+  existingCategories: z.array(z.string()).optional(),
+});
+export type AIFinalizeRequest = z.infer<typeof aiFinalizeRequestSchema>;
+
 // AI-generated task suggestion schema
 export const aiGeneratedTaskSchema = z.object({
   name: z.string().min(1),

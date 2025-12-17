@@ -40,7 +40,9 @@ import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Ta
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
-import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season, SeasonWithData, TaskTier, AIGenerateTasksResponse, AIGeneratedTask, AIGeneratedPenalty, AIGeneratedCategory } from "@shared/schema";
+import type { TaskPriority, PenaltyRule, PenaltyItem, Category, Season, SeasonWithData, TaskTier, AIGenerateTasksResponse, AIGeneratedTask, AIGeneratedPenalty, AIGeneratedCategory, AIConversationState, AIConversationMessage, AIConversationResponse } from "@shared/schema";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Send, MessageSquare, User } from "lucide-react";
 
 interface Task {
   id: string;
@@ -169,15 +171,22 @@ export default function TasksPage() {
   const [importPenalties, setImportPenalties] = useState<string[]>([]);
   const [archiveSeasonId, setArchiveSeasonId] = useState<string | null>(null);
 
-  // AI task generation state
+  // AI task generation state - conversational flow
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [aiDialogStep, setAiDialogStep] = useState<"prompt" | "preview">("prompt");
-  const [aiVisionStatement, setAiVisionStatement] = useState("");
-  const [aiTimeAvailability, setAiTimeAvailability] = useState<"minimal" | "moderate" | "dedicated">("moderate");
+  const [aiDialogStep, setAiDialogStep] = useState<"chat" | "preview">("chat");
+  const [aiMessages, setAiMessages] = useState<AIConversationMessage[]>([]);
+  const [aiConversationState, setAiConversationState] = useState<AIConversationState>({
+    currentStep: "vision",
+    goals: [],
+    challenges: [],
+    badHabits: [],
+  });
+  const [aiUserInput, setAiUserInput] = useState("");
   const [aiGeneratedData, setAiGeneratedData] = useState<AIGenerateTasksResponse | null>(null);
   const [aiSelectedTasks, setAiSelectedTasks] = useState<Set<number>>(new Set());
   const [aiSelectedPenalties, setAiSelectedPenalties] = useState<Set<number>>(new Set());
   const [aiSelectedCategories, setAiSelectedCategories] = useState<Set<number>>(new Set());
+  const aiChatEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch seasons from API (available to all authenticated users)
   const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Season[]>({
@@ -369,10 +378,29 @@ export default function TasksPage() {
     },
   });
 
-  // AI task generation mutation
-  const generateAiTasksMutation = useMutation({
-    mutationFn: async (data: { visionStatement: string; timeAvailability?: "minimal" | "moderate" | "dedicated"; existingCategories?: string[] }) => {
-      const res = await apiRequest("POST", "/api/ai/generate-tasks", data);
+  // AI conversation mutation - for multi-turn chat
+  const aiConversationMutation = useMutation({
+    mutationFn: async (data: { message: string; conversationState: AIConversationState; messageHistory: AIConversationMessage[] }) => {
+      const res = await apiRequest("POST", "/api/ai/task-conversation", data);
+      return res.json() as Promise<AIConversationResponse>;
+    },
+    onSuccess: (data) => {
+      // Add assistant response to messages
+      setAiMessages(prev => [...prev, { role: "assistant", content: data.assistantMessage, timestamp: Date.now() }]);
+      setAiConversationState(data.updatedState);
+      
+      // Scroll to bottom
+      setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to get AI response. Please try again.", variant: "destructive" });
+    },
+  });
+
+  // AI finalize mutation - generate tasks from conversation
+  const aiFinalizeMutation = useMutation({
+    mutationFn: async (data: { conversationState: AIConversationState; existingCategories?: string[] }) => {
+      const res = await apiRequest("POST", "/api/ai/task-conversation/finalize", data);
       return res.json() as Promise<AIGenerateTasksResponse>;
     },
     onSuccess: (data) => {
@@ -388,21 +416,50 @@ export default function TasksPage() {
   });
 
   const handleOpenAiDialog = () => {
-    setAiVisionStatement("");
-    setAiTimeAvailability("moderate");
+    // Reset all AI state for a fresh conversation
+    setAiMessages([{
+      role: "assistant",
+      content: "Hi! I'm here to help you design habits that will shape your ideal life over the next 6 months. Let's start with the big picture - what does your ideal life look like? What goals are you working toward? Tell me about the areas that matter most to you.",
+      timestamp: Date.now(),
+    }]);
+    setAiConversationState({
+      currentStep: "vision",
+      goals: [],
+      challenges: [],
+      badHabits: [],
+    });
+    setAiUserInput("");
     setAiGeneratedData(null);
-    setAiDialogStep("prompt");
+    setAiDialogStep("chat");
     setAiSelectedTasks(new Set());
     setAiSelectedPenalties(new Set());
     setAiSelectedCategories(new Set());
     setAiDialogOpen(true);
   };
 
-  const handleGenerateWithAi = () => {
-    if (!aiVisionStatement.trim()) return;
-    generateAiTasksMutation.mutate({
-      visionStatement: aiVisionStatement.trim(),
-      timeAvailability: aiTimeAvailability,
+  const handleSendMessage = () => {
+    const trimmed = aiUserInput.trim();
+    if (!trimmed || aiConversationMutation.isPending) return;
+    
+    // Add user message to list
+    const userMessage: AIConversationMessage = { role: "user", content: trimmed, timestamp: Date.now() };
+    setAiMessages(prev => [...prev, userMessage]);
+    setAiUserInput("");
+    
+    // Send to API
+    aiConversationMutation.mutate({
+      message: trimmed,
+      conversationState: aiConversationState,
+      messageHistory: aiMessages,
+    });
+    
+    // Scroll to bottom
+    setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  const handleGenerateFromConversation = () => {
+    aiFinalizeMutation.mutate({
+      conversationState: aiConversationState,
       existingCategories: categories.map(c => c.name),
     });
   };
@@ -1406,7 +1463,7 @@ export default function TasksPage() {
           <Button
             variant="outline"
             onClick={handleOpenAiDialog}
-            disabled={generateAiTasksMutation.isPending}
+            disabled={aiConversationMutation.isPending || aiFinalizeMutation.isPending}
             data-testid="button-generate-ai"
           >
             <Sparkles className="h-4 w-4 mr-2" />
@@ -1916,81 +1973,139 @@ export default function TasksPage() {
       </Dialog>
 
       <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              {aiDialogStep === "prompt" ? "Generate Tasks with AI" : "Review AI Suggestions"}
+              {aiDialogStep === "chat" ? "Design Your Habits" : "Review AI Suggestions"}
             </DialogTitle>
           </DialogHeader>
 
-          {aiDialogStep === "prompt" ? (
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="ai-vision">Describe your ideal life for the next 6 months</Label>
-                <Textarea
-                  id="ai-vision"
-                  value={aiVisionStatement}
-                  onChange={(e) => setAiVisionStatement(e.target.value)}
-                  placeholder="Tell me about your goals, the habits you want to build, what success looks like for you, and any specific areas you want to focus on..."
-                  rows={6}
-                  data-testid="input-ai-vision"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Be specific! Mention health goals, career aspirations, relationships, hobbies, spiritual practices, or anything else important to you.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>How much time can you dedicate to daily habits?</Label>
-                <RadioGroup
-                  value={aiTimeAvailability}
-                  onValueChange={(v) => setAiTimeAvailability(v as "minimal" | "moderate" | "dedicated")}
-                  className="flex gap-4 flex-wrap"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="minimal" id="time-minimal" data-testid="radio-time-minimal" />
-                    <Label htmlFor="time-minimal" className="font-normal cursor-pointer">
-                      Minimal (4-6 tasks)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="moderate" id="time-moderate" data-testid="radio-time-moderate" />
-                    <Label htmlFor="time-moderate" className="font-normal cursor-pointer">
-                      Moderate (8-12 tasks)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="dedicated" id="time-dedicated" data-testid="radio-time-dedicated" />
-                    <Label htmlFor="time-dedicated" className="font-normal cursor-pointer">
-                      Dedicated (12-18 tasks)
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleGenerateWithAi}
-                  disabled={!aiVisionStatement.trim() || generateAiTasksMutation.isPending}
-                  data-testid="button-generate-tasks"
-                >
-                  {generateAiTasksMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate Tasks
-                    </>
+          {aiDialogStep === "chat" ? (
+            <div className="flex flex-col flex-1 min-h-0">
+              {/* Conversation progress indicator */}
+              {aiConversationState.goals.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pb-3 border-b mb-3">
+                  {aiConversationState.goals.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {aiConversationState.goals.length} goals
+                    </Badge>
                   )}
-                </Button>
-              </DialogFooter>
+                  {aiConversationState.challenges.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {aiConversationState.challenges.length} challenges
+                    </Badge>
+                  )}
+                  {aiConversationState.badHabits.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {aiConversationState.badHabits.length} habits to break
+                    </Badge>
+                  )}
+                  {aiConversationState.timeAvailability && (
+                    <Badge variant="outline" className="text-xs">
+                      {aiConversationState.timeAvailability} time
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Chat messages */}
+              <ScrollArea className="flex-1 pr-4 min-h-[300px] max-h-[400px]">
+                <div className="space-y-4">
+                  {aiMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      {msg.role === "assistant" && (
+                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[80%] rounded-lg px-4 py-2.5 ${
+                          msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        }`}
+                        data-testid={`ai-message-${idx}`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                      {msg.role === "user" && (
+                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-secondary flex items-center justify-center">
+                          <User className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {aiConversationMutation.isPending && (
+                    <div className="flex gap-3 justify-start">
+                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="bg-muted rounded-lg px-4 py-2.5">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    </div>
+                  )}
+                  <div ref={aiChatEndRef} />
+                </div>
+              </ScrollArea>
+
+              {/* Input area */}
+              <div className="pt-4 border-t mt-4 space-y-3">
+                <div className="flex gap-2">
+                  <Textarea
+                    value={aiUserInput}
+                    onChange={(e) => setAiUserInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    placeholder="Type your response..."
+                    rows={2}
+                    className="flex-1 resize-none"
+                    disabled={aiConversationMutation.isPending}
+                    data-testid="input-ai-chat"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSendMessage}
+                    disabled={!aiUserInput.trim() || aiConversationMutation.isPending}
+                    data-testid="button-send-message"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="flex justify-between items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAiDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  {(aiConversationState.goals.length >= 2 || aiConversationState.currentStep === "confirm" || aiConversationState.currentStep === "complete") && (
+                    <Button
+                      onClick={handleGenerateFromConversation}
+                      disabled={aiFinalizeMutation.isPending}
+                      data-testid="button-generate-tasks"
+                    >
+                      {aiFinalizeMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Generate My Tasks
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           ) : aiGeneratedData ? (
             <div className="space-y-4 py-2">
@@ -2101,8 +2216,8 @@ export default function TasksPage() {
               )}
 
               <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setAiDialogStep("prompt")}>
-                  Back
+                <Button variant="outline" onClick={() => setAiDialogStep("chat")}>
+                  Back to Chat
                 </Button>
                 <Button
                   onClick={handleApplyAiResults}

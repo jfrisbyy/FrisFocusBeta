@@ -963,6 +963,261 @@ Please analyze my goals and generate a personalized set of daily habits, penalti
     }
   });
 
+  // AI conversation for task generation - multi-turn guided flow
+  app.post("/api/ai/task-conversation", isAuthenticated, async (req: any, res) => {
+    try {
+      const { aiConversationRequestSchema, aiConversationResponseSchema } = await import("@shared/schema");
+      
+      const parseResult = aiConversationRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+      
+      const { message, conversationState, messageHistory } = parseResult.data;
+      const currentStep = conversationState.currentStep;
+      
+      // Build the system prompt for conversational guidance
+      const systemPrompt = `You are a friendly, empathetic habit coach having a conversation to understand someone's goals and create personalized habits for them. Your job is to guide them through understanding:
+
+1. Their vision and goals for the next 6 months
+2. Which goals are most important to them
+3. What tasks/habits are naturally difficult for them
+4. Any bad habits they want to break
+5. How much time they have available
+
+Current conversation step: ${currentStep}
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "message": "Your friendly conversational response to the user",
+  "extractedData": {
+    "goals": ["goal 1", "goal 2"] or null if not mentioned,
+    "priorities": [1, 2, 3] or null (numbers indicating which goals are most important, by index),
+    "challenges": ["challenge 1"] or null if not mentioned,
+    "badHabits": ["habit 1"] or null if not mentioned,
+    "timeAvailability": "minimal" | "moderate" | "dedicated" | null
+  },
+  "nextStep": "vision" | "priorities" | "challenges" | "habits" | "time" | "confirm" | "complete",
+  "readyToGenerate": true/false
+}
+
+Guidelines:
+- Be warm, encouraging, and conversational - not robotic
+- Ask follow-up questions based on their responses
+- Only move to the next step when you have enough information
+- Extract specific, actionable information from their responses
+- If they mention something relevant to a future step, capture it in extractedData
+- When you have goals + priorities + challenges/habits + time preference, suggest moving to confirm
+- At "confirm" step, summarize what you've learned and ask if they're ready to generate tasks
+
+Step-specific guidance:
+- vision: Get 2-5 specific goals they want to achieve
+- priorities: Have them rank which goals matter most
+- challenges: Understand what behaviors are hard for them (will become higher-value tasks)
+- habits: Identify bad habits to break (will become penalties)
+- time: Understand if they have minimal, moderate, or dedicated time for habits
+- confirm: Summarize everything and confirm before generating`;
+
+      // Build message history for context
+      const messages: Array<{role: "system" | "user" | "assistant", content: string}> = [
+        { role: "system", content: systemPrompt }
+      ];
+      
+      for (const msg of messageHistory) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+      messages.push({ role: "user", content: message });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages,
+        max_tokens: 800,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      // Parse AI response
+      let aiParsed: any;
+      try {
+        aiParsed = JSON.parse(rawContent);
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      // Update conversation state with extracted data
+      const updatedState = { ...conversationState };
+      
+      if (aiParsed.extractedData) {
+        const ext = aiParsed.extractedData;
+        
+        // Add new goals
+        if (ext.goals && Array.isArray(ext.goals)) {
+          const existingDescs = updatedState.goals.map(g => g.description.toLowerCase());
+          for (const goal of ext.goals) {
+            if (!existingDescs.includes(goal.toLowerCase())) {
+              updatedState.goals.push({ description: goal });
+            }
+          }
+        }
+        
+        // Update priorities if provided
+        if (ext.priorities && Array.isArray(ext.priorities)) {
+          for (let i = 0; i < ext.priorities.length && i < updatedState.goals.length; i++) {
+            const goalIndex = ext.priorities[i];
+            if (typeof goalIndex === 'number' && goalIndex < updatedState.goals.length) {
+              updatedState.goals[goalIndex].priority = i + 1;
+            }
+          }
+        }
+        
+        // Add challenges
+        if (ext.challenges && Array.isArray(ext.challenges)) {
+          for (const c of ext.challenges) {
+            if (!updatedState.challenges.includes(c)) {
+              updatedState.challenges.push(c);
+            }
+          }
+        }
+        
+        // Add bad habits
+        if (ext.badHabits && Array.isArray(ext.badHabits)) {
+          for (const h of ext.badHabits) {
+            if (!updatedState.badHabits.includes(h)) {
+              updatedState.badHabits.push(h);
+            }
+          }
+        }
+        
+        // Set time availability
+        if (ext.timeAvailability && ["minimal", "moderate", "dedicated"].includes(ext.timeAvailability)) {
+          updatedState.timeAvailability = ext.timeAvailability;
+        }
+      }
+      
+      // Update step
+      if (aiParsed.nextStep) {
+        updatedState.currentStep = aiParsed.nextStep;
+      }
+
+      const responseData: z.infer<typeof aiConversationResponseSchema> = {
+        assistantMessage: aiParsed.message || "Could you tell me more?",
+        updatedState,
+        isComplete: aiParsed.readyToGenerate === true || updatedState.currentStep === "complete",
+      };
+
+      res.json(responseData);
+    } catch (error) {
+      console.error("AI conversation error:", error);
+      res.status(500).json({ error: "Failed to process conversation" });
+    }
+  });
+
+  // Finalize - generate tasks from conversation state
+  app.post("/api/ai/task-conversation/finalize", isAuthenticated, async (req: any, res) => {
+    try {
+      const { aiFinalizeRequestSchema, aiGenerateTasksResponseSchema } = await import("@shared/schema");
+      
+      const parseResult = aiFinalizeRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+      
+      const { conversationState, existingCategories } = parseResult.data;
+      
+      // Build comprehensive prompt from conversation state
+      const goalsText = conversationState.goals
+        .sort((a, b) => (a.priority || 99) - (b.priority || 99))
+        .map((g, i) => `${i + 1}. ${g.description}${g.priority ? ` (priority: ${g.priority})` : ""}`)
+        .join("\n");
+      
+      const challengesText = conversationState.challenges.length > 0 
+        ? `\nThings they find difficult: ${conversationState.challenges.join(", ")}`
+        : "";
+      
+      const habitsText = conversationState.badHabits.length > 0
+        ? `\nBad habits to break: ${conversationState.badHabits.join(", ")}`
+        : "";
+      
+      const timeText = conversationState.timeAvailability
+        ? `\nTime availability: ${conversationState.timeAvailability}`
+        : "";
+
+      const systemPrompt = `You are an expert habit coach. Based on a detailed conversation with a user, generate personalized daily habits and penalties.
+
+Guidelines:
+- Create 8-15 specific, actionable daily habits tailored to their goals
+- Tasks for things they find difficult should have HIGHER point values (reward the effort!)
+- Assign point values 5-30 based on effort and impact
+- Group tasks into meaningful categories (Health, Productivity, Spiritual, Social, Learning, etc.)
+- Set priorities: mustDo (critical), shouldDo (important), couldDo (nice to have)
+- Create penalties for each bad habit they mentioned (negative values -5 to -15)
+- Higher priority goals should have more associated tasks
+
+Time availability:
+- minimal: 4-6 tasks total
+- moderate: 8-12 tasks total  
+- dedicated: 12-18 tasks total
+
+Return JSON:
+{
+  "seasonTheme": "Inspiring 2-4 word theme",
+  "summary": "1-2 sentence summary",
+  "tasks": [{"name": "Task", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why this matters"}],
+  "penalties": [{"name": "Penalty", "value": -5, "description": "Why to avoid"}],
+  "categories": [{"name": "Category"}]
+}`;
+
+      const userPrompt = `Here's what I learned from my conversation with this user:
+
+Their goals for the next 6 months:
+${goalsText}
+${challengesText}
+${habitsText}
+${timeText}
+${conversationState.additionalContext ? `\nAdditional context: ${conversationState.additionalContext}` : ""}
+${existingCategories && existingCategories.length > 0 ? `\nExisting categories to reuse if relevant: ${existingCategories.join(", ")}` : ""}
+
+Generate personalized habits and penalties based on this detailed understanding. Return valid JSON only.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 2000,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      let aiResponse: AIGenerateTasksResponse;
+      try {
+        const parsed = JSON.parse(rawContent);
+        const validated = aiGenerateTasksResponseSchema.safeParse(parsed);
+        if (!validated.success) {
+          console.error("AI finalize validation failed:", validated.error.issues);
+          return res.status(500).json({ error: "AI response format was invalid" });
+        }
+        aiResponse = validated.data;
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      res.json(aiResponse);
+    } catch (error) {
+      console.error("AI finalize error:", error);
+      res.status(500).json({ error: "Failed to generate tasks" });
+    }
+  });
+
   // ==================== FRIENDS API ROUTES ====================
 
   // Get all friends (accepted friendships)
