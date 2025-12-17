@@ -1604,6 +1604,8 @@ export const aiConversationStepEnum = z.enum([
   "priorities",   // Which goals matter most
   "challenges",   // What's difficult for you
   "habits",       // Bad habits to address
+  "aggressiveness", // How intensely they want to pursue goals
+  "hobbies",      // Other interests for shouldDo/couldDo
   "time",         // Time availability
   "confirm",      // Review and confirm before generating
   "complete"      // Conversation done, ready to generate
@@ -1628,6 +1630,8 @@ export const aiConversationStateSchema = z.object({
   challenges: z.array(z.string()).default([]), // Tasks that are hard for the person
   badHabits: z.array(z.string()).default([]),  // Habits to address as penalties
   timeAvailability: z.enum(["minimal", "moderate", "dedicated"]).optional(),
+  aggressiveness: z.enum(["gentle", "moderate", "aggressive", "intense"]).optional(), // How intensely to pursue goals
+  hobbies: z.array(z.string()).default([]), // Hobbies/interests for shouldDo/couldDo tasks
   additionalContext: z.string().optional(), // Any other context gathered
 });
 export type AIConversationState = z.infer<typeof aiConversationStateSchema>;
@@ -1662,6 +1666,7 @@ export const aiGeneratedTaskSchema = z.object({
   category: z.string().min(1),
   priority: taskPriorityEnum,
   description: z.string().optional(),
+  boosterRule: boosterRuleSchema.optional().nullable(),
 });
 export type AIGeneratedTask = z.infer<typeof aiGeneratedTaskSchema>;
 
@@ -1697,3 +1702,40 @@ export const aiGenerateTasksResponseSchema = z.object({
   categories: z.array(aiGeneratedCategorySchema),
 });
 export type AIGenerateTasksResponse = z.infer<typeof aiGenerateTasksResponseSchema>;
+
+// ==================== AI BADGE GENERATION ====================
+
+// AI-generated badge level schema
+export const aiGeneratedBadgeLevelSchema = z.object({
+  level: z.number().int().min(1).max(5),
+  required: z.number().int().min(1),
+});
+export type AIGeneratedBadgeLevel = z.infer<typeof aiGeneratedBadgeLevelSchema>;
+
+// AI-generated badge schema
+export const aiGeneratedBadgeSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  icon: z.enum(["award", "flame", "book", "zap", "heart", "star", "target", "trophy", "shield"]),
+  conditionType: z.enum(["taskCompletions", "perfectDaysStreak", "negativeFreeStreak", "weeklyGoalStreak"]),
+  taskName: z.string().optional(),
+  levels: z.array(aiGeneratedBadgeLevelSchema),
+});
+export type AIGeneratedBadge = z.infer<typeof aiGeneratedBadgeSchema>;
+
+// Request schema for AI badge generation
+export const aiGenerateBadgesRequestSchema = z.object({
+  tasks: z.array(z.object({
+    name: z.string(),
+    category: z.string(),
+    priority: z.string(),
+  })),
+  existingBadges: z.array(z.string()).optional(),
+});
+export type AIGenerateBadgesRequest = z.infer<typeof aiGenerateBadgesRequestSchema>;
+
+// Response schema for AI badge generation
+export const aiGenerateBadgesResponseSchema = z.object({
+  badges: z.array(aiGeneratedBadgeSchema),
+});
+export type AIGenerateBadgesResponse = z.infer<typeof aiGenerateBadgesResponseSchema>;

@@ -181,6 +181,7 @@ export default function TasksPage() {
     goals: [],
     challenges: [],
     badHabits: [],
+    hobbies: [],
   });
   const [aiUserInput, setAiUserInput] = useState("");
   const [aiGeneratedData, setAiGeneratedData] = useState<AIGenerateTasksResponse | null>(null);
@@ -428,6 +429,7 @@ export default function TasksPage() {
       goals: [],
       challenges: [],
       badHabits: [],
+      hobbies: [],
     });
     setAiUserInput("");
     setAiGeneratedData(null);
@@ -487,6 +489,7 @@ export default function TasksPage() {
           value: task.value,
           category: task.category,
           priority: task.priority,
+          boosterRule: task.boosterRule || undefined,
         });
       }
     });
@@ -1460,18 +1463,19 @@ export default function TasksPage() {
       </div>
 
       {activeSeason && !isActiveSeasonArchived && !isDemo && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-primary/10 to-chart-4/10 rounded-lg border border-primary/20">
           <Button
-            variant="outline"
+            size="lg"
+            className="bg-gradient-to-r from-primary to-chart-4 hover:from-primary/90 hover:to-chart-4/90 text-primary-foreground shadow-md"
             onClick={handleOpenAiDialog}
             disabled={aiConversationMutation.isPending || aiFinalizeMutation.isPending}
             data-testid="button-generate-ai"
           >
-            <Sparkles className="h-4 w-4 mr-2" />
+            <Sparkles className="h-5 w-5 mr-2" />
             Generate with AI
           </Button>
           <span className="text-sm text-muted-foreground">
-            Describe your ideal life and let AI create tasks for you
+            Describe your ideal life and let AI create personalized tasks for you
           </span>
         </div>
       )}

@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -34,10 +36,17 @@ import {
   Target,
   Trophy,
   Shield,
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { Task, AIGenerateBadgesResponse, AIGeneratedBadge } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -215,6 +224,85 @@ export default function BadgesPage() {
   const [formTaskName, setFormTaskName] = useState("");
   const [formLevels, setFormLevels] = useState<string[]>(["10", "25", "50"]);
 
+  // AI badge generation state
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiGeneratedBadges, setAiGeneratedBadges] = useState<AIGeneratedBadge[] | null>(null);
+  const [aiSelectedBadges, setAiSelectedBadges] = useState<Set<number>>(new Set());
+
+  // Fetch tasks for AI badge generation
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/habit/tasks"],
+    enabled: !isDemo,
+  });
+
+  // AI badge generation mutation
+  const generateBadgesMutation = useMutation({
+    mutationFn: async (data: { tasks: { name: string; category: string; priority: string }[]; existingBadges?: string[] }) => {
+      const res = await apiRequest("POST", "/api/ai/generate-badges", data);
+      return res.json() as Promise<AIGenerateBadgesResponse>;
+    },
+    onSuccess: (data) => {
+      setAiGeneratedBadges(data.badges);
+      setAiSelectedBadges(new Set(data.badges.map((_, i) => i)));
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to generate badges. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleOpenAiDialog = () => {
+    setAiGeneratedBadges(null);
+    setAiSelectedBadges(new Set());
+    setAiDialogOpen(true);
+  };
+
+  const handleGenerateBadges = () => {
+    if (tasks.length === 0) {
+      toast({ title: "No tasks found", description: "Please create tasks first before generating badges.", variant: "destructive" });
+      return;
+    }
+    generateBadgesMutation.mutate({
+      tasks: tasks.map(t => ({ name: t.name, category: t.category, priority: t.priority })),
+      existingBadges: badges.map(b => b.name),
+    });
+  };
+
+  const toggleAiBadge = (idx: number) => {
+    const newSet = new Set(aiSelectedBadges);
+    if (newSet.has(idx)) {
+      newSet.delete(idx);
+    } else {
+      newSet.add(idx);
+    }
+    setAiSelectedBadges(newSet);
+  };
+
+  const handleApplyAiBadges = () => {
+    if (!aiGeneratedBadges) return;
+    
+    const newBadges: BadgeDefinition[] = [];
+    aiSelectedBadges.forEach((idx) => {
+      const badge = aiGeneratedBadges[idx];
+      if (badge) {
+        newBadges.push({
+          id: String(Date.now() + Math.random()),
+          name: badge.name,
+          description: badge.description,
+          icon: badge.icon,
+          conditionType: badge.conditionType as BadgeConditionType,
+          taskName: badge.taskName,
+          levels: badge.levels.map(l => ({ ...l, earned: false })),
+          progress: 0,
+        });
+      }
+    });
+    
+    saveBadges([...badges, ...newBadges]);
+    toast({ title: "Badges added!", description: `Added ${newBadges.length} new badges` });
+    setAiDialogOpen(false);
+    setAiGeneratedBadges(null);
+  };
+
   // Load badges from localStorage on mount
   useEffect(() => {
     if (isDemo) {
@@ -372,10 +460,23 @@ export default function BadgesPage() {
           <h2 className="text-2xl font-semibold tracking-tight">Badges</h2>
           <p className="text-muted-foreground text-sm">Create and track achievement badges</p>
         </div>
-        <Button onClick={handleOpenCreate} data-testid="button-create-badge">
-          <Plus className="h-4 w-4 mr-1" />
-          Create Badge
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isDemo && (
+            <Button
+              variant="outline"
+              onClick={handleOpenAiDialog}
+              className="bg-gradient-to-r from-primary/10 to-chart-3/10 hover:from-primary/20 hover:to-chart-3/20 border-primary/30"
+              data-testid="button-generate-badges-ai"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Generate with AI
+            </Button>
+          )}
+          <Button onClick={handleOpenCreate} data-testid="button-create-badge">
+            <Plus className="h-4 w-4 mr-1" />
+            Create Badge
+          </Button>
+        </div>
       </div>
 
       {earnedBadges.length > 0 && (
@@ -669,6 +770,139 @@ export default function BadgesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Generate Badges with AI
+            </DialogTitle>
+            <DialogDescription>
+              AI will create achievement badges based on your tasks. Make sure your tasks are finalized before generating badges.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!aiGeneratedBadges && (
+            <div className="py-4 space-y-4">
+              <div className="rounded-md bg-chart-2/10 border border-chart-2/30 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-chart-2 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-chart-2">Before generating badges</p>
+                    <p className="text-muted-foreground mt-1">
+                      Make sure your tasks are finalized. Badges are based on your current tasks - if you change tasks later, 
+                      you may want to update your badges to match.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                <p>You currently have <span className="font-medium text-foreground">{tasks.length}</span> tasks configured.</p>
+              </div>
+            </div>
+          )}
+
+          {generateBadgesMutation.isPending && (
+            <div className="py-8 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Generating badges based on your tasks...</p>
+            </div>
+          )}
+
+          {aiGeneratedBadges && !generateBadgesMutation.isPending && (
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Select which badges to add ({aiSelectedBadges.size} of {aiGeneratedBadges.length} selected):
+                </p>
+                {aiGeneratedBadges.map((badge, idx) => {
+                  const Icon = getIcon(badge.icon);
+                  const isSelected = aiSelectedBadges.has(idx);
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => toggleAiBadge(idx)}
+                      className={cn(
+                        "p-3 rounded-md border cursor-pointer transition-colors hover-elevate",
+                        isSelected ? "border-primary/50 bg-primary/5" : "border-border"
+                      )}
+                      data-testid={`ai-badge-suggestion-${idx}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleAiBadge(idx)}
+                          className="mt-1"
+                        />
+                        <div className="rounded-full p-2 bg-muted">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">{badge.name}</div>
+                          <p className="text-xs text-muted-foreground mt-0.5">{badge.description}</p>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              {badge.conditionType === "taskCompletions" ? "Task completions" :
+                               badge.conditionType === "perfectDaysStreak" ? "Perfect days" :
+                               badge.conditionType === "negativeFreeStreak" ? "Penalty-free" :
+                               "Weekly streak"}
+                            </Badge>
+                            {badge.taskName && (
+                              <Badge variant="secondary" className="text-xs">{badge.taskName}</Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs">
+                              {badge.levels.length} levels
+                            </Badge>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
+              Cancel
+            </Button>
+            {!aiGeneratedBadges ? (
+              <Button
+                onClick={handleGenerateBadges}
+                disabled={generateBadgesMutation.isPending || tasks.length === 0}
+                data-testid="button-ai-generate-badges"
+              >
+                {generateBadgesMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-1" />
+                    Generate Badges
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleApplyAiBadges}
+                disabled={aiSelectedBadges.size === 0}
+                data-testid="button-apply-ai-badges"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add {aiSelectedBadges.size} Badge{aiSelectedBadges.size !== 1 ? "s" : ""}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

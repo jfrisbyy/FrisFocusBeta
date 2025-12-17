@@ -983,7 +983,9 @@ Please analyze my goals and generate a personalized set of daily habits, penalti
 2. Which goals are most important to them
 3. What tasks/habits are naturally difficult for them
 4. Any bad habits they want to break
-5. How much time they have available
+5. How aggressively they want to pursue their goals (this affects task difficulty and expectations)
+6. Any hobbies or personal interests they want to lean into (for balance and enjoyment)
+7. How much time they have available
 
 Current conversation step: ${currentStep}
 
@@ -995,9 +997,11 @@ IMPORTANT: You must respond with valid JSON in this exact format:
     "priorities": [1, 2, 3] or null (numbers indicating which goals are most important, by index),
     "challenges": ["challenge 1"] or null if not mentioned,
     "badHabits": ["habit 1"] or null if not mentioned,
+    "aggressiveness": "gentle" | "moderate" | "aggressive" | "intense" | null,
+    "hobbies": ["hobby 1", "hobby 2"] or null if not mentioned,
     "timeAvailability": "minimal" | "moderate" | "dedicated" | null
   },
-  "nextStep": "vision" | "priorities" | "challenges" | "habits" | "time" | "confirm" | "complete",
+  "nextStep": "vision" | "priorities" | "challenges" | "habits" | "aggressiveness" | "hobbies" | "time" | "confirm" | "complete",
   "readyToGenerate": true/false
 }
 
@@ -1007,16 +1011,18 @@ Guidelines:
 - Only move to the next step when you have enough information
 - Extract specific, actionable information from their responses
 - If they mention something relevant to a future step, capture it in extractedData
-- When you have goals + priorities + challenges/habits + time preference, suggest moving to confirm
-- At "confirm" step, summarize what you've learned and ask if they're ready to generate tasks
+- When you have goals + priorities + challenges/habits + aggressiveness + hobbies (optional) + time preference, suggest moving to confirm
+- At "confirm" step, summarize what you've learned, then tell them to click the "Generate Tasks" button to create their personalized tasks. Remind them that these generated tasks are a starting point - they should review, edit, and adjust the tasks to fit their specific situation.
 
 Step-specific guidance:
 - vision: Get 2-5 specific goals they want to achieve
 - priorities: Have them rank which goals matter most
 - challenges: Understand what behaviors are hard for them (will become higher-value tasks)
 - habits: Identify bad habits to break (will become penalties)
+- aggressiveness: Ask how intensely they want to pursue their goals. Options: gentle (easy start), moderate (balanced), aggressive (challenging), intense (maximum effort). This affects how ambitious the tasks are.
+- hobbies: Ask about hobbies, interests, or fun activities they'd like to incorporate. These become "shouldDo" or "couldDo" priority tasks for balance and enjoyment.
 - time: Understand if they have minimal, moderate, or dedicated time for habits
-- confirm: Summarize everything and confirm before generating`;
+- confirm: Summarize everything learned. Remind user this is a starting point - they should edit/adjust tasks after generation. Tell them to click the "Generate Tasks" button when ready.`;
 
       // Build message history for context
       const messages: Array<{role: "system" | "user" | "assistant", content: string}> = [
@@ -1096,6 +1102,21 @@ Step-specific guidance:
         if (ext.timeAvailability && ["minimal", "moderate", "dedicated"].includes(ext.timeAvailability)) {
           updatedState.timeAvailability = ext.timeAvailability;
         }
+        
+        // Set aggressiveness
+        if (ext.aggressiveness && ["gentle", "moderate", "aggressive", "intense"].includes(ext.aggressiveness)) {
+          updatedState.aggressiveness = ext.aggressiveness;
+        }
+        
+        // Add hobbies
+        if (ext.hobbies && Array.isArray(ext.hobbies)) {
+          if (!updatedState.hobbies) updatedState.hobbies = [];
+          for (const hobby of ext.hobbies) {
+            if (!updatedState.hobbies.includes(hobby)) {
+              updatedState.hobbies.push(hobby);
+            }
+          }
+        }
       }
       
       // Update step
@@ -1145,19 +1166,50 @@ Step-specific guidance:
       const timeText = conversationState.timeAvailability
         ? `\nTime availability: ${conversationState.timeAvailability}`
         : "";
+        
+      const aggressivenessText = conversationState.aggressiveness
+        ? `\nAggressiveness level: ${conversationState.aggressiveness}`
+        : "";
+        
+      const hobbiesText = conversationState.hobbies && conversationState.hobbies.length > 0
+        ? `\nHobbies/interests to incorporate: ${conversationState.hobbies.join(", ")}`
+        : "";
 
       const systemPrompt = `You are an expert habit coach. Based on a detailed conversation with a user, generate personalized daily habits and penalties.
 
-Guidelines:
-- Create 8-15 specific, actionable daily habits tailored to their goals
-- Tasks for things they find difficult should have HIGHER point values (reward the effort!)
-- Assign point values 5-30 based on effort and impact
-- Group tasks into meaningful categories (Health, Productivity, Spiritual, Social, Learning, etc.)
-- Set priorities: mustDo (critical), shouldDo (important), couldDo (nice to have)
-- Create penalties for each bad habit they mentioned (negative values -5 to -15)
-- Higher priority goals should have more associated tasks
+CRITICAL GUIDELINES:
 
-Time availability:
+1. POINT SCALE: Target a 50-point daily goal. A near-perfect day where they complete all mustDo and most shouldDo tasks should total 50-60 points. Distribute points accordingly.
+
+2. ACTIONABLE TASKS: Every task must be specific, measurable, and clear-cut - NOT vague or subjective.
+   - BAD: "Eat healthy" (vague, subjective)
+   - GOOD: "Eat whole foods only" (clear yes/no)
+   - BAD: "Exercise" (too broad)
+   - GOOD: "Complete 30-minute workout" (specific, measurable)
+   - BAD: "Be productive" (subjective)
+   - GOOD: "Complete 3 priority work tasks" (countable)
+
+3. BOOSTERS & PENALTIES: Automatically add boosters for high-priority mustDo tasks to reward weekly consistency, and penalties for tasks not done consistently.
+   - For mustDo tasks: Add boosterRule with period="week", timesRequired=4-5, bonusPoints=10-20
+   - For challenging tasks: Add higher bonusPoints to reward overcoming difficulty
+   - Create penaltyRule for mustDo tasks: if missed X days in a week, apply penalty
+
+4. AGGRESSIVENESS affects expectations:
+   - gentle: Fewer tasks, lower point values, achievable goals
+   - moderate: Balanced approach, reasonable expectations
+   - aggressive: More tasks, higher standards, challenging goals
+   - intense: Maximum tasks, highest point values, demanding expectations
+
+5. HOBBIES: Include hobby-related tasks as "shouldDo" or "couldDo" for balance and enjoyment
+
+6. PRIORITIES:
+   - mustDo: Core tasks critical to their main goals, get boosters for consistency
+   - shouldDo: Important supporting tasks including hobbies
+   - couldDo: Nice-to-have tasks for extra points
+
+7. CATEGORIES: Group into meaningful categories (Health, Productivity, Spiritual, Social, Learning, Hobbies, etc.)
+
+Time availability task counts:
 - minimal: 4-6 tasks total
 - moderate: 8-12 tasks total  
 - dedicated: 12-18 tasks total
@@ -1166,7 +1218,7 @@ Return JSON:
 {
   "seasonTheme": "Inspiring 2-4 word theme",
   "summary": "1-2 sentence summary",
-  "tasks": [{"name": "Task", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why this matters"}],
+  "tasks": [{"name": "Specific Actionable Task", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why this matters", "boosterRule": {"period": "week", "enabled": true, "timesRequired": 5, "bonusPoints": 15} or null}],
   "penalties": [{"name": "Penalty", "value": -5, "description": "Why to avoid"}],
   "categories": [{"name": "Category"}]
 }`;
@@ -1177,11 +1229,13 @@ Their goals for the next 6 months:
 ${goalsText}
 ${challengesText}
 ${habitsText}
+${aggressivenessText}
+${hobbiesText}
 ${timeText}
 ${conversationState.additionalContext ? `\nAdditional context: ${conversationState.additionalContext}` : ""}
 ${existingCategories && existingCategories.length > 0 ? `\nExisting categories to reuse if relevant: ${existingCategories.join(", ")}` : ""}
 
-Generate personalized habits and penalties based on this detailed understanding. Return valid JSON only.`;
+Generate personalized habits and penalties based on this detailed understanding. Remember: target 50-point daily goal, make all tasks actionable and specific, add boosters for mustDo tasks. Return valid JSON only.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -1215,6 +1269,106 @@ Generate personalized habits and penalties based on this detailed understanding.
     } catch (error) {
       console.error("AI finalize error:", error);
       res.status(500).json({ error: "Failed to generate tasks" });
+    }
+  });
+
+  // AI badge generation endpoint
+  app.post("/api/ai/generate-badges", isAuthenticated, async (req: any, res) => {
+    try {
+      const { aiGenerateBadgesRequestSchema, aiGenerateBadgesResponseSchema } = await import("@shared/schema");
+      
+      const parseResult = aiGenerateBadgesRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+      
+      const { tasks, existingBadges } = parseResult.data;
+      
+      if (tasks.length === 0) {
+        return res.status(400).json({ error: "No tasks provided. Please create tasks first before generating badges." });
+      }
+      
+      const tasksText = tasks.map(t => `- ${t.name} (${t.category}, ${t.priority})`).join("\n");
+      
+      const systemPrompt = `You are an expert gamification designer. Based on a user's tasks and habits, generate achievement badges that motivate consistent behavior.
+
+BADGE DESIGN GUIDELINES:
+
+1. Create 5-10 meaningful badges based on the provided tasks
+2. Badge types:
+   - taskCompletions: Completing a specific task X times (set taskName to the task name)
+   - perfectDaysStreak: Hitting daily goal for X days in a row
+   - negativeFreeStreak: Days without penalties in a row
+   - weeklyGoalStreak: Hitting weekly goal for X weeks in a row
+
+3. Each badge should have 2-4 levels with increasing requirements
+4. Use creative, motivating names that reflect the achievement
+5. Icons: award, flame, book, zap, heart, star, target, trophy, shield
+
+6. Level requirements should be achievable:
+   - Level 1: Easy to earn (7-15 completions or 3-7 days streak)
+   - Level 2: Moderate (20-40 completions or 14-21 days streak)
+   - Level 3: Challenging (50-100 completions or 30+ days streak)
+   - Level 4+: Expert (100+ completions or 60+ days streak)
+
+Return JSON:
+{
+  "badges": [
+    {
+      "name": "Badge Name",
+      "description": "What this badge rewards",
+      "icon": "flame",
+      "conditionType": "taskCompletions",
+      "taskName": "Task Name" (only for taskCompletions type),
+      "levels": [
+        {"level": 1, "required": 10},
+        {"level": 2, "required": 30},
+        {"level": 3, "required": 60}
+      ]
+    }
+  ]
+}`;
+
+      const userPrompt = `Generate achievement badges for this user's tasks:
+
+${tasksText}
+
+${existingBadges && existingBadges.length > 0 ? `\nExisting badges to avoid duplicating: ${existingBadges.join(", ")}` : ""}
+
+Create motivating badges that will encourage consistency. Return valid JSON only.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 1500,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      let aiResponse: any;
+      try {
+        const parsed = JSON.parse(rawContent);
+        const validated = aiGenerateBadgesResponseSchema.safeParse(parsed);
+        if (!validated.success) {
+          console.error("AI badge validation failed:", validated.error.issues);
+          return res.status(500).json({ error: "AI response format was invalid" });
+        }
+        aiResponse = validated.data;
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      res.json(aiResponse);
+    } catch (error) {
+      console.error("AI badge generation error:", error);
+      res.status(500).json({ error: "Failed to generate badges" });
     }
   });
 
