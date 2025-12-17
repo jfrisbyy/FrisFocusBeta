@@ -2121,114 +2121,118 @@ export default function TasksPage() {
               </div>
             </div>
           ) : aiGeneratedData ? (
-            <div className="space-y-4 py-2">
-              {aiGeneratedData.seasonTheme && (
-                <div className="bg-muted p-3 rounded-md">
-                  <p className="text-sm font-medium">Suggested Season Theme</p>
-                  <p className="text-lg font-semibold">{aiGeneratedData.seasonTheme}</p>
-                </div>
-              )}
-
-              <p className="text-sm text-muted-foreground">{aiGeneratedData.summary}</p>
-
-              {aiGeneratedData.categories.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Categories</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {aiGeneratedData.categories.map((cat, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs cursor-pointer border ${
-                          aiSelectedCategories.has(idx)
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-secondary border-transparent"
-                        }`}
-                        onClick={() => toggleAiCategory(idx)}
-                        data-testid={`ai-category-${idx}`}
-                      >
-                        <Checkbox checked={aiSelectedCategories.has(idx)} className="h-3 w-3" />
-                        <span>{cat.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {aiGeneratedData.tasks.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Tasks ({aiSelectedTasks.size}/{aiGeneratedData.tasks.length} selected)</Label>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setAiSelectedTasks(new Set(aiGeneratedData.tasks.map((_, i) => i)))}>
-                        Select All
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setAiSelectedTasks(new Set())}>
-                        Clear
-                      </Button>
+            <div className="flex flex-col flex-1 min-h-0">
+              <ScrollArea className={`flex-1 pr-4 ${aiDialogFullscreen ? "max-h-[70vh]" : "max-h-[55vh]"}`}>
+                <div className="space-y-4 py-2">
+                  {aiGeneratedData.seasonTheme && (
+                    <div className="bg-muted p-3 rounded-md">
+                      <p className="text-sm font-medium">Suggested Season Theme</p>
+                      <p className="text-lg font-semibold">{aiGeneratedData.seasonTheme}</p>
                     </div>
-                  </div>
-                  <div className={`grid gap-2 overflow-y-auto ${aiDialogFullscreen ? "max-h-[40vh]" : "max-h-48"}`}>
-                    {aiGeneratedData.tasks.map((task, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
-                          aiSelectedTasks.has(idx) ? "bg-secondary border-primary/50" : "border-transparent"
-                        }`}
-                        onClick={() => toggleAiTask(idx)}
-                        data-testid={`ai-task-${idx}`}
-                      >
-                        <Checkbox checked={aiSelectedTasks.has(idx)} className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm">{task.name}</span>
-                            <Badge variant="secondary" className="text-xs">{task.category}</Badge>
-                            <span className="text-xs text-muted-foreground">{task.priority}</span>
+                  )}
+
+                  <p className="text-sm text-muted-foreground">{aiGeneratedData.summary}</p>
+
+                  {aiGeneratedData.categories.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Categories</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {aiGeneratedData.categories.map((cat, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs cursor-pointer border ${
+                              aiSelectedCategories.has(idx)
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-secondary border-transparent"
+                            }`}
+                            onClick={() => toggleAiCategory(idx)}
+                            data-testid={`ai-category-${idx}`}
+                          >
+                            <Checkbox checked={aiSelectedCategories.has(idx)} className="h-3 w-3" />
+                            <span>{cat.name}</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-mono text-chart-1">+{task.value} pts</span>
-                            {task.description && (
-                              <span className="text-xs text-muted-foreground">{task.description}</span>
-                            )}
-                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {aiGeneratedData.tasks.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Label className="text-sm font-medium">Tasks ({aiSelectedTasks.size}/{aiGeneratedData.tasks.length} selected)</Label>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setAiSelectedTasks(new Set(aiGeneratedData.tasks.map((_, i) => i)))}>
+                            Select All
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setAiSelectedTasks(new Set())}>
+                            Clear
+                          </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {aiGeneratedData.penalties.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">Penalties ({aiSelectedPenalties.size}/{aiGeneratedData.penalties.length} selected)</Label>
-                  </div>
-                  <div className={`grid gap-2 overflow-y-auto ${aiDialogFullscreen ? "max-h-[30vh]" : "max-h-32"}`}>
-                    {aiGeneratedData.penalties.map((penalty, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
-                          aiSelectedPenalties.has(idx) ? "bg-secondary border-chart-3/50" : "border-transparent"
-                        }`}
-                        onClick={() => toggleAiPenalty(idx)}
-                        data-testid={`ai-penalty-${idx}`}
-                      >
-                        <Checkbox checked={aiSelectedPenalties.has(idx)} className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{penalty.name}</span>
-                            <span className="text-xs font-mono text-chart-3">{penalty.value} pts</span>
+                      <div className="grid gap-2">
+                        {aiGeneratedData.tasks.map((task, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
+                              aiSelectedTasks.has(idx) ? "bg-secondary border-primary/50" : "border-transparent"
+                            }`}
+                            onClick={() => toggleAiTask(idx)}
+                            data-testid={`ai-task-${idx}`}
+                          >
+                            <Checkbox checked={aiSelectedTasks.has(idx)} className="mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-sm">{task.name}</span>
+                                <Badge variant="secondary" className="text-xs">{task.category}</Badge>
+                                <span className="text-xs text-muted-foreground">{task.priority}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-mono text-chart-1">+{task.value} pts</span>
+                                {task.description && (
+                                  <span className="text-xs text-muted-foreground">{task.description}</span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {penalty.description && (
-                            <span className="text-xs text-muted-foreground">{penalty.description}</span>
-                          )}
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  )}
 
-              <DialogFooter className="gap-2">
+                  {aiGeneratedData.penalties.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Penalties ({aiSelectedPenalties.size}/{aiGeneratedData.penalties.length} selected)</Label>
+                      </div>
+                      <div className="grid gap-2">
+                        {aiGeneratedData.penalties.map((penalty, idx) => (
+                          <div
+                            key={idx}
+                            className={`flex items-start gap-3 p-2 rounded-md cursor-pointer border ${
+                              aiSelectedPenalties.has(idx) ? "bg-secondary border-chart-3/50" : "border-transparent"
+                            }`}
+                            onClick={() => toggleAiPenalty(idx)}
+                            data-testid={`ai-penalty-${idx}`}
+                          >
+                            <Checkbox checked={aiSelectedPenalties.has(idx)} className="mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">{penalty.name}</span>
+                                <span className="text-xs font-mono text-chart-3">{penalty.value} pts</span>
+                              </div>
+                              {penalty.description && (
+                                <span className="text-xs text-muted-foreground">{penalty.description}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              <DialogFooter className="gap-2 pt-4 border-t mt-4">
                 <Button variant="outline" onClick={() => setAiDialogStep("chat")}>
                   Back to Chat
                 </Button>
