@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
@@ -174,6 +174,7 @@ export default function TasksPage() {
   // AI task generation state - conversational flow
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiDialogStep, setAiDialogStep] = useState<"chat" | "preview">("chat");
+  const [aiDialogFullscreen, setAiDialogFullscreen] = useState(false);
   const [aiMessages, setAiMessages] = useState<AIConversationMessage[]>([]);
   const [aiConversationState, setAiConversationState] = useState<AIConversationState>({
     currentStep: "vision",
@@ -1973,12 +1974,20 @@ export default function TasksPage() {
       </Dialog>
 
       <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className={`flex flex-col ${aiDialogFullscreen ? "!w-[95vw] !max-w-[95vw] !h-[95vh] !max-h-[95vh]" : "sm:max-w-2xl max-h-[85vh]"}`}>
+          <DialogHeader className="flex flex-row items-center justify-between gap-4">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
               {aiDialogStep === "chat" ? "Design Your Habits" : "Review AI Suggestions"}
             </DialogTitle>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setAiDialogFullscreen(!aiDialogFullscreen)}
+              data-testid="button-toggle-fullscreen"
+            >
+              {aiDialogFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
           </DialogHeader>
 
           {aiDialogStep === "chat" ? (
@@ -2010,7 +2019,7 @@ export default function TasksPage() {
               )}
 
               {/* Chat messages */}
-              <ScrollArea className="flex-1 pr-4 min-h-[300px] max-h-[400px]">
+              <ScrollArea className={`flex-1 pr-4 ${aiDialogFullscreen ? "min-h-[50vh]" : "min-h-[300px] max-h-[400px]"}`}>
                 <div className="space-y-4">
                   {aiMessages.map((msg, idx) => (
                     <div
@@ -2154,7 +2163,7 @@ export default function TasksPage() {
                       </Button>
                     </div>
                   </div>
-                  <div className="grid gap-2 max-h-48 overflow-y-auto">
+                  <div className={`grid gap-2 overflow-y-auto ${aiDialogFullscreen ? "max-h-[40vh]" : "max-h-48"}`}>
                     {aiGeneratedData.tasks.map((task, idx) => (
                       <div
                         key={idx}
@@ -2189,7 +2198,7 @@ export default function TasksPage() {
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Penalties ({aiSelectedPenalties.size}/{aiGeneratedData.penalties.length} selected)</Label>
                   </div>
-                  <div className="grid gap-2 max-h-32 overflow-y-auto">
+                  <div className={`grid gap-2 overflow-y-auto ${aiDialogFullscreen ? "max-h-[30vh]" : "max-h-32"}`}>
                     {aiGeneratedData.penalties.map((penalty, idx) => (
                       <div
                         key={idx}
