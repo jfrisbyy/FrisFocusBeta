@@ -6,6 +6,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { useAuth } from "@/hooks/useAuth";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
 import BoostersPanel from "@/components/BoostersPanel";
@@ -433,6 +436,7 @@ export default function Dashboard() {
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [weeklyTodoWeekOffset, setWeeklyTodoWeekOffset] = useState(0);
   const [weekStartDate, setWeekStartDate] = useState("");
   const [weekEndDate, setWeekEndDate] = useState("");
 
@@ -494,10 +498,21 @@ export default function Dashboard() {
     enabled: !useMockData,
   });
   
-  // Fetch weekly todos from API
+  // Fetch weekly todos from API - support week navigation
   const currentWeekId = getWeekId(new Date());
+  const selectedWeekDate = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weeklyTodoWeekOffset * 7);
+  const selectedWeekId = getWeekId(selectedWeekDate);
+  const previousWeekDate = addDays(selectedWeekDate, -7);
+  const previousWeekId = getWeekId(previousWeekDate);
+  
   const { data: apiWeeklyTodos, isFetched: weeklyTodosFetched } = useQuery<any>({
-    queryKey: ["/api/habit/weekly-todos", currentWeekId],
+    queryKey: ["/api/habit/weekly-todos", selectedWeekId],
+    enabled: !useMockData,
+  });
+  
+  // Fetch previous week's todos for import functionality
+  const { data: apiPreviousWeekTodos } = useQuery<any>({
+    queryKey: ["/api/habit/weekly-todos", previousWeekId],
     enabled: !useMockData,
   });
 
@@ -693,12 +708,18 @@ export default function Dashboard() {
       setWeeklyTodoBonusAwarded(apiWeeklyTodos.bonusAwarded ?? false);
     } else if (!weeklyTodosFetched) {
       // While fetching, use localStorage as initial state
-      const storedWeeklyTodoList = loadWeeklyTodoListFromStorage(currentWeekId);
+      const storedWeeklyTodoList = loadWeeklyTodoListFromStorage(selectedWeekId);
       if (storedWeeklyTodoList) {
         setWeeklyTodos(storedWeeklyTodoList.items);
         setWeeklyTodoBonusEnabled(storedWeeklyTodoList.bonusEnabled);
         setWeeklyTodoBonusPoints(storedWeeklyTodoList.bonusPoints);
         setWeeklyTodoBonusAwarded(storedWeeklyTodoList.bonusAwarded);
+      } else {
+        // Clear state when switching to a week with no data
+        setWeeklyTodos([]);
+        setWeeklyTodoBonusEnabled(false);
+        setWeeklyTodoBonusPoints(25);
+        setWeeklyTodoBonusAwarded(false);
       }
     }
 
@@ -1177,7 +1198,7 @@ export default function Dashboard() {
     // They are handled separately via the /api/fp/check-weekly-bonuses endpoint
     
     setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties]);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId, selectedWeekId]);
 
   const baseWeekStartForRange = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekStartForRange = addDays(baseWeekStartForRange, weekOffset * 7);
@@ -1443,13 +1464,13 @@ export default function Dashboard() {
     setWeeklyTodos(items);
     if (!useMockData) {
       try {
-        await apiRequest("PUT", `/api/habit/weekly-todos/${currentWeekId}`, {
+        await apiRequest("PUT", `/api/habit/weekly-todos/${selectedWeekId}`, {
           items,
           bonusEnabled: weeklyTodoBonusEnabled,
           bonusPoints: weeklyTodoBonusPoints,
           bonusAwarded: weeklyTodoBonusAwarded,
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", currentWeekId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", selectedWeekId] });
       } catch (e) { console.error("Error saving weekly todos:", e); }
     }
   };
@@ -1458,13 +1479,13 @@ export default function Dashboard() {
     setWeeklyTodoBonusEnabled(enabled);
     if (!useMockData) {
       try {
-        await apiRequest("PUT", `/api/habit/weekly-todos/${currentWeekId}`, {
+        await apiRequest("PUT", `/api/habit/weekly-todos/${selectedWeekId}`, {
           items: weeklyTodos,
           bonusEnabled: enabled,
           bonusPoints: weeklyTodoBonusPoints,
           bonusAwarded: weeklyTodoBonusAwarded,
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", currentWeekId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", selectedWeekId] });
       } catch (e) { console.error("Error saving weekly todos:", e); }
     }
   };
@@ -1473,15 +1494,46 @@ export default function Dashboard() {
     setWeeklyTodoBonusPoints(points);
     if (!useMockData) {
       try {
-        await apiRequest("PUT", `/api/habit/weekly-todos/${currentWeekId}`, {
+        await apiRequest("PUT", `/api/habit/weekly-todos/${selectedWeekId}`, {
           items: weeklyTodos,
           bonusEnabled: weeklyTodoBonusEnabled,
           bonusPoints: points,
           bonusAwarded: weeklyTodoBonusAwarded,
         });
-        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", currentWeekId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/habit/weekly-todos", selectedWeekId] });
       } catch (e) { console.error("Error saving weekly todos:", e); }
     }
+  };
+  
+  // Get incomplete items from previous week for import
+  const previousWeekItems: StoredTodoItem[] = (apiPreviousWeekTodos?.items || []).filter(
+    (item: StoredTodoItem) => !item.completed
+  );
+
+  const handleImportFromPreviousWeek = async () => {
+    if (previousWeekItems.length === 0) return;
+    
+    // Create new items with fresh IDs, copying essential fields from previous week
+    const importedItems: StoredTodoItem[] = previousWeekItems.map((item: StoredTodoItem, index: number) => ({
+      id: `todo-${Date.now()}-${index}`,
+      title: item.title,
+      pointValue: item.pointValue || 0,
+      completed: false,
+      order: weeklyTodos.length + index,
+      note: item.note,
+      penaltyEnabled: item.penaltyEnabled,
+      penaltyValue: item.penaltyValue,
+    }));
+    
+    const newItems = [...weeklyTodos, ...importedItems];
+    await handleWeeklyTodosChange(newItems);
+    
+    // Show toast
+    const { toast } = await import("@/hooks/use-toast");
+    toast({
+      title: "Items Imported",
+      description: `${importedItems.length} incomplete item${importedItems.length > 1 ? "s" : ""} imported from last week`,
+    });
   };
 
   // Due dates handlers
@@ -1598,19 +1650,67 @@ export default function Dashboard() {
             case "alerts":
               return <AlertsPanel alerts={alerts} />;
             case "weeklyTodos":
+              const weeklyTodoStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weeklyTodoWeekOffset * 7);
+              const weeklyTodoEnd = addDays(weeklyTodoStart, 6);
+              const weeklyTodoRange = `${format(weeklyTodoStart, "MMM d")} - ${format(weeklyTodoEnd, "MMM d")}`;
+              const isCurrentWeek = weeklyTodoWeekOffset === 0;
               return (
-                <TodoListPanel
-                  title="Weekly To-Do List"
-                  prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
-                  items={weeklyTodos}
-                  onItemsChange={handleWeeklyTodosChange}
-                  bonusEnabled={weeklyTodoBonusEnabled}
-                  bonusPoints={weeklyTodoBonusPoints}
-                  bonusAwarded={weeklyTodoBonusAwarded}
-                  onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
-                  onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
-                  isDemo={useMockData}
-                />
+                <Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm font-medium">Weekly To-Do List</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setWeeklyTodoWeekOffset(weeklyTodoWeekOffset - 1)}
+                          data-testid="button-weekly-todo-prev-week"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-muted-foreground min-w-[120px] text-center">
+                          {weeklyTodoRange}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setWeeklyTodoWeekOffset(weeklyTodoWeekOffset + 1)}
+                          disabled={weeklyTodoWeekOffset >= 0}
+                          data-testid="button-weekly-todo-next-week"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        {!isCurrentWeek && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWeeklyTodoWeekOffset(0)}
+                            data-testid="button-weekly-todo-today"
+                          >
+                            This Week
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <TodoListPanel
+                      title=""
+                      prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
+                      items={weeklyTodos}
+                      onItemsChange={handleWeeklyTodosChange}
+                      bonusEnabled={weeklyTodoBonusEnabled}
+                      bonusPoints={weeklyTodoBonusPoints}
+                      bonusAwarded={weeklyTodoBonusAwarded}
+                      onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
+                      onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
+                      isDemo={useMockData}
+                      previousItems={previousWeekItems}
+                      onImportFromPrevious={handleImportFromPreviousWeek}
+                      importLabel="Import from last week"
+                    />
+                  </CardContent>
+                </Card>
               );
             case "dueDates":
               return (
