@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isAuthenticated, upsertFirebaseUser, verifyFirebaseToken } from "./firebaseAdmin";
 import OpenAI from "openai";
+import { getAISystemPrompt } from "./aiSystemPrompt";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { randomBytes } from "crypto";
@@ -885,37 +886,8 @@ Keep responses brief and encouraging (2-4 sentences) unless the user asks for de
       
       const { visionStatement, focusAreas, timeAvailability, existingCategories } = parseResult.data;
       
-      // Build the prompt for AI
-      const systemPrompt = `You are an expert habit coach and life design specialist. Your task is to analyze a user's vision for their ideal life and generate practical, achievable daily habits and tasks.
-
-Guidelines for generating tasks:
-- Create 8-15 specific, actionable daily habits
-- Assign realistic point values (5-30 points based on effort/impact)
-- Group tasks into meaningful categories (Health, Productivity, Spiritual, Social, Learning, etc.)
-- Set appropriate priorities: mustDo (critical habits), shouldDo (important), couldDo (nice to have)
-- Consider the user's time availability when setting task counts
-- Create 2-5 penalty items for behaviors to avoid (negative point values from -5 to -15)
-- Suggest relevant categories that align with their goals
-
-Time availability guidelines:
-- minimal: 4-6 tasks, focus on essentials only
-- moderate: 8-12 tasks, balanced approach
-- dedicated: 12-18 tasks, comprehensive habit system
-
-Return a JSON object with this exact structure:
-{
-  "seasonTheme": "A short inspiring name for this life season (2-4 words)",
-  "summary": "Brief 1-2 sentence summary of the recommended approach",
-  "tasks": [
-    {"name": "Task name", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why this matters"}
-  ],
-  "penalties": [
-    {"name": "Penalty name", "value": -5, "description": "Why to avoid this"}
-  ],
-  "categories": [
-    {"name": "Category name"}
-  ]
-}`;
+      // Get the system prompt (includes custom instructions if configured)
+      const systemPrompt = getAISystemPrompt();
 
       const userPrompt = `Here is my vision for the next 6 months:
 
