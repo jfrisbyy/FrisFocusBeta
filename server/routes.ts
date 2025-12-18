@@ -297,7 +297,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Return public profile info only
+      // Return public profile info with FP total from user record
       res.json({
         id: user.id,
         username: user.username,
@@ -306,6 +306,7 @@ export async function registerRoutes(
         lastName: user.lastName,
         profileImageUrl: user.profileImageUrl,
         createdAt: user.createdAt,
+        fpTotal: user.fpTotal || 0,
       });
     } catch (error) {
       console.error("Error fetching user summary:", error);

@@ -174,7 +174,7 @@ export default function TasksPage() {
   // AI task generation state - conversational flow
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiDialogStep, setAiDialogStep] = useState<"chat" | "preview">("chat");
-  const [aiDialogFullscreen, setAiDialogFullscreen] = useState(false);
+  const [aiDialogFullscreen, setAiDialogFullscreen] = useState(true);
   const [aiMessages, setAiMessages] = useState<AIConversationMessage[]>([]);
   const [aiConversationState, setAiConversationState] = useState<AIConversationState>({
     currentStep: "vision",

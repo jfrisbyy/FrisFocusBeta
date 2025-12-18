@@ -123,11 +123,11 @@ export default function PointsCard({ weekTotal, weekRange, boosterPoints = 0, we
               )}
             </div>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
+          <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>Week Total Breakdown</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1">
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <Calendar className="h-4 w-4" />

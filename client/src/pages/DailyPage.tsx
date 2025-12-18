@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DatePicker from "@/components/DatePicker";
 import TaskCheckbox from "@/components/TaskCheckbox";
@@ -138,6 +138,13 @@ export default function DailyPage() {
   // Fetch daily todos from API
   const { data: apiDailyTodos, isFetched: dailyTodosFetched } = useQuery<any>({
     queryKey: ["/api/habit/daily-todos", dateStr],
+    enabled: !isDemo,
+  });
+
+  // Fetch previous day's todos for import feature
+  const previousDayStr = format(addDays(date, -1), "yyyy-MM-dd");
+  const { data: apiPreviousDayTodos } = useQuery<any>({
+    queryKey: ["/api/habit/daily-todos", previousDayStr],
     enabled: !isDemo,
   });
   
@@ -462,6 +469,38 @@ export default function DailyPage() {
     }
   };
 
+  // Get incomplete items from previous day for import
+  const previousDayItems: StoredTodoItem[] = (apiPreviousDayTodos?.items || []).filter(
+    (item: StoredTodoItem) => !item.completed
+  );
+
+  const handleImportFromPreviousDay = async () => {
+    if (previousDayItems.length === 0) return;
+    
+    // Create new items with fresh IDs, copying essential fields from previous day
+    const importedItems: StoredTodoItem[] = previousDayItems.map((item: StoredTodoItem, index: number) => ({
+      id: `todo-${Date.now()}-${index}`,
+      title: item.title,
+      pointValue: item.pointValue || 0,
+      completed: false,
+      order: todoItems.length + index,
+      note: item.note,
+      penaltyEnabled: item.penaltyEnabled,
+      penaltyValue: item.penaltyValue,
+    }));
+    
+    const newItems = [...todoItems, ...importedItems];
+    await handleTodoItemsChange(newItems);
+    
+    // Refetch to ensure persistence
+    queryClient.invalidateQueries({ queryKey: ["/api/habit/daily-todos", dateStr] });
+    
+    toast({
+      title: "Items Imported",
+      description: `${importedItems.length} incomplete item${importedItems.length > 1 ? "s" : ""} imported from yesterday`,
+    });
+  };
+
   const handleSave = async () => {
     if (isDemo) {
       toast({
@@ -612,6 +651,9 @@ export default function DailyPage() {
             bonusPoints={todoBonusPoints}
             onBonusPointsChange={handleTodoBonusPointsChange}
             bonusAwarded={todoBonusAwarded}
+            previousItems={previousDayItems}
+            onImportFromPrevious={handleImportFromPreviousDay}
+            importLabel="Import from yesterday"
             data-testid="panel-daily-todos"
           />
           

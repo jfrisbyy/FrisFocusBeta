@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift, Settings, StickyNote, Pencil, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Gift, Settings, StickyNote, Pencil, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,6 +32,9 @@ interface TodoListPanelProps {
   bonusAwarded: boolean;
   readOnly?: boolean;
   isDemo?: boolean;
+  previousItems?: StoredTodoItem[];
+  onImportFromPrevious?: () => void;
+  importLabel?: string;
 }
 
 export default function TodoListPanel({
@@ -46,6 +49,9 @@ export default function TodoListPanel({
   bonusAwarded,
   readOnly = false,
   isDemo = false,
+  previousItems,
+  onImportFromPrevious,
+  importLabel = "Import from previous",
 }: TodoListPanelProps) {
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("0");
@@ -278,6 +284,18 @@ export default function TodoListPanel({
                 />
               )}
             </div>
+            {!readOnly && previousItems && previousItems.filter(i => !i.completed).length > 0 && onImportFromPrevious && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onImportFromPrevious}
+                className="w-full mt-2"
+                data-testid={`button-${title.toLowerCase().replace(/\s/g, "-")}-import`}
+              >
+                <Download className="h-3 w-3 mr-2" />
+                {importLabel} ({previousItems.filter(i => !i.completed).length} incomplete)
+              </Button>
+            )}
           </div>
         )}
 
