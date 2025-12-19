@@ -10,7 +10,7 @@ import { SiGoogle } from "react-icons/si";
 import ProfileDialog from "@/components/ProfileDialog";
 import NotificationBell from "@/components/NotificationBell";
 import FpBar from "@/components/FpBar";
-import logoUrl from "@assets/ChatGPT_Image_Dec_19,_2025,_12_27_45_AM_1766122092280.png";
+import logoUrl from "@assets/frisfocus-logo.png";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
