@@ -239,8 +239,34 @@ export default function FitnessPage() {
   };
 
   const getLatestWeight = () => bodyComp.length > 0 ? bodyComp.sort((a, b) => b.date.localeCompare(a.date))[0] : null;
-  const getTodayCalories = () => nutrition.find(n => n.date === format(new Date(), "yyyy-MM-dd"));
-  const getSelectedDateCalories = () => nutrition.find(n => n.date === format(selectedNutritionDate, "yyyy-MM-dd"));
+  
+  // Aggregate all nutrition logs for a given date
+  const aggregateNutritionForDate = (dateStr: string): NutritionLog | null => {
+    const logsForDate = nutrition.filter(n => n.date === dateStr);
+    if (logsForDate.length === 0) return null;
+    if (logsForDate.length === 1) return logsForDate[0];
+    
+    // Aggregate multiple logs
+    const aggregated: NutritionLog = {
+      id: logsForDate[0].id,
+      date: dateStr,
+      userId: logsForDate[0].userId,
+      calories: logsForDate.reduce((sum, n) => sum + (n.calories || 0), 0),
+      protein: logsForDate.reduce((sum, n) => sum + (n.protein || 0), 0),
+      carbs: logsForDate.reduce((sum, n) => sum + (n.carbs || 0), 0),
+      fats: logsForDate.reduce((sum, n) => sum + (n.fats || 0), 0),
+      creatine: logsForDate.some(n => n.creatine),
+      waterGallon: logsForDate.some(n => n.waterGallon),
+      deficit: logsForDate.reduce((sum, n) => sum + (n.deficit || 0), 0) || null,
+      caloriesBurned: logsForDate.reduce((sum, n) => sum + (n.caloriesBurned || 0), 0) || null,
+      meals: logsForDate.flatMap(n => (Array.isArray(n.meals) ? n.meals : []) as Meal[]),
+      completedToggles: logsForDate[0].completedToggles,
+    };
+    return aggregated;
+  };
+  
+  const getTodayCalories = () => aggregateNutritionForDate(format(new Date(), "yyyy-MM-dd"));
+  const getSelectedDateCalories = () => aggregateNutritionForDate(format(selectedNutritionDate, "yyyy-MM-dd"));
   const getAvgDeficit = () => {
     const recent = nutrition.filter(n => n.deficit).slice(0, 7);
     if (recent.length === 0) return 0;
