@@ -139,6 +139,17 @@ export default function DailyPage() {
     enabled: !isDemo,
   });
 
+  // Determine if we need to load a historical season's tasks
+  // (when the log's seasonId differs from the current active season)
+  const logSeasonId = apiDailyLog?.seasonId;
+  const needsHistoricalSeason = logSeasonId && logSeasonId !== activeSeason?.id;
+  
+  // Fetch the historical season's data if needed
+  const { data: historicalSeasonData, isFetched: historicalSeasonFetched } = useQuery<SeasonWithData>({
+    queryKey: ["/api/seasons", logSeasonId, "data"],
+    enabled: !isDemo && !!needsHistoricalSeason,
+  });
+
   // Fetch daily todos from API
   const { data: apiDailyTodos, isFetched: dailyTodosFetched } = useQuery<any>({
     queryKey: ["/api/habit/daily-todos", dateStr],
@@ -153,7 +164,14 @@ export default function DailyPage() {
   });
   
   // Check if API queries have completed their initial fetch
-  const apiQueriesReady = isDemo || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched));
+  // Also wait for historical season data if needed
+  const apiQueriesReady = isDemo || (
+    dailyLogFetched && (
+      needsHistoricalSeason 
+        ? historicalSeasonFetched 
+        : (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched))
+    )
+  );
 
   // Mutation for saving daily log
   const saveDailyLogMutation = useMutation({
@@ -210,8 +228,32 @@ export default function DailyPage() {
       return;
     }
 
-    // If there's an active season, use its data
-    if (activeSeason && activeSeasonData) {
+    // Priority 1: Use historical season data if viewing an old day with different season
+    if (needsHistoricalSeason && historicalSeasonData) {
+      const categoryMap = new Map(historicalSeasonData.categories.map((c: any) => [c.id, c.name]));
+
+      const taskItems: DisplayTask[] = historicalSeasonData.tasks.map((task: any) => ({
+        id: task.id,
+        name: task.name,
+        value: task.value,
+        category: task.category ? (categoryMap.get(task.category) || task.category) : "Uncategorized",
+        isBooster: !!task.boosterRule,
+        tiers: task.tiers,
+      }));
+
+      const penaltyItems: DisplayTask[] = historicalSeasonData.penalties.map((penalty: any) => ({
+        id: penalty.id,
+        name: penalty.name,
+        value: -Math.abs(penalty.value),
+        category: "Penalties",
+      }));
+
+      setAllTasks([...taskItems, ...penaltyItems]);
+      return;
+    }
+
+    // Priority 2: Use active season data for current/new days
+    if (activeSeason && activeSeasonData && !needsHistoricalSeason) {
       const categoryMap = new Map(activeSeasonData.categories.map((c: any) => [c.id, c.name]));
 
       const taskItems: DisplayTask[] = activeSeasonData.tasks.map((task: any) => ({
@@ -283,7 +325,7 @@ export default function DailyPage() {
 
       setAllTasks([...taskItems, ...penaltyItems]);
     }
-  }, [isDemo, apiTasks, apiPenalties, apiCategories, apiQueriesReady, activeSeason, activeSeasonData]);
+  }, [isDemo, apiTasks, apiPenalties, apiCategories, apiQueriesReady, activeSeason, activeSeasonData, needsHistoricalSeason, historicalSeasonData]);
 
   // Reset the loaded log date ref when date changes
   useEffect(() => {
@@ -406,7 +448,7 @@ export default function DailyPage() {
             todoPoints: totalTodoPoints,
             penaltyPoints: Math.abs(newNegativePoints),
             taskPoints: newPositivePoints,
-            seasonId: activeSeason?.id || null,
+            seasonId: logSeasonId || activeSeason?.id || null,
             taskNotes,
             taskTiers,
           });
@@ -619,7 +661,7 @@ export default function DailyPage() {
         todoPoints: totalTodoPoints,
         penaltyPoints: Math.abs(negativePoints),
         taskPoints: computedTaskPoints,
-        seasonId: activeSeason?.id || null,
+        seasonId: logSeasonId || activeSeason?.id || null,
         taskNotes,
         taskTiers,
       });
