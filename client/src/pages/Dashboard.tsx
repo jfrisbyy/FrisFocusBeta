@@ -811,6 +811,8 @@ export default function Dashboard() {
     // Use mock data during demo/onboarding, otherwise load from storage
     // BUT: Don't overwrite with mock data if we've already loaded real user data
     if (useMockData && !hasLoadedRealDataRef.current) {
+      // Mark as initialized immediately to prevent re-running on every render
+      hasLoadedRealDataRef.current = true;
       setDays(getMockWeekData(weekOffset, true));
       // Update week date strings for mock data too
       const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
