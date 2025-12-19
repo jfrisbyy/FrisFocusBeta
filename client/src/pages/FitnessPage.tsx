@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,8 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
-  Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints
+  Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
+  MessageCircle, Send
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2395,35 +2396,92 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
     date: format(new Date(), "yyyy-MM-dd"),
     deficit: "",
   });
-  const [activityDescription, setActivityDescription] = useState("");
-  const [aiEstimate, setAiEstimate] = useState<{ estimatedDeficit: number; breakdown: { exerciseCalories: number; neatBonus: number; proteinTEF: number; explanation: string } } | null>(null);
-  const [isEstimating, setIsEstimating] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [userInput, setUserInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [finalEstimate, setFinalEstimate] = useState<{ estimatedDeficit: number; breakdown: { exerciseCalories: number; neatBonus: number; proteinTEF: number; explanation: string } } | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const getAIEstimate = async () => {
-    if (!activityDescription.trim()) {
-      toast({ title: "Please describe your day's activities", variant: "destructive" });
-      return;
-    }
-    setIsEstimating(true);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  const resetChat = () => {
+    setChatMessages([]);
+    setUserInput("");
+    setShowChat(false);
+    setFinalEstimate(null);
+  };
+
+  const startAIConversation = async () => {
+    setShowChat(true);
+    setIsLoading(true);
+    setChatMessages([]);
+    setFinalEstimate(null);
+    
     try {
-      const res = await apiRequest("POST", "/api/fitness/deficit/estimate", {
-        activityDescription,
+      const res = await apiRequest("POST", "/api/fitness/deficit/chat", {
+        date: formData.date,
+        history: [],
         maintenanceCalories: nutritionSettings?.maintenanceCalories || 2500,
         proteinIntake: nutritionSettings?.proteinTarget || 150,
       });
       const data = await res.json();
-      setAiEstimate(data);
-      setFormData(prev => ({ ...prev, deficit: data.estimatedDeficit?.toString() || prev.deficit }));
+      
+      setChatMessages([{ role: 'assistant', content: data.message }]);
+      
+      if (data.isFinal && data.estimatedDeficit !== undefined) {
+        setFinalEstimate({
+          estimatedDeficit: data.estimatedDeficit,
+          breakdown: data.breakdown,
+        });
+      }
     } catch (error) {
-      toast({ title: "Failed to get AI estimate", variant: "destructive" });
+      toast({ title: "Failed to start AI conversation", variant: "destructive" });
+      setShowChat(false);
     } finally {
-      setIsEstimating(false);
+      setIsLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!userInput.trim() || isLoading) return;
+    
+    const newUserMessage = { role: 'user' as const, content: userInput.trim() };
+    const updatedHistory = [...chatMessages, newUserMessage];
+    setChatMessages(updatedHistory);
+    setUserInput("");
+    setIsLoading(true);
+    
+    try {
+      const res = await apiRequest("POST", "/api/fitness/deficit/chat", {
+        date: formData.date,
+        history: updatedHistory,
+        maintenanceCalories: nutritionSettings?.maintenanceCalories || 2500,
+        proteinIntake: nutritionSettings?.proteinTarget || 150,
+      });
+      const data = await res.json();
+      
+      setChatMessages([...updatedHistory, { role: 'assistant', content: data.message }]);
+      
+      if (data.isFinal && data.estimatedDeficit !== undefined) {
+        setFinalEstimate({
+          estimatedDeficit: data.estimatedDeficit,
+          breakdown: data.breakdown,
+        });
+      }
+    } catch (error) {
+      toast({ title: "Failed to get AI response", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const acceptEstimate = () => {
-    if (aiEstimate) {
-      setFormData(prev => ({ ...prev, deficit: aiEstimate.estimatedDeficit.toString() }));
+    if (finalEstimate) {
+      setFormData(prev => ({ ...prev, deficit: finalEstimate.estimatedDeficit.toString() }));
+      setShowChat(false);
     }
   };
 
@@ -2437,8 +2495,7 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
       toast({ title: "Deficit logged" });
       onOpenChange(false);
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), deficit: "" });
-      setActivityDescription("");
-      setAiEstimate(null);
+      resetChat();
     },
     onError: () => {
       toast({ title: "Failed to log deficit", variant: "destructive" });
@@ -2462,7 +2519,7 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(val) => { onOpenChange(val); if (!val) resetChat(); }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Log Caloric Deficit</DialogTitle>
@@ -2471,7 +2528,12 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Date</Label>
-            <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-deficit-date" />
+            <Input 
+              type="date" 
+              value={formData.date} 
+              onChange={(e) => { setFormData({ ...formData, date: e.target.value }); resetChat(); }} 
+              data-testid="input-deficit-date" 
+            />
           </div>
 
           <div className="space-y-2">
@@ -2486,56 +2548,119 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
           </div>
 
           <div className="border-t pt-4 space-y-3">
-            <Label className="text-base font-medium">AI Estimation</Label>
-            <p className="text-sm text-muted-foreground">Describe your day's activities and let AI estimate your caloric burn</p>
-            <Textarea 
-              placeholder="e.g., I did a 45 minute strength workout focusing on upper body, walked 8000 steps throughout the day, and had a generally active day at work standing and moving around..."
-              value={activityDescription}
-              onChange={(e) => setActivityDescription(e.target.value)}
-              className="min-h-[100px]"
-              data-testid="input-activity-description"
-            />
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={getAIEstimate} 
-              disabled={isEstimating || !activityDescription.trim()}
-              data-testid="button-get-ai-estimate"
-            >
-              {isEstimating ? "Estimating..." : "Get AI Estimate"}
-            </Button>
-
-            {aiEstimate && (
-              <div className="bg-muted/50 rounded-md p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Estimated Deficit:</span>
-                  <Badge variant="secondary" className="text-lg px-3 py-1">{aiEstimate.estimatedDeficit} cal</Badge>
-                </div>
-                {aiEstimate.breakdown && (
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <div className="flex justify-between">
-                      <span>Exercise calories:</span>
-                      <span>{aiEstimate.breakdown.exerciseCalories} cal</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>NEAT bonus:</span>
-                      <span>{aiEstimate.breakdown.neatBonus} cal</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Protein TEF:</span>
-                      <span>{aiEstimate.breakdown.proteinTEF} cal</span>
-                    </div>
-                    <p className="pt-2 text-xs">{aiEstimate.breakdown.explanation}</p>
-                  </div>
-                )}
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <Label className="text-base font-medium">AI Estimation</Label>
+                <p className="text-sm text-muted-foreground">Chat with AI to estimate your caloric burn for the day</p>
+              </div>
+              {!showChat && (
                 <Button 
                   type="button" 
-                  size="sm" 
-                  onClick={acceptEstimate}
-                  data-testid="button-accept-estimate"
+                  variant="outline" 
+                  onClick={startAIConversation} 
+                  disabled={isLoading}
+                  data-testid="button-start-ai-chat"
                 >
-                  Use This Estimate
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  {isLoading ? "Starting..." : "Get AI Estimate"}
                 </Button>
+              )}
+            </div>
+
+            {showChat && (
+              <div className="space-y-3">
+                <div className="bg-muted/30 rounded-md p-3 max-h-[250px] overflow-y-auto space-y-3">
+                  {chatMessages.map((msg, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[85%] rounded-md px-3 py-2 text-sm ${
+                          msg.role === 'user' 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-muted'
+                        }`}
+                        data-testid={`chat-message-${msg.role}-${idx}`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted rounded-md px-3 py-2 text-sm text-muted-foreground">
+                        Thinking...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                {finalEstimate ? (
+                  <div className="bg-muted/50 rounded-md p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">Estimated Deficit:</span>
+                      <Badge variant="secondary" className="text-lg px-3 py-1">{finalEstimate.estimatedDeficit} cal</Badge>
+                    </div>
+                    {finalEstimate.breakdown && (
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <div className="flex justify-between gap-2">
+                          <span>Exercise calories:</span>
+                          <span>{finalEstimate.breakdown.exerciseCalories} cal</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span>NEAT bonus:</span>
+                          <span>{finalEstimate.breakdown.neatBonus} cal</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span>Protein TEF:</span>
+                          <span>{finalEstimate.breakdown.proteinTEF} cal</span>
+                        </div>
+                        <p className="pt-2 text-xs">{finalEstimate.breakdown.explanation}</p>
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        onClick={acceptEstimate}
+                        data-testid="button-accept-estimate"
+                      >
+                        Use This Estimate
+                      </Button>
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        variant="outline"
+                        onClick={startAIConversation}
+                        data-testid="button-restart-chat"
+                      >
+                        Start Over
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type your response..."
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                      disabled={isLoading}
+                      data-testid="input-chat-message"
+                    />
+                    <Button 
+                      type="button" 
+                      size="icon"
+                      onClick={sendMessage}
+                      disabled={isLoading || !userInput.trim()}
+                      data-testid="button-send-message"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -773,61 +773,116 @@ export async function registerRoutes(
     }
   });
 
-  // AI Deficit Estimation
-  const deficitEstimateRequestSchema = z.object({
-    activityDescription: z.string().min(1, "Activity description is required"),
-    maintenanceCalories: z.number().optional().default(2500),
-    proteinIntake: z.number().optional().default(150),
-  });
-
-  const deficitEstimateResponseSchema = z.object({
-    estimatedDeficit: z.number(),
-    breakdown: z.object({
-      exerciseCalories: z.number(),
-      neatBonus: z.number(),
-      proteinTEF: z.number(),
-      explanation: z.string(),
-    }),
-  });
-
-  app.post("/api/fitness/deficit/estimate", isAuthenticated, async (req: any, res) => {
+  // Conversational AI Deficit Estimation - fetches user's logs and has a conversation
+  app.post("/api/fitness/deficit/chat", isAuthenticated, async (req: any, res) => {
     try {
-      const parseResult = deficitEstimateRequestSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      const userId = req.user.claims.sub;
+      const { date, history, maintenanceCalories, proteinIntake } = req.body;
+      
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
       }
       
-      const { activityDescription, maintenanceCalories, proteinIntake } = parseResult.data;
+      const normalizedDate = date.split('T')[0];
       
-      const systemPrompt = `You are a nutrition and fitness expert helping estimate daily caloric deficit based on a user's activity description.
+      // Fetch all logs for the date
+      const [strengthLogs] = await Promise.all([
+        db.select().from(strengthWorkouts).where(and(eq(strengthWorkouts.userId, userId), eq(strengthWorkouts.date, normalizedDate))),
+      ]);
+      const [basketballLogs] = await Promise.all([
+        db.select().from(basketballRuns).where(and(eq(basketballRuns.userId, userId), eq(basketballRuns.date, normalizedDate))),
+      ]);
+      const [cardioLogs] = await Promise.all([
+        db.select().from(cardioRuns).where(and(eq(cardioRuns.userId, userId), eq(cardioRuns.date, normalizedDate))),
+      ]);
+      const [nutritionLogs_] = await Promise.all([
+        db.select().from(nutritionLogs).where(and(eq(nutritionLogs.userId, userId), eq(nutritionLogs.date, normalizedDate))),
+      ]);
+      
+      // Build a summary of known activities
+      let knownActivities: string[] = [];
+      
+      if (strengthLogs.length > 0) {
+        for (const w of strengthLogs) {
+          const exercises = Array.isArray(w.exercises) ? w.exercises as any[] : [];
+          const volume = exercises.reduce((sum, ex) => sum + (ex.sets || 0) * (ex.reps || 0) * (ex.weight || 0), 0);
+          knownActivities.push(`Strength workout: ${w.primaryFocus || 'General'} focus, ${w.duration || '?'} minutes, ${exercises.length} exercises, volume ${volume}lbs`);
+        }
+      }
+      
+      if (basketballLogs.length > 0) {
+        for (const b of basketballLogs) {
+          const gameType = b.gameType && typeof b.gameType === 'object' ? Object.keys(b.gameType as object).filter(k => (b.gameType as any)[k]).join('/') : 'unknown';
+          knownActivities.push(`Basketball: ${b.gamesPlayed || 0} games (${gameType}), ${b.courtType || 'unknown'} court, ${b.competitionLevel || 'unknown'} level`);
+        }
+      }
+      
+      if (cardioLogs.length > 0) {
+        for (const c of cardioLogs) {
+          knownActivities.push(`Cardio run: ${c.distance ? (c.distance/1000).toFixed(1) + 'km' : '?'}, ${c.duration || '?'} minutes, ${c.terrain || 'unknown'} terrain`);
+        }
+      }
+      
+      // Check for steps in nutrition log
+      const todayNutrition = nutritionLogs_.length > 0 ? nutritionLogs_[0] : null;
+      
+      const TDEE = maintenanceCalories || 2500;
+      const protein = proteinIntake || 150;
+      
+      const systemPrompt = `You are a helpful fitness coach estimating the user's daily caloric deficit for ${normalizedDate}.
 
-The user has a maintenance TDEE of ${maintenanceCalories} calories and typically consumes ${proteinIntake}g of protein per day.
+USER PROFILE:
+- Maintenance TDEE: ${TDEE} calories
+- Protein intake: ${protein}g (thermic effect ~${Math.round(protein * 4 * 0.25)} calories)
 
-Consider the thermic effect of protein (TEF) - approximately 20-30% of protein calories are burned during digestion. For example, 150g protein = 600 calories, with ~120-180 calories burned from TEF.
+KNOWN LOGGED ACTIVITIES FOR THIS DAY:
+${knownActivities.length > 0 ? knownActivities.map(a => '- ' + a).join('\n') : '- No workouts logged yet'}
 
-Based on the user's description of their day's activities, estimate:
-1. Approximate calories burned from exercise/activities mentioned
-2. Any additional Non-Exercise Activity Thermogenesis (NEAT) factors
-3. The expected caloric deficit for the day
+YOUR TASK:
+1. First, acknowledge what you already know from their logs
+2. Ask 1-2 specific follow-up questions to refine the estimate (e.g., intensity level, rest times, steps walked, general activity level)
+3. After they respond, provide a final estimate
 
-Respond in JSON format:
+When you have enough information to give a final estimate, respond with JSON:
 {
-  "estimatedDeficit": <number in calories>,
+  "isFinal": true,
+  "estimatedDeficit": <number>,
   "breakdown": {
     "exerciseCalories": <number>,
     "neatBonus": <number>,
     "proteinTEF": <number>,
-    "explanation": "<brief 1-2 sentence explanation>"
+    "explanation": "<brief explanation>"
   }
+}
+
+While gathering info, respond with:
+{
+  "isFinal": false,
+  "message": "<your message to the user>"
 }`;
+
+      const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemPrompt },
+      ];
+      
+      // Add conversation history
+      if (Array.isArray(history)) {
+        for (const msg of history) {
+          if (msg.role === "user" || msg.role === "assistant") {
+            messages.push({ role: msg.role, content: msg.content });
+          }
+        }
+      }
+      
+      // If no history, this is the initial request - AI will start the conversation
+      if (!history || history.length === 0) {
+        messages.push({ role: "user", content: "Help me estimate my caloric deficit for today." });
+      }
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: activityDescription }
-        ],
-        max_tokens: 500,
+        messages,
+        max_tokens: 600,
         response_format: { type: "json_object" },
       });
 
@@ -838,19 +893,17 @@ Respond in JSON format:
 
       try {
         const parsed = JSON.parse(rawContent);
-        const validated = deficitEstimateResponseSchema.safeParse(parsed);
-        if (!validated.success) {
-          console.error("AI response validation failed:", validated.error.issues);
-          return res.status(500).json({ error: "AI returned invalid format", estimatedDeficit: 0, breakdown: { exerciseCalories: 0, neatBonus: 0, proteinTEF: 0, explanation: "Could not parse AI response" } });
-        }
-        res.json(validated.data);
+        res.json({
+          ...parsed,
+          knownActivities,
+        });
       } catch (parseError) {
-        console.error("Failed to parse AI deficit response:", parseError);
+        console.error("Failed to parse AI response:", parseError);
         res.status(500).json({ error: "Failed to parse AI response" });
       }
     } catch (error) {
-      console.error("AI deficit estimation error:", error);
-      res.status(500).json({ error: "Failed to estimate deficit" });
+      console.error("AI deficit chat error:", error);
+      res.status(500).json({ error: "Failed to get AI response" });
     }
   });
 
