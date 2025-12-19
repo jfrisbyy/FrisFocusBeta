@@ -802,25 +802,6 @@ WHEN TO FINALIZE:
 - Major toppings/additions are clarified
 - OR user says "just estimate" or seems impatient
 
-MATH RULES (CRITICAL - FOLLOW EXACTLY):
-Before providing final numbers, you MUST:
-
-Step 1: List each food item with its BASE nutritional values (per 1 unit)
-Step 2: Multiply each value by the quantity
-Step 3: Write out each item's TOTAL (qty × base)
-Step 4: Add ALL items together, column by column
-Step 5: VERIFY your addition by adding again
-
-Example calculation format:
-"Item 1 (×2): 2 × 400cal = 800cal, 2 × 14g protein = 28g, 2 × 40g carbs = 80g, 2 × 21g fat = 42g
-Item 2 (×1): 220cal, 3g protein, 28g carbs, 11g fat
-TOTAL: 800 + 220 = 1020cal, 28 + 3 = 31g protein, 80 + 28 = 108g carbs, 42 + 11 = 53g fat"
-
-NEVER skip the addition step. ALWAYS show "X + Y = Z" for the final totals.
-If you have 3+ items, add them one at a time: "800 + 220 = 1020, 1020 + 300 = 1320"
-
-CRITICAL: The "calories", "protein", "carbs", and "fats" values in your JSON response MUST EXACTLY MATCH the final totals you calculated in the breakdown. Copy the numbers directly from your calculation - do not estimate or round differently.
-
 RESPONSE FORMAT:
 If you need more information, respond with:
 {
@@ -828,16 +809,20 @@ If you need more information, respond with:
   "message": "<your clarifying question>"
 }
 
-When you have enough details for an accurate estimate, respond with:
+When you have enough details, respond with an "items" array. DO NOT calculate totals - just provide per-item values:
 {
   "isFinal": true,
   "mealName": "<descriptive name>",
-  "calories": <number>,
-  "protein": <number>,
-  "carbs": <number>,
-  "fats": <number>,
-  "breakdown": "<per-item breakdown showing math>"
-}`;
+  "items": [
+    { "name": "McChicken", "quantity": 2, "caloriesPer": 400, "proteinPer": 14, "carbsPer": 40, "fatsPer": 21 },
+    { "name": "Small Fries", "quantity": 1, "caloriesPer": 220, "proteinPer": 3, "carbsPer": 29, "fatsPer": 11 }
+  ]
+}
+
+IMPORTANT: 
+- "caloriesPer", "proteinPer", "carbsPer", "fatsPer" are the values for ONE unit of that item
+- The system will calculate totals automatically - do NOT include total fields
+- Be accurate with per-item nutritional data from known sources`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
@@ -863,7 +848,43 @@ When you have enough details for an accurate estimate, respond with:
 
       try {
         const parsed = JSON.parse(rawContent);
-        res.json(parsed);
+        
+        // If final response with items, calculate totals programmatically
+        if (parsed.isFinal && parsed.items && Array.isArray(parsed.items)) {
+          let totalCalories = 0;
+          let totalProtein = 0;
+          let totalCarbs = 0;
+          let totalFats = 0;
+          const breakdownParts: string[] = [];
+          
+          for (const item of parsed.items) {
+            const qty = item.quantity || 1;
+            const itemCals = qty * (item.caloriesPer || 0);
+            const itemProtein = qty * (item.proteinPer || 0);
+            const itemCarbs = qty * (item.carbsPer || 0);
+            const itemFats = qty * (item.fatsPer || 0);
+            
+            totalCalories += itemCals;
+            totalProtein += itemProtein;
+            totalCarbs += itemCarbs;
+            totalFats += itemFats;
+            
+            breakdownParts.push(`${item.name} (x${qty}): ${itemCals}cal, ${itemProtein}g protein, ${itemCarbs}g carbs, ${itemFats}g fat`);
+          }
+          
+          // Return with calculated totals
+          res.json({
+            isFinal: true,
+            mealName: parsed.mealName,
+            calories: Math.round(totalCalories),
+            protein: Math.round(totalProtein),
+            carbs: Math.round(totalCarbs),
+            fats: Math.round(totalFats),
+            breakdown: breakdownParts.join('\n')
+          });
+        } else {
+          res.json(parsed);
+        }
       } catch (parseError) {
         console.error("Failed to parse AI nutrition response:", parseError);
         res.status(500).json({ error: "Failed to parse AI response" });
