@@ -2422,17 +2422,32 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
 
   const applyAiResult = () => {
     if (!aiResult) return;
+    // Add as a meal entry so it shows in the meals list
+    const meal: Meal = {
+      id: `ai-meal-${Date.now()}`,
+      name: aiResult.mealName,
+      calories: aiResult.calories,
+      protein: aiResult.protein,
+      time: format(new Date(), "h:mm a"),
+    };
+    const newMeals = [...meals, meal];
+    setMeals(newMeals);
+    // Update totals
+    const totalCalories = (parseInt(formData.calories) || 0) + aiResult.calories;
+    const totalProtein = (parseInt(formData.protein) || 0) + aiResult.protein;
+    const totalCarbs = (parseInt(formData.carbs) || 0) + aiResult.carbs;
+    const totalFats = (parseInt(formData.fats) || 0) + aiResult.fats;
     setFormData({
       ...formData,
-      calories: aiResult.calories.toString(),
-      protein: aiResult.protein.toString(),
-      carbs: aiResult.carbs.toString(),
-      fats: aiResult.fats.toString(),
+      calories: totalCalories.toString(),
+      protein: totalProtein.toString(),
+      carbs: totalCarbs.toString(),
+      fats: totalFats.toString(),
     });
-    setLogMode("total");
+    setLogMode("meal"); // Switch to meal mode so they can see it and add more
     setAiResult(null);
     setAiDescription("");
-    toast({ title: "Applied AI estimate" });
+    toast({ title: `Added "${aiResult.mealName}" to meals` });
   };
 
   const addMeal = () => {
@@ -2491,7 +2506,7 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       protein: formData.protein ? parseInt(formData.protein) : undefined,
       carbs: formData.carbs ? parseInt(formData.carbs) : undefined,
       fats: formData.fats ? parseInt(formData.fats) : undefined,
-      meals: logMode === "meal" && meals.length > 0 ? meals : undefined,
+      meals: meals.length > 0 ? meals : undefined,
     };
     if (isEditing && editData && onEdit) {
       onEdit(editData.id, payload);
