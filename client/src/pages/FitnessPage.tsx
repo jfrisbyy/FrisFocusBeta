@@ -21,7 +21,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal } from "@shared/schema";
 import { Settings } from "lucide-react";
-import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays } from "date-fns";
+import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend } from "recharts";
 
 const mockNutrition: NutritionLog[] = [
   { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, carbs: 220, fats: 65, creatine: true, waterGallon: true, deficit: 300 },
@@ -702,6 +703,128 @@ export default function FitnessPage() {
               ) : (
                 <p className="text-muted-foreground text-sm text-center py-4">No data logged today. Use the button above to log your nutrition.</p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Weekly Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Weekly Overview
+              </CardTitle>
+              <CardDescription>Your nutrition trends over the past 7 days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const today = new Date();
+                const weekDays = eachDayOfInterval({
+                  start: subDays(today, 6),
+                  end: today
+                });
+                
+                const chartData = weekDays.map(day => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const log = nutrition.find(n => n.date === dateStr);
+                  return {
+                    day: format(day, 'EEE'),
+                    fullDate: format(day, 'MMM d'),
+                    calories: log?.calories || 0,
+                    protein: log?.protein || 0,
+                    target: nutritionSettings.calorieTarget || 2000,
+                    proteinTarget: nutritionSettings.proteinTarget || 150,
+                    hasData: !!log
+                  };
+                });
+
+                const weeklyAvgCalories = chartData.filter(d => d.hasData).reduce((sum, d) => sum + d.calories, 0) / 
+                  Math.max(chartData.filter(d => d.hasData).length, 1);
+                const weeklyAvgProtein = chartData.filter(d => d.hasData).reduce((sum, d) => sum + d.protein, 0) / 
+                  Math.max(chartData.filter(d => d.hasData).length, 1);
+                const daysLogged = chartData.filter(d => d.hasData).length;
+
+                if (daysLogged === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                      No data logged this week. Start logging to see your trends!
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div className="p-3 bg-muted/50 rounded-md">
+                        <div className="text-xl font-bold font-mono">{daysLogged}/7</div>
+                        <div className="text-xs text-muted-foreground">Days Logged</div>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-md">
+                        <div className={`text-xl font-bold font-mono ${weeklyAvgCalories <= (nutritionSettings.calorieTarget || 2000) ? 'text-green-500' : 'text-amber-500'}`}>
+                          {Math.round(weeklyAvgCalories)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Avg Calories</div>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-md">
+                        <div className={`text-xl font-bold font-mono ${weeklyAvgProtein >= (nutritionSettings.proteinTarget || 150) ? 'text-green-500' : 'text-amber-500'}`}>
+                          {Math.round(weeklyAvgProtein)}g
+                        </div>
+                        <div className="text-xs text-muted-foreground">Avg Protein</div>
+                      </div>
+                    </div>
+
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis 
+                            dataKey="day" 
+                            tick={{ fontSize: 12 }} 
+                            className="fill-muted-foreground"
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12 }} 
+                            className="fill-muted-foreground"
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: 'hsl(var(--card))', 
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '6px'
+                            }}
+                            labelFormatter={(value, payload) => payload?.[0]?.payload?.fullDate || value}
+                            formatter={(value: number, name: string) => {
+                              if (name === 'calories') return [`${value} cal`, 'Calories'];
+                              if (name === 'protein') return [`${value}g`, 'Protein'];
+                              return [value, name];
+                            }}
+                          />
+                          <Legend />
+                          <ReferenceLine 
+                            y={nutritionSettings.calorieTarget || 2000} 
+                            stroke="hsl(var(--destructive))" 
+                            strokeDasharray="3 3" 
+                            label={{ value: 'Target', fill: 'hsl(var(--destructive))', fontSize: 10, position: 'right' }}
+                          />
+                          <Bar 
+                            dataKey="calories" 
+                            name="calories"
+                            radius={[4, 4, 0, 0]}
+                          >
+                            {chartData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`}
+                                fill={!entry.hasData ? 'hsl(var(--muted))' : 
+                                  entry.calories <= (nutritionSettings.calorieTarget || 2000) ? 
+                                  'hsl(142 76% 36%)' : 'hsl(0 84% 60%)'}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
