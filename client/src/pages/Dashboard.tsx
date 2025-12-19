@@ -602,6 +602,7 @@ export default function Dashboard() {
   const hasLoadedRealDataRef = useRef(false);
   const [weeklyTodoWeekOffset, setWeeklyTodoWeekOffset] = useState(0);
   const [weeklyTodosExpanded, setWeeklyTodosExpanded] = useState(false);
+  const [milestonesExpanded, setMilestonesExpanded] = useState(false);
   const [weekStartDate, setWeekStartDate] = useState("");
   const [weekEndDate, setWeekEndDate] = useState("");
 
@@ -629,7 +630,9 @@ export default function Dashboard() {
     enabled: !useMockData,
   });
 
-  const activeSeason = seasons.find((s) => s.isActive && !s.isArchived);
+  const activeSeason = useMockData 
+    ? { id: "demo-season", name: "Demo Season", isActive: true, isArchived: false, weeklyGoal: 350 }
+    : seasons.find((s) => s.isActive && !s.isArchived);
 
   // Fetch active season data (tasks/categories/penalties) when a season is active
   const { data: activeSeasonData, isFetched: activeSeasonDataFetched } = useQuery<SeasonWithData>({
@@ -1953,6 +1956,9 @@ export default function Dashboard() {
                   onEdit={handleMilestoneEdit}
                   onDelete={handleMilestoneDelete}
                   onToggleAchieved={handleMilestoneToggle}
+                  maxItems={3}
+                  isExpanded={milestonesExpanded}
+                  onExpandToggle={() => setMilestonesExpanded(!milestonesExpanded)}
                 />
               );
             case "recentWeeks":

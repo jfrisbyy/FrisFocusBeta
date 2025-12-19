@@ -68,7 +68,6 @@ const sampleTasks: DisplayTask[] = [
   { id: "demo-p3", name: "Scrolled social media 2+ hrs", value: -8, category: "Penalties" },
   { id: "demo-p4", name: "Stayed up past midnight", value: -5, category: "Penalties" },
   { id: "demo-p5", name: "Impulse purchase", value: -12, category: "Penalties" },
-  { id: "demo-p6", name: "Complained/negativity", value: -5, category: "Penalties" },
 ];
 
 const sampleDailyTodos: StoredTodoItem[] = [

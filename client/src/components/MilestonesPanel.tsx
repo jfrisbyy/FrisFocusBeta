@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Flag, Plus, Check, Pencil, Trash2, Trophy, Calendar, AlertCircle, StickyNote } from "lucide-react";
+import { Flag, Plus, Check, Pencil, Trash2, Trophy, Calendar, AlertCircle, StickyNote, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { Milestone } from "@shared/schema";
@@ -34,6 +34,9 @@ interface MilestonesPanelProps {
   onEdit: (id: string, milestone: Omit<Milestone, "id" | "achieved" | "achievedAt">) => void;
   onDelete: (id: string) => void;
   onToggleAchieved: (id: string) => void;
+  maxItems?: number;
+  isExpanded?: boolean;
+  onExpandToggle?: () => void;
 }
 
 export default function MilestonesPanel({
@@ -42,6 +45,9 @@ export default function MilestonesPanel({
   onEdit,
   onDelete,
   onToggleAchieved,
+  maxItems,
+  isExpanded = true,
+  onExpandToggle,
 }: MilestonesPanelProps) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -62,6 +68,12 @@ export default function MilestonesPanel({
   const achievedMilestones = milestones.filter(m => m.achieved);
   const pendingMilestones = milestones.filter(m => !m.achieved);
   const totalPoints = achievedMilestones.reduce((sum, m) => sum + m.points, 0);
+  
+  // Collapse/expand logic
+  const displayMilestones = maxItems && !isExpanded 
+    ? pendingMilestones.slice(0, maxItems) 
+    : pendingMilestones;
+  const hiddenCount = pendingMilestones.length - displayMilestones.length;
 
   const resetForm = () => {
     setFormName("");
@@ -190,7 +202,7 @@ export default function MilestonesPanel({
           </p>
         )}
 
-        {pendingMilestones.map((milestone) => (
+        {displayMilestones.map((milestone) => (
           <div
             key={milestone.id}
             className="flex items-start gap-3 rounded-md p-3 bg-muted/50"
@@ -266,6 +278,29 @@ export default function MilestonesPanel({
             </div>
           </div>
         ))}
+
+        {/* Show more/less button for pending milestones */}
+        {onExpandToggle && maxItems !== undefined && pendingMilestones.length > maxItems && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs text-muted-foreground"
+            onClick={onExpandToggle}
+            data-testid="button-toggle-milestones"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-3 w-3 mr-1" />
+                Show less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3 w-3 mr-1" />
+                Show {hiddenCount} more
+              </>
+            )}
+          </Button>
+        )}
 
         {achievedMilestones.length > 0 && (
           <>

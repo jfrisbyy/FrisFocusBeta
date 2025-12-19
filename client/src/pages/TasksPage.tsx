@@ -95,10 +95,7 @@ const samplePenalties: PenaltyItem[] = [
   { id: "p2", name: "Drank alcohol", value: -10, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 2, period: "week", boostPenaltyPoints: 20, currentCount: 0, triggered: false },
   { id: "p3", name: "Scrolled social media 2+ hrs", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 18, currentCount: 2, triggered: false },
   { id: "p4", name: "Stayed up past midnight", value: -5, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 4, period: "week", boostPenaltyPoints: 12, currentCount: 1, triggered: false },
-  { id: "p5", name: "Smoked/vaped", value: -15, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 1, period: "week", boostPenaltyPoints: 25, currentCount: 0, triggered: false },
   { id: "p6", name: "Impulse purchase", value: -12, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 2, period: "week", boostPenaltyPoints: 20, currentCount: 0, triggered: false },
-  { id: "p7", name: "Complained/negativity", value: -5, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
-  { id: "p8", name: "Skipped skincare", value: -3, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
 ];
 
 // API response types for habit data
