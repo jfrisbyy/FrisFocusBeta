@@ -83,23 +83,27 @@ const helpCards: HelpCard[] = [
     subtitle: "How Your Daily System Works",
     icon: CheckSquare,
     content: {
-      intro: "FrisFocus separates repeatable habits from one-time responsibilities — so everything has its place.",
+      intro: "",
       sections: [
         {
-          title: "Tasks (Repeatable Habits)",
-          text: "Tasks represent actions you repeat regularly to support your current Season — like workouts, training sessions, journaling, recovery habits, or daily routines. Tasks are checked off daily and earn personal points when completed. They form the foundation of your consistency.",
+          title: "To-Dos, Milestones & Due Dates",
+          text: "To-Dos are a flexible way to plan and organize your days. You can use them however it makes sense for you — whether that's tracking one-off items, outlining what you want to work on today, or keeping a running list of things to handle this week.",
         },
         {
-          title: "To-Do Lists (One-Time Actions)",
-          text: "To-Dos are for things that don't repeat — like doctor's appointments, errands, meetings, and admin tasks. You can add a daily to-do list and a weekly to-do list for flexible, non-urgent items.",
+          title: "You can create:",
+          items: [
+            "Daily to-dos for what you plan to tackle today",
+            "Weekly to-dos for flexible or non-urgent items",
+            "Milestones for larger short-term goals you're working toward",
+            "Due dates for time-sensitive items like bills, assignments, or deadlines",
+          ],
         },
         {
-          title: "Milestones & Due Dates",
-          text: "Milestones represent major goals you want to complete in the near future — like buying a car, finishing a project, or preparing for an event. Due dates help you track time-sensitive items such as bills, assignments, and deadlines.",
+          text: "These tools give structure to real life without forcing everything into a habit.",
         },
         {
           title: "Daily & Weekly Point Goals",
-          text: "You set a daily personal point goal and a weekly personal point goal. Completing tasks earns personal points that roll up toward those goals. Important actions should carry more weight than optional ones.",
+          text: "You set a daily personal point goal and a weekly personal point goal. Completing repeatable tasks earns personal points that roll up toward those goals. Important actions should carry more weight than optional ones, so your scoring reflects what truly matters — especially on busy days.",
         },
         {
           title: "Breaking Habits & Reinforcing Good Ones",
@@ -108,8 +112,11 @@ const helpCards: HelpCard[] = [
             "Add boosters that reward consistency, streaks, or hitting weekly goals repeatedly",
           ],
         },
+        {
+          text: "If you're unsure how to structure tasks, scoring, penalties, or milestones, AI can help you explore realistic setups based on your goals and lifestyle.",
+        },
       ],
-      outro: "If you're unsure how to structure your tasks, scoring, penalties, or milestones, AI can help you explore realistic setups. You stay in control — AI supports your thinking, it doesn't replace it.",
+      outro: "You stay in control. AI supports your thinking — it doesn't replace it.",
     },
   },
   {
