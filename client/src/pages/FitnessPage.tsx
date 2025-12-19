@@ -8,18 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { 
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
-  Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2
+  Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun } from "@shared/schema";
 import { Settings } from "lucide-react";
 import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend } from "recharts";
@@ -57,6 +59,12 @@ const mockRuns: BasketballRun[] = [
   { id: "demo-3", userId: "demo", date: subDays(new Date(), 10).toISOString().split("T")[0], type: "Run", gameType: { fullCourt: true }, courtType: "Indoor", competitionLevel: "Competitive", gamesPlayed: 6, wins: 4, losses: 2, performanceGrade: "A-", confidence: 8, positivePoints: null, weakPoints: null, matchupNotes: null, challenges: null },
 ];
 
+const mockCardioRuns: CardioRun[] = [
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], distance: 5000, duration: 28, pace: "9:00", speed: 67, location: "Park Trail", terrain: "trail", effort: 7, notes: null, caloriesBurned: 320 },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], distance: 3200, duration: 18, pace: "9:15", speed: 65, location: "Neighborhood", terrain: "road", effort: 6, notes: null, caloriesBurned: 210 },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 7).toISOString().split("T")[0], distance: 8000, duration: 45, pace: "9:05", speed: 66, location: "Treadmill", terrain: "treadmill", effort: 8, notes: null, caloriesBurned: 480 },
+];
+
 const mockNutritionSettings: NutritionSettings = {
   id: "demo",
   userId: "demo",
@@ -75,7 +83,8 @@ const mockNutritionSettings: NutritionSettings = {
 };
 
 type ActiveTab = "overview" | "nutrition" | "sports" | "strength" | "body-comp";
-type SportsSubTab = "runs" | "drills";
+type SportsSubTab = "runs" | "drills" | "cardio";
+type ChartPeriod = "weekly" | "monthly";
 
 export default function FitnessPage() {
   const { isDemo } = useDemo();
@@ -86,6 +95,7 @@ export default function FitnessPage() {
   const [strengthDialogOpen, setStrengthDialogOpen] = useState(false);
   const [skillDialogOpen, setSkillDialogOpen] = useState(false);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [cardioDialogOpen, setCardioDialogOpen] = useState(false);
   const [bodyCompDialogOpen, setBodyCompDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
@@ -93,6 +103,7 @@ export default function FitnessPage() {
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("weekly");
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -119,6 +130,11 @@ export default function FitnessPage() {
     enabled: !isDemo,
   });
 
+  const { data: cardioData = [], isLoading: loadingCardio } = useQuery<CardioRun[]>({
+    queryKey: ["/api/fitness/cardio"],
+    enabled: !isDemo,
+  });
+
   const { data: nutritionSettingsData } = useQuery<NutritionSettings>({
     queryKey: ["/api/fitness/nutrition-settings"],
     enabled: !isDemo,
@@ -130,8 +146,9 @@ export default function FitnessPage() {
   const strength = isDemo ? mockStrength : strengthData;
   const skills = isDemo ? mockSkills : skillsData;
   const runs = isDemo ? mockRuns : runsData;
+  const cardioRuns = isDemo ? mockCardioRuns : cardioData;
 
-  const isLoading = !isDemo && (loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns);
+  const isLoading = !isDemo && (loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns || loadingCardio);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -223,6 +240,16 @@ export default function FitnessPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/runs"] });
       toast({ title: "Run deleted" });
+    },
+  });
+
+  const deleteCardioMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/fitness/cardio/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/cardio"] });
+      toast({ title: "Cardio run deleted" });
     },
   });
 
@@ -374,6 +401,17 @@ export default function FitnessPage() {
                 <p className="text-xs text-muted-foreground">Consecutive activity</p>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium">Today's Steps</CardTitle>
+                <Footprints className="h-4 w-4 text-emerald-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{isDemo ? "8,432" : "--"}</div>
+                <p className="text-xs text-muted-foreground">Goal: 10,000 steps</p>
+              </CardContent>
+            </Card>
           </div>
 
           {avgDeficit > 0 && (
@@ -490,12 +528,29 @@ export default function FitnessPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-2 min-w-[140px] justify-center">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium" data-testid="text-selected-date">
-                {isToday(selectedNutritionDate) ? "Today" : format(selectedNutritionDate, "MMM d, yyyy")}
-              </span>
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="flex items-center gap-2 min-w-[140px] justify-center"
+                  data-testid="button-date-picker"
+                >
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium" data-testid="text-selected-date">
+                    {isToday(selectedNutritionDate) ? "Today" : format(selectedNutritionDate, "MMM d, yyyy")}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <CalendarPicker
+                  mode="single"
+                  selected={selectedNutritionDate}
+                  onSelect={(date) => date && setSelectedNutritionDate(date)}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
             <Button 
               size="icon" 
               variant="ghost" 
@@ -764,28 +819,49 @@ export default function FitnessPage() {
             </CardContent>
           </Card>
 
-          {/* Weekly Chart */}
+          {/* Weekly/Monthly Chart */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Weekly Overview
-              </CardTitle>
-              <CardDescription>Your nutrition trends over the past 7 days</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  {chartPeriod === "weekly" ? "Weekly" : "Monthly"} Overview
+                </CardTitle>
+                <CardDescription>Your nutrition trends over the past {chartPeriod === "weekly" ? "7 days" : "30 days"}</CardDescription>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button 
+                  size="sm" 
+                  variant={chartPeriod === "weekly" ? "default" : "ghost"}
+                  onClick={() => setChartPeriod("weekly")}
+                  data-testid="button-chart-weekly"
+                >
+                  Weekly
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={chartPeriod === "monthly" ? "default" : "ghost"}
+                  onClick={() => setChartPeriod("monthly")}
+                  data-testid="button-chart-monthly"
+                >
+                  Monthly
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {(() => {
                 const today = new Date();
-                const weekDays = eachDayOfInterval({
-                  start: subDays(today, 6),
+                const daysBack = chartPeriod === "weekly" ? 6 : 29;
+                const periodDays = eachDayOfInterval({
+                  start: subDays(today, daysBack),
                   end: today
                 });
                 
-                const chartData = weekDays.map(day => {
+                const chartData = periodDays.map(day => {
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const log = nutrition.find(n => n.date === dateStr);
                   return {
-                    day: format(day, 'EEE'),
+                    day: chartPeriod === "weekly" ? format(day, 'EEE') : format(day, 'd'),
                     fullDate: format(day, 'MMM d'),
                     calories: log?.calories || 0,
                     protein: log?.protein || 0,
@@ -801,10 +877,12 @@ export default function FitnessPage() {
                   Math.max(chartData.filter(d => d.hasData).length, 1);
                 const daysLogged = chartData.filter(d => d.hasData).length;
 
+                const totalDays = chartPeriod === "weekly" ? 7 : 30;
+
                 if (daysLogged === 0) {
                   return (
                     <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                      No data logged this week. Start logging to see your trends!
+                      No data logged this {chartPeriod === "weekly" ? "week" : "month"}. Start logging to see your trends!
                     </div>
                   );
                 }
@@ -813,7 +891,7 @@ export default function FitnessPage() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-3 gap-4 text-center">
                       <div className="p-3 bg-muted/50 rounded-md">
-                        <div className="text-xl font-bold font-mono">{daysLogged}/7</div>
+                        <div className="text-xl font-bold font-mono">{daysLogged}/{totalDays}</div>
                         <div className="text-xs text-muted-foreground">Days Logged</div>
                       </div>
                       <div className="p-3 bg-muted/50 rounded-md">
@@ -951,6 +1029,10 @@ export default function FitnessPage() {
                 <Target className="h-4 w-4 mr-2" />
                 Skill Drills
               </TabsTrigger>
+              <TabsTrigger value="cardio" data-testid="subtab-cardio">
+                <Footprints className="h-4 w-4 mr-2" />
+                Cardio
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="runs" className="space-y-4 mt-4">
@@ -1081,6 +1163,67 @@ export default function FitnessPage() {
                       </Card>
                     );
                   })
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="cardio" className="space-y-4 mt-4">
+              <div className="flex justify-end">
+                <CardioRunDialog 
+                  open={cardioDialogOpen} 
+                  onOpenChange={setCardioDialogOpen}
+                  isDemo={isDemo}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                {cardioRuns.length === 0 ? (
+                  <Card className="md:col-span-3">
+                    <CardContent className="py-8 text-center">
+                      <Footprints className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No cardio runs logged yet</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  cardioRuns.sort((a, b) => b.date.localeCompare(a.date)).map((run) => (
+                    <Card key={run.id} data-testid={`card-cardio-${run.id}`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-sm">{formatDate(run.date)}</CardTitle>
+                          {!isDemo && (
+                            <Button size="icon" variant="ghost" onClick={() => deleteCardioMutation.mutate(run.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <CardDescription>{run.terrain} - {run.location}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Distance</span>
+                            <span>{((run.distance || 0) / 1609.34).toFixed(2)} mi</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Duration</span>
+                            <span>{run.duration} min</span>
+                          </div>
+                          {run.pace && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Pace</span>
+                              <span>{run.pace}/mi</span>
+                            </div>
+                          )}
+                          {run.effort && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Effort</span>
+                              <span>{run.effort}/10</span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
                 )}
               </div>
             </TabsContent>
@@ -1904,6 +2047,129 @@ function RunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-run">
+            {createMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    distance: "",
+    duration: "",
+    terrain: "Road",
+    location: "",
+    effort: "",
+    notes: "",
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<CardioRun>) => {
+      const res = await apiRequest("POST", "/api/fitness/cardio-runs", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/cardio-runs"] });
+      toast({ title: "Cardio run logged" });
+      onOpenChange(false);
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), distance: "", duration: "", terrain: "Road", location: "", effort: "", notes: "" });
+    },
+    onError: () => {
+      toast({ title: "Failed to log cardio run", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - data not saved" });
+      onOpenChange(false);
+      return;
+    }
+    const distanceMeters = formData.distance ? parseFloat(formData.distance) * 1609.34 : undefined;
+    const durationMin = formData.duration ? parseInt(formData.duration) : undefined;
+    let pace: string | undefined;
+    if (distanceMeters && durationMin && distanceMeters > 0) {
+      const paceMinPerMile = durationMin / (distanceMeters / 1609.34);
+      const paceMin = Math.floor(paceMinPerMile);
+      const paceSec = Math.round((paceMinPerMile - paceMin) * 60);
+      pace = `${paceMin}:${paceSec.toString().padStart(2, '0')}`;
+    }
+    createMutation.mutate({
+      date: formData.date,
+      distance: distanceMeters,
+      duration: durationMin,
+      terrain: formData.terrain,
+      location: formData.location || undefined,
+      pace,
+      effort: formData.effort ? parseInt(formData.effort) : undefined,
+      notes: formData.notes || undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <Button data-testid="button-add-cardio">
+          <Plus className="h-4 w-4 mr-2" />
+          Log Cardio Run
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Log Cardio Run</DialogTitle>
+          <DialogDescription>Record your running session</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-cardio-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Terrain</Label>
+              <Select value={formData.terrain} onValueChange={(v) => setFormData({ ...formData, terrain: v })}>
+                <SelectTrigger data-testid="select-cardio-terrain">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Road">Road</SelectItem>
+                  <SelectItem value="Trail">Trail</SelectItem>
+                  <SelectItem value="Track">Track</SelectItem>
+                  <SelectItem value="Treadmill">Treadmill</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Distance (miles)</Label>
+              <Input type="number" step="0.01" placeholder="3.1" value={formData.distance} onChange={(e) => setFormData({ ...formData, distance: e.target.value })} data-testid="input-cardio-distance" />
+            </div>
+            <div className="space-y-2">
+              <Label>Duration (minutes)</Label>
+              <Input type="number" placeholder="25" value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: e.target.value })} data-testid="input-cardio-duration" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Location</Label>
+            <Input placeholder="Local park, neighborhood, etc." value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} data-testid="input-cardio-location" />
+          </div>
+          <div className="space-y-2">
+            <Label>Effort (1-10)</Label>
+            <Input type="number" min="1" max="10" placeholder="7" value={formData.effort} onChange={(e) => setFormData({ ...formData, effort: e.target.value })} data-testid="input-cardio-effort" />
+          </div>
+          <div className="space-y-2">
+            <Label>Notes</Label>
+            <Textarea placeholder="How did it feel?" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} data-testid="input-cardio-notes" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-cardio">
             {createMutation.isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

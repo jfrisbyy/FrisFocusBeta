@@ -399,6 +399,26 @@ export const insertBasketballRunSchema = createInsertSchema(basketballRuns).omit
 export type InsertBasketballRun = z.infer<typeof insertBasketballRunSchema>;
 export type BasketballRun = typeof basketballRuns.$inferSelect;
 
+// Cardio runs (running/jogging) - with userId for multi-user support
+export const cardioRuns = pgTable("cardio_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: text("date").notNull(),
+  distance: integer("distance"), // in meters
+  duration: integer("duration"), // in minutes
+  pace: text("pace"), // e.g. "8:30" per mile
+  speed: integer("speed"), // in mph * 10 for decimal precision
+  location: text("location"),
+  terrain: text("terrain"), // road, trail, treadmill
+  effort: integer("effort"), // 1-10
+  notes: text("notes"),
+  caloriesBurned: integer("calories_burned"),
+});
+
+export const insertCardioRunSchema = createInsertSchema(cardioRuns).omit({ id: true });
+export type InsertCardioRun = z.infer<typeof insertCardioRunSchema>;
+export type CardioRun = typeof cardioRuns.$inferSelect;
+
 // Meal schema for nutrition logging
 export const mealSchema = z.object({
   id: z.string(),

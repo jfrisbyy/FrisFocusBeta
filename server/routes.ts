@@ -20,6 +20,7 @@ import {
   strengthWorkouts,
   skillWorkouts,
   basketballRuns,
+  cardioRuns,
   gptAccessTokens,
   gptAuthCodes,
   insertNutritionLogSchema,
@@ -27,6 +28,7 @@ import {
   insertStrengthWorkoutSchema,
   insertSkillWorkoutSchema,
   insertBasketballRunSchema,
+  insertCardioRunSchema,
   nutritionSettings,
   insertNutritionSettingsSchema,
   friendships,
@@ -984,6 +986,45 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting basketball run:", error);
       res.status(400).json({ error: "Failed to delete basketball run" });
+    }
+  });
+
+  // Cardio runs - filtered by user
+  app.get("/api/fitness/cardio", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const runs = await db.select().from(cardioRuns).where(eq(cardioRuns.userId, userId));
+      res.json(runs);
+    } catch (error) {
+      console.error("Error fetching cardio runs:", error);
+      res.status(500).json({ error: "Failed to fetch cardio runs" });
+    }
+  });
+
+  app.post("/api/fitness/cardio", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertCardioRunSchema.parse({ ...req.body, userId });
+      const [run] = await db.insert(cardioRuns).values(parsed).returning();
+      res.json(run);
+    } catch (error) {
+      console.error("Error creating cardio run:", error);
+      res.status(400).json({ error: "Failed to create cardio run" });
+    }
+  });
+
+  app.delete("/api/fitness/cardio/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const [deleted] = await db.delete(cardioRuns)
+        .where(and(eq(cardioRuns.id, id), eq(cardioRuns.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Cardio run not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting cardio run:", error);
+      res.status(400).json({ error: "Failed to delete cardio run" });
     }
   });
 
