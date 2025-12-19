@@ -528,6 +528,7 @@ export default function TasksPage() {
       
       if (newTasks.length > 0) {
         const tasksToSave = updatedTasks.map(t => ({
+          id: t.id,
           name: t.name,
           value: t.value,
           category: t.category,
@@ -541,6 +542,7 @@ export default function TasksPage() {
       
       if (newPenalties.length > 0) {
         const penaltiesToSave = updatedPenalties.map(p => ({
+          id: p.id,
           name: p.name,
           value: p.value,
           negativeBoostEnabled: p.negativeBoostEnabled,
@@ -958,6 +960,7 @@ export default function TasksPage() {
     if (!hasUserModifiedDataRef.current) return;
     
     const tasksToSave = tasks.map(t => ({
+      id: t.id,
       name: t.name,
       value: t.value,
       category: t.category,
@@ -985,6 +988,7 @@ export default function TasksPage() {
     if (!hasUserModifiedDataRef.current) return;
     
     const penaltiesToSave = penalties.map(p => ({
+      id: p.id,
       name: p.name,
       value: p.value,
       negativeBoostEnabled: p.negativeBoostEnabled,
