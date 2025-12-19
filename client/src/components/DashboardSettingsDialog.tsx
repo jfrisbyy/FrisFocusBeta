@@ -38,10 +38,10 @@ const siteThemes: { value: SiteTheme; label: string; description: string }[] = [
   { value: "sepia", label: "Sepia", description: "Warm brown tones" },
   { value: "forest", label: "Forest", description: "Deep green tones" },
   { value: "ocean", label: "Ocean", description: "Blue-gray tones" },
-  { value: "sunrise", label: "Sunrise", description: "Warm orange tones" },
-  { value: "aurora", label: "Aurora", description: "Fresh teal tones" },
-  { value: "citrus", label: "Citrus", description: "Bright yellow tones" },
-  { value: "orchid", label: "Orchid", description: "Vibrant purple tones" },
+  { value: "sunrise", label: "Sunrise", description: "Deep burnt orange" },
+  { value: "aurora", label: "Aurora", description: "Deep teal" },
+  { value: "citrus", label: "Citrus", description: "Deep golden amber" },
+  { value: "orchid", label: "Orchid", description: "Deep violet purple" },
 ];
 
 interface WelcomeSettings {
