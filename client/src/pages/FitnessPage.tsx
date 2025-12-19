@@ -1372,6 +1372,10 @@ export default function FitnessPage() {
 
             <TabsContent value="cardio" className="space-y-4 mt-4">
               <div className="flex justify-end">
+                <Button onClick={() => setCardioDialogOpen(true)} data-testid="button-log-cardio">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Cardio Run
+                </Button>
                 <CardioRunDialog 
                   open={cardioDialogOpen} 
                   onOpenChange={setCardioDialogOpen}

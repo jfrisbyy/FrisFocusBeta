@@ -304,8 +304,8 @@ export default function InsightsPage() {
                   conversationsQuery.data?.map((conversation) => (
                     <div
                       key={conversation.id}
-                      className={`group flex items-center gap-2 rounded-md p-2 cursor-pointer hover-elevate ${
-                        activeConversationId === conversation.id ? "bg-accent" : ""
+                      className={`group flex items-center gap-2 rounded-md p-2 cursor-pointer ${
+                        activeConversationId === conversation.id ? "bg-accent" : "hover:bg-accent/50"
                       }`}
                       onClick={() => editingConversationId !== conversation.id && handleSelectConversation(conversation)}
                       data-testid={`conversation-item-${conversation.id}`}
