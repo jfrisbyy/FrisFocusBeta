@@ -113,6 +113,7 @@ export default function FitnessPage() {
   const [habitsManageOpen, setHabitsManageOpen] = useState(false);
   const [newHabitName, setNewHabitName] = useState("");
   const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
 
   // Editing state for each fitness log type
   const [editingNutrition, setEditingNutrition] = useState<NutritionLog | null>(null);
@@ -498,6 +499,21 @@ export default function FitnessPage() {
     updateCustomHabitsMutation.mutate(updated);
   };
 
+  const updateGoalMutation = useMutation({
+    mutationFn: async (data: { goalType: string; calorieTarget: number; maintenanceCalories: number }) => {
+      const res = await apiRequest("PUT", "/api/fitness/nutrition-settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+      toast({ title: "Goal updated" });
+      setGoalDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update goal", variant: "destructive" });
+    },
+  });
+
   const handleToggleHabit = (toggleId: string, field: string | undefined, value: boolean) => {
     const todayLog = getTodayCalories();
     if (!todayLog) {
@@ -582,6 +598,59 @@ export default function FitnessPage() {
 
         {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Goal Banner */}
+          <Card className={`border-2 ${
+            nutritionSettings.goalType === 'maintenance' ? 'border-blue-500/50 bg-blue-500/5' :
+            nutritionSettings.goalType?.includes('surplus') ? 'border-green-500/50 bg-green-500/5' :
+            'border-orange-500/50 bg-orange-500/5'
+          }`}>
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-full ${
+                    nutritionSettings.goalType === 'maintenance' ? 'bg-blue-500/20' :
+                    nutritionSettings.goalType?.includes('surplus') ? 'bg-green-500/20' :
+                    'bg-orange-500/20'
+                  }`}>
+                    <Target className={`h-5 w-5 ${
+                      nutritionSettings.goalType === 'maintenance' ? 'text-blue-500' :
+                      nutritionSettings.goalType?.includes('surplus') ? 'text-green-500' :
+                      'text-orange-500'
+                    }`} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold">
+                        {nutritionSettings.goalType === 'maintenance' ? 'Maintenance Mode' :
+                         nutritionSettings.goalType?.includes('surplus') ? 'Surplus Mode' :
+                         'Deficit Mode'}
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {nutritionSettings.calorieTarget || 2000} cal/day
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {nutritionSettings.goalType === 'maintenance' 
+                        ? 'Maintaining current weight'
+                        : nutritionSettings.goalType?.includes('surplus')
+                        ? `+${(nutritionSettings.calorieTarget || 2500) - (nutritionSettings.maintenanceCalories || 2500)} cal above maintenance`
+                        : `-${(nutritionSettings.maintenanceCalories || 2500) - (nutritionSettings.calorieTarget || 2000)} cal below maintenance`}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setGoalDialogOpen(true)}
+                  data-testid="button-adjust-goal"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Adjust Goal
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
