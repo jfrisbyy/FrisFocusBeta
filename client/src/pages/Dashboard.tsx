@@ -825,7 +825,7 @@ export default function Dashboard() {
       setBoosters(getMockBoosters());
       setBadges(getMockBadges());
       setAlerts(getMockAlerts());
-      setUserName("Jordan");
+      setUserName("Charlie");
       setEncouragementMessage("Let's start this week off right, you can do it I believe in you!");
       setUseCustomMessage(true);
       setFriendWelcomeMessages([

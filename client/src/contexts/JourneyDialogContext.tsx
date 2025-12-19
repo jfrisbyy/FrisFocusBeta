@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -230,6 +230,13 @@ function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
 export function JourneyDialogProvider({ children }: { children: React.ReactNode }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { isOnboarding } = useOnboarding();
+
+  // Auto-open dialog when user is in onboarding mode (hasn't started journey yet)
+  useEffect(() => {
+    if (isOnboarding) {
+      setDialogOpen(true);
+    }
+  }, [isOnboarding]);
 
   const openDialog = () => setDialogOpen(true);
 
