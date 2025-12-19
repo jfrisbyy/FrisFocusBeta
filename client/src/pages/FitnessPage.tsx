@@ -2647,6 +2647,16 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   const isEditing = !!editData;
 
   useEffect(() => {
+    // Always reset photo and AI state when dialog opens
+    setPhotoImageData(null);
+    setPhotoResult(null);
+    setPhotoAnalyzing(false);
+    setAiChatMessages([]);
+    setAiUserInput("");
+    setAiResult(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    
     if (editData) {
       setFormData({
         date: editData.date,
@@ -2662,12 +2672,6 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "" });
       setMeals([]);
       setLogMode("total");
-      setAiChatMessages([]);
-      setAiUserInput("");
-      setAiResult(null);
-      setPhotoImageData(null);
-      setPhotoResult(null);
-      setPhotoAnalyzing(false);
     }
   }, [editData]);
 
