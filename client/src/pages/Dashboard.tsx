@@ -83,6 +83,7 @@ const getMockWeekData = (weekOffset: number = 0, isDemo: boolean = false) => {
 };
 
 const getMockBoosters = (): UnifiedBooster[] => [
+  // Positive boosters - achieved
   {
     id: "booster_5of7_tracking",
     name: "5 of 7 Tracking",
@@ -100,6 +101,29 @@ const getMockBoosters = (): UnifiedBooster[] => [
     isNegative: false,
   },
   {
+    id: "custom-workout",
+    name: "Morning workout",
+    description: "Complete 5 times per week",
+    points: 15,
+    achieved: true,
+    progress: 5,
+    required: 5,
+    period: "week",
+    isNegative: false,
+  },
+  {
+    id: "custom-hydration",
+    name: "Hydration goal",
+    description: "Drink 8 glasses 6 times per week",
+    points: 12,
+    achieved: true,
+    progress: 6,
+    required: 6,
+    period: "week",
+    isNegative: false,
+  },
+  // Positive boosters - in progress
+  {
     id: "custom-reading",
     name: "Read 30 minutes",
     description: "Complete 4 times per week",
@@ -111,16 +135,39 @@ const getMockBoosters = (): UnifiedBooster[] => [
     isNegative: false,
   },
   {
-    id: "custom-workout",
-    name: "Morning workout",
-    description: "Complete 5 times per week",
+    id: "custom-bible",
+    name: "Daily devotion",
+    description: "Bible study 6 times per week",
+    points: 25,
+    achieved: false,
+    progress: 4,
+    required: 6,
+    period: "week",
+    isNegative: false,
+  },
+  {
+    id: "custom-meditate",
+    name: "Mindfulness streak",
+    description: "Meditate 5 times per week",
     points: 15,
-    achieved: true,
-    progress: 5,
+    achieved: false,
+    progress: 3,
     required: 5,
     period: "week",
     isNegative: false,
   },
+  {
+    id: "custom-nospend",
+    name: "Frugal week",
+    description: "No spending day 3 times per week",
+    points: 18,
+    achieved: false,
+    progress: 1,
+    required: 3,
+    period: "week",
+    isNegative: false,
+  },
+  // Negative boosters (penalties)
   {
     id: "negative-junkfood",
     name: "Junk Food",
@@ -143,20 +190,97 @@ const getMockBoosters = (): UnifiedBooster[] => [
     period: "week",
     isNegative: true,
   },
+  {
+    id: "negative-latesleep",
+    name: "Late Night",
+    description: "If stayed up past midnight 4+ times",
+    points: -12,
+    achieved: false,
+    progress: 2,
+    required: 4,
+    period: "week",
+    isNegative: true,
+  },
+  {
+    id: "negative-skipworkout",
+    name: "Skipped Gym",
+    description: "If missed gym 4+ days this week",
+    points: -10,
+    achieved: false,
+    progress: 1,
+    required: 4,
+    period: "week",
+    isNegative: true,
+  },
 ];
 
 const getMockRecentWeeks = (defaultGoal: number): WeekData[] => {
   const today = new Date();
   
-  // Sample tasks for demo mode day breakdowns
+  // Comprehensive sample tasks covering different life areas
   const sampleTasks: DayTaskData[][] = [
-    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t2", name: "Morning workout", value: 20 }, { id: "t3", name: "Read 30 min", value: 10 }],
-    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t4", name: "Meal prep", value: 12 }, { id: "t5", name: "Meditate", value: 8 }],
-    [{ id: "t2", name: "Morning workout", value: 20 }, { id: "t5", name: "Meditate", value: 8 }, { id: "t6", name: "Journal", value: 7 }],
-    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t2", name: "Morning workout", value: 20 }, { id: "t3", name: "Read 30 min", value: 10 }, { id: "t5", name: "Meditate", value: 8 }],
-    [{ id: "t4", name: "Meal prep", value: 12 }, { id: "t3", name: "Read 30 min", value: 10 }, { id: "t6", name: "Journal", value: 7 }],
-    [{ id: "t1", name: "Bible study", value: 15 }, { id: "t5", name: "Meditate", value: 8 }, { id: "t7", name: "Stretch", value: 5 }],
-    [{ id: "t2", name: "Morning workout", value: 20 }, { id: "t6", name: "Journal", value: 7 }],
+    // Monday - Strong start
+    [
+      { id: "t1", name: "Bible study", value: 15 },
+      { id: "t2", name: "Morning workout", value: 20 },
+      { id: "t3", name: "Read 30 min", value: 10 },
+      { id: "t8", name: "Drink 8 glasses water", value: 5 },
+      { id: "t9", name: "Take vitamins", value: 3 },
+      { id: "t10", name: "No phone first hour", value: 8 },
+    ],
+    // Tuesday - Balanced day
+    [
+      { id: "t1", name: "Bible study", value: 15 },
+      { id: "t4", name: "Meal prep", value: 12 },
+      { id: "t5", name: "Meditate", value: 8 },
+      { id: "t8", name: "Drink 8 glasses water", value: 5 },
+      { id: "t11", name: "Call family", value: 10 },
+      { id: "t12", name: "Budget review", value: 7 },
+    ],
+    // Wednesday - Midweek focus
+    [
+      { id: "t2", name: "Morning workout", value: 20 },
+      { id: "t5", name: "Meditate", value: 8 },
+      { id: "t6", name: "Journal", value: 7 },
+      { id: "t13", name: "Deep work 2hrs", value: 15 },
+      { id: "t14", name: "Learn new skill", value: 12 },
+      { id: "t9", name: "Take vitamins", value: 3 },
+    ],
+    // Thursday - Productive day
+    [
+      { id: "t1", name: "Bible study", value: 15 },
+      { id: "t2", name: "Morning workout", value: 20 },
+      { id: "t3", name: "Read 30 min", value: 10 },
+      { id: "t5", name: "Meditate", value: 8 },
+      { id: "t15", name: "Gratitude practice", value: 5 },
+      { id: "t8", name: "Drink 8 glasses water", value: 5 },
+      { id: "t16", name: "Evening walk", value: 8 },
+    ],
+    // Friday - Lighter day
+    [
+      { id: "t4", name: "Meal prep", value: 12 },
+      { id: "t3", name: "Read 30 min", value: 10 },
+      { id: "t6", name: "Journal", value: 7 },
+      { id: "t17", name: "Clean room", value: 8 },
+      { id: "t18", name: "Review weekly goals", value: 6 },
+    ],
+    // Saturday - Self-care focus
+    [
+      { id: "t1", name: "Bible study", value: 15 },
+      { id: "t5", name: "Meditate", value: 8 },
+      { id: "t7", name: "Stretch routine", value: 5 },
+      { id: "t19", name: "Skincare routine", value: 4 },
+      { id: "t20", name: "No spending day", value: 10 },
+      { id: "t21", name: "Outdoor time 1hr", value: 12 },
+    ],
+    // Sunday - Rest and reset
+    [
+      { id: "t1", name: "Bible study", value: 15 },
+      { id: "t6", name: "Journal", value: 7 },
+      { id: "t4", name: "Meal prep", value: 12 },
+      { id: "t22", name: "Plan next week", value: 8 },
+      { id: "t15", name: "Gratitude practice", value: 5 },
+    ],
   ];
   
   const generateDays = (weekOffset: number, points: number[]): DayData[] => {
@@ -289,6 +413,30 @@ const getMockMilestones = (): Milestone[] => [
     achieved: true,
     achievedAt: "2024-11-15",
   },
+  {
+    id: "milestone-3",
+    name: "Read 12 books",
+    description: "Complete one book per month",
+    points: 75,
+    deadline: "2025-12-31",
+    achieved: false,
+  },
+  {
+    id: "milestone-4",
+    name: "Emergency fund",
+    description: "Save 3 months of expenses",
+    points: 150,
+    deadline: "2025-06-01",
+    achieved: false,
+  },
+  {
+    id: "milestone-5",
+    name: "Learn Spanish basics",
+    description: "Complete beginner Spanish course",
+    points: 60,
+    deadline: "2025-04-15",
+    achieved: false,
+  },
 ];
 
 const getMockBadges = (): BadgeWithLevels[] => [
@@ -377,12 +525,17 @@ const getMockWeeklyTodos = (): StoredTodoItem[] => [
   { id: "wt1", title: "Meal prep for the week", pointValue: 15, completed: true, order: 0 },
   { id: "wt2", title: "Review weekly goals", pointValue: 10, completed: false, order: 1 },
   { id: "wt3", title: "Clean the garage", pointValue: 20, completed: false, order: 2 },
+  { id: "wt4", title: "Schedule dentist appointment", pointValue: 8, completed: true, order: 3 },
+  { id: "wt5", title: "Organize closet", pointValue: 12, completed: false, order: 4 },
+  { id: "wt6", title: "Call mom", pointValue: 5, completed: true, order: 5 },
 ];
 
 const getMockDueDates = (): StoredDueDateItem[] => [
   { id: "dd1", title: "Submit tax documents", dueDate: "2025-01-15", pointValue: 50, penaltyValue: 25, status: "pending" },
   { id: "dd2", title: "Renew gym membership", dueDate: "2024-12-31", pointValue: 20, penaltyValue: 10, status: "pending" },
   { id: "dd3", title: "Pay credit card bill", dueDate: "2024-12-10", pointValue: 30, penaltyValue: 15, status: "completed", completedAt: "2024-12-08" },
+  { id: "dd4", title: "Car insurance renewal", dueDate: "2025-02-15", pointValue: 25, penaltyValue: 15, status: "pending" },
+  { id: "dd5", title: "Annual physical checkup", dueDate: "2025-01-30", pointValue: 40, penaltyValue: 20, status: "pending" },
 ];
 
 const getEmptyWeekData = () => {
