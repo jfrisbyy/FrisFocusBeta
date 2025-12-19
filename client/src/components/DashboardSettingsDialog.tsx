@@ -30,7 +30,7 @@ const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
   { value: "rose", label: "Rose", color: "bg-rose-500" },
 ];
 
-type SiteTheme = "default" | "midnight" | "sepia" | "forest" | "ocean";
+type SiteTheme = "default" | "midnight" | "sepia" | "forest" | "ocean" | "sunrise" | "aurora" | "citrus" | "orchid";
 
 const siteThemes: { value: SiteTheme; label: string; description: string }[] = [
   { value: "default", label: "Default", description: "Standard light/dark theme" },
@@ -38,6 +38,10 @@ const siteThemes: { value: SiteTheme; label: string; description: string }[] = [
   { value: "sepia", label: "Sepia", description: "Warm brown tones" },
   { value: "forest", label: "Forest", description: "Deep green tones" },
   { value: "ocean", label: "Ocean", description: "Blue-gray tones" },
+  { value: "sunrise", label: "Sunrise", description: "Warm orange tones" },
+  { value: "aurora", label: "Aurora", description: "Fresh teal tones" },
+  { value: "citrus", label: "Citrus", description: "Bright yellow tones" },
+  { value: "orchid", label: "Orchid", description: "Vibrant purple tones" },
 ];
 
 interface WelcomeSettings {
