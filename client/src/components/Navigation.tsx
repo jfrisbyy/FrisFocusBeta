@@ -74,8 +74,8 @@ export default function Navigation() {
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-6">
         <div className="flex items-center gap-2">
-          <img src={logoUrl} alt="FrisFocus logo" className="h-8 w-8" />
-          <h1 className="text-xl font-semibold tracking-tight">FrisFocus</h1>
+          <img src={logoUrl} alt="FrisFocus logo" className="h-12 w-12" />
+          <h1 className="text-2xl font-semibold tracking-tight font-['Architects_Daughter']">FrisFocus</h1>
         </div>
         <nav className="flex items-center gap-1 flex-wrap">
           {navItems.map((item) => {
