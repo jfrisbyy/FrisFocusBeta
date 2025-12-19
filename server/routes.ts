@@ -33,6 +33,8 @@ import {
   insertNutritionSettingsSchema,
   livePlaySettings,
   insertLivePlaySettingsSchema,
+  practiceSettings,
+  insertPracticeSettingsSchema,
   friendships,
   userStats,
   sharingSettings,
@@ -1215,6 +1217,53 @@ Be encouraging and realistic. Help them understand what's achievable.`;
     } catch (error) {
       console.error("Error updating live play settings:", error);
       res.status(400).json({ error: "Failed to update live play settings" });
+    }
+  });
+
+  // Practice settings - field visibility and custom templates for practice/drills
+  const DEFAULT_PRACTICE_FIELDS = [
+    "date", "drillType", "effort", "notes"
+  ];
+
+  app.get("/api/fitness/practice-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [settings] = await db.select().from(practiceSettings).where(eq(practiceSettings.userId, userId));
+      if (!settings) {
+        return res.json({
+          userId,
+          visibleFields: DEFAULT_PRACTICE_FIELDS,
+          customFields: [],
+          activeTemplateId: "basketball-drills",
+          customTemplates: [],
+        });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching practice settings:", error);
+      res.status(500).json({ error: "Failed to fetch practice settings" });
+    }
+  });
+
+  app.put("/api/fitness/practice-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [existing] = await db.select().from(practiceSettings).where(eq(practiceSettings.userId, userId));
+      
+      if (existing) {
+        const [updated] = await db.update(practiceSettings)
+          .set(req.body)
+          .where(eq(practiceSettings.userId, userId))
+          .returning();
+        return res.json(updated);
+      } else {
+        const parsed = insertPracticeSettingsSchema.parse({ ...req.body, userId });
+        const [created] = await db.insert(practiceSettings).values(parsed).returning();
+        return res.json(created);
+      }
+    } catch (error) {
+      console.error("Error updating practice settings:", error);
+      res.status(400).json({ error: "Failed to update practice settings" });
     }
   });
 

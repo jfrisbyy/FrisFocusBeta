@@ -17,12 +17,12 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, Send, Sparkles, Check, Loader2, X
+  MessageCircle, Send, Sparkles, Check, Loader2, X, Pencil
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
@@ -102,6 +102,7 @@ export default function FitnessPage() {
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
   const [livePlaySettingsOpen, setLivePlaySettingsOpen] = useState(false);
+  const [practiceSettingsOpen, setPracticeSettingsOpen] = useState(false);
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
@@ -191,6 +192,26 @@ export default function FitnessPage() {
 
   const livePlayVisibleFields = livePlaySettingsData?.visibleFields as string[] || 
     DEFAULT_LIVE_PLAY_FIELDS.map(f => f.id);
+
+  // Practice/Skill settings
+  const DEFAULT_PRACTICE_FIELDS: PracticeField[] = [
+    { id: "date", label: "Date", enabled: true, type: "text" },
+    { id: "drillType", label: "Drill Type", enabled: true, type: "text" },
+    { id: "effort", label: "Effort (1-10)", enabled: true, type: "number" },
+    { id: "skillFocus", label: "Skills Focus", enabled: true, type: "multiselect", options: ["Shooting", "Dribbling", "Passing", "Defense", "Footwork", "Conditioning"] },
+    { id: "zoneFocus", label: "Zone Focus", enabled: true, type: "multiselect", options: ["Paint", "Mid-Range", "3-Point", "Free Throw", "Post"] },
+    { id: "makes", label: "Makes", enabled: true, type: "number" },
+    { id: "attempts", label: "Attempts", enabled: true, type: "number" },
+    { id: "notes", label: "Notes", enabled: true, type: "textarea" },
+  ];
+
+  const { data: practiceSettingsData } = useQuery<PracticeSettings>({
+    queryKey: ["/api/fitness/practice-settings"],
+    enabled: !isDemo,
+  });
+
+  const practiceVisibleFields = practiceSettingsData?.visibleFields as string[] || 
+    DEFAULT_PRACTICE_FIELDS.map(f => f.id);
 
   const nutrition = isDemo ? demoNutritionData : nutritionData;
   const nutritionSettings = isDemo ? demoNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
@@ -1789,7 +1810,7 @@ export default function FitnessPage() {
             </TabsContent>
 
             <TabsContent value="drills" className="space-y-4 mt-4">
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
                 <SkillDialog 
                   open={skillDialogOpen} 
                   onOpenChange={(open) => {
@@ -1800,6 +1821,22 @@ export default function FitnessPage() {
                   editData={editingSkill}
                   onEdit={(id, data) => editSkillMutation.mutate({ id, data })}
                 />
+                <PracticeSettingsDialog
+                  open={practiceSettingsOpen}
+                  onOpenChange={setPracticeSettingsOpen}
+                  isDemo={isDemo}
+                  defaultFields={DEFAULT_PRACTICE_FIELDS}
+                  currentVisibleFields={practiceVisibleFields}
+                  settingsData={practiceSettingsData}
+                />
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setPracticeSettingsOpen(true)}
+                  data-testid="button-practice-settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
                 <Button onClick={() => { setEditingSkill(null); setSkillDialogOpen(true); }} data-testid="button-add-skill">
                   <Plus className="h-4 w-4 mr-2" />
                   Log Drill Session
@@ -3988,6 +4025,8 @@ function SkillDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   );
 }
 
+type FieldType = "text" | "number" | "select" | "multiselect" | "toggle" | "textarea";
+
 function LivePlaySettingsDialog({ 
   open, 
   onOpenChange, 
@@ -4009,7 +4048,12 @@ function LivePlaySettingsDialog({
   const [newTemplateName, setNewTemplateName] = useState("");
   const [showAddField, setShowAddField] = useState(false);
   const [newFieldLabel, setNewFieldLabel] = useState("");
-  const [newFieldType, setNewFieldType] = useState<"text" | "number" | "select" | "textarea">("text");
+  const [newFieldType, setNewFieldType] = useState<FieldType>("text");
+  const [newFieldOptions, setNewFieldOptions] = useState("");
+  const [editingField, setEditingField] = useState<LivePlayField | null>(null);
+  const [editFieldLabel, setEditFieldLabel] = useState("");
+  const [editFieldType, setEditFieldType] = useState<FieldType>("text");
+  const [editFieldOptions, setEditFieldOptions] = useState("");
 
   const customTemplates = (settingsData?.customTemplates as SportTemplate[]) || [];
   const activeTemplateId = (settingsData?.activeTemplateId as string) || "basketball";
@@ -4153,11 +4197,20 @@ function LivePlaySettingsDialog({
       toast({ title: "Please enter a field label", variant: "destructive" });
       return;
     }
+    const needsOptions = ["select", "multiselect"].includes(newFieldType);
+    const optionsArray = needsOptions && newFieldOptions.trim() 
+      ? newFieldOptions.split(",").map(o => o.trim()).filter(o => o)
+      : undefined;
+    if (needsOptions && (!optionsArray || optionsArray.length === 0)) {
+      toast({ title: "Please enter at least one option", variant: "destructive" });
+      return;
+    }
     const newField: LivePlayField = {
       id: `custom-field-${Date.now()}`,
       label: newFieldLabel.trim(),
       enabled: true,
       type: newFieldType,
+      options: optionsArray,
     };
     
     if (activeTemplate.isDefault) {
@@ -4171,6 +4224,7 @@ function LivePlaySettingsDialog({
           toast({ title: `Field "${newField.label}" added` });
           setNewFieldLabel("");
           setNewFieldType("text");
+          setNewFieldOptions("");
           setShowAddField(false);
         }
       });
@@ -4189,10 +4243,81 @@ function LivePlaySettingsDialog({
           toast({ title: `Field "${newField.label}" added` });
           setNewFieldLabel("");
           setNewFieldType("text");
+          setNewFieldOptions("");
           setShowAddField(false);
         }
       });
     }
+  };
+
+  const handleStartEdit = (field: LivePlayField) => {
+    setEditingField(field);
+    setEditFieldLabel(field.label);
+    setEditFieldType(field.type);
+    setEditFieldOptions(field.options?.join(", ") || "");
+  };
+
+  const handleSaveEdit = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot edit fields" });
+      return;
+    }
+    if (!editingField) return;
+    if (!editFieldLabel.trim()) {
+      toast({ title: "Please enter a field label", variant: "destructive" });
+      return;
+    }
+    const needsOptions = ["select", "multiselect"].includes(editFieldType);
+    const optionsArray = needsOptions && editFieldOptions.trim() 
+      ? editFieldOptions.split(",").map(o => o.trim()).filter(o => o)
+      : undefined;
+    if (needsOptions && (!optionsArray || optionsArray.length === 0)) {
+      toast({ title: "Please enter at least one option", variant: "destructive" });
+      return;
+    }
+    const updatedField: LivePlayField = {
+      ...editingField,
+      label: editFieldLabel.trim(),
+      type: editFieldType,
+      options: optionsArray,
+    };
+    
+    if (activeTemplate.isDefault) {
+      const existingCustomFields = (settingsData?.customFields as LivePlayField[]) || [];
+      const updatedFields = existingCustomFields.map(f => 
+        f.id === editingField.id ? updatedField : f
+      );
+      updateMutation.mutate({ customFields: updatedFields }, {
+        onSuccess: () => {
+          toast({ title: `Field "${updatedField.label}" updated` });
+          setEditingField(null);
+        }
+      });
+    } else {
+      const updatedTemplates = customTemplates.map(t => 
+        t.id === activeTemplateId 
+          ? { ...t, fields: t.fields.map(f => f.id === editingField.id ? updatedField : f) }
+          : t
+      );
+      updateMutation.mutate({ customTemplates: updatedTemplates }, {
+        onSuccess: () => {
+          toast({ title: `Field "${updatedField.label}" updated` });
+          setEditingField(null);
+        }
+      });
+    }
+  };
+
+  const getFieldTypeBadge = (type: string) => {
+    const labels: Record<string, string> = {
+      text: "Text",
+      number: "Number",
+      select: "Dropdown",
+      multiselect: "Multi-select",
+      toggle: "Toggle",
+      textarea: "Text Area",
+    };
+    return labels[type] || type;
   };
 
   const handleRemoveField = (fieldId: string) => {
@@ -4304,29 +4429,86 @@ function LivePlaySettingsDialog({
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {displayFields.map((field) => (
                 <div key={field.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <Checkbox 
                       id={field.id}
                       checked={selectedFields.includes(field.id)}
                       onCheckedChange={() => toggleField(field.id)}
                       data-testid={`checkbox-field-${field.id}`}
                     />
-                    <Label htmlFor={field.id} className="cursor-pointer text-sm">{field.label}</Label>
+                    <Label htmlFor={field.id} className="cursor-pointer text-sm truncate">{field.label}</Label>
+                    <Badge variant="secondary" className="text-xs shrink-0">{getFieldTypeBadge(field.type)}</Badge>
                   </div>
                   {field.id.startsWith("custom-field-") && (
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      onClick={() => handleRemoveField(field.id)}
-                      data-testid={`button-remove-field-${field.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                    <div className="flex gap-1 shrink-0">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleStartEdit(field)}
+                        data-testid={`button-edit-field-${field.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleRemoveField(field.id)}
+                        data-testid={`button-remove-field-${field.id}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           </div>
+
+          {editingField && (
+            <div className="space-y-2 p-3 border rounded-md bg-muted/50">
+              <div className="text-sm font-medium">Edit Field</div>
+              <div className="space-y-2">
+                <Label>Field Label</Label>
+                <Input 
+                  placeholder="e.g., Energy Level"
+                  value={editFieldLabel}
+                  onChange={(e) => setEditFieldLabel(e.target.value)}
+                  data-testid="input-edit-field-label"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Field Type</Label>
+                <Select value={editFieldType} onValueChange={(v) => setEditFieldType(v as FieldType)}>
+                  <SelectTrigger data-testid="select-edit-field-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="textarea">Text Area</SelectItem>
+                    <SelectItem value="select">Dropdown</SelectItem>
+                    <SelectItem value="multiselect">Multiple Choice</SelectItem>
+                    <SelectItem value="toggle">Toggle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {["select", "multiselect"].includes(editFieldType) && (
+                <div className="space-y-2">
+                  <Label>Options (comma-separated)</Label>
+                  <Input 
+                    placeholder="e.g., Low, Medium, High"
+                    value={editFieldOptions}
+                    onChange={(e) => setEditFieldOptions(e.target.value)}
+                    data-testid="input-edit-field-options"
+                  />
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setEditingField(null)}>Cancel</Button>
+                <Button size="sm" onClick={handleSaveEdit} data-testid="button-save-edit-field">Save</Button>
+              </div>
+            </div>
+          )}
 
           {showAddField ? (
             <div className="space-y-2 p-3 border rounded-md">
@@ -4341,7 +4523,7 @@ function LivePlaySettingsDialog({
               </div>
               <div className="space-y-2">
                 <Label>Field Type</Label>
-                <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as typeof newFieldType)}>
+                <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as FieldType)}>
                   <SelectTrigger data-testid="select-field-type">
                     <SelectValue />
                   </SelectTrigger>
@@ -4349,9 +4531,23 @@ function LivePlaySettingsDialog({
                     <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="number">Number</SelectItem>
                     <SelectItem value="textarea">Text Area</SelectItem>
+                    <SelectItem value="select">Dropdown</SelectItem>
+                    <SelectItem value="multiselect">Multiple Choice</SelectItem>
+                    <SelectItem value="toggle">Toggle</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {["select", "multiselect"].includes(newFieldType) && (
+                <div className="space-y-2">
+                  <Label>Options (comma-separated)</Label>
+                  <Input 
+                    placeholder="e.g., Low, Medium, High"
+                    value={newFieldOptions}
+                    onChange={(e) => setNewFieldOptions(e.target.value)}
+                    data-testid="input-field-options"
+                  />
+                </div>
+              )}
               <div className="flex gap-2 justify-end">
                 <Button size="sm" variant="outline" onClick={() => setShowAddField(false)}>Cancel</Button>
                 <Button size="sm" onClick={handleAddField} data-testid="button-confirm-add-field">Add Field</Button>
@@ -4374,6 +4570,557 @@ function LivePlaySettingsDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-live-play-settings">
+            {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PracticeSettingsDialog({ 
+  open, 
+  onOpenChange, 
+  isDemo, 
+  defaultFields,
+  currentVisibleFields,
+  settingsData
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  defaultFields: PracticeField[];
+  currentVisibleFields: string[];
+  settingsData: PracticeSettings | undefined;
+}) {
+  const { toast } = useToast();
+  const [selectedFields, setSelectedFields] = useState<string[]>(currentVisibleFields);
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [showAddField, setShowAddField] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<FieldType>("text");
+  const [newFieldOptions, setNewFieldOptions] = useState("");
+  const [editingField, setEditingField] = useState<PracticeField | null>(null);
+  const [editFieldLabel, setEditFieldLabel] = useState("");
+  const [editFieldType, setEditFieldType] = useState<FieldType>("text");
+  const [editFieldOptions, setEditFieldOptions] = useState("");
+
+  const customTemplates = (settingsData?.customTemplates as PracticeTemplate[]) || [];
+  const activeTemplateId = (settingsData?.activeTemplateId as string) || "basketball-drills";
+  const customFields = (settingsData?.customFields as PracticeField[]) || [];
+
+  const DEFAULT_TEMPLATE: PracticeTemplate = {
+    id: "basketball-drills",
+    name: "Basketball Drills",
+    isDefault: true,
+    fields: defaultFields,
+  };
+
+  const allTemplates = [DEFAULT_TEMPLATE, ...customTemplates];
+  const activeTemplate = allTemplates.find(t => t.id === activeTemplateId) || DEFAULT_TEMPLATE;
+
+  useEffect(() => {
+    setSelectedFields(currentVisibleFields);
+  }, [currentVisibleFields]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: Partial<PracticeSettings>) => {
+      const currentSettings = {
+        visibleFields: settingsData?.visibleFields || currentVisibleFields,
+        customFields: settingsData?.customFields || [],
+        customTemplates: settingsData?.customTemplates || [],
+        activeTemplateId: settingsData?.activeTemplateId || "basketball-drills",
+      };
+      const res = await apiRequest("PUT", "/api/fitness/practice-settings", { ...currentSettings, ...data });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/practice-settings"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const toggleField = (fieldId: string) => {
+    setSelectedFields(prev => 
+      prev.includes(fieldId) 
+        ? prev.filter(f => f !== fieldId)
+        : [...prev, fieldId]
+    );
+  };
+
+  const handleSave = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - settings not saved" });
+      onOpenChange(false);
+      return;
+    }
+    updateMutation.mutate({ visibleFields: selectedFields }, {
+      onSuccess: () => {
+        toast({ title: "Settings saved" });
+        onOpenChange(false);
+      }
+    });
+  };
+
+  const displayFields = activeTemplate.isDefault 
+    ? [...activeTemplate.fields, ...customFields]
+    : activeTemplate.fields;
+
+  const handleCreateTemplate = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot create templates" });
+      return;
+    }
+    if (!newTemplateName.trim()) {
+      toast({ title: "Please enter a template name", variant: "destructive" });
+      return;
+    }
+    const selectedFieldsFromDisplay = displayFields.filter(f => selectedFields.includes(f.id));
+    const newTemplate: PracticeTemplate = {
+      id: `custom-${Date.now()}`,
+      name: newTemplateName.trim(),
+      isDefault: false,
+      fields: selectedFieldsFromDisplay,
+    };
+    const updatedTemplates = [...customTemplates, newTemplate];
+    const newFieldIds = selectedFieldsFromDisplay.map(f => f.id);
+    updateMutation.mutate({ 
+      customTemplates: updatedTemplates,
+      activeTemplateId: newTemplate.id,
+      visibleFields: newFieldIds
+    }, {
+      onSuccess: () => {
+        toast({ title: `Template "${newTemplate.name}" created` });
+        setNewTemplateName("");
+        setShowCreateTemplate(false);
+        setSelectedFields(newFieldIds);
+      }
+    });
+  };
+
+  const handleSwitchTemplate = (templateId: string) => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot switch templates" });
+      return;
+    }
+    const template = allTemplates.find(t => t.id === templateId);
+    let fieldIds: string[] = [];
+    if (template) {
+      fieldIds = template.fields.map(f => f.id);
+      if (template.isDefault) {
+        const customFieldIds = customFields.map(f => f.id);
+        fieldIds = [...fieldIds, ...customFieldIds];
+      }
+    }
+    updateMutation.mutate({ 
+      activeTemplateId: templateId,
+      visibleFields: fieldIds
+    }, {
+      onSuccess: () => {
+        setSelectedFields(fieldIds);
+      }
+    });
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot delete templates" });
+      return;
+    }
+    const template = customTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    const updatedTemplates = customTemplates.filter(t => t.id !== templateId);
+    updateMutation.mutate({ 
+      customTemplates: updatedTemplates,
+      activeTemplateId: activeTemplateId === templateId ? "basketball-drills" : activeTemplateId
+    }, {
+      onSuccess: () => {
+        toast({ title: `Template "${template.name}" deleted` });
+      }
+    });
+  };
+
+  const handleAddField = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot add fields" });
+      return;
+    }
+    if (!newFieldLabel.trim()) {
+      toast({ title: "Please enter a field label", variant: "destructive" });
+      return;
+    }
+    const needsOptions = ["select", "multiselect"].includes(newFieldType);
+    const optionsArray = needsOptions && newFieldOptions.trim() 
+      ? newFieldOptions.split(",").map(o => o.trim()).filter(o => o)
+      : undefined;
+    if (needsOptions && (!optionsArray || optionsArray.length === 0)) {
+      toast({ title: "Please enter at least one option", variant: "destructive" });
+      return;
+    }
+    const newField: PracticeField = {
+      id: `custom-field-${Date.now()}`,
+      label: newFieldLabel.trim(),
+      enabled: true,
+      type: newFieldType,
+      options: optionsArray,
+    };
+    
+    if (activeTemplate.isDefault) {
+      const existingCustomFields = (settingsData?.customFields as PracticeField[]) || [];
+      updateMutation.mutate({ 
+        customFields: [...existingCustomFields, newField],
+        visibleFields: [...selectedFields, newField.id]
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => [...prev, newField.id]);
+          toast({ title: `Field "${newField.label}" added` });
+          setNewFieldLabel("");
+          setNewFieldType("text");
+          setNewFieldOptions("");
+          setShowAddField(false);
+        }
+      });
+    } else {
+      const updatedTemplates = customTemplates.map(t => 
+        t.id === activeTemplateId 
+          ? { ...t, fields: [...t.fields, newField] }
+          : t
+      );
+      updateMutation.mutate({ 
+        customTemplates: updatedTemplates,
+        visibleFields: [...selectedFields, newField.id]
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => [...prev, newField.id]);
+          toast({ title: `Field "${newField.label}" added` });
+          setNewFieldLabel("");
+          setNewFieldType("text");
+          setNewFieldOptions("");
+          setShowAddField(false);
+        }
+      });
+    }
+  };
+
+  const handleStartEdit = (field: PracticeField) => {
+    setEditingField(field);
+    setEditFieldLabel(field.label);
+    setEditFieldType(field.type);
+    setEditFieldOptions(field.options?.join(", ") || "");
+  };
+
+  const handleSaveEdit = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot edit fields" });
+      return;
+    }
+    if (!editingField) return;
+    if (!editFieldLabel.trim()) {
+      toast({ title: "Please enter a field label", variant: "destructive" });
+      return;
+    }
+    const needsOptions = ["select", "multiselect"].includes(editFieldType);
+    const optionsArray = needsOptions && editFieldOptions.trim() 
+      ? editFieldOptions.split(",").map(o => o.trim()).filter(o => o)
+      : undefined;
+    if (needsOptions && (!optionsArray || optionsArray.length === 0)) {
+      toast({ title: "Please enter at least one option", variant: "destructive" });
+      return;
+    }
+    const updatedField: PracticeField = {
+      ...editingField,
+      label: editFieldLabel.trim(),
+      type: editFieldType,
+      options: optionsArray,
+    };
+    
+    if (activeTemplate.isDefault) {
+      const existingCustomFields = (settingsData?.customFields as PracticeField[]) || [];
+      const updatedFields = existingCustomFields.map(f => 
+        f.id === editingField.id ? updatedField : f
+      );
+      updateMutation.mutate({ customFields: updatedFields }, {
+        onSuccess: () => {
+          toast({ title: `Field "${updatedField.label}" updated` });
+          setEditingField(null);
+        }
+      });
+    } else {
+      const updatedTemplates = customTemplates.map(t => 
+        t.id === activeTemplateId 
+          ? { ...t, fields: t.fields.map(f => f.id === editingField.id ? updatedField : f) }
+          : t
+      );
+      updateMutation.mutate({ customTemplates: updatedTemplates }, {
+        onSuccess: () => {
+          toast({ title: `Field "${updatedField.label}" updated` });
+          setEditingField(null);
+        }
+      });
+    }
+  };
+
+  const handleRemoveField = (fieldId: string) => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot remove fields" });
+      return;
+    }
+    if (activeTemplate.isDefault) {
+      const existingCustomFields = (settingsData?.customFields as PracticeField[]) || [];
+      const updatedFields = existingCustomFields.filter(f => f.id !== fieldId);
+      updateMutation.mutate({ 
+        customFields: updatedFields,
+        visibleFields: selectedFields.filter(id => id !== fieldId)
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => prev.filter(id => id !== fieldId));
+          toast({ title: "Field removed" });
+        }
+      });
+    } else {
+      const updatedTemplates = customTemplates.map(t => 
+        t.id === activeTemplateId 
+          ? { ...t, fields: t.fields.filter(f => f.id !== fieldId) }
+          : t
+      );
+      updateMutation.mutate({ 
+        customTemplates: updatedTemplates,
+        visibleFields: selectedFields.filter(id => id !== fieldId)
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => prev.filter(id => id !== fieldId));
+          toast({ title: "Field removed" });
+        }
+      });
+    }
+  };
+
+  const getFieldTypeBadge = (type: string) => {
+    const labels: Record<string, string> = {
+      text: "Text",
+      number: "Number",
+      select: "Dropdown",
+      multiselect: "Multi-select",
+      toggle: "Toggle",
+      textarea: "Text Area",
+    };
+    return labels[type] || type;
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Practice Settings</DialogTitle>
+          <DialogDescription>Configure your practice template and visible fields</DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Current Template</Label>
+            <div className="flex gap-2">
+              <Select value={activeTemplateId} onValueChange={handleSwitchTemplate}>
+                <SelectTrigger data-testid="select-practice-template">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {allTemplates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name} {template.isDefault && "(Default)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!activeTemplate.isDefault && (
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => handleDeleteTemplate(activeTemplateId)}
+                  data-testid="button-delete-practice-template"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {showCreateTemplate ? (
+            <div className="space-y-2 p-3 border rounded-md">
+              <Label>New Template Name</Label>
+              <Input 
+                placeholder="e.g., Yoga, Swimming, Tennis Drills"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                data-testid="input-practice-template-name"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setShowCreateTemplate(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleCreateTemplate} data-testid="button-confirm-create-practice-template">Create</Button>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => setShowCreateTemplate(true)}
+              data-testid="button-create-practice-template"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Template
+            </Button>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Visible Fields</Label>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {displayFields.map((field) => (
+                <div key={field.id} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                    <Checkbox 
+                      id={`practice-${field.id}`}
+                      checked={selectedFields.includes(field.id)}
+                      onCheckedChange={() => toggleField(field.id)}
+                      data-testid={`checkbox-practice-field-${field.id}`}
+                    />
+                    <Label htmlFor={`practice-${field.id}`} className="cursor-pointer text-sm truncate">{field.label}</Label>
+                    <Badge variant="secondary" className="text-xs shrink-0">{getFieldTypeBadge(field.type)}</Badge>
+                  </div>
+                  {field.id.startsWith("custom-field-") && (
+                    <div className="flex gap-1 shrink-0">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleStartEdit(field)}
+                        data-testid={`button-edit-practice-field-${field.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => handleRemoveField(field.id)}
+                        data-testid={`button-remove-practice-field-${field.id}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {editingField && (
+            <div className="space-y-2 p-3 border rounded-md bg-muted/50">
+              <div className="text-sm font-medium">Edit Field</div>
+              <div className="space-y-2">
+                <Label>Field Label</Label>
+                <Input 
+                  placeholder="e.g., Energy Level"
+                  value={editFieldLabel}
+                  onChange={(e) => setEditFieldLabel(e.target.value)}
+                  data-testid="input-edit-practice-field-label"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Field Type</Label>
+                <Select value={editFieldType} onValueChange={(v) => setEditFieldType(v as FieldType)}>
+                  <SelectTrigger data-testid="select-edit-practice-field-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="textarea">Text Area</SelectItem>
+                    <SelectItem value="select">Dropdown</SelectItem>
+                    <SelectItem value="multiselect">Multiple Choice</SelectItem>
+                    <SelectItem value="toggle">Toggle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {["select", "multiselect"].includes(editFieldType) && (
+                <div className="space-y-2">
+                  <Label>Options (comma-separated)</Label>
+                  <Input 
+                    placeholder="e.g., Low, Medium, High"
+                    value={editFieldOptions}
+                    onChange={(e) => setEditFieldOptions(e.target.value)}
+                    data-testid="input-edit-practice-field-options"
+                  />
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setEditingField(null)}>Cancel</Button>
+                <Button size="sm" onClick={handleSaveEdit} data-testid="button-save-edit-practice-field">Save</Button>
+              </div>
+            </div>
+          )}
+
+          {showAddField ? (
+            <div className="space-y-2 p-3 border rounded-md">
+              <div className="space-y-2">
+                <Label>Field Label</Label>
+                <Input 
+                  placeholder="e.g., Duration, Intensity"
+                  value={newFieldLabel}
+                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                  data-testid="input-practice-field-label"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Field Type</Label>
+                <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as FieldType)}>
+                  <SelectTrigger data-testid="select-practice-field-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="textarea">Text Area</SelectItem>
+                    <SelectItem value="select">Dropdown</SelectItem>
+                    <SelectItem value="multiselect">Multiple Choice</SelectItem>
+                    <SelectItem value="toggle">Toggle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {["select", "multiselect"].includes(newFieldType) && (
+                <div className="space-y-2">
+                  <Label>Options (comma-separated)</Label>
+                  <Input 
+                    placeholder="e.g., Low, Medium, High"
+                    value={newFieldOptions}
+                    onChange={(e) => setNewFieldOptions(e.target.value)}
+                    data-testid="input-practice-field-options"
+                  />
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setShowAddField(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleAddField} data-testid="button-confirm-add-practice-field">Add Field</Button>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="w-full" 
+              onClick={() => setShowAddField(true)}
+              data-testid="button-add-practice-field"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Custom Field
+            </Button>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-practice-settings">
             {updateMutation.isPending ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

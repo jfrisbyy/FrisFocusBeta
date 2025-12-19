@@ -477,7 +477,7 @@ export const livePlayFieldSchema = z.object({
   id: z.string(),
   label: z.string(),
   enabled: z.boolean(),
-  type: z.enum(["text", "number", "select", "textarea"]),
+  type: z.enum(["text", "number", "select", "multiselect", "toggle", "textarea"]),
   options: z.array(z.string()).optional(),
   placeholder: z.string().optional(),
 });
@@ -504,6 +504,38 @@ export const livePlaySettings = pgTable("live_play_settings", {
 export const insertLivePlaySettingsSchema = createInsertSchema(livePlaySettings).omit({ id: true });
 export type InsertLivePlaySettings = z.infer<typeof insertLivePlaySettingsSchema>;
 export type LivePlaySettings = typeof livePlaySettings.$inferSelect;
+
+// Practice settings - stores customizable field visibility for practice/drills
+export const practiceFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  enabled: z.boolean(),
+  type: z.enum(["text", "number", "select", "multiselect", "toggle", "textarea"]),
+  options: z.array(z.string()).optional(),
+  placeholder: z.string().optional(),
+});
+export type PracticeField = z.infer<typeof practiceFieldSchema>;
+
+export const practiceTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isDefault: z.boolean().optional(),
+  fields: z.array(practiceFieldSchema),
+});
+export type PracticeTemplate = z.infer<typeof practiceTemplateSchema>;
+
+export const practiceSettings = pgTable("practice_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  visibleFields: jsonb("visible_fields"),
+  customFields: jsonb("custom_fields"),
+  activeTemplateId: text("active_template_id").default("basketball-drills"),
+  customTemplates: jsonb("custom_templates"),
+});
+
+export const insertPracticeSettingsSchema = createInsertSchema(practiceSettings).omit({ id: true });
+export type InsertPracticeSettings = z.infer<typeof insertPracticeSettingsSchema>;
+export type PracticeSettings = typeof practiceSettings.$inferSelect;
 
 // ==================== GPT OAuth Tables ====================
 
