@@ -1596,6 +1596,46 @@ export const insertUserDailyScheduleSchema = createInsertSchema(userDailySchedul
 export type InsertUserDailySchedule = z.infer<typeof insertUserDailyScheduleSchema>;
 export type UserDailySchedule = typeof userDailySchedules.$inferSelect;
 
+// ==================== MILESTONES & DUE DATES (Database) ====================
+
+// Milestones table - persisted across devices
+export const userMilestones = pgTable("user_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  points: integer("points").notNull().default(0),
+  deadline: varchar("deadline"), // YYYY-MM-DD format
+  achieved: boolean("achieved").notNull().default(false),
+  achievedAt: varchar("achieved_at"), // ISO timestamp
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserMilestoneSchema = createInsertSchema(userMilestones).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserMilestone = z.infer<typeof insertUserMilestoneSchema>;
+export type UserMilestone = typeof userMilestones.$inferSelect;
+
+// Due Dates table - persisted across devices
+export const userDueDates = pgTable("user_due_dates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  dueDate: varchar("due_date").notNull(), // YYYY-MM-DD format
+  pointValue: integer("point_value").notNull().default(0),
+  penaltyValue: integer("penalty_value").notNull().default(0),
+  status: varchar("status").notNull().default("pending"), // pending, completed, missed
+  completedAt: varchar("completed_at"), // ISO timestamp
+  isRecurring: boolean("is_recurring").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserDueDateSchema = createInsertSchema(userDueDates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserDueDate = z.infer<typeof insertUserDueDateSchema>;
+export type UserDueDate = typeof userDueDates.$inferSelect;
+
 // ==================== AI TASK GENERATION ====================
 
 // Conversation step enum - tracks where we are in the flow

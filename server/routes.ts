@@ -114,6 +114,10 @@ import {
   aiGenerateTasksRequestSchema,
   aiGenerateTasksResponseSchema,
   type AIGenerateTasksResponse,
+  userMilestones,
+  userDueDates,
+  insertUserMilestoneSchema,
+  insertUserDueDateSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray, gte, sql } from "drizzle-orm";
@@ -7209,6 +7213,124 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     } catch (error: any) {
       console.error("Error listing GitHub commits:", error);
       res.status(500).json({ error: error.message || "Failed to list GitHub commits" });
+    }
+  });
+
+  // ==================== MILESTONES API ====================
+
+  // Get all milestones for user
+  app.get("/api/milestones", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const milestones = await storage.getMilestones(userId);
+      res.json(milestones);
+    } catch (error: any) {
+      console.error("Error fetching milestones:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch milestones" });
+    }
+  });
+
+  // Create a new milestone
+  app.post("/api/milestones", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = insertUserMilestoneSchema.parse({ ...req.body, userId });
+      const milestone = await storage.createMilestone(validated);
+      res.json(milestone);
+    } catch (error: any) {
+      console.error("Error creating milestone:", error);
+      res.status(500).json({ error: error.message || "Failed to create milestone" });
+    }
+  });
+
+  // Update a milestone
+  app.put("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const milestone = await storage.updateMilestone(id, userId, req.body);
+      if (!milestone) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      res.json(milestone);
+    } catch (error: any) {
+      console.error("Error updating milestone:", error);
+      res.status(500).json({ error: error.message || "Failed to update milestone" });
+    }
+  });
+
+  // Delete a milestone
+  app.delete("/api/milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteMilestone(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting milestone:", error);
+      res.status(500).json({ error: error.message || "Failed to delete milestone" });
+    }
+  });
+
+  // ==================== DUE DATES API ====================
+
+  // Get all due dates for user
+  app.get("/api/due-dates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dueDates = await storage.getDueDates(userId);
+      res.json(dueDates);
+    } catch (error: any) {
+      console.error("Error fetching due dates:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch due dates" });
+    }
+  });
+
+  // Create a new due date
+  app.post("/api/due-dates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = insertUserDueDateSchema.parse({ ...req.body, userId });
+      const dueDate = await storage.createDueDate(validated);
+      res.json(dueDate);
+    } catch (error: any) {
+      console.error("Error creating due date:", error);
+      res.status(500).json({ error: error.message || "Failed to create due date" });
+    }
+  });
+
+  // Update a due date
+  app.put("/api/due-dates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const dueDate = await storage.updateDueDate(id, userId, req.body);
+      if (!dueDate) {
+        return res.status(404).json({ error: "Due date not found" });
+      }
+      res.json(dueDate);
+    } catch (error: any) {
+      console.error("Error updating due date:", error);
+      res.status(500).json({ error: error.message || "Failed to update due date" });
+    }
+  });
+
+  // Delete a due date
+  app.delete("/api/due-dates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteDueDate(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Due date not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting due date:", error);
+      res.status(500).json({ error: error.message || "Failed to delete due date" });
     }
   });
 

@@ -4,6 +4,8 @@ import {
   friendChallenges,
   friendChallengeTasks,
   friendChallengeCompletions,
+  userMilestones,
+  userDueDates,
   type User,
   type UpsertUser,
   type Notification,
@@ -16,6 +18,10 @@ import {
   type FriendChallengeCompletion,
   type InsertFriendChallengeCompletion,
   type FriendChallengeWithDetails,
+  type UserMilestone,
+  type InsertUserMilestone,
+  type UserDueDate,
+  type InsertUserDueDate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -39,6 +45,18 @@ export interface IStorage {
   declineFriendChallenge(id: string, userId: string): Promise<FriendChallenge | undefined>;
   completeChallengeTask(challengeId: string, taskId: string, userId: string): Promise<FriendChallengeCompletion | undefined>;
   getChallengeCompletions(challengeId: string): Promise<FriendChallengeCompletion[]>;
+
+  // Milestones
+  getMilestones(userId: string): Promise<UserMilestone[]>;
+  createMilestone(data: InsertUserMilestone): Promise<UserMilestone>;
+  updateMilestone(id: string, userId: string, data: Partial<InsertUserMilestone>): Promise<UserMilestone | undefined>;
+  deleteMilestone(id: string, userId: string): Promise<boolean>;
+
+  // Due Dates
+  getDueDates(userId: string): Promise<UserDueDate[]>;
+  createDueDate(data: InsertUserDueDate): Promise<UserDueDate>;
+  updateDueDate(id: string, userId: string, data: Partial<InsertUserDueDate>): Promise<UserDueDate | undefined>;
+  deleteDueDate(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -407,6 +425,70 @@ export class DatabaseStorage implements IStorage {
       .from(friendChallengeCompletions)
       .where(eq(friendChallengeCompletions.challengeId, challengeId))
       .orderBy(desc(friendChallengeCompletions.completedAt));
+  }
+
+  // ==================== MILESTONES ====================
+
+  async getMilestones(userId: string): Promise<UserMilestone[]> {
+    return db
+      .select()
+      .from(userMilestones)
+      .where(eq(userMilestones.userId, userId))
+      .orderBy(desc(userMilestones.createdAt));
+  }
+
+  async createMilestone(data: InsertUserMilestone): Promise<UserMilestone> {
+    const [milestone] = await db.insert(userMilestones).values(data).returning();
+    return milestone;
+  }
+
+  async updateMilestone(id: string, userId: string, data: Partial<InsertUserMilestone>): Promise<UserMilestone | undefined> {
+    const [milestone] = await db
+      .update(userMilestones)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(userMilestones.id, id), eq(userMilestones.userId, userId)))
+      .returning();
+    return milestone;
+  }
+
+  async deleteMilestone(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(userMilestones)
+      .where(and(eq(userMilestones.id, id), eq(userMilestones.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== DUE DATES ====================
+
+  async getDueDates(userId: string): Promise<UserDueDate[]> {
+    return db
+      .select()
+      .from(userDueDates)
+      .where(eq(userDueDates.userId, userId))
+      .orderBy(desc(userDueDates.createdAt));
+  }
+
+  async createDueDate(data: InsertUserDueDate): Promise<UserDueDate> {
+    const [dueDate] = await db.insert(userDueDates).values(data).returning();
+    return dueDate;
+  }
+
+  async updateDueDate(id: string, userId: string, data: Partial<InsertUserDueDate>): Promise<UserDueDate | undefined> {
+    const [dueDate] = await db
+      .update(userDueDates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(userDueDates.id, id), eq(userDueDates.userId, userId)))
+      .returning();
+    return dueDate;
+  }
+
+  async deleteDueDate(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(userDueDates)
+      .where(and(eq(userDueDates.id, id), eq(userDueDates.userId, userId)))
+      .returning();
+    return result.length > 0;
   }
 }
 

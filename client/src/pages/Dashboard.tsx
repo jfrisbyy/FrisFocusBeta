@@ -500,6 +500,17 @@ export default function Dashboard() {
     queryKey: ["/api/cheerlines"],
     enabled: !useMockData,
   });
+
+  // Fetch milestones and due dates from API for cross-device persistence
+  const { data: apiMilestones, isFetched: milestonesFetched } = useQuery<any[]>({
+    queryKey: ["/api/milestones"],
+    enabled: !useMockData,
+  });
+
+  const { data: apiDueDates, isFetched: dueDatesFetched } = useQuery<any[]>({
+    queryKey: ["/api/due-dates"],
+    enabled: !useMockData,
+  });
   
   // Fetch weekly todos from API - support week navigation
   const currentWeekId = getWeekId(new Date());
@@ -687,17 +698,29 @@ export default function Dashboard() {
       setWeeklyGoal(loadWeeklyGoalFromStorage());
     }
 
-    // Load milestones
-    const storedMilestones = loadMilestonesFromStorage();
-    setMilestones(storedMilestones.map(m => ({
-      id: m.id,
-      name: m.name,
-      description: m.description || "",
-      points: m.points,
-      deadline: m.deadline,
-      achieved: m.achieved,
-      achievedAt: m.achievedAt,
-    })));
+    // Load milestones - prefer API data, fallback to localStorage
+    if (apiMilestones && apiMilestones.length > 0) {
+      setMilestones(apiMilestones.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description || "",
+        points: m.points,
+        deadline: m.deadline,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })));
+    } else if (!milestonesFetched) {
+      const storedMilestones = loadMilestonesFromStorage();
+      setMilestones(storedMilestones.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description || "",
+        points: m.points,
+        deadline: m.deadline,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })));
+    }
 
     // Load badges
     const storedBadges = loadBadgesFromStorage();
@@ -735,9 +758,22 @@ export default function Dashboard() {
       }
     }
 
-    // Load due dates
-    const storedDueDates = loadDueDatesFromStorage();
-    setDueDates(storedDueDates);
+    // Load due dates - prefer API data, fallback to localStorage
+    if (apiDueDates && apiDueDates.length > 0) {
+      setDueDates(apiDueDates.map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        dueDate: d.dueDate,
+        pointValue: d.pointValue,
+        penaltyValue: d.penaltyValue,
+        status: d.status,
+        completedAt: d.completedAt,
+        isRecurring: d.isRecurring,
+      })));
+    } else if (!dueDatesFetched) {
+      const storedDueDates = loadDueDatesFromStorage();
+      setDueDates(storedDueDates);
+    }
 
     // Wait for API queries to complete before processing data
     if (!apiQueriesReady) {
@@ -1396,78 +1432,68 @@ export default function Dashboard() {
     const updated = [...milestones, newMilestone];
     setMilestones(updated);
     if (!useMockData) {
-      saveMilestonesToStorage(updated.map(m => ({
-        id: m.id,
-        name: m.name,
-        description: m.description,
-        points: m.points,
-        deadline: m.deadline,
-        achieved: m.achieved,
-        achievedAt: m.achievedAt,
-      })));
-      // Award first_milestone one-time FP bonus
       try {
+        await apiRequest("POST", "/api/milestones", {
+          name: milestone.name,
+          description: milestone.description,
+          points: milestone.points,
+          deadline: milestone.deadline,
+          achieved: false,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
+        // Award first_milestone one-time FP bonus
         await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_milestone" });
         queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
-      } catch (e) { console.error("FP award error:", e); }
+      } catch (e) { console.error("Milestone add error:", e); }
     }
   };
 
-  const handleMilestoneEdit = (id: string, updates: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
+  const handleMilestoneEdit = async (id: string, updates: Omit<Milestone, "id" | "achieved" | "achievedAt">) => {
     const updated = milestones.map(m => 
       m.id === id ? { ...m, ...updates } : m
     );
     setMilestones(updated);
     if (!useMockData) {
-      saveMilestonesToStorage(updated.map(m => ({
-        id: m.id,
-        name: m.name,
-        description: m.description,
-        points: m.points,
-        deadline: m.deadline,
-        achieved: m.achieved,
-        achievedAt: m.achievedAt,
-      })));
+      try {
+        await apiRequest("PUT", `/api/milestones/${id}`, updates);
+        queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
+      } catch (e) { console.error("Milestone edit error:", e); }
     }
   };
 
-  const handleMilestoneDelete = (id: string) => {
+  const handleMilestoneDelete = async (id: string) => {
     const updated = milestones.filter(m => m.id !== id);
     setMilestones(updated);
     if (!useMockData) {
-      saveMilestonesToStorage(updated.map(m => ({
-        id: m.id,
-        name: m.name,
-        description: m.description,
-        points: m.points,
-        deadline: m.deadline,
-        achieved: m.achieved,
-        achievedAt: m.achievedAt,
-      })));
+      try {
+        await apiRequest("DELETE", `/api/milestones/${id}`, {});
+        queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
+      } catch (e) { console.error("Milestone delete error:", e); }
     }
   };
 
-  const handleMilestoneToggle = (id: string) => {
+  const handleMilestoneToggle = async (id: string) => {
+    const milestone = milestones.find(m => m.id === id);
+    if (!milestone) return;
+    const newAchieved = !milestone.achieved;
     const updated = milestones.map(m => 
       m.id === id 
         ? { 
             ...m, 
-            achieved: !m.achieved, 
-            achievedAt: !m.achieved ? new Date().toISOString() : undefined 
+            achieved: newAchieved, 
+            achievedAt: newAchieved ? new Date().toISOString() : undefined 
           } 
         : m
     );
     setMilestones(updated);
     if (!useMockData) {
-      saveMilestonesToStorage(updated.map(m => ({
-        id: m.id,
-        name: m.name,
-        description: m.description,
-        points: m.points,
-        deadline: m.deadline,
-        achieved: m.achieved,
-        achievedAt: m.achievedAt,
-      })));
+      try {
+        await apiRequest("PUT", `/api/milestones/${id}`, {
+          achieved: newAchieved,
+          achievedAt: newAchieved ? new Date().toISOString() : null,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/milestones"] });
+      } catch (e) { console.error("Milestone toggle error:", e); }
     }
   };
 
@@ -1548,18 +1574,65 @@ export default function Dashboard() {
     });
   };
 
-  // Due dates handlers
+  // Due dates handlers - sync with API
   const handleDueDatesChange = async (items: StoredDueDateItem[]) => {
     const wasAdding = items.length > dueDates.length;
+    const prevIds = new Set(dueDates.map(d => d.id));
+    const newIds = new Set(items.map(d => d.id));
+    
     setDueDates(items);
+    
     if (!useMockData) {
-      saveDueDatesToStorage(items);
-      // Award first_due_date one-time FP bonus when adding
-      if (wasAdding) {
-        try {
+      try {
+        // Find added items (new IDs)
+        const addedItems = items.filter(item => !prevIds.has(item.id));
+        // Find deleted items (IDs no longer present)
+        const deletedIds = dueDates.filter(d => !newIds.has(d.id)).map(d => d.id);
+        // Find updated items (existing IDs with changes)
+        const updatedItems = items.filter(item => 
+          prevIds.has(item.id) && 
+          JSON.stringify(item) !== JSON.stringify(dueDates.find(d => d.id === item.id))
+        );
+
+        // Process additions
+        for (const item of addedItems) {
+          await apiRequest("POST", "/api/due-dates", {
+            title: item.title,
+            dueDate: item.dueDate,
+            pointValue: item.pointValue,
+            penaltyValue: item.penaltyValue,
+            status: item.status,
+            isRecurring: item.isRecurring,
+          });
+        }
+
+        // Process deletions
+        for (const id of deletedIds) {
+          await apiRequest("DELETE", `/api/due-dates/${id}`, {});
+        }
+
+        // Process updates
+        for (const item of updatedItems) {
+          await apiRequest("PUT", `/api/due-dates/${item.id}`, {
+            title: item.title,
+            dueDate: item.dueDate,
+            pointValue: item.pointValue,
+            penaltyValue: item.penaltyValue,
+            status: item.status,
+            completedAt: item.completedAt,
+            isRecurring: item.isRecurring,
+          });
+        }
+
+        queryClient.invalidateQueries({ queryKey: ["/api/due-dates"] });
+
+        // Award first_due_date one-time FP bonus when adding
+        if (wasAdding) {
           await apiRequest("POST", "/api/fp/award-onetime", { eventType: "first_due_date" });
           queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
-        } catch (e) { console.error("FP award error:", e); }
+        }
+      } catch (e) { 
+        console.error("Due date sync error:", e); 
       }
     }
   };
