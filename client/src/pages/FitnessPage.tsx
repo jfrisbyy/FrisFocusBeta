@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
-import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
+import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend, PieChart, Pie } from "recharts";
 
 const mockNutrition: NutritionLog[] = [
@@ -100,7 +100,6 @@ export default function FitnessPage() {
   const [bodyCompDialogOpen, setBodyCompDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
-  const [habitsDialogOpen, setHabitsDialogOpen] = useState(false);
   const [livePlaySettingsOpen, setLivePlaySettingsOpen] = useState(false);
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
@@ -109,6 +108,7 @@ export default function FitnessPage() {
   const [stepsView, setStepsView] = useState<"today" | "weekly">("today");
   const [stepsDialogOpen, setStepsDialogOpen] = useState(false);
   const [stepsWeekOffset, setStepsWeekOffset] = useState(0);
+  const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -779,29 +779,6 @@ export default function FitnessPage() {
               }
             }}
           />
-          <EditHabitsDialog
-            open={habitsDialogOpen}
-            onOpenChange={setHabitsDialogOpen}
-            nutritionSettings={nutritionSettings}
-            isDemo={isDemo}
-            onSave={(toggles) => {
-              if (!isDemo) {
-                apiRequest("PUT", "/api/fitness/nutrition-settings", {
-                  ...nutritionSettings,
-                  customToggles: toggles,
-                }).then(() => {
-                  queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
-                  toast({ title: "Habits updated" });
-                });
-              } else {
-                setDemoNutritionSettings(prev => ({
-                  ...prev,
-                  customToggles: toggles,
-                }));
-                toast({ title: "Habits updated (demo mode)" });
-              }
-            }}
-          />
 
           {/* Steps Dialog */}
           <Dialog open={stepsDialogOpen} onOpenChange={setStepsDialogOpen}>
@@ -840,6 +817,66 @@ export default function FitnessPage() {
               </form>
             </DialogContent>
           </Dialog>
+
+          {/* Today's Breakdown - Main Card */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm">{isToday(selectedNutritionDate) ? "Today's Breakdown" : format(selectedNutritionDate, "MMM d") + " Breakdown"}</CardTitle>
+              <Button 
+                size="sm" 
+                onClick={() => setNutritionDialogOpen(true)}
+                data-testid="button-log-meal-breakdown"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Log Meal
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {selectedDateCalories ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.calories || 0}</div>
+                      <div className="text-xs text-muted-foreground">Calories</div>
+                    </div>
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.protein || 0}g</div>
+                      <div className="text-xs text-muted-foreground">Protein</div>
+                    </div>
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.carbs || 0}g</div>
+                      <div className="text-xs text-muted-foreground">Carbs</div>
+                    </div>
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.fats || 0}g</div>
+                      <div className="text-xs text-muted-foreground">Fats</div>
+                    </div>
+                  </div>
+                  {selectedDateCalories.meals && Array.isArray(selectedDateCalories.meals) && selectedDateCalories.meals.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Meals Logged</div>
+                      <div className="space-y-1">
+                        {(selectedDateCalories.meals as Meal[]).map((meal) => (
+                          <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{meal.name}</span>
+                              {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+                            </div>
+                            <div className="flex items-center gap-3 text-muted-foreground">
+                              <span>{meal.calories} cal</span>
+                              <span>{meal.protein}g protein</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-4">No data logged for this day. Click "Log Meal" to add nutrition.</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Macro Progress Bars */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -955,16 +992,8 @@ export default function FitnessPage() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+              <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Daily Habits</CardTitle>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  onClick={() => setHabitsDialogOpen(true)}
-                  data-testid="button-edit-habits"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
               </CardHeader>
               <CardContent>
                 <DailyHabitsContent 
@@ -976,59 +1005,6 @@ export default function FitnessPage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Day's Quick Stats */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{isToday(selectedNutritionDate) ? "Today's Breakdown" : format(selectedNutritionDate, "MMM d") + " Breakdown"}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedDateCalories ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.calories || 0}</div>
-                      <div className="text-xs text-muted-foreground">Calories</div>
-                    </div>
-                    <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.protein || 0}g</div>
-                      <div className="text-xs text-muted-foreground">Protein</div>
-                    </div>
-                    <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.carbs || 0}g</div>
-                      <div className="text-xs text-muted-foreground">Carbs</div>
-                    </div>
-                    <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.fats || 0}g</div>
-                      <div className="text-xs text-muted-foreground">Fats</div>
-                    </div>
-                  </div>
-                  {/* Individual Meals */}
-                  {selectedDateCalories.meals && Array.isArray(selectedDateCalories.meals) && selectedDateCalories.meals.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Meals Logged</div>
-                      <div className="space-y-1">
-                        {(selectedDateCalories.meals as Meal[]).map((meal) => (
-                          <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{meal.name}</span>
-                              {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
-                            </div>
-                            <div className="flex items-center gap-3 text-muted-foreground">
-                              <span>{meal.calories} cal</span>
-                              <span>{meal.protein}g protein</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm text-center py-4">No data logged for this day. Use the button above to log nutrition.</p>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Weekly/Monthly Chart */}
           <Card>
@@ -1518,54 +1494,118 @@ export default function FitnessPage() {
           <div className="grid gap-4 md:grid-cols-2">
             {/* Volume Progression Chart */}
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Volume Progression
-                </CardTitle>
-                <CardDescription className="text-xs">Weekly training volume (lbs)</CardDescription>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Volume Progression
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {volumeChartView === "weekly" ? "Daily volume this week (lbs)" : "Weekly volume progression (lbs)"}
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant={volumeChartView === "weekly" ? "default" : "ghost"}
+                    onClick={() => setVolumeChartView("weekly")}
+                    data-testid="button-volume-weekly"
+                  >
+                    Week
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={volumeChartView === "monthly" ? "default" : "ghost"}
+                    onClick={() => setVolumeChartView("monthly")}
+                    data-testid="button-volume-monthly"
+                  >
+                    Month
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const last4Weeks = Array.from({ length: 4 }, (_, i) => {
-                    const weekStart = startOfWeek(subDays(new Date(), i * 7), { weekStartsOn: 1 });
-                    const weekEnd = subDays(startOfWeek(subDays(new Date(), (i - 1) * 7), { weekStartsOn: 1 }), 1);
-                    const weekWorkouts = strength.filter(s => {
-                      try {
-                        const d = parseISO(s.date);
-                        return d >= weekStart && d <= weekEnd;
-                      } catch { return false; }
+                  if (volumeChartView === "weekly") {
+                    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+                    const days = Array.from({ length: 7 }, (_, i) => {
+                      const day = addDays(weekStart, i);
+                      const dayWorkouts = strength.filter(s => {
+                        try {
+                          const d = parseISO(s.date);
+                          return format(d, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
+                        } catch { return false; }
+                      });
+                      const totalVolume = dayWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0);
+                      return {
+                        day: format(day, 'EEE'),
+                        volume: totalVolume,
+                        workouts: dayWorkouts.length
+                      };
                     });
-                    const totalVolume = weekWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0);
-                    return {
-                      week: i === 0 ? 'This Week' : i === 1 ? 'Last Week' : `${i}w ago`,
-                      volume: totalVolume,
-                      workouts: weekWorkouts.length
-                    };
-                  }).reverse();
 
-                  if (last4Weeks.every(w => w.volume === 0)) {
+                    if (days.every(d => d.volume === 0)) {
+                      return (
+                        <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                          Log workouts to see daily volume
+                        </div>
+                      );
+                    }
+
                     return (
-                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
-                        Log workouts to see volume trends
-                      </div>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={days}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="day" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                          <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toString()} />
+                          <Tooltip 
+                            formatter={(value: number) => [`${value.toLocaleString()} lbs`, 'Volume']}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                          <Bar dataKey="volume" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  } else {
+                    const last4Weeks = Array.from({ length: 4 }, (_, i) => {
+                      const weekStart = startOfWeek(subDays(new Date(), i * 7), { weekStartsOn: 1 });
+                      const weekEnd = subDays(startOfWeek(subDays(new Date(), (i - 1) * 7), { weekStartsOn: 1 }), 1);
+                      const weekWorkouts = strength.filter(s => {
+                        try {
+                          const d = parseISO(s.date);
+                          return d >= weekStart && d <= weekEnd;
+                        } catch { return false; }
+                      });
+                      const totalVolume = weekWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0);
+                      return {
+                        week: i === 0 ? 'This Week' : i === 1 ? 'Last Week' : `${i}w ago`,
+                        volume: totalVolume,
+                        workouts: weekWorkouts.length
+                      };
+                    }).reverse();
+
+                    if (last4Weeks.every(w => w.volume === 0)) {
+                      return (
+                        <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                          Log workouts to see volume trends
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={last4Weeks}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="week" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                          <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip 
+                            formatter={(value: number) => [`${value.toLocaleString()} lbs`, 'Volume']}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                          <Bar dataKey="volume" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     );
                   }
-
-                  return (
-                    <ResponsiveContainer width="100%" height={160}>
-                      <BarChart data={last4Weeks}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="week" tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                        <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip 
-                          formatter={(value: number) => [`${value.toLocaleString()} lbs`, 'Volume']}
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                        />
-                        <Bar dataKey="volume" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  );
                 })()}
               </CardContent>
             </Card>
@@ -3137,8 +3177,7 @@ function DailyHabitsContent({
   if (enabledCustomToggles.length === 0) {
     return (
       <div className="text-center py-4">
-        <p className="text-sm text-muted-foreground">No habits configured</p>
-        <p className="text-xs text-muted-foreground mt-1">Click the settings icon to add custom habits</p>
+        <p className="text-sm text-muted-foreground">No custom habits configured</p>
       </div>
     );
   }
@@ -3163,128 +3202,5 @@ function DailyHabitsContent({
         <p className="text-xs text-muted-foreground text-center pt-2">Log nutrition to track habits</p>
       )}
     </div>
-  );
-}
-
-function EditHabitsDialog({ 
-  open, 
-  onOpenChange,
-  nutritionSettings,
-  isDemo,
-  onSave
-}: { 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void;
-  nutritionSettings: NutritionSettings;
-  isDemo: boolean;
-  onSave: (toggles: { id: string; name: string; enabled: boolean }[]) => void;
-}) {
-  const [toggles, setToggles] = useState<{ id: string; name: string; enabled: boolean }[]>([]);
-  const [newHabitName, setNewHabitName] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      const existing = (nutritionSettings.customToggles as { id: string; name: string; enabled: boolean }[]) || [];
-      setToggles(existing);
-    }
-  }, [open, nutritionSettings.customToggles]);
-
-  const handleAddHabit = () => {
-    if (!newHabitName.trim()) return;
-    const newToggle = {
-      id: `custom-${Date.now()}`,
-      name: newHabitName.trim(),
-      enabled: true,
-    };
-    setToggles([...toggles, newToggle]);
-    setNewHabitName("");
-  };
-
-  const handleRemoveHabit = (id: string) => {
-    setToggles(toggles.filter(t => t.id !== id));
-  };
-
-  const handleToggleEnabled = (id: string, enabled: boolean) => {
-    setToggles(toggles.map(t => t.id === id ? { ...t, enabled } : t));
-  };
-
-  const handleSave = () => {
-    onSave(toggles);
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Manage Daily Habits</DialogTitle>
-          <DialogDescription>Add or remove custom daily habits to track</DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Built-in Habits</Label>
-            <div className="space-y-2 p-3 bg-muted/50 rounded-md">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Droplets className="h-4 w-4" />
-                <span>Gallon of Water</span>
-                <span className="ml-auto text-xs">(always shown)</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Zap className="h-4 w-4" />
-                <span>Creatine</span>
-                <span className="ml-auto text-xs">(always shown)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Custom Habits</Label>
-            {toggles.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No custom habits yet</p>
-            ) : (
-              <div className="space-y-2">
-                {toggles.map((toggle) => (
-                  <div key={toggle.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
-                    <Switch 
-                      checked={toggle.enabled}
-                      onCheckedChange={(checked) => handleToggleEnabled(toggle.id, checked)}
-                      data-testid={`toggle-edit-${toggle.id}`}
-                    />
-                    <span className="text-sm flex-1">{toggle.name}</span>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      onClick={() => handleRemoveHabit(toggle.id)}
-                      data-testid={`button-remove-${toggle.id}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <Input 
-              placeholder="New habit name..."
-              value={newHabitName}
-              onChange={(e) => setNewHabitName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddHabit()}
-              data-testid="input-new-habit"
-            />
-            <Button onClick={handleAddHabit} disabled={!newHabitName.trim()} data-testid="button-add-habit">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} data-testid="button-save-habits">Save Changes</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
