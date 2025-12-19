@@ -709,6 +709,44 @@ export default function FitnessPage() {
                 })()}
               </CardContent>
             </Card>
+
+            <Card className="md:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-green-500" />
+                  <CardTitle className="text-sm font-medium">Today's Deficit</CardTitle>
+                </div>
+                <Button 
+                  size="icon" 
+                  variant="ghost"
+                  onClick={() => setDeficitDialogOpen(true)}
+                  data-testid="button-log-deficit-overview"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {todayCalories?.deficit ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-2xl font-bold">{todayCalories.deficit} <span className="text-sm font-normal text-muted-foreground">cal</span></div>
+                      <Badge variant={todayCalories.deficit >= 500 ? "default" : todayCalories.deficit >= 300 ? "secondary" : "outline"}>
+                        {todayCalories.deficit >= 500 ? "On Target" : todayCalories.deficit >= 300 ? "Good" : "Low"}
+                      </Badge>
+                    </div>
+                    <Progress value={Math.min((todayCalories.deficit / 500) * 100, 100)} className="h-2" />
+                    <p className="text-xs text-muted-foreground">Target: 500 cal/day for ~1 lb/week loss</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-16 text-muted-foreground text-sm gap-2">
+                    <p>No deficit logged for today</p>
+                    <Button size="sm" variant="outline" onClick={() => setDeficitDialogOpen(true)} data-testid="button-add-deficit-empty">
+                      <Plus className="h-3 w-3 mr-1" /> Log Deficit
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {avgDeficit > 0 && (
