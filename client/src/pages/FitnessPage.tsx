@@ -110,6 +110,15 @@ export default function FitnessPage() {
   const [stepsWeekOffset, setStepsWeekOffset] = useState(0);
   const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
 
+  // Editing state for each fitness log type
+  const [editingNutrition, setEditingNutrition] = useState<NutritionLog | null>(null);
+  const [editingStrength, setEditingStrength] = useState<StrengthWorkout | null>(null);
+  const [editingSkill, setEditingSkill] = useState<SkillWorkout | null>(null);
+  const [editingRun, setEditingRun] = useState<BasketballRun | null>(null);
+  const [editingCardio, setEditingCardio] = useState<CardioRun | null>(null);
+  const [editingBodyComp, setEditingBodyComp] = useState<BodyComposition | null>(null);
+  const [editingSteps, setEditingSteps] = useState<DailySteps | null>(null);
+
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
     enabled: !isDemo,
@@ -312,6 +321,119 @@ export default function FitnessPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/body-comp"] });
       toast({ title: "Record deleted" });
+    },
+  });
+
+  // Edit mutations for all fitness log types
+  const editNutritionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<NutritionLog> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/nutrition/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition"] });
+      toast({ title: "Nutrition log updated" });
+      setEditingNutrition(null);
+      setNutritionDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update nutrition log", variant: "destructive" });
+    },
+  });
+
+  const editStrengthMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<StrengthWorkout> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/strength/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/strength"] });
+      toast({ title: "Strength workout updated" });
+      setEditingStrength(null);
+      setStrengthDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update workout", variant: "destructive" });
+    },
+  });
+
+  const editSkillMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<SkillWorkout> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/skill/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/skill"] });
+      toast({ title: "Skill workout updated" });
+      setEditingSkill(null);
+      setSkillDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update skill workout", variant: "destructive" });
+    },
+  });
+
+  const editRunMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BasketballRun> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/runs/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/runs"] });
+      toast({ title: "Basketball run updated" });
+      setEditingRun(null);
+      setRunDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update run", variant: "destructive" });
+    },
+  });
+
+  const editCardioMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CardioRun> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/cardio/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/cardio"] });
+      toast({ title: "Cardio run updated" });
+      setEditingCardio(null);
+      setCardioDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update cardio run", variant: "destructive" });
+    },
+  });
+
+  const editBodyCompMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BodyComposition> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/body-comp/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/body-comp"] });
+      toast({ title: "Body composition updated" });
+      setEditingBodyComp(null);
+      setBodyCompDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update body composition", variant: "destructive" });
+    },
+  });
+
+  const editStepsMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<DailySteps> }) => {
+      const res = await apiRequest("PUT", `/api/fitness/steps/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/steps"] });
+      toast({ title: "Steps updated" });
+      setEditingSteps(null);
+      setStepsDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update steps", variant: "destructive" });
     },
   });
 
@@ -685,9 +807,18 @@ export default function FitnessPage() {
               </Button>
               <NutritionDialog 
                 open={nutritionDialogOpen} 
-                onOpenChange={setNutritionDialogOpen}
+                onOpenChange={(open) => {
+                  setNutritionDialogOpen(open);
+                  if (!open) setEditingNutrition(null);
+                }}
                 isDemo={isDemo}
+                editData={editingNutrition}
+                onEdit={(id, data) => editNutritionMutation.mutate({ id, data })}
               />
+              <Button onClick={() => { setEditingNutrition(null); setNutritionDialogOpen(true); }} data-testid="button-add-nutrition">
+                <Plus className="h-4 w-4 mr-2" />
+                Log Nutrition
+              </Button>
             </div>
           </div>
 
@@ -1182,14 +1313,27 @@ export default function FitnessPage() {
                           </div>
                         </div>
                         {!isDemo && (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            onClick={() => deleteNutritionMutation.mutate(log.id)}
-                            data-testid={`button-delete-nutrition-${log.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => {
+                                setEditingNutrition(log);
+                                setNutritionDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-nutrition-${log.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => deleteNutritionMutation.mutate(log.id)}
+                              data-testid={`button-delete-nutrition-${log.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     );
@@ -1234,10 +1378,19 @@ export default function FitnessPage() {
                 </Button>
                 <RunDialog 
                   open={runDialogOpen} 
-                  onOpenChange={setRunDialogOpen}
+                  onOpenChange={(open) => {
+                    setRunDialogOpen(open);
+                    if (!open) setEditingRun(null);
+                  }}
                   isDemo={isDemo}
                   visibleFields={livePlayVisibleFields}
+                  editData={editingRun}
+                  onEdit={(id, data) => editRunMutation.mutate({ id, data })}
                 />
+                <Button onClick={() => { setEditingRun(null); setRunDialogOpen(true); }} data-testid="button-add-run">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Run
+                </Button>
               </div>
               <LivePlaySettingsDialog
                 open={livePlaySettingsOpen}
@@ -1264,9 +1417,22 @@ export default function FitnessPage() {
                           <div className="flex items-center justify-between gap-2">
                             <CardTitle className="text-sm">{formatDate(run.date)}</CardTitle>
                             {!isDemo && (
-                              <Button size="icon" variant="ghost" onClick={() => deleteRunMutation.mutate(run.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => {
+                                    setEditingRun(run);
+                                    setRunDialogOpen(true);
+                                  }}
+                                  data-testid={`button-edit-run-${run.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => deleteRunMutation.mutate(run.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                           <CardDescription>{gameType?.fullCourt ? "Full Court" : "Half Court"} - {run.courtType}</CardDescription>
@@ -1306,9 +1472,18 @@ export default function FitnessPage() {
               <div className="flex justify-end">
                 <SkillDialog 
                   open={skillDialogOpen} 
-                  onOpenChange={setSkillDialogOpen}
+                  onOpenChange={(open) => {
+                    setSkillDialogOpen(open);
+                    if (!open) setEditingSkill(null);
+                  }}
                   isDemo={isDemo}
+                  editData={editingSkill}
+                  onEdit={(id, data) => editSkillMutation.mutate({ id, data })}
                 />
+                <Button onClick={() => { setEditingSkill(null); setSkillDialogOpen(true); }} data-testid="button-add-skill">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Drill Session
+                </Button>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1330,9 +1505,22 @@ export default function FitnessPage() {
                           <div className="flex items-center justify-between gap-2">
                             <CardTitle className="text-sm">{formatDate(workout.date)}</CardTitle>
                             {!isDemo && (
-                              <Button size="icon" variant="ghost" onClick={() => deleteSkillMutation.mutate(workout.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => {
+                                    setEditingSkill(workout);
+                                    setSkillDialogOpen(true);
+                                  }}
+                                  data-testid={`button-edit-skill-${workout.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => deleteSkillMutation.mutate(workout.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                           <CardDescription>{workout.drillType}</CardDescription>
@@ -1378,8 +1566,13 @@ export default function FitnessPage() {
                 </Button>
                 <CardioRunDialog 
                   open={cardioDialogOpen} 
-                  onOpenChange={setCardioDialogOpen}
+                  onOpenChange={(open) => {
+                    setCardioDialogOpen(open);
+                    if (!open) setEditingCardio(null);
+                  }}
                   isDemo={isDemo}
+                  editData={editingCardio}
+                  onEdit={(id, data) => editCardioMutation.mutate({ id, data })}
                 />
               </div>
 
@@ -1398,9 +1591,14 @@ export default function FitnessPage() {
                         <div className="flex items-center justify-between gap-2">
                           <CardTitle className="text-sm">{formatDate(run.date)}</CardTitle>
                           {!isDemo && (
-                            <Button size="icon" variant="ghost" onClick={() => deleteCardioMutation.mutate(run.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => { setEditingCardio(run); setCardioDialogOpen(true); }} data-testid={`button-edit-cardio-${run.id}`}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteCardioMutation.mutate(run.id)} data-testid={`button-delete-cardio-${run.id}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                         <CardDescription>{run.terrain} - {run.location}</CardDescription>
@@ -1443,9 +1641,18 @@ export default function FitnessPage() {
             <h2 className="text-xl font-semibold">Strength Training</h2>
             <StrengthDialog 
               open={strengthDialogOpen} 
-              onOpenChange={setStrengthDialogOpen}
+              onOpenChange={(open) => {
+                setStrengthDialogOpen(open);
+                if (!open) setEditingStrength(null);
+              }}
               isDemo={isDemo}
+              editData={editingStrength}
+              onEdit={(id, data) => editStrengthMutation.mutate({ id, data })}
             />
+            <Button onClick={() => { setEditingStrength(null); setStrengthDialogOpen(true); }} data-testid="button-add-strength">
+              <Plus className="h-4 w-4 mr-2" />
+              Log Workout
+            </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -1766,9 +1973,22 @@ export default function FitnessPage() {
                             {workout.duration && <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />{workout.duration}min</Badge>}
                             {workout.volume && <Badge variant="secondary">{workout.volume.toLocaleString()} vol</Badge>}
                             {!isDemo && (
-                              <Button size="icon" variant="ghost" onClick={() => deleteStrengthMutation.mutate(workout.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => {
+                                    setEditingStrength(workout);
+                                    setStrengthDialogOpen(true);
+                                  }}
+                                  data-testid={`button-edit-strength-${workout.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => deleteStrengthMutation.mutate(workout.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1798,9 +2018,18 @@ export default function FitnessPage() {
             <h2 className="text-xl font-semibold">Body Composition</h2>
             <BodyCompDialog 
               open={bodyCompDialogOpen} 
-              onOpenChange={setBodyCompDialogOpen}
+              onOpenChange={(open) => {
+                setBodyCompDialogOpen(open);
+                if (!open) setEditingBodyComp(null);
+              }}
               isDemo={isDemo}
+              editData={editingBodyComp}
+              onEdit={(id, data) => editBodyCompMutation.mutate({ id, data })}
             />
+            <Button onClick={() => { setEditingBodyComp(null); setBodyCompDialogOpen(true); }} data-testid="button-add-body-comp">
+              <Plus className="h-4 w-4 mr-2" />
+              Log Body Comp
+            </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -1883,9 +2112,22 @@ export default function FitnessPage() {
                         <div className="flex items-center gap-2">
                           {record.photoUrl && <Camera className="h-4 w-4 text-muted-foreground" />}
                           {!isDemo && (
-                            <Button size="icon" variant="ghost" onClick={() => deleteBodyCompMutation.mutate(record.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                onClick={() => {
+                                  setEditingBodyComp(record);
+                                  setBodyCompDialogOpen(true);
+                                }}
+                                data-testid={`button-edit-body-${record.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => deleteBodyCompMutation.mutate(record.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1901,7 +2143,13 @@ export default function FitnessPage() {
   );
 }
 
-function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  editData?: NutritionLog | null;
+  onEdit?: (id: string, data: Partial<NutritionLog>) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -1913,6 +2161,25 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
   });
   const [meals, setMeals] = useState<Meal[]>([]);
   const [newMeal, setNewMeal] = useState({ name: "", calories: "", protein: "", time: "" });
+
+  const isEditing = !!editData;
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        date: editData.date,
+        calories: editData.calories?.toString() || "",
+        protein: editData.protein?.toString() || "",
+        carbs: editData.carbs?.toString() || "",
+        fats: editData.fats?.toString() || "",
+        deficit: editData.deficit?.toString() || "",
+      });
+      setMeals(Array.isArray(editData.meals) ? editData.meals as Meal[] : []);
+    } else {
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "", deficit: "" });
+      setMeals([]);
+    }
+  }, [editData]);
 
   const addMeal = () => {
     if (!newMeal.name || !newMeal.calories) return;
@@ -1963,7 +2230,7 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       onOpenChange(false);
       return;
     }
-    createMutation.mutate({
+    const payload = {
       date: formData.date,
       calories: formData.calories ? parseInt(formData.calories) : undefined,
       protein: formData.protein ? parseInt(formData.protein) : undefined,
@@ -1971,21 +2238,20 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       fats: formData.fats ? parseInt(formData.fats) : undefined,
       deficit: formData.deficit ? parseInt(formData.deficit) : undefined,
       meals: meals.length > 0 ? meals : undefined,
-    });
+    };
+    if (isEditing && editData && onEdit) {
+      onEdit(editData.id, payload);
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-add-nutrition">
-          <Plus className="h-4 w-4 mr-2" />
-          Log Nutrition
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Log Nutrition</DialogTitle>
-          <DialogDescription>Track your daily food intake with individual meals</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit Nutrition" : "Log Nutrition"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your nutrition log" : "Track your daily food intake with individual meals"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -2077,7 +2343,7 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-nutrition">
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2087,7 +2353,13 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
 
 type Exercise = { name: string; sets: number; reps: number; weight: number };
 
-function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  editData?: StrengthWorkout | null;
+  onEdit?: (id: string, data: Partial<StrengthWorkout>) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -2098,6 +2370,25 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
   });
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [newExercise, setNewExercise] = useState({ name: "", sets: "", reps: "", weight: "" });
+
+  const isEditing = !!editData;
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        date: editData.date,
+        primaryFocus: editData.primaryFocus || "Push",
+        duration: editData.duration?.toString() || "",
+        effort: editData.effort?.toString() || "",
+        notes: editData.notes || "",
+      });
+      const exs = Array.isArray(editData.exercises) ? editData.exercises as Exercise[] : [];
+      setExercises(exs);
+    } else {
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", effort: "", notes: "" });
+      setExercises([]);
+    }
+  }, [editData]);
 
   const addExercise = () => {
     if (!newExercise.name || !newExercise.sets || !newExercise.reps) return;
@@ -2142,7 +2433,7 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
       onOpenChange(false);
       return;
     }
-    createMutation.mutate({
+    const payload = {
       date: formData.date,
       type: "Strength",
       primaryFocus: formData.primaryFocus,
@@ -2151,21 +2442,20 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
       effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
       exercises: exercises.length > 0 ? exercises : undefined,
-    });
+    };
+    if (isEditing && editData && onEdit) {
+      onEdit(editData.id, payload);
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-add-strength">
-          <Plus className="h-4 w-4 mr-2" />
-          Log Workout
-        </Button>
-      </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Log Strength Workout</DialogTitle>
-          <DialogDescription>Record your exercises and training session</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit Strength Workout" : "Log Strength Workout"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your workout" : "Record your exercises and training session"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -2267,7 +2557,7 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-strength">
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2275,7 +2565,13 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
   );
 }
 
-function SkillDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+function SkillDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  editData?: SkillWorkout | null;
+  onEdit?: (id: string, data: Partial<SkillWorkout>) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -2283,6 +2579,20 @@ function SkillDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChan
     effort: "",
     notes: "",
   });
+  const isEditing = !!editData;
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        date: editData.date,
+        drillType: editData.drillType || "Shooting",
+        effort: editData.effort?.toString() || "",
+        notes: editData.notes || "",
+      });
+    } else {
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), drillType: "Shooting", effort: "", notes: "" });
+    }
+  }, [editData]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<SkillWorkout>) => {
@@ -2306,27 +2616,27 @@ function SkillDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChan
       onOpenChange(false);
       return;
     }
-    createMutation.mutate({
+    const data = {
       date: formData.date,
-      type: "Skill",
+      type: "Skill" as const,
       drillType: formData.drillType,
       effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
-    });
+    };
+    if (isEditing && editData && onEdit) {
+      onEdit(editData.id, data);
+      onOpenChange(false);
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-add-skill">
-          <Plus className="h-4 w-4 mr-2" />
-          Log Drill Session
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Skill Workout</DialogTitle>
-          <DialogDescription>Record your basketball drill session</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit Skill Workout" : "Log Skill Workout"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your drill session details" : "Record your basketball drill session"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -2362,7 +2672,7 @@ function SkillDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChan
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-skill">
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2453,7 +2763,14 @@ function LivePlaySettingsDialog({
   );
 }
 
-function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean; visibleFields: string[] }) {
+function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean; 
+  visibleFields: string[];
+  editData?: BasketballRun | null;
+  onEdit?: (id: string, data: Partial<BasketballRun>) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -2465,8 +2782,27 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolea
     performanceGrade: "",
     confidence: "",
   });
+  const isEditing = !!editData;
 
   const isVisible = (fieldId: string) => visibleFields.includes(fieldId);
+
+  useEffect(() => {
+    if (editData) {
+      const gameTypeVal = editData.gameType?.fullCourt ? "fullCourt" : "halfCourt";
+      setFormData({
+        date: editData.date,
+        courtType: editData.courtType || "Indoor",
+        gameType: gameTypeVal,
+        gamesPlayed: editData.gamesPlayed?.toString() || "",
+        wins: editData.wins?.toString() || "",
+        losses: editData.losses?.toString() || "",
+        performanceGrade: editData.performanceGrade || "",
+        confidence: editData.confidence?.toString() || "",
+      });
+    } else {
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), courtType: "Indoor", gameType: "fullCourt", gamesPlayed: "", wins: "", losses: "", performanceGrade: "", confidence: "" });
+    }
+  }, [editData]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<BasketballRun>) => {
@@ -2490,9 +2826,9 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolea
       onOpenChange(false);
       return;
     }
-    createMutation.mutate({
+    const data = {
       date: formData.date,
-      type: "Run",
+      type: "Run" as const,
       courtType: formData.courtType,
       gameType: formData.gameType === "fullCourt" ? { fullCourt: true } : { halfCourt: true },
       gamesPlayed: formData.gamesPlayed ? parseInt(formData.gamesPlayed) : undefined,
@@ -2500,21 +2836,21 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolea
       losses: formData.losses ? parseInt(formData.losses) : undefined,
       performanceGrade: formData.performanceGrade || undefined,
       confidence: formData.confidence ? parseInt(formData.confidence) : undefined,
-    });
+    };
+    if (isEditing && editData && onEdit) {
+      onEdit(editData.id, data);
+      onOpenChange(false);
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-add-run">
-          <Plus className="h-4 w-4 mr-2" />
-          Log Run
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Live Play Session</DialogTitle>
-          <DialogDescription>Record your live play session</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit Live Play Session" : "Log Live Play Session"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your session details" : "Record your live play session"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -2605,7 +2941,7 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolea
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-run">
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2613,7 +2949,13 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolea
   );
 }
 
-function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+function CardioRunDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  editData?: CardioRun | null;
+  onEdit?: (id: string, data: Partial<CardioRun>) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -2624,6 +2966,24 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
     effort: "",
     notes: "",
   });
+
+  const isEditing = !!editData;
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        date: editData.date,
+        distance: editData.distance ? (editData.distance / 1609.34).toFixed(2) : "",
+        duration: editData.duration?.toString() || "",
+        terrain: editData.terrain || "Road",
+        location: editData.location || "",
+        effort: editData.effort?.toString() || "",
+        notes: editData.notes || "",
+      });
+    } else {
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), distance: "", duration: "", terrain: "Road", location: "", effort: "", notes: "" });
+    }
+  }, [editData]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<CardioRun>) => {
@@ -2656,7 +3016,7 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       const paceSec = Math.round((paceMinPerMile - paceMin) * 60);
       pace = `${paceMin}:${paceSec.toString().padStart(2, '0')}`;
     }
-    createMutation.mutate({
+    const payload = {
       date: formData.date,
       distance: distanceMeters,
       duration: durationMin,
@@ -2665,15 +3025,20 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       pace,
       effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
-    });
+    };
+    if (isEditing && editData && onEdit) {
+      onEdit(editData.id, payload);
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Cardio Run</DialogTitle>
-          <DialogDescription>Record your running session</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit Cardio Run" : "Log Cardio Run"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your running session" : "Record your running session"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -2722,7 +3087,7 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-cardio">
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2730,7 +3095,13 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
   );
 }
 
-function BodyCompDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  editData?: BodyComposition | null;
+  onEdit?: (id: string, data: Partial<BodyComposition>) => void;
+}) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -2738,6 +3109,21 @@ function BodyCompDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
     bodyFat: "",
     goalWeight: "",
   });
+
+  const isEditing = !!editData;
+
+  useEffect(() => {
+    if (editData) {
+      setFormData({
+        date: editData.date,
+        weight: editData.weight?.toString() || "",
+        bodyFat: editData.bodyFat?.toString() || "",
+        goalWeight: editData.goalWeight?.toString() || "",
+      });
+    } else {
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "" });
+    }
+  }, [editData]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<BodyComposition>) => {
@@ -2761,26 +3147,25 @@ function BodyCompDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
       onOpenChange(false);
       return;
     }
-    createMutation.mutate({
+    const payload = {
       date: formData.date,
       weight: formData.weight ? parseInt(formData.weight) : undefined,
       bodyFat: formData.bodyFat ? parseInt(formData.bodyFat) : undefined,
       goalWeight: formData.goalWeight ? parseInt(formData.goalWeight) : undefined,
-    });
+    };
+    if (isEditing && editData && onEdit) {
+      onEdit(editData.id, payload);
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-add-body-comp">
-          <Plus className="h-4 w-4 mr-2" />
-          Log Weigh-In
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Body Composition</DialogTitle>
-          <DialogDescription>Track your weight and body fat</DialogDescription>
+          <DialogTitle>{isEditing ? "Edit Body Composition" : "Log Body Composition"}</DialogTitle>
+          <DialogDescription>{isEditing ? "Update your body composition" : "Track your weight and body fat"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -2805,7 +3190,7 @@ function BodyCompDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-body-comp">
-            {createMutation.isPending ? "Saving..." : "Save"}
+            {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
           </Button>
         </DialogFooter>
       </DialogContent>
