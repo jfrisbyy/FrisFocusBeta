@@ -22,7 +22,7 @@ import {
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
@@ -115,6 +115,7 @@ export default function FitnessPage() {
   const [newHabitName, setNewHabitName] = useState("");
   const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+  const [stepGoalSettingsOpen, setStepGoalSettingsOpen] = useState(false);
 
   // Editing state for each fitness log type
   const [editingNutrition, setEditingNutrition] = useState<NutritionLog | null>(null);
@@ -212,6 +213,14 @@ export default function FitnessPage() {
 
   const practiceVisibleFields = practiceSettingsData?.visibleFields as string[] || 
     DEFAULT_PRACTICE_FIELDS.map(f => f.id);
+
+  // Dashboard preferences for step goal
+  const { data: dashboardPreferencesData } = useQuery<{ preferences: DashboardPreferences }>({
+    queryKey: ["/api/dashboard/preferences"],
+    enabled: !isDemo,
+  });
+
+  const defaultStepGoal = dashboardPreferencesData?.preferences?.defaultStepGoal || 10000;
 
   const nutrition = isDemo ? demoNutritionData : nutritionData;
   const nutritionSettings = isDemo ? demoNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
@@ -355,13 +364,29 @@ export default function FitnessPage() {
 
   const saveStepsMutation = useMutation({
     mutationFn: async ({ date, steps, goal }: { date: string; steps: number; goal?: number }) => {
-      const res = await apiRequest("POST", "/api/fitness/steps", { date, steps, goal: goal || 10000 });
+      const res = await apiRequest("POST", "/api/fitness/steps", { date, steps, goal: goal || defaultStepGoal });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/steps"] });
       toast({ title: "Steps saved" });
       setStepsDialogOpen(false);
+    },
+  });
+
+  const updateStepGoalMutation = useMutation({
+    mutationFn: async (newGoal: number) => {
+      const currentPrefs = dashboardPreferencesData?.preferences || {};
+      const res = await apiRequest("PUT", "/api/dashboard/preferences", {
+        ...currentPrefs,
+        defaultStepGoal: newGoal,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/preferences"] });
+      toast({ title: "Step goal updated" });
+      setStepGoalSettingsOpen(false);
     },
   });
 
@@ -783,6 +808,14 @@ export default function FitnessPage() {
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
+                  <Button 
+                    size="icon" 
+                    variant="ghost"
+                    onClick={() => setStepGoalSettingsOpen(true)}
+                    data-testid="button-step-goal-settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -790,7 +823,7 @@ export default function FitnessPage() {
                   const today = format(new Date(), "yyyy-MM-dd");
                   const todayEntry = steps.find(s => s.date === today);
                   const todaySteps = todayEntry?.steps || 0;
-                  const todayGoal = todayEntry?.goal || 10000;
+                  const todayGoal = todayEntry?.goal || defaultStepGoal;
                   
                   const weekStart = startOfWeek(subDays(new Date(), stepsWeekOffset * 7), { weekStartsOn: 1 });
                   const weekDays = eachDayOfInterval({ start: weekStart, end: subDays(weekStart, -6) });
@@ -801,7 +834,7 @@ export default function FitnessPage() {
                       day: format(day, "EEE"),
                       date: dateStr,
                       steps: entry?.steps || 0,
-                      goal: entry?.goal || 10000,
+                      goal: entry?.goal || defaultStepGoal,
                     };
                   });
                   
@@ -862,7 +895,7 @@ export default function FitnessPage() {
                             formatter={(value: number) => [`${value.toLocaleString()} steps`, '']}
                             contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
                           />
-                          <ReferenceLine y={10000} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                          <ReferenceLine y={defaultStepGoal} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
                           <Bar dataKey="steps" radius={[3, 3, 0, 0]}>
                             {weekData.map((entry, index) => (
                               <Cell 
@@ -1197,7 +1230,7 @@ export default function FitnessPage() {
                 saveStepsMutation.mutate({
                   date: formData.get('date') as string,
                   steps: parseInt(formData.get('steps') as string),
-                  goal: parseInt(formData.get('goal') as string) || 10000,
+                  goal: parseInt(formData.get('goal') as string) || defaultStepGoal,
                 });
               }}>
                 <div className="space-y-4 py-4">
@@ -1211,12 +1244,52 @@ export default function FitnessPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Goal</Label>
-                    <Input type="number" name="goal" defaultValue="10000" min="0" data-testid="input-steps-goal" />
+                    <Input type="number" name="goal" defaultValue={defaultStepGoal} min="0" data-testid="input-steps-goal" />
                   </div>
                 </div>
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setStepsDialogOpen(false)}>Cancel</Button>
                   <Button type="submit" disabled={saveStepsMutation.isPending} data-testid="button-save-steps">Save</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Step Goal Settings Dialog */}
+          <Dialog open={stepGoalSettingsOpen} onOpenChange={setStepGoalSettingsOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Step Goal Settings</DialogTitle>
+                <DialogDescription>Set your daily step goal target</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                const newGoal = parseInt(formData.get('stepGoal') as string);
+                if (newGoal && newGoal >= 100) {
+                  updateStepGoalMutation.mutate(newGoal);
+                }
+              }}>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Daily Step Goal</Label>
+                    <Input 
+                      type="number" 
+                      name="stepGoal" 
+                      defaultValue={defaultStepGoal} 
+                      min="100" 
+                      max="100000"
+                      required 
+                      data-testid="input-default-step-goal" 
+                    />
+                    <p className="text-xs text-muted-foreground">This will be your default goal for new step entries</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setStepGoalSettingsOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={updateStepGoalMutation.isPending} data-testid="button-save-step-goal">
+                    {updateStepGoalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
