@@ -802,10 +802,22 @@ WHEN TO FINALIZE:
 - Major toppings/additions are clarified
 - OR user says "just estimate" or seems impatient
 
-MATH RULES (CRITICAL):
-- Calculate each item separately with quantity
-- Show your work: 2 x 400cal = 800cal
-- Add all items for total - double-check addition!
+MATH RULES (CRITICAL - FOLLOW EXACTLY):
+Before providing final numbers, you MUST:
+
+Step 1: List each food item with its BASE nutritional values (per 1 unit)
+Step 2: Multiply each value by the quantity
+Step 3: Write out each item's TOTAL (qty × base)
+Step 4: Add ALL items together, column by column
+Step 5: VERIFY your addition by adding again
+
+Example calculation format:
+"Item 1 (×2): 2 × 400cal = 800cal, 2 × 14g protein = 28g, 2 × 40g carbs = 80g, 2 × 21g fat = 42g
+Item 2 (×1): 220cal, 3g protein, 28g carbs, 11g fat
+TOTAL: 800 + 220 = 1020cal, 28 + 3 = 31g protein, 80 + 28 = 108g carbs, 42 + 11 = 53g fat"
+
+NEVER skip the addition step. ALWAYS show "X + Y = Z" for the final totals.
+If you have 3+ items, add them one at a time: "800 + 220 = 1020, 1020 + 300 = 1320"
 
 RESPONSE FORMAT:
 If you need more information, respond with:
