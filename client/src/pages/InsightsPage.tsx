@@ -347,7 +347,7 @@ export default function InsightsPage() {
                               {conversation.createdAt ? format(new Date(conversation.createdAt), "MMM d") : ""}
                             </p>
                           </div>
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100" style={{ visibility: editingConversationId === conversation.id ? "hidden" : "visible" }}>
+                          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100" style={{ visibility: editingConversationId === conversation.id ? "hidden" : "visible" }}>
                             <Button
                               variant="ghost"
                               size="icon"
