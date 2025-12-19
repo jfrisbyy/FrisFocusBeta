@@ -22,7 +22,7 @@ import {
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
@@ -164,16 +164,25 @@ export default function FitnessPage() {
     enabled: !isDemo,
   });
 
-  const DEFAULT_LIVE_PLAY_FIELDS = [
-    { id: "date", label: "Date", enabled: true },
-    { id: "courtType", label: "Court Type", enabled: true },
-    { id: "gameType", label: "Game Type", enabled: true },
-    { id: "gamesPlayed", label: "Games Played", enabled: true },
-    { id: "wins", label: "Wins", enabled: true },
-    { id: "losses", label: "Losses", enabled: true },
-    { id: "performanceGrade", label: "Performance Grade", enabled: true },
-    { id: "confidence", label: "Confidence", enabled: true },
-  ];
+  // Default Basketball template with all basketball-specific fields
+  const BASKETBALL_TEMPLATE: SportTemplate = {
+    id: "basketball",
+    name: "Basketball",
+    isDefault: true,
+    fields: [
+      { id: "date", label: "Date", enabled: true, type: "text" },
+      { id: "courtType", label: "Court Type", enabled: true, type: "select", options: ["Indoor", "Outdoor"] },
+      { id: "gameType", label: "Game Type", enabled: true, type: "select", options: ["Full Court", "Half Court"] },
+      { id: "gamesPlayed", label: "Games Played", enabled: true, type: "number", placeholder: "5" },
+      { id: "wins", label: "Wins", enabled: true, type: "number", placeholder: "3" },
+      { id: "losses", label: "Losses", enabled: true, type: "number", placeholder: "2" },
+      { id: "performanceGrade", label: "Performance Grade", enabled: true, type: "select", options: ["A+", "A", "A-", "B+", "B", "B-", "C+", "C"] },
+      { id: "confidence", label: "Confidence (1-10)", enabled: true, type: "number", placeholder: "7" },
+    ],
+  };
+
+  // For backwards compatibility
+  const DEFAULT_LIVE_PLAY_FIELDS = BASKETBALL_TEMPLATE.fields;
 
   const { data: livePlaySettingsData } = useQuery<LivePlaySettings>({
     queryKey: ["/api/fitness/live-play-settings"],
@@ -1060,7 +1069,7 @@ export default function FitnessPage() {
               </Button>
               <Button onClick={() => setDeficitDialogOpen(true)} variant="outline" data-testid="button-add-deficit">
                 <TrendingDown className="h-4 w-4 mr-2" />
-                Log Deficit
+                Update Calorie Delta
               </Button>
             </div>
           </div>
@@ -1194,16 +1203,8 @@ export default function FitnessPage() {
 
           {/* Today's Breakdown - Main Card */}
           <Card>
-            <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+            <CardHeader className="pb-2">
               <CardTitle className="text-sm">{isToday(selectedNutritionDate) ? "Today's Breakdown" : format(selectedNutritionDate, "MMM d") + " Breakdown"}</CardTitle>
-              <Button 
-                size="sm" 
-                onClick={() => setNutritionDialogOpen(true)}
-                data-testid="button-log-meal-breakdown"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Log Meal
-              </Button>
             </CardHeader>
             <CardContent>
               {selectedDateCalories ? (
@@ -1226,28 +1227,32 @@ export default function FitnessPage() {
                       <div className="text-xs text-muted-foreground">Fats</div>
                     </div>
                   </div>
-                  {selectedDateCalories.meals && Array.isArray(selectedDateCalories.meals) && selectedDateCalories.meals.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Meals Logged</div>
-                      <div className="space-y-1">
-                        {(selectedDateCalories.meals as Meal[]).map((meal) => (
-                          <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{meal.name}</span>
-                              {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+                  {(() => {
+                    const meals = selectedDateCalories.meals as Meal[] | null;
+                    if (!meals || !Array.isArray(meals) || meals.length === 0) return null;
+                    return (
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Meals Logged</div>
+                        <div className="space-y-1">
+                          {meals.map((meal) => (
+                            <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{meal.name}</span>
+                                {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+                              </div>
+                              <div className="flex items-center gap-3 text-muted-foreground">
+                                <span>{meal.calories} cal</span>
+                                <span>{meal.protein}g protein</span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3 text-muted-foreground">
-                              <span>{meal.calories} cal</span>
-                              <span>{meal.protein}g protein</span>
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm text-center py-4">No data logged for this day. Click "Log Meal" to add nutrition.</p>
+                <p className="text-muted-foreground text-sm text-center py-4">No data logged for this day. Use "Log Nutrition" above to add meals.</p>
               )}
             </CardContent>
           </Card>
@@ -1419,7 +1424,7 @@ export default function FitnessPage() {
               </CardHeader>
               <CardContent>
                 <DailyHabitsContent 
-                  todayCalories={selectedDateCalories}
+                  todayCalories={selectedDateCalories || undefined}
                   nutritionSettings={nutritionSettings}
                   isDemo={isDemo}
                   onToggleHabit={handleToggleHabit}
@@ -1609,8 +1614,8 @@ export default function FitnessPage() {
                   nutrition.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((log) => {
                     const calTarget = nutritionSettings.calorieTarget || 2000;
                     const proteinTarget = nutritionSettings.proteinTarget || 150;
-                    const calOk = log.calories <= calTarget;
-                    const proteinOk = log.protein >= proteinTarget;
+                    const calOk = (log.calories || 0) <= calTarget;
+                    const proteinOk = (log.protein || 0) >= proteinTarget;
                     return (
                       <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`log-nutrition-${log.id}`}>
                         <div className="flex items-center gap-4 flex-wrap">
@@ -4091,7 +4096,7 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit
 
   useEffect(() => {
     if (editData) {
-      const gameTypeVal = editData.gameType?.fullCourt ? "fullCourt" : "halfCourt";
+      const gameTypeVal = editData.gameType === "Full Court" ? "fullCourt" : "halfCourt";
       setFormData({
         date: editData.date,
         courtType: editData.courtType || "Indoor",

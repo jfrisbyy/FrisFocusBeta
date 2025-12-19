@@ -479,14 +479,26 @@ export const livePlayFieldSchema = z.object({
   enabled: z.boolean(),
   type: z.enum(["text", "number", "select", "textarea"]),
   options: z.array(z.string()).optional(),
+  placeholder: z.string().optional(),
 });
 export type LivePlayField = z.infer<typeof livePlayFieldSchema>;
+
+// Sport template schema for custom sport configurations
+export const sportTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(), // e.g., "Basketball", "Soccer", "Tennis"
+  isDefault: z.boolean().optional(), // Built-in templates can't be deleted
+  fields: z.array(livePlayFieldSchema),
+});
+export type SportTemplate = z.infer<typeof sportTemplateSchema>;
 
 export const livePlaySettings = pgTable("live_play_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id).unique(),
   visibleFields: jsonb("visible_fields"), // Array of field IDs that are visible
   customFields: jsonb("custom_fields"), // Array of LivePlayField for custom fields
+  activeTemplateId: text("active_template_id").default("basketball"), // Which template is active
+  customTemplates: jsonb("custom_templates"), // Array of SportTemplate for user-created templates
 });
 
 export const insertLivePlaySettingsSchema = createInsertSchema(livePlaySettings).omit({ id: true });
