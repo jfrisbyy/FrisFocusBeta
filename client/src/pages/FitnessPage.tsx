@@ -2631,7 +2631,7 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fitness/cardio-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/cardio"] });
       toast({ title: "Cardio run logged" });
       onOpenChange(false);
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), distance: "", duration: "", terrain: "Road", location: "", effort: "", notes: "" });
