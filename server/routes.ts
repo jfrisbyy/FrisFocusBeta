@@ -31,6 +31,8 @@ import {
   insertCardioRunSchema,
   nutritionSettings,
   insertNutritionSettingsSchema,
+  livePlaySettings,
+  insertLivePlaySettingsSchema,
   friendships,
   userStats,
   sharingSettings,
@@ -766,6 +768,52 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating nutrition settings:", error);
       res.status(400).json({ error: "Failed to update nutrition settings" });
+    }
+  });
+
+  // Live Play settings - field visibility and custom fields
+  const DEFAULT_LIVE_PLAY_FIELDS = [
+    "date", "courtType", "gameType", "gamesPlayed", "wins", "losses",
+    "performanceGrade", "confidence", "notes"
+  ];
+
+  app.get("/api/fitness/live-play-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [settings] = await db.select().from(livePlaySettings).where(eq(livePlaySettings.userId, userId));
+      if (!settings) {
+        return res.json({
+          userId,
+          visibleFields: DEFAULT_LIVE_PLAY_FIELDS,
+          customFields: [],
+        });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching live play settings:", error);
+      res.status(500).json({ error: "Failed to fetch live play settings" });
+    }
+  });
+
+  app.put("/api/fitness/live-play-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [existing] = await db.select().from(livePlaySettings).where(eq(livePlaySettings.userId, userId));
+      
+      if (existing) {
+        const [updated] = await db.update(livePlaySettings)
+          .set(req.body)
+          .where(eq(livePlaySettings.userId, userId))
+          .returning();
+        return res.json(updated);
+      } else {
+        const parsed = insertLivePlaySettingsSchema.parse({ ...req.body, userId });
+        const [created] = await db.insert(livePlaySettings).values(parsed).returning();
+        return res.json(created);
+      }
+    } catch (error) {
+      console.error("Error updating live play settings:", error);
+      res.status(400).json({ error: "Failed to update live play settings" });
     }
   });
 

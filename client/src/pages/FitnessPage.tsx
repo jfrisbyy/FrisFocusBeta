@@ -21,7 +21,8 @@ import {
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend } from "recharts";
@@ -100,6 +101,7 @@ export default function FitnessPage() {
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
   const [habitsDialogOpen, setHabitsDialogOpen] = useState(false);
+  const [livePlaySettingsOpen, setLivePlaySettingsOpen] = useState(false);
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
@@ -139,6 +141,25 @@ export default function FitnessPage() {
     queryKey: ["/api/fitness/nutrition-settings"],
     enabled: !isDemo,
   });
+
+  const DEFAULT_LIVE_PLAY_FIELDS = [
+    { id: "date", label: "Date", enabled: true },
+    { id: "courtType", label: "Court Type", enabled: true },
+    { id: "gameType", label: "Game Type", enabled: true },
+    { id: "gamesPlayed", label: "Games Played", enabled: true },
+    { id: "wins", label: "Wins", enabled: true },
+    { id: "losses", label: "Losses", enabled: true },
+    { id: "performanceGrade", label: "Performance Grade", enabled: true },
+    { id: "confidence", label: "Confidence", enabled: true },
+  ];
+
+  const { data: livePlaySettingsData } = useQuery<LivePlaySettings>({
+    queryKey: ["/api/fitness/live-play-settings"],
+    enabled: !isDemo,
+  });
+
+  const livePlayVisibleFields = livePlaySettingsData?.visibleFields as string[] || 
+    DEFAULT_LIVE_PLAY_FIELDS.map(f => f.id);
 
   const nutrition = isDemo ? demoNutritionData : nutritionData;
   const nutritionSettings = isDemo ? demoNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
@@ -1036,13 +1057,29 @@ export default function FitnessPage() {
             </TabsList>
 
             <TabsContent value="runs" className="space-y-4 mt-4">
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => setLivePlaySettingsOpen(true)}
+                  data-testid="button-live-play-settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
                 <RunDialog 
                   open={runDialogOpen} 
                   onOpenChange={setRunDialogOpen}
                   isDemo={isDemo}
+                  visibleFields={livePlayVisibleFields}
                 />
               </div>
+              <LivePlaySettingsDialog
+                open={livePlaySettingsOpen}
+                onOpenChange={setLivePlaySettingsOpen}
+                isDemo={isDemo}
+                defaultFields={DEFAULT_LIVE_PLAY_FIELDS}
+                currentVisibleFields={livePlayVisibleFields}
+              />
 
               <div className="grid gap-4 md:grid-cols-3">
                 {runs.length === 0 ? (
@@ -1913,7 +1950,90 @@ function SkillDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChan
   );
 }
 
-function RunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
+function LivePlaySettingsDialog({ 
+  open, 
+  onOpenChange, 
+  isDemo, 
+  defaultFields,
+  currentVisibleFields 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  defaultFields: { id: string; label: string; enabled: boolean }[];
+  currentVisibleFields: string[];
+}) {
+  const { toast } = useToast();
+  const [selectedFields, setSelectedFields] = useState<string[]>(currentVisibleFields);
+
+  useEffect(() => {
+    setSelectedFields(currentVisibleFields);
+  }, [currentVisibleFields]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (visibleFields: string[]) => {
+      const res = await apiRequest("PUT", "/api/fitness/live-play-settings", { visibleFields });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/live-play-settings"] });
+      toast({ title: "Settings saved" });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const toggleField = (fieldId: string) => {
+    setSelectedFields(prev => 
+      prev.includes(fieldId) 
+        ? prev.filter(f => f !== fieldId)
+        : [...prev, fieldId]
+    );
+  };
+
+  const handleSave = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - settings not saved" });
+      onOpenChange(false);
+      return;
+    }
+    updateMutation.mutate(selectedFields);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Live Play Form Fields</DialogTitle>
+          <DialogDescription>Choose which fields to show when logging a session</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {defaultFields.map((field) => (
+            <div key={field.id} className="flex items-center space-x-3">
+              <Checkbox 
+                id={field.id}
+                checked={selectedFields.includes(field.id)}
+                onCheckedChange={() => toggleField(field.id)}
+                data-testid={`checkbox-field-${field.id}`}
+              />
+              <Label htmlFor={field.id} className="cursor-pointer">{field.label}</Label>
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-live-play-settings">
+            {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RunDialog({ open, onOpenChange, isDemo, visibleFields }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean; visibleFields: string[] }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
@@ -1925,6 +2045,8 @@ function RunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange
     performanceGrade: "",
     confidence: "",
   });
+
+  const isVisible = (fieldId: string) => visibleFields.includes(fieldId);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<BasketballRun>) => {
@@ -1976,72 +2098,88 @@ function RunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
+            {isVisible("date") && (
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-run-date" />
+              </div>
+            )}
+            {isVisible("courtType") && (
+              <div className="space-y-2">
+                <Label>Court Type</Label>
+                <Select value={formData.courtType} onValueChange={(v) => setFormData({ ...formData, courtType: v })}>
+                  <SelectTrigger data-testid="select-run-court">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Indoor">Indoor</SelectItem>
+                    <SelectItem value="Outdoor">Outdoor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          {isVisible("gameType") && (
             <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-run-date" />
-            </div>
-            <div className="space-y-2">
-              <Label>Court Type</Label>
-              <Select value={formData.courtType} onValueChange={(v) => setFormData({ ...formData, courtType: v })}>
-                <SelectTrigger data-testid="select-run-court">
+              <Label>Game Type</Label>
+              <Select value={formData.gameType} onValueChange={(v) => setFormData({ ...formData, gameType: v })}>
+                <SelectTrigger data-testid="select-run-game-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Indoor">Indoor</SelectItem>
-                  <SelectItem value="Outdoor">Outdoor</SelectItem>
+                  <SelectItem value="fullCourt">Full Court</SelectItem>
+                  <SelectItem value="halfCourt">Half Court</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Game Type</Label>
-            <Select value={formData.gameType} onValueChange={(v) => setFormData({ ...formData, gameType: v })}>
-              <SelectTrigger data-testid="select-run-game-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fullCourt">Full Court</SelectItem>
-                <SelectItem value="halfCourt">Half Court</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Games</Label>
-              <Input type="number" placeholder="5" value={formData.gamesPlayed} onChange={(e) => setFormData({ ...formData, gamesPlayed: e.target.value })} data-testid="input-run-games" />
-            </div>
-            <div className="space-y-2">
-              <Label>Wins</Label>
-              <Input type="number" placeholder="3" value={formData.wins} onChange={(e) => setFormData({ ...formData, wins: e.target.value })} data-testid="input-run-wins" />
-            </div>
-            <div className="space-y-2">
-              <Label>Losses</Label>
-              <Input type="number" placeholder="2" value={formData.losses} onChange={(e) => setFormData({ ...formData, losses: e.target.value })} data-testid="input-run-losses" />
-            </div>
+            {isVisible("gamesPlayed") && (
+              <div className="space-y-2">
+                <Label>Games</Label>
+                <Input type="number" placeholder="5" value={formData.gamesPlayed} onChange={(e) => setFormData({ ...formData, gamesPlayed: e.target.value })} data-testid="input-run-games" />
+              </div>
+            )}
+            {isVisible("wins") && (
+              <div className="space-y-2">
+                <Label>Wins</Label>
+                <Input type="number" placeholder="3" value={formData.wins} onChange={(e) => setFormData({ ...formData, wins: e.target.value })} data-testid="input-run-wins" />
+              </div>
+            )}
+            {isVisible("losses") && (
+              <div className="space-y-2">
+                <Label>Losses</Label>
+                <Input type="number" placeholder="2" value={formData.losses} onChange={(e) => setFormData({ ...formData, losses: e.target.value })} data-testid="input-run-losses" />
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Grade</Label>
-              <Select value={formData.performanceGrade} onValueChange={(v) => setFormData({ ...formData, performanceGrade: v })}>
-                <SelectTrigger data-testid="select-run-grade">
-                  <SelectValue placeholder="Select grade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A+">A+</SelectItem>
-                  <SelectItem value="A">A</SelectItem>
-                  <SelectItem value="A-">A-</SelectItem>
-                  <SelectItem value="B+">B+</SelectItem>
-                  <SelectItem value="B">B</SelectItem>
-                  <SelectItem value="B-">B-</SelectItem>
-                  <SelectItem value="C+">C+</SelectItem>
-                  <SelectItem value="C">C</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Confidence (1-10)</Label>
-              <Input type="number" min="1" max="10" placeholder="7" value={formData.confidence} onChange={(e) => setFormData({ ...formData, confidence: e.target.value })} data-testid="input-run-confidence" />
-            </div>
+            {isVisible("performanceGrade") && (
+              <div className="space-y-2">
+                <Label>Grade</Label>
+                <Select value={formData.performanceGrade} onValueChange={(v) => setFormData({ ...formData, performanceGrade: v })}>
+                  <SelectTrigger data-testid="select-run-grade">
+                    <SelectValue placeholder="Select grade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A+">A+</SelectItem>
+                    <SelectItem value="A">A</SelectItem>
+                    <SelectItem value="A-">A-</SelectItem>
+                    <SelectItem value="B+">B+</SelectItem>
+                    <SelectItem value="B">B</SelectItem>
+                    <SelectItem value="B-">B-</SelectItem>
+                    <SelectItem value="C+">C+</SelectItem>
+                    <SelectItem value="C">C</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isVisible("confidence") && (
+              <div className="space-y-2">
+                <Label>Confidence (1-10)</Label>
+                <Input type="number" min="1" max="10" placeholder="7" value={formData.confidence} onChange={(e) => setFormData({ ...formData, confidence: e.target.value })} data-testid="input-run-confidence" />
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
