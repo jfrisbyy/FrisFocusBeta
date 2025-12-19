@@ -910,7 +910,12 @@ While gathering info, respond with:
   // AI Goal Advisor - helps users select fitness goals
   app.post("/api/fitness/goal/chat", isAuthenticated, async (req: any, res) => {
     try {
-      const { history, currentStats } = req.body;
+      const { history, currentStats, currentGoal } = req.body;
+      
+      const hasExistingGoal = currentGoal && currentGoal.calorieTarget && currentGoal.maintenanceCalories;
+      const goalMode = hasExistingGoal ? 
+        (currentGoal.calorieTarget === currentGoal.maintenanceCalories ? 'maintenance' :
+         currentGoal.calorieTarget > currentGoal.maintenanceCalories ? 'surplus' : 'deficit') : null;
       
       const systemPrompt = `You are a supportive fitness coach helping someone set their nutrition and fitness goals. Your job is to understand their aspirations and recommend appropriate calorie targets.
 
@@ -922,15 +927,26 @@ ${currentStats ? `- Weight: ${currentStats.weight || 'unknown'} lbs
 - Activity Level: ${currentStats.activityLevel || 'unknown'}
 - Calculated TDEE: ${currentStats.tdee || 'unknown'} cal` : 'No stats provided yet'}
 
+${hasExistingGoal ? `CURRENT GOAL (already configured):
+- Goal Type: ${currentGoal.goalType || 'custom'}
+- Mode: ${goalMode} (${goalMode === 'deficit' ? 'losing weight' : goalMode === 'surplus' ? 'gaining weight' : 'maintaining'})
+- Calorie Target: ${currentGoal.calorieTarget} cal/day
+- Maintenance Calories: ${currentGoal.maintenanceCalories} cal/day
+- Daily ${goalMode === 'deficit' ? 'Deficit' : goalMode === 'surplus' ? 'Surplus' : 'Difference'}: ${Math.abs(currentGoal.calorieTarget - currentGoal.maintenanceCalories)} cal` : ''}
+
 YOUR APPROACH:
-1. Ask about their fitness goals in a friendly, conversational way
+${hasExistingGoal ? `Since they already have a goal set:
+1. Start by acknowledging their current goal and asking if they'd like to adjust it
+2. Ask what's prompting the change - are results slower than expected? Life circumstances changed? Want to be more/less aggressive?
+3. Understand what aspect they want to change (more aggressive deficit, switch to maintenance, etc.)
+4. Make a recommendation that builds on what's working or addresses their concerns` : `1. Ask about their fitness goals in a friendly, conversational way
 2. Understand HOW they want to look and feel (not just weight goals)
 3. IMPORTANT: Always ask about their TIMEFRAME - when do they want to achieve this goal? (e.g., "by summer", "in 3 months", "by my wedding in 6 weeks")
 4. Ask about their lifestyle and what they can realistically sustain
 5. Use the timeframe to determine how aggressive the deficit/surplus should be:
    - Shorter timeframe = more aggressive approach (but explain the tradeoffs)
    - Longer timeframe = more sustainable, moderate approach
-6. After understanding their goals and timeframe, recommend a specific plan
+6. After understanding their goals and timeframe, recommend a specific plan`}
 
 When you have enough information to make a recommendation, respond with JSON:
 {

@@ -3031,6 +3031,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       const res = await apiRequest("POST", "/api/fitness/goal/chat", {
         history: [],
         currentStats,
+        currentGoal: {
+          goalType: nutritionSettings.goalType,
+          calorieTarget: nutritionSettings.calorieTarget,
+          maintenanceCalories: nutritionSettings.maintenanceCalories,
+        },
       });
       const data = await res.json();
       setChatMessages([{ role: 'assistant', content: data.message }]);
@@ -3068,6 +3073,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       const res = await apiRequest("POST", "/api/fitness/goal/chat", {
         history: updatedHistory,
         currentStats,
+        currentGoal: {
+          goalType: nutritionSettings.goalType,
+          calorieTarget: nutritionSettings.calorieTarget,
+          maintenanceCalories: nutritionSettings.maintenanceCalories,
+        },
       });
       const data = await res.json();
       setChatMessages([...updatedHistory, { role: 'assistant', content: data.message }]);
