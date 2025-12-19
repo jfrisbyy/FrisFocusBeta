@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Sparkles, Plus, Trash2, Shuffle, ChevronUp, ChevronDown, GripVertical, Sun, Moon } from "lucide-react";
+import { Settings, Sparkles, Plus, Trash2, Shuffle, ChevronUp, ChevronDown, GripVertical, Sun, Moon, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { DashboardPreferences, DashboardCardKey } from "@shared/schema";
 import { dashboardCardKeys } from "@shared/schema";
+
+type ColorScheme = "green" | "blue" | "purple" | "orange" | "rose";
+
+const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
+  { value: "green", label: "Green", color: "bg-green-500" },
+  { value: "blue", label: "Blue", color: "bg-blue-500" },
+  { value: "purple", label: "Purple", color: "bg-purple-500" },
+  { value: "orange", label: "Orange", color: "bg-orange-500" },
+  { value: "rose", label: "Rose", color: "bg-rose-500" },
+];
 
 interface WelcomeSettings {
   userName: string;
@@ -86,6 +96,22 @@ export default function DashboardSettingsDialog({
       localStorage.setItem("frisfocus-theme", "dark");
     }
   }, [preferences.theme]);
+
+  useEffect(() => {
+    const scheme = preferences.colorScheme || "green";
+    colorSchemes.forEach(({ value }) => {
+      document.documentElement.classList.remove(`scheme-${value}`);
+    });
+    document.documentElement.classList.add(`scheme-${scheme}`);
+    localStorage.setItem("frisfocus-color-scheme", scheme);
+  }, [preferences.colorScheme]);
+
+  const handleColorSchemeChange = (scheme: ColorScheme) => {
+    onPreferencesChange({
+      ...preferences,
+      colorScheme: scheme,
+    });
+  };
 
   const handleThemeToggle = (checked: boolean) => {
     onPreferencesChange({
@@ -486,7 +512,7 @@ export default function DashboardSettingsDialog({
           </TabsContent>
 
           <TabsContent value="appearance" className="flex-1 overflow-auto mt-4">
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50">
                 <div className="space-y-0.5">
                   <Label htmlFor="toggle-theme" className="text-sm font-medium flex items-center gap-2">
@@ -502,6 +528,30 @@ export default function DashboardSettingsDialog({
                   disabled={isPending}
                   data-testid="switch-light-mode"
                 />
+              </div>
+              
+              <div className="p-3 rounded-md bg-muted/50">
+                <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                  <Palette className="h-4 w-4" />
+                  Color Scheme
+                </Label>
+                <p className="text-xs text-muted-foreground mb-3">Choose your accent color</p>
+                <div className="flex gap-2 flex-wrap">
+                  {colorSchemes.map(({ value, label, color }) => (
+                    <button
+                      key={value}
+                      onClick={() => handleColorSchemeChange(value)}
+                      disabled={isPending}
+                      className={`w-8 h-8 rounded-full ${color} transition-all ${
+                        preferences.colorScheme === value 
+                          ? "ring-2 ring-offset-2 ring-offset-background ring-foreground scale-110" 
+                          : "opacity-70 hover:opacity-100"
+                      }`}
+                      title={label}
+                      data-testid={`button-scheme-${value}`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </TabsContent>
