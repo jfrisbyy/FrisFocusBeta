@@ -27,6 +27,8 @@ import {
   insertStrengthWorkoutSchema,
   insertSkillWorkoutSchema,
   insertBasketballRunSchema,
+  nutritionSettings,
+  insertNutritionSettingsSchema,
   friendships,
   userStats,
   sharingSettings,
@@ -670,6 +672,54 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting nutrition log:", error);
       res.status(400).json({ error: "Failed to delete nutrition log" });
+    }
+  });
+
+  // Nutrition Settings - user's targets and preferences
+  app.get("/api/fitness/nutrition-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [settings] = await db.select().from(nutritionSettings).where(eq(nutritionSettings.userId, userId));
+      if (!settings) {
+        // Return default settings if none exist
+        return res.json({
+          userId,
+          maintenanceCalories: 2500,
+          calorieTarget: 2000,
+          proteinTarget: 150,
+          goalType: "moderate_cut",
+          customToggles: [
+            { id: "creatine", name: "Creatine Taken", enabled: true },
+            { id: "water", name: "Gallon of Water", enabled: true },
+          ],
+        });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching nutrition settings:", error);
+      res.status(500).json({ error: "Failed to fetch nutrition settings" });
+    }
+  });
+
+  app.put("/api/fitness/nutrition-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [existing] = await db.select().from(nutritionSettings).where(eq(nutritionSettings.userId, userId));
+      
+      if (existing) {
+        const [updated] = await db.update(nutritionSettings)
+          .set(req.body)
+          .where(eq(nutritionSettings.userId, userId))
+          .returning();
+        return res.json(updated);
+      } else {
+        const parsed = insertNutritionSettingsSchema.parse({ ...req.body, userId });
+        const [created] = await db.insert(nutritionSettings).values(parsed).returning();
+        return res.json(created);
+      }
+    } catch (error) {
+      console.error("Error updating nutrition settings:", error);
+      res.status(400).json({ error: "Failed to update nutrition settings" });
     }
   });
 

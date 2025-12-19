@@ -398,6 +398,46 @@ export const insertBasketballRunSchema = createInsertSchema(basketballRuns).omit
 export type InsertBasketballRun = z.infer<typeof insertBasketballRunSchema>;
 export type BasketballRun = typeof basketballRuns.$inferSelect;
 
+// Meal schema for nutrition logging
+export const mealSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  calories: z.number().int().min(0),
+  protein: z.number().int().min(0),
+  time: z.string().optional(),
+});
+export type Meal = z.infer<typeof mealSchema>;
+
+// Daily toggle schema for customizable habits
+export const dailyToggleSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  enabled: z.boolean(),
+});
+export type DailyToggle = z.infer<typeof dailyToggleSchema>;
+
+// Nutrition settings - stores user's targets and preferences
+export const nutritionSettings = pgTable("nutrition_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  maintenanceCalories: integer("maintenance_calories").default(2500),
+  calorieTarget: integer("calorie_target").default(2000),
+  proteinTarget: integer("protein_target").default(150),
+  carbTarget: integer("carb_target"),
+  fatTarget: integer("fat_target"),
+  goalType: text("goal_type").default("moderate_cut"),
+  weight: integer("weight"),
+  height: integer("height"),
+  age: integer("age"),
+  gender: text("gender"),
+  activityLevel: text("activity_level"),
+  customToggles: jsonb("custom_toggles"),
+});
+
+export const insertNutritionSettingsSchema = createInsertSchema(nutritionSettings).omit({ id: true });
+export type InsertNutritionSettings = z.infer<typeof insertNutritionSettingsSchema>;
+export type NutritionSettings = typeof nutritionSettings.$inferSelect;
+
 // ==================== GPT OAuth Tables ====================
 
 // OAuth access tokens for GPT integration
