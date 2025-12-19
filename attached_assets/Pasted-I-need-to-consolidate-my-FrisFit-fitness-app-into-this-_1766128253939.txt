@@ -1,0 +1,53 @@
+I need to consolidate my "FrisFit" fitness app into this project as a single, feature-rich "Fitness Dashboard" page.
+
+On the fitness page, use a Tabbed Interface to switch between 5 distinct views. It must connect to API endpoints so it can be stored to the account and include ALL of the following specific features:
+
+1. Tab: Overview (Dashboard)
+
+Vitals Row: Display current Daily Calories, Deficit Status, Protein Total, Current Weight, and Next Milestone.
+Activity Feed: A list of the most recent logs from all categories combined.
+Quick Actions: Big buttons to immediately "Log Meal", "Log Run", or "Log Lift".
+Weekly Streak: A visual indicator of consecutive days active.
+2. Tab: Nutrition (Macro & Deficit Tracker)
+
+Daily Summary: Progress bars for Calories and Protein vs Goals.
+Deficit Mode: A specific section calculating (Goal - Food Intake + Calories Burned).
+Meal Logger: A generic list of meals for the day (Name, Cals, Protein, Time) with Add/Delete functionality.
+Daily Toggles: Checkboxes for "Creatine Taken" and "Water Gallon Drank".
+Deficit Calculator: A modal/dialog to calculate calorie targets based on Weight, Height, Age, and Activity Level.
+History: List of past daily logs.
+3. Tab: Sports (Basketball & Skill Work)
+
+Consolidated View: This tab should have its own internal toggle/sub-tabs to switch between "Pickup Games" and "Skill Drills".
+
+Sub-View A: Pickup Games (Hoops)
+
+Note: Tracks competitive games, not cardio.
+Session Logger: Inputs for Date, Duration, Court Type (Full/Half), and Multi-Select Format (1v1, 3v3, 5v5, 21, KOC).
+Game Stats: Track Games Played, Wins, Losses, and calculate a "Win Rate %".
+Performance GPA: Dropdown to grade performance (A+ to F), converted to a GPA score.
+Mental Game: Confidence slider (1-10) and Reflection text areas.
+Challenges: Add specific session goals (e.g., "5 Assists") with Target vs. Achieved inputs.
+Sub-View B: Skill Lab (Drills)
+
+Session Logger: Inputs for Date, Drill Type, and Intensity/Effort % (Slider).
+Zone Focus: Sliders to estimate time spent in Paint, Mid-Range, and 3-Point (visualized in a Pie Chart).
+Drill Stats: List to track specific drills (Name, Reps Made).
+Focus Tags: Multi-select badges for skills (e.g., "Handles", "Shooting").
+Intensity Gauge: Visual bar showing avg effort level across sessions.
+4. Tab: Strength (Lifting)
+
+Workout Logger: Inputs for Date, Duration, and Primary Focus (Push/Pull/Legs).
+Exercise Grid: Dynamic list for Exercises (Name, Sets, Reps, Weight).
+Volume Analytics: Auto-calculate "Total Volume" (lbs lifted) per session.
+Charts: Bar Chart for Volume Progression and Pie Chart for Focus Area breakdown.
+5. Tab: Body Comp (Weight & Photos)
+
+Check-in Logger: Inputs for Date, Current Weight, and Body Fat %.
+Photo Upload: File input to attach a progress picture to the log.
+Goal Settings: Persistent section to set "Goal Weight" and "Next Milestone".
+Visuals: Area Chart for weight trends and a "Before/After" photo gallery view.
+
+
+
+Ensure all "Delete" and "Edit" actions work for every log type.

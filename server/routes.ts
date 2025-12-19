@@ -641,6 +641,38 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/fitness/nutrition/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { calories, protein, carbs, fats, creatine, waterGallon, deficit, caloriesBurned, meals, date } = req.body;
+      const [log] = await db.update(nutritionLogs)
+        .set({ calories, protein, carbs, fats, creatine, waterGallon, deficit, caloriesBurned, meals, date })
+        .where(and(eq(nutritionLogs.id, id), eq(nutritionLogs.userId, userId)))
+        .returning();
+      if (!log) return res.status(404).json({ error: "Nutrition log not found" });
+      res.json(log);
+    } catch (error) {
+      console.error("Error updating nutrition log:", error);
+      res.status(400).json({ error: "Failed to update nutrition log" });
+    }
+  });
+
+  app.delete("/api/fitness/nutrition/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const [deleted] = await db.delete(nutritionLogs)
+        .where(and(eq(nutritionLogs.id, id), eq(nutritionLogs.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Nutrition log not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting nutrition log:", error);
+      res.status(400).json({ error: "Failed to delete nutrition log" });
+    }
+  });
+
   // Body composition - filtered by user
   app.get("/api/fitness/body-comp", isAuthenticated, async (req: any, res) => {
     try {
@@ -662,6 +694,37 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating body composition:", error);
       res.status(400).json({ error: "Failed to create body composition" });
+    }
+  });
+
+  app.put("/api/fitness/body-comp/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [updated] = await db.update(bodyComposition)
+        .set(req.body)
+        .where(and(eq(bodyComposition.id, id), eq(bodyComposition.userId, userId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Body composition record not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating body composition:", error);
+      res.status(400).json({ error: "Failed to update body composition" });
+    }
+  });
+
+  app.delete("/api/fitness/body-comp/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(bodyComposition)
+        .where(and(eq(bodyComposition.id, id), eq(bodyComposition.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Body composition record not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting body composition:", error);
+      res.status(400).json({ error: "Failed to delete body composition" });
     }
   });
 
@@ -689,6 +752,37 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/fitness/strength/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [updated] = await db.update(strengthWorkouts)
+        .set(req.body)
+        .where(and(eq(strengthWorkouts.id, id), eq(strengthWorkouts.userId, userId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Strength workout not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating strength workout:", error);
+      res.status(400).json({ error: "Failed to update strength workout" });
+    }
+  });
+
+  app.delete("/api/fitness/strength/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(strengthWorkouts)
+        .where(and(eq(strengthWorkouts.id, id), eq(strengthWorkouts.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Strength workout not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting strength workout:", error);
+      res.status(400).json({ error: "Failed to delete strength workout" });
+    }
+  });
+
   // Skill workouts - filtered by user
   app.get("/api/fitness/skill", isAuthenticated, async (req: any, res) => {
     try {
@@ -713,6 +807,37 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/fitness/skill/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [updated] = await db.update(skillWorkouts)
+        .set(req.body)
+        .where(and(eq(skillWorkouts.id, id), eq(skillWorkouts.userId, userId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Skill workout not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating skill workout:", error);
+      res.status(400).json({ error: "Failed to update skill workout" });
+    }
+  });
+
+  app.delete("/api/fitness/skill/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(skillWorkouts)
+        .where(and(eq(skillWorkouts.id, id), eq(skillWorkouts.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Skill workout not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting skill workout:", error);
+      res.status(400).json({ error: "Failed to delete skill workout" });
+    }
+  });
+
   // Basketball runs - filtered by user
   app.get("/api/fitness/runs", isAuthenticated, async (req: any, res) => {
     try {
@@ -734,6 +859,37 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating basketball run:", error);
       res.status(400).json({ error: "Failed to create basketball run" });
+    }
+  });
+
+  app.put("/api/fitness/runs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [updated] = await db.update(basketballRuns)
+        .set(req.body)
+        .where(and(eq(basketballRuns.id, id), eq(basketballRuns.userId, userId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Basketball run not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating basketball run:", error);
+      res.status(400).json({ error: "Failed to update basketball run" });
+    }
+  });
+
+  app.delete("/api/fitness/runs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const [deleted] = await db.delete(basketballRuns)
+        .where(and(eq(basketballRuns.id, id), eq(basketballRuns.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Basketball run not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting basketball run:", error);
+      res.status(400).json({ error: "Failed to delete basketball run" });
     }
   });
 
