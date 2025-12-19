@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heart, X, ChevronDown, ChevronUp } from "lucide-react";
@@ -38,7 +38,7 @@ export default function WelcomeMessage({
 }: WelcomeMessageProps) {
   const [showCheerlines, setShowCheerlines] = useState(true);
 
-  const getDisplayMessage = () => {
+  const displayMessage = useMemo(() => {
     if (!useCustomMessage) {
       return defaultMessages[Math.floor(Math.random() * defaultMessages.length)];
     }
@@ -52,7 +52,7 @@ export default function WelcomeMessage({
       }
     }
     return message;
-  };
+  }, [useCustomMessage, savedCustomMessages, selectedMessageIndex, message]);
 
   const now = new Date();
   const validCheerlines = friendMessages.filter(m => {
@@ -72,7 +72,7 @@ export default function WelcomeMessage({
               Welcome, {userName}!
             </h1>
             <p className="text-sm text-muted-foreground" data-testid="text-welcome-message">
-              {getDisplayMessage()}
+              {displayMessage}
             </p>
           </div>
         </div>
