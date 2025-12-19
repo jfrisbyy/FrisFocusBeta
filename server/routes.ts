@@ -907,6 +907,90 @@ While gathering info, respond with:
     }
   });
 
+  // AI Goal Advisor - helps users select fitness goals
+  app.post("/api/fitness/goal/chat", isAuthenticated, async (req: any, res) => {
+    try {
+      const { history, currentStats } = req.body;
+      
+      const systemPrompt = `You are a supportive fitness coach helping someone set their nutrition and fitness goals. Your job is to understand their aspirations and recommend appropriate calorie targets.
+
+CURRENT STATS (if provided):
+${currentStats ? `- Weight: ${currentStats.weight || 'unknown'} lbs
+- Height: ${currentStats.height || 'unknown'} inches
+- Age: ${currentStats.age || 'unknown'}
+- Gender: ${currentStats.gender || 'unknown'}
+- Activity Level: ${currentStats.activityLevel || 'unknown'}
+- Calculated TDEE: ${currentStats.tdee || 'unknown'} cal` : 'No stats provided yet'}
+
+YOUR APPROACH:
+1. Ask about their fitness goals in a friendly, conversational way
+2. Understand HOW they want to look and feel (not just weight goals)
+3. Ask about their timeline and lifestyle
+4. After understanding their goals, recommend a specific plan
+
+When you have enough information to make a recommendation, respond with JSON:
+{
+  "isFinal": true,
+  "recommendation": {
+    "goalType": "<custom goal name describing their goal, e.g. 'summer_shred', 'athletic_recomp', 'strength_focus'>",
+    "goalLabel": "<Human readable label, e.g. 'Summer Shred', 'Athletic Recomp'>",
+    "calorieTarget": <number>,
+    "maintenanceCalories": <number based on their stats or estimate>,
+    "proteinTarget": <grams>,
+    "explanation": "<why this recommendation fits their goals>",
+    "weeklyChangeEstimate": "<expected weekly weight change>"
+  }
+}
+
+While gathering info, respond with:
+{
+  "isFinal": false,
+  "message": "<your friendly message>"
+}
+
+Be encouraging and realistic. Help them understand what's achievable.`;
+
+      const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemPrompt },
+      ];
+      
+      if (Array.isArray(history)) {
+        for (const msg of history) {
+          if (msg.role === "user" || msg.role === "assistant") {
+            messages.push({ role: msg.role, content: msg.content });
+          }
+        }
+      }
+      
+      if (!history || history.length === 0) {
+        messages.push({ role: "user", content: "Help me figure out my fitness goals and calorie targets." });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages,
+        max_tokens: 800,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      try {
+        const parsed = JSON.parse(rawContent);
+        res.json(parsed);
+      } catch (parseError) {
+        console.error("Failed to parse AI goal response:", parseError);
+        res.status(500).json({ error: "Failed to parse AI response" });
+      }
+    } catch (error) {
+      console.error("AI goal chat error:", error);
+      res.status(500).json({ error: "Failed to get AI response" });
+    }
+  });
+
   // Update or create deficit for a specific date
   app.post("/api/fitness/nutrition/deficit", isAuthenticated, async (req: any, res) => {
     try {

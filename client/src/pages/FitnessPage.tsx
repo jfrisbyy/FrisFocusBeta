@@ -17,7 +17,7 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, Send
+  MessageCircle, Send, Sparkles
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2880,44 +2880,184 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number }) => void;
 }) {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("settings");
   const [goalMode, setGoalMode] = useState(nutritionSettings.goalType || 'moderate_cut');
+  const [customGoalLabel, setCustomGoalLabel] = useState("");
   const [maintenance, setMaintenance] = useState(nutritionSettings.maintenanceCalories?.toString() || '2500');
   const [target, setTarget] = useState(nutritionSettings.calorieTarget?.toString() || '2000');
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  
+  // TDEE Calculator state
+  const [tdeeData, setTdeeData] = useState({
+    weight: "",
+    height: "",
+    age: "",
+    gender: "male",
+    activityLevel: "moderate",
+  });
+  const [tdeeResult, setTdeeResult] = useState<{ bmr: number; tdee: number } | null>(null);
+  
+  // AI Chat state
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [userInput, setUserInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [aiRecommendation, setAiRecommendation] = useState<{
+    goalType: string;
+    goalLabel: string;
+    calorieTarget: number;
+    maintenanceCalories: number;
+    proteinTarget: number;
+    explanation: string;
+    weeklyChangeEstimate: string;
+  } | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
 
   useEffect(() => {
     if (open) {
-      setGoalMode(nutritionSettings.goalType || 'moderate_cut');
+      const presetModes = ['aggressive_cut', 'moderate_cut', 'light_cut', 'maintenance', 'lean_bulk', 'bulk'];
+      const currentGoal = nutritionSettings.goalType || 'moderate_cut';
+      setIsCustomMode(!presetModes.includes(currentGoal));
+      setGoalMode(presetModes.includes(currentGoal) ? currentGoal : 'custom');
+      setCustomGoalLabel(!presetModes.includes(currentGoal) ? currentGoal : "");
       setMaintenance(nutritionSettings.maintenanceCalories?.toString() || '2500');
       setTarget(nutritionSettings.calorieTarget?.toString() || '2000');
     }
   }, [open, nutritionSettings]);
 
   useEffect(() => {
-    const maintenanceCal = parseInt(maintenance) || 2500;
-    let newTarget = maintenanceCal;
-    
-    switch (goalMode) {
-      case 'aggressive_cut':
-        newTarget = maintenanceCal - 750;
-        break;
-      case 'moderate_cut':
-        newTarget = maintenanceCal - 500;
-        break;
-      case 'light_cut':
-        newTarget = maintenanceCal - 250;
-        break;
-      case 'maintenance':
-        newTarget = maintenanceCal;
-        break;
-      case 'lean_bulk':
-        newTarget = maintenanceCal + 250;
-        break;
-      case 'bulk':
-        newTarget = maintenanceCal + 500;
-        break;
+    if (goalMode !== 'custom') {
+      const maintenanceCal = parseInt(maintenance) || 2500;
+      let newTarget = maintenanceCal;
+      
+      switch (goalMode) {
+        case 'aggressive_cut': newTarget = maintenanceCal - 750; break;
+        case 'moderate_cut': newTarget = maintenanceCal - 500; break;
+        case 'light_cut': newTarget = maintenanceCal - 250; break;
+        case 'maintenance': newTarget = maintenanceCal; break;
+        case 'lean_bulk': newTarget = maintenanceCal + 250; break;
+        case 'bulk': newTarget = maintenanceCal + 500; break;
+      }
+      setTarget(newTarget.toString());
     }
-    setTarget(newTarget.toString());
   }, [goalMode, maintenance]);
+
+  const calculateBMR = (weight: number, height: number, age: number, gender: string) => {
+    const weightKg = weight * 0.453592;
+    const heightCm = height * 2.54;
+    if (gender === "male") {
+      return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age + 5);
+    }
+    return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age - 161);
+  };
+
+  const activityMultipliers: Record<string, number> = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    very_active: 1.9,
+  };
+
+  const calculateTDEE = () => {
+    const weight = parseFloat(tdeeData.weight);
+    const height = parseFloat(tdeeData.height);
+    const age = parseInt(tdeeData.age);
+    
+    if (!weight || !height || !age) {
+      toast({ title: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
+    
+    const bmr = calculateBMR(weight, height, age, tdeeData.gender);
+    const tdee = Math.round(bmr * (activityMultipliers[tdeeData.activityLevel] || 1.55));
+    setTdeeResult({ bmr, tdee });
+  };
+
+  const applyTDEE = () => {
+    if (tdeeResult) {
+      setMaintenance(tdeeResult.tdee.toString());
+      setActiveTab("settings");
+      toast({ title: "TDEE applied as maintenance calories" });
+    }
+  };
+
+  const startAIChat = async () => {
+    setIsLoading(true);
+    setChatMessages([]);
+    setAiRecommendation(null);
+    
+    try {
+      const res = await apiRequest("POST", "/api/fitness/goal/chat", {
+        history: [],
+        currentStats: tdeeResult ? {
+          weight: tdeeData.weight,
+          height: tdeeData.height,
+          age: tdeeData.age,
+          gender: tdeeData.gender,
+          activityLevel: tdeeData.activityLevel,
+          tdee: tdeeResult.tdee,
+        } : null,
+      });
+      const data = await res.json();
+      setChatMessages([{ role: 'assistant', content: data.message }]);
+      if (data.isFinal && data.recommendation) {
+        setAiRecommendation(data.recommendation);
+      }
+    } catch {
+      toast({ title: "Failed to start AI conversation", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!userInput.trim() || isLoading) return;
+    
+    const newUserMessage = { role: 'user' as const, content: userInput.trim() };
+    const updatedHistory = [...chatMessages, newUserMessage];
+    setChatMessages(updatedHistory);
+    setUserInput("");
+    setIsLoading(true);
+    
+    try {
+      const res = await apiRequest("POST", "/api/fitness/goal/chat", {
+        history: updatedHistory,
+        currentStats: tdeeResult ? {
+          weight: tdeeData.weight,
+          height: tdeeData.height,
+          age: tdeeData.age,
+          gender: tdeeData.gender,
+          activityLevel: tdeeData.activityLevel,
+          tdee: tdeeResult.tdee,
+        } : null,
+      });
+      const data = await res.json();
+      setChatMessages([...updatedHistory, { role: 'assistant', content: data.message }]);
+      if (data.isFinal && data.recommendation) {
+        setAiRecommendation(data.recommendation);
+      }
+    } catch {
+      toast({ title: "Failed to get AI response", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const applyAIRecommendation = () => {
+    if (aiRecommendation) {
+      setGoalMode('custom');
+      setIsCustomMode(true);
+      setCustomGoalLabel(aiRecommendation.goalLabel);
+      setMaintenance(aiRecommendation.maintenanceCalories.toString());
+      setTarget(aiRecommendation.calorieTarget.toString());
+      setActiveTab("settings");
+      toast({ title: "AI recommendation applied" });
+    }
+  };
 
   const handleSave = () => {
     if (isDemo) {
@@ -2926,8 +3066,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       return;
     }
     
+    const finalGoalType = goalMode === 'custom' ? (customGoalLabel || 'custom') : goalMode;
     onSave({
-      goalType: goalMode,
+      goalType: finalGoalType,
       calorieTarget: parseInt(target) || 2000,
       maintenanceCalories: parseInt(maintenance) || 2500,
     });
@@ -2940,73 +3081,255 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     { value: 'maintenance', label: 'Maintenance', description: 'No change' },
     { value: 'lean_bulk', label: 'Lean Bulk', description: '+250 cal/day' },
     { value: 'bulk', label: 'Bulk', description: '+500 cal/day' },
+    { value: 'custom', label: 'Custom', description: 'Set your own' },
   ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Adjust Your Goal</DialogTitle>
           <DialogDescription>
-            Set your nutrition goal and calorie targets
+            Set your nutrition goal, calculate TDEE, or get AI recommendations
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Maintenance Calories</Label>
-            <Input
-              type="number"
-              value={maintenance}
-              onChange={(e) => setMaintenance(e.target.value)}
-              placeholder="2500"
-              data-testid="input-maintenance-calories"
-            />
-            <p className="text-xs text-muted-foreground">Your estimated daily calorie burn</p>
-          </div>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
+            <TabsTrigger value="tdee" data-testid="tab-tdee">TDEE Calc</TabsTrigger>
+            <TabsTrigger value="ai" data-testid="tab-ai">Ask AI</TabsTrigger>
+          </TabsList>
           
-          <div className="space-y-2">
-            <Label>Goal Mode</Label>
-            <Select value={goalMode} onValueChange={setGoalMode}>
-              <SelectTrigger data-testid="select-goal-mode">
-                <SelectValue placeholder="Select goal" />
-              </SelectTrigger>
-              <SelectContent>
-                {goalOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div className="flex items-center gap-2">
-                      <span>{option.label}</span>
-                      <span className="text-xs text-muted-foreground">({option.description})</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <TabsContent value="settings" className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Maintenance Calories (TDEE)</Label>
+              <Input
+                type="number"
+                value={maintenance}
+                onChange={(e) => setMaintenance(e.target.value)}
+                placeholder="2500"
+                data-testid="input-maintenance-calories"
+              />
+              <p className="text-xs text-muted-foreground">Your estimated daily calorie burn</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Goal Mode</Label>
+              <Select value={goalMode} onValueChange={(v) => { setGoalMode(v); setIsCustomMode(v === 'custom'); }}>
+                <SelectTrigger data-testid="select-goal-mode">
+                  <SelectValue placeholder="Select goal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {goalOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <div className="flex items-center gap-2">
+                        <span>{option.label}</span>
+                        <span className="text-xs text-muted-foreground">({option.description})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Daily Calorie Target</Label>
-            <Input
-              type="number"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="2000"
-              data-testid="input-calorie-target"
-            />
-            <p className="text-xs text-muted-foreground">
-              {goalMode === 'maintenance' 
-                ? 'Eating at maintenance level'
-                : goalMode.includes('cut') 
-                  ? `${parseInt(maintenance) - parseInt(target)} cal deficit per day`
-                  : `${parseInt(target) - parseInt(maintenance)} cal surplus per day`}
-            </p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} data-testid="button-save-goal">
-            Save Goal
-          </Button>
-        </DialogFooter>
+            {isCustomMode && (
+              <div className="space-y-2">
+                <Label>Custom Goal Name</Label>
+                <Input
+                  value={customGoalLabel}
+                  onChange={(e) => setCustomGoalLabel(e.target.value)}
+                  placeholder="e.g., Summer Shred, Athletic Recomp"
+                  data-testid="input-custom-goal-name"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Daily Calorie Target</Label>
+              <Input
+                type="number"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                placeholder="2000"
+                data-testid="input-calorie-target"
+              />
+              <p className="text-xs text-muted-foreground">
+                {parseInt(maintenance) === parseInt(target)
+                  ? 'Eating at maintenance level'
+                  : parseInt(target) < parseInt(maintenance)
+                    ? `${parseInt(maintenance) - parseInt(target)} cal deficit per day`
+                    : `${parseInt(target) - parseInt(maintenance)} cal surplus per day`}
+              </p>
+            </div>
+            
+            <DialogFooter className="pt-4">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={handleSave} data-testid="button-save-goal">Save Goal</Button>
+            </DialogFooter>
+          </TabsContent>
+          
+          <TabsContent value="tdee" className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Weight (lbs)</Label>
+                <Input
+                  type="number"
+                  value={tdeeData.weight}
+                  onChange={(e) => setTdeeData({ ...tdeeData, weight: e.target.value })}
+                  placeholder="180"
+                  data-testid="input-tdee-weight"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Height (inches)</Label>
+                <Input
+                  type="number"
+                  value={tdeeData.height}
+                  onChange={(e) => setTdeeData({ ...tdeeData, height: e.target.value })}
+                  placeholder="70"
+                  data-testid="input-tdee-height"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Age</Label>
+                <Input
+                  type="number"
+                  value={tdeeData.age}
+                  onChange={(e) => setTdeeData({ ...tdeeData, age: e.target.value })}
+                  placeholder="30"
+                  data-testid="input-tdee-age"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <Select value={tdeeData.gender} onValueChange={(v) => setTdeeData({ ...tdeeData, gender: v })}>
+                  <SelectTrigger data-testid="select-tdee-gender">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Activity Level</Label>
+              <Select value={tdeeData.activityLevel} onValueChange={(v) => setTdeeData({ ...tdeeData, activityLevel: v })}>
+                <SelectTrigger data-testid="select-activity-level">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sedentary">Sedentary (desk job, little exercise)</SelectItem>
+                  <SelectItem value="light">Light (1-3 days/week exercise)</SelectItem>
+                  <SelectItem value="moderate">Moderate (3-5 days/week exercise)</SelectItem>
+                  <SelectItem value="active">Active (6-7 days/week exercise)</SelectItem>
+                  <SelectItem value="very_active">Very Active (athlete, physical job)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button onClick={calculateTDEE} className="w-full" data-testid="button-calculate-tdee">
+              <Calculator className="h-4 w-4 mr-2" />
+              Calculate TDEE
+            </Button>
+            
+            {tdeeResult && (
+              <div className="bg-muted/50 rounded-md p-4 space-y-2">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">BMR (Basal Metabolic Rate):</span>
+                  <span className="font-medium">{tdeeResult.bmr} cal</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">TDEE (Total Daily Energy):</span>
+                  <span className="font-bold text-lg">{tdeeResult.tdee} cal</span>
+                </div>
+                <Button onClick={applyTDEE} variant="outline" className="w-full mt-2" data-testid="button-apply-tdee">
+                  Use as Maintenance Calories
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="ai" className="space-y-4 mt-4">
+            {chatMessages.length === 0 ? (
+              <div className="text-center py-6 space-y-4">
+                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground" />
+                <div>
+                  <p className="font-medium">AI Goal Advisor</p>
+                  <p className="text-sm text-muted-foreground">
+                    Tell me about your fitness goals and how you want to look. I'll help you find the right calorie targets.
+                  </p>
+                </div>
+                {tdeeResult && (
+                  <p className="text-xs text-muted-foreground">
+                    I'll use your calculated TDEE of {tdeeResult.tdee} cal
+                  </p>
+                )}
+                <Button onClick={startAIChat} disabled={isLoading} data-testid="button-start-ai-chat">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  {isLoading ? "Starting..." : "Start Conversation"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="max-h-[250px] overflow-y-auto space-y-3 pr-1">
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-md px-3 py-2 text-sm ${
+                        msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                      }`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted rounded-md px-3 py-2 text-sm text-muted-foreground">
+                        Thinking...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+                
+                {aiRecommendation ? (
+                  <div className="bg-muted/50 rounded-md p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-primary" />
+                      <span className="font-semibold">{aiRecommendation.goalLabel}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>Calories: <span className="font-medium">{aiRecommendation.calorieTarget}</span></div>
+                      <div>Protein: <span className="font-medium">{aiRecommendation.proteinTarget}g</span></div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
+                    <p className="text-xs">Expected: {aiRecommendation.weeklyChangeEstimate}</p>
+                    <Button onClick={applyAIRecommendation} className="w-full" data-testid="button-apply-ai">
+                      Apply This Recommendation
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type your response..."
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                      disabled={isLoading}
+                      data-testid="input-ai-chat"
+                    />
+                    <Button size="icon" onClick={sendMessage} disabled={isLoading || !userInput.trim()} data-testid="button-send-ai">
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
