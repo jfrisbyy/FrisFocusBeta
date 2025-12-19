@@ -782,7 +782,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Chat history is required" });
       }
 
-      const systemPrompt = `You are a helpful nutrition assistant. Your goal is to provide accurate calorie and macro estimates by asking clarifying questions when details are missing.
+      const systemPrompt = `You are a helpful nutrition assistant. Your goal is to provide accurate calorie and macro estimates by asking clarifying questions when details are missing. You always respond in JSON format.
 
 CONVERSATION FLOW:
 1. When the user describes food, identify what details are MISSING that would significantly affect the estimate
