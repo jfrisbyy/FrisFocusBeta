@@ -43,19 +43,32 @@ interface DisplayTask {
 }
 
 const sampleTasks: DisplayTask[] = [
-  { id: "demo-1", name: "Morning Meditation", value: 10, category: "Mindfulness" },
-  { id: "demo-2", name: "Reading (30 min)", value: 15, category: "Personal Growth", isBooster: true },
-  { id: "demo-3", name: "Journal Entry", value: 10, category: "Mindfulness" },
-  { id: "demo-4", name: "Workout", value: 20, category: "Health" },
-  { id: "demo-5", name: "Meal Prep", value: 10, category: "Health" },
-  { id: "demo-6", name: "8 Hours Sleep", value: 15, category: "Health" },
-  { id: "demo-7", name: "Deep Work Session", value: 25, category: "Productivity" },
-  { id: "demo-8", name: "Project Progress", value: 20, category: "Productivity" },
-  { id: "demo-9", name: "Learn Something New", value: 15, category: "Personal Growth" },
-  { id: "demo-10", name: "Hydration Goal", value: 10, category: "Health" },
-  { id: "demo-11", name: "Skipped workout", value: -15, category: "Penalties" },
-  { id: "demo-12", name: "Junk food", value: -10, category: "Penalties" },
-  { id: "demo-13", name: "Missed sleep goal", value: -10, category: "Penalties" },
+  // Health & Fitness
+  { id: "demo-1", name: "Morning workout", value: 20, category: "Health", isBooster: true },
+  { id: "demo-2", name: "Drink 8 glasses water", value: 5, category: "Health", isBooster: true },
+  { id: "demo-3", name: "Take vitamins", value: 3, category: "Health" },
+  { id: "demo-4", name: "Stretch routine", value: 5, category: "Health" },
+  { id: "demo-5", name: "Evening walk", value: 8, category: "Health" },
+  // Productivity
+  { id: "demo-6", name: "Deep work 2hrs", value: 15, category: "Productivity" },
+  { id: "demo-7", name: "Read 30 minutes", value: 10, category: "Productivity", isBooster: true },
+  { id: "demo-8", name: "Learn new skill", value: 12, category: "Productivity" },
+  { id: "demo-9", name: "No phone first hour", value: 8, category: "Productivity" },
+  // Spiritual
+  { id: "demo-10", name: "Bible study", value: 15, category: "Spiritual", isBooster: true },
+  { id: "demo-11", name: "Prayer time", value: 10, category: "Spiritual" },
+  { id: "demo-12", name: "Gratitude practice", value: 5, category: "Spiritual" },
+  // Mindfulness & Social
+  { id: "demo-13", name: "Meditate", value: 8, category: "Mindfulness", isBooster: true },
+  { id: "demo-14", name: "Journal", value: 7, category: "Mindfulness" },
+  { id: "demo-15", name: "Call family", value: 10, category: "Social" },
+  // Bad Habits (Penalties)
+  { id: "demo-p1", name: "Ate junk food", value: -8, category: "Penalties" },
+  { id: "demo-p2", name: "Drank alcohol", value: -10, category: "Penalties" },
+  { id: "demo-p3", name: "Scrolled social media 2+ hrs", value: -8, category: "Penalties" },
+  { id: "demo-p4", name: "Stayed up past midnight", value: -5, category: "Penalties" },
+  { id: "demo-p5", name: "Impulse purchase", value: -12, category: "Penalties" },
+  { id: "demo-p6", name: "Complained/negativity", value: -5, category: "Penalties" },
 ];
 
 const sampleDailyTodos: StoredTodoItem[] = [

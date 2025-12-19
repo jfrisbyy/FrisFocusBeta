@@ -167,7 +167,7 @@ const getMockBoosters = (): UnifiedBooster[] => [
     period: "week",
     isNegative: false,
   },
-  // Negative boosters (penalties)
+  // Negative boosters (bad habits penalties)
   {
     id: "negative-junkfood",
     name: "Junk Food",
@@ -182,11 +182,11 @@ const getMockBoosters = (): UnifiedBooster[] => [
   {
     id: "negative-socialmedia",
     name: "Social Media Binge",
-    description: "If wasted 2+ hours twice this week",
-    points: -20,
+    description: "If scrolled 2+ hours 3 times this week",
+    points: -18,
     achieved: true,
-    progress: 2,
-    required: 2,
+    progress: 3,
+    required: 3,
     period: "week",
     isNegative: true,
   },
@@ -202,13 +202,24 @@ const getMockBoosters = (): UnifiedBooster[] => [
     isNegative: true,
   },
   {
-    id: "negative-skipworkout",
-    name: "Skipped Gym",
-    description: "If missed gym 4+ days this week",
-    points: -10,
+    id: "negative-alcohol",
+    name: "Drank Alcohol",
+    description: "If drank 2+ times per week",
+    points: -20,
+    achieved: false,
+    progress: 0,
+    required: 2,
+    period: "week",
+    isNegative: true,
+  },
+  {
+    id: "negative-impulse",
+    name: "Impulse Purchase",
+    description: "If made 2+ impulse buys this week",
+    points: -20,
     achieved: false,
     progress: 1,
-    required: 4,
+    required: 2,
     period: "week",
     isNegative: true,
   },
@@ -1818,7 +1829,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <WelcomeMessage
@@ -2025,7 +2036,7 @@ export default function Dashboard() {
         };
 
         return (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {cardOrder.map((key) => {
               const card = renderCard(key);
               if (!card) return null;

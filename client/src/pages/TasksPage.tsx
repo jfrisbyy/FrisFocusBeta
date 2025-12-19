@@ -66,22 +66,39 @@ const sampleCategories: Category[] = [
 ];
 
 const sampleTasks: Task[] = [
-  { id: "1", name: "Morning workout", value: 15, category: "Health", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 5, period: "week", bonusPoints: 15 } },
-  { id: "2", name: "Evening walk", value: 5, category: "Health", priority: "couldDo" },
-  { id: "3", name: "Gym session", value: 20, category: "Health", priority: "mustDo", boosterRule: { enabled: true, timesRequired: 3, period: "week", bonusPoints: 10 }, penaltyRule: { enabled: true, timesThreshold: 1, penaltyPoints: 20, condition: "lessThan" } },
-  { id: "4", name: "Read 30 minutes", value: 10, category: "Productivity", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 4, period: "week", bonusPoints: 20 } },
-  { id: "5", name: "Complete work tasks", value: 15, category: "Productivity", priority: "mustDo" },
-  { id: "6", name: "Learn something new", value: 10, category: "Productivity", priority: "couldDo" },
-  { id: "7", name: "Bible study", value: 15, category: "Spiritual", priority: "mustDo", boosterRule: { enabled: true, timesRequired: 7, period: "week", bonusPoints: 25 }, penaltyRule: { enabled: true, timesThreshold: 2, penaltyPoints: 10, condition: "lessThan" } },
-  { id: "8", name: "Prayer time", value: 10, category: "Spiritual", priority: "shouldDo" },
-  { id: "9", name: "Connect with friend", value: 5, category: "Social", priority: "couldDo" },
+  // Health & Fitness
+  { id: "1", name: "Morning workout", value: 20, category: "Health", priority: "mustDo", boosterRule: { enabled: true, timesRequired: 5, period: "week", bonusPoints: 15 }, penaltyRule: { enabled: true, timesThreshold: 2, penaltyPoints: 15, condition: "lessThan" } },
+  { id: "2", name: "Evening walk", value: 8, category: "Health", priority: "shouldDo" },
+  { id: "3", name: "Drink 8 glasses water", value: 5, category: "Health", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 6, period: "week", bonusPoints: 12 } },
+  { id: "4", name: "Take vitamins", value: 3, category: "Health", priority: "couldDo" },
+  { id: "5", name: "Stretch routine", value: 5, category: "Health", priority: "couldDo" },
+  // Productivity
+  { id: "6", name: "Deep work 2hrs", value: 15, category: "Productivity", priority: "mustDo" },
+  { id: "7", name: "Read 30 minutes", value: 10, category: "Productivity", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 4, period: "week", bonusPoints: 20 } },
+  { id: "8", name: "Learn new skill", value: 12, category: "Productivity", priority: "shouldDo" },
+  { id: "9", name: "No phone first hour", value: 8, category: "Productivity", priority: "couldDo" },
+  // Spiritual
+  { id: "10", name: "Bible study", value: 15, category: "Spiritual", priority: "mustDo", boosterRule: { enabled: true, timesRequired: 6, period: "week", bonusPoints: 25 }, penaltyRule: { enabled: true, timesThreshold: 3, penaltyPoints: 10, condition: "lessThan" } },
+  { id: "11", name: "Prayer time", value: 10, category: "Spiritual", priority: "shouldDo" },
+  { id: "12", name: "Gratitude practice", value: 5, category: "Spiritual", priority: "couldDo" },
+  // Social & Personal
+  { id: "13", name: "Call family", value: 10, category: "Social", priority: "shouldDo" },
+  { id: "14", name: "Journal", value: 7, category: "Social", priority: "couldDo" },
+  { id: "15", name: "Meditate", value: 8, category: "Social", priority: "shouldDo", boosterRule: { enabled: true, timesRequired: 5, period: "week", bonusPoints: 15 } },
+  // Financial
+  { id: "16", name: "No spending day", value: 10, category: "Productivity", priority: "couldDo", boosterRule: { enabled: true, timesRequired: 3, period: "week", bonusPoints: 18 } },
+  { id: "17", name: "Budget review", value: 7, category: "Productivity", priority: "shouldDo" },
 ];
 
 const samplePenalties: PenaltyItem[] = [
-  { id: "p1", name: "Missed workout", value: -10, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
-  { id: "p2", name: "Skipped prayer", value: -5, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
-  { id: "p3", name: "Ate junk food", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 15, currentCount: 1, triggered: false },
-  { id: "p4", name: "Too much screen time", value: -5, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 4, period: "week", boostPenaltyPoints: 20, currentCount: 2, triggered: false },
+  { id: "p1", name: "Ate junk food", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 15, currentCount: 1, triggered: false },
+  { id: "p2", name: "Drank alcohol", value: -10, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 2, period: "week", boostPenaltyPoints: 20, currentCount: 0, triggered: false },
+  { id: "p3", name: "Scrolled social media 2+ hrs", value: -8, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 3, period: "week", boostPenaltyPoints: 18, currentCount: 2, triggered: false },
+  { id: "p4", name: "Stayed up past midnight", value: -5, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 4, period: "week", boostPenaltyPoints: 12, currentCount: 1, triggered: false },
+  { id: "p5", name: "Smoked/vaped", value: -15, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 1, period: "week", boostPenaltyPoints: 25, currentCount: 0, triggered: false },
+  { id: "p6", name: "Impulse purchase", value: -12, category: "Penalties", negativeBoostEnabled: true, timesThreshold: 2, period: "week", boostPenaltyPoints: 20, currentCount: 0, triggered: false },
+  { id: "p7", name: "Complained/negativity", value: -5, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
+  { id: "p8", name: "Skipped skincare", value: -3, category: "Penalties", negativeBoostEnabled: false, currentCount: 0, triggered: false },
 ];
 
 // API response types for habit data
