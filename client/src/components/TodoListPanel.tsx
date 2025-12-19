@@ -35,6 +35,9 @@ interface TodoListPanelProps {
   previousItems?: StoredTodoItem[];
   onImportFromPrevious?: () => void;
   importLabel?: string;
+  maxItems?: number;
+  isExpanded?: boolean;
+  onExpandToggle?: () => void;
 }
 
 export default function TodoListPanel({
@@ -52,6 +55,9 @@ export default function TodoListPanel({
   previousItems,
   onImportFromPrevious,
   importLabel = "Import from previous",
+  maxItems,
+  isExpanded = true,
+  onExpandToggle,
 }: TodoListPanelProps) {
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("0");
@@ -305,78 +311,108 @@ export default function TodoListPanel({
           </p>
         ) : (
           <div className="space-y-1">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "flex items-center gap-3 py-2 px-2 rounded-md hover-elevate group",
-                  item.completed && "opacity-60"
-                )}
-                data-testid={`todo-item-${item.id}`}
-              >
-                <Checkbox
-                  checked={item.completed}
-                  onCheckedChange={() => handleToggleItem(item.id)}
-                  disabled={readOnly && !isDemo}
-                  data-testid={`checkbox-todo-${item.id}`}
-                />
-                <span
-                  className={cn(
-                    "flex-1 text-sm",
-                    item.completed && "line-through"
+            {(() => {
+              const displayItems = maxItems && !isExpanded ? items.slice(0, maxItems) : items;
+              const hiddenCount = maxItems && !isExpanded ? Math.max(0, items.length - maxItems) : 0;
+              return (
+                <>
+                  {displayItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "flex items-center gap-3 py-2 px-2 rounded-md hover-elevate group",
+                        item.completed && "opacity-60"
+                      )}
+                      data-testid={`todo-item-${item.id}`}
+                    >
+                      <Checkbox
+                        checked={item.completed}
+                        onCheckedChange={() => handleToggleItem(item.id)}
+                        disabled={readOnly && !isDemo}
+                        data-testid={`checkbox-todo-${item.id}`}
+                      />
+                      <span
+                        className={cn(
+                          "flex-1 text-sm",
+                          item.completed && "line-through"
+                        )}
+                      >
+                        {item.title}
+                      </span>
+                      <span className="font-mono text-sm text-muted-foreground">
+                        +{item.pointValue}
+                      </span>
+                      {item.penaltyEnabled && item.penaltyValue && !item.completed && (
+                        <span className="font-mono text-sm text-destructive" data-testid={`penalty-indicator-${item.id}`}>
+                          -{item.penaltyValue}
+                        </span>
+                      )}
+                      {(!readOnly || isDemo) && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className={cn(
+                            "h-7 w-7",
+                            item.note && item.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
+                          )}
+                          onClick={() => handleOpenNoteDialog(item.id, item.note || "")}
+                          data-testid={`button-note-todo-${item.id}`}
+                        >
+                          <StickyNote className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {readOnly && !isDemo && item.note && item.note.trim() && (
+                        <StickyNote className="h-3 w-3 text-chart-2" />
+                      )}
+                      {!readOnly && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleOpenEditDialog(item)}
+                          data-testid={`button-edit-todo-${item.id}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {!readOnly && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleDeleteItem(item.id)}
+                          data-testid={`button-delete-todo-${item.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {hiddenCount > 0 && onExpandToggle && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onExpandToggle}
+                      className="w-full text-muted-foreground"
+                      data-testid="button-show-more-todos"
+                    >
+                      Show {hiddenCount} more item{hiddenCount !== 1 ? "s" : ""}
+                    </Button>
                   )}
-                >
-                  {item.title}
-                </span>
-                <span className="font-mono text-sm text-muted-foreground">
-                  +{item.pointValue}
-                </span>
-                {item.penaltyEnabled && item.penaltyValue && !item.completed && (
-                  <span className="font-mono text-sm text-destructive" data-testid={`penalty-indicator-${item.id}`}>
-                    -{item.penaltyValue}
-                  </span>
-                )}
-                {(!readOnly || isDemo) && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn(
-                      "h-7 w-7",
-                      item.note && item.note.trim() ? "text-chart-2" : "text-muted-foreground opacity-50"
-                    )}
-                    onClick={() => handleOpenNoteDialog(item.id, item.note || "")}
-                    data-testid={`button-note-todo-${item.id}`}
-                  >
-                    <StickyNote className="h-3 w-3" />
-                  </Button>
-                )}
-                {readOnly && !isDemo && item.note && item.note.trim() && (
-                  <StickyNote className="h-3 w-3 text-chart-2" />
-                )}
-                {!readOnly && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleOpenEditDialog(item)}
-                    data-testid={`button-edit-todo-${item.id}`}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                )}
-                {!readOnly && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleDeleteItem(item.id)}
-                    data-testid={`button-delete-todo-${item.id}`}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            ))}
+                  {isExpanded && maxItems && items.length > maxItems && onExpandToggle && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onExpandToggle}
+                      className="w-full text-muted-foreground"
+                      data-testid="button-show-less-todos"
+                    >
+                      Show less
+                    </Button>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 

@@ -601,6 +601,7 @@ export default function Dashboard() {
   // Track if we've loaded real data to prevent mock data from overwriting
   const hasLoadedRealDataRef = useRef(false);
   const [weeklyTodoWeekOffset, setWeeklyTodoWeekOffset] = useState(0);
+  const [weeklyTodosExpanded, setWeeklyTodosExpanded] = useState(false);
   const [weekStartDate, setWeekStartDate] = useState("");
   const [weekEndDate, setWeekEndDate] = useState("");
 
@@ -1973,6 +1974,9 @@ export default function Dashboard() {
                       previousItems={previousWeekItems}
                       onImportFromPrevious={handleImportFromPreviousWeek}
                       importLabel="Import from last week"
+                      maxItems={4}
+                      isExpanded={weeklyTodosExpanded}
+                      onExpandToggle={() => setWeeklyTodosExpanded(!weeklyTodosExpanded)}
                     />
                   </CardContent>
                 </Card>
