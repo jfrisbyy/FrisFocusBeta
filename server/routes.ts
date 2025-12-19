@@ -819,6 +819,8 @@ TOTAL: 800 + 220 = 1020cal, 28 + 3 = 31g protein, 80 + 28 = 108g carbs, 42 + 11 
 NEVER skip the addition step. ALWAYS show "X + Y = Z" for the final totals.
 If you have 3+ items, add them one at a time: "800 + 220 = 1020, 1020 + 300 = 1320"
 
+CRITICAL: The "calories", "protein", "carbs", and "fats" values in your JSON response MUST EXACTLY MATCH the final totals you calculated in the breakdown. Copy the numbers directly from your calculation - do not estimate or round differently.
+
 RESPONSE FORMAT:
 If you need more information, respond with:
 {
