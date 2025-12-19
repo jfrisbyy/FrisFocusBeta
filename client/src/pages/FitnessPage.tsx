@@ -857,8 +857,20 @@ export default function FitnessPage() {
             <Card className="md:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                 <div className="flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4 text-green-500" />
-                  <CardTitle className="text-sm font-medium">Today's Deficit</CardTitle>
+                  {(() => {
+                    const target = nutritionSettings.calorieTarget || 2000;
+                    const maintenance = nutritionSettings.maintenanceCalories || 2500;
+                    const isDeficit = target < maintenance;
+                    const isSurplus = target > maintenance;
+                    return isDeficit ? (
+                      <TrendingDown className="h-4 w-4 text-green-500" />
+                    ) : isSurplus ? (
+                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                    ) : (
+                      <Target className="h-4 w-4 text-amber-500" />
+                    );
+                  })()}
+                  <CardTitle className="text-sm font-medium">Calorie Delta</CardTitle>
                 </div>
                 <Button 
                   size="icon" 
@@ -870,25 +882,68 @@ export default function FitnessPage() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {todayCalories?.deficit ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-2xl font-bold">{todayCalories.deficit} <span className="text-sm font-normal text-muted-foreground">cal</span></div>
-                      <Badge variant={todayCalories.deficit >= 500 ? "default" : todayCalories.deficit >= 300 ? "secondary" : "outline"}>
-                        {todayCalories.deficit >= 500 ? "On Target" : todayCalories.deficit >= 300 ? "Good" : "Low"}
-                      </Badge>
+                {(() => {
+                  const target = nutritionSettings.calorieTarget || 2000;
+                  const maintenance = nutritionSettings.maintenanceCalories || 2500;
+                  const isDeficit = target < maintenance;
+                  const isSurplus = target > maintenance;
+                  const dailyCalories = todayCalories?.calories || 0;
+                  const delta = maintenance - dailyCalories;
+                  const hasDelta = dailyCalories > 0;
+                  
+                  if (!hasDelta) {
+                    return (
+                      <div className="flex flex-col items-center justify-center h-16 text-muted-foreground text-sm gap-2">
+                        <p>No calories logged for today</p>
+                        <Button size="sm" variant="outline" onClick={() => setDeficitDialogOpen(true)} data-testid="button-add-deficit-empty">
+                          <Plus className="h-3 w-3 mr-1" /> Log Delta
+                        </Button>
+                      </div>
+                    );
+                  }
+                  
+                  const targetDelta = maintenance - target;
+                  const onTarget = isDeficit 
+                    ? delta >= targetDelta * 0.9
+                    : isSurplus 
+                      ? delta <= targetDelta * 0.9
+                      : Math.abs(delta) <= 100;
+                  
+                  const good = isDeficit
+                    ? delta >= targetDelta * 0.6
+                    : isSurplus
+                      ? delta <= targetDelta * 0.6
+                      : Math.abs(delta) <= 200;
+                  
+                  const displayDelta = delta > 0 ? `-${delta}` : `+${Math.abs(delta)}`;
+                  const progressValue = isDeficit
+                    ? Math.min((delta / targetDelta) * 100, 100)
+                    : isSurplus
+                      ? Math.min((Math.abs(delta) / Math.abs(targetDelta)) * 100, 100)
+                      : Math.max(0, 100 - Math.abs(delta) / 5);
+                  
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-2xl font-bold">
+                          <span className={delta > 0 ? "text-green-500" : delta < 0 ? "text-red-500" : ""}>{displayDelta}</span>
+                          <span className="text-sm font-normal text-muted-foreground"> cal</span>
+                        </div>
+                        <Badge variant={onTarget ? "default" : good ? "secondary" : "outline"}>
+                          {onTarget ? "On Target" : good ? "Good" : isDeficit ? "Low Deficit" : isSurplus ? "Low Surplus" : "Off Target"}
+                        </Badge>
+                      </div>
+                      <Progress value={Math.max(0, progressValue)} className="h-2" />
+                      <p className="text-xs text-muted-foreground">
+                        {isDeficit 
+                          ? `Target: -${targetDelta} cal/day (${target} cal goal)`
+                          : isSurplus
+                            ? `Target: +${Math.abs(targetDelta)} cal/day (${target} cal goal)`
+                            : `Maintenance: ${maintenance} cal/day`}
+                      </p>
                     </div>
-                    <Progress value={Math.min((todayCalories.deficit / 500) * 100, 100)} className="h-2" />
-                    <p className="text-xs text-muted-foreground">Target: 500 cal/day for ~1 lb/week loss</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-16 text-muted-foreground text-sm gap-2">
-                    <p>No deficit logged for today</p>
-                    <Button size="sm" variant="outline" onClick={() => setDeficitDialogOpen(true)} data-testid="button-add-deficit-empty">
-                      <Plus className="h-3 w-3 mr-1" /> Log Deficit
-                    </Button>
-                  </div>
-                )}
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
