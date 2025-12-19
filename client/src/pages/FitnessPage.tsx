@@ -2898,6 +2898,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   const [tdeeResult, setTdeeResult] = useState<{ bmr: number; tdee: number } | null>(null);
   
   // AI Chat state
+  const [showAIChat, setShowAIChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -3090,18 +3091,93 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
         <DialogHeader>
           <DialogTitle>Adjust Your Goal</DialogTitle>
           <DialogDescription>
-            Set your nutrition goal, calculate TDEE, or get AI recommendations
+            Calculate your TDEE, set your goal, or get AI recommendations
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
-            <TabsTrigger value="tdee" data-testid="tab-tdee">TDEE Calc</TabsTrigger>
-            <TabsTrigger value="ai" data-testid="tab-ai">Ask AI</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="settings" className="space-y-4 mt-4">
+        <div className="space-y-5">
+          {/* TDEE Calculator Section */}
+          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Calculator className="h-4 w-4" />
+              <Label className="font-medium">TDEE Calculator</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Weight (lbs)</Label>
+                <Input
+                  type="number"
+                  value={tdeeData.weight}
+                  onChange={(e) => setTdeeData({ ...tdeeData, weight: e.target.value })}
+                  placeholder="180"
+                  data-testid="input-tdee-weight"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Height (in)</Label>
+                <Input
+                  type="number"
+                  value={tdeeData.height}
+                  onChange={(e) => setTdeeData({ ...tdeeData, height: e.target.value })}
+                  placeholder="70"
+                  data-testid="input-tdee-height"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Age</Label>
+                <Input
+                  type="number"
+                  value={tdeeData.age}
+                  onChange={(e) => setTdeeData({ ...tdeeData, age: e.target.value })}
+                  placeholder="30"
+                  data-testid="input-tdee-age"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Gender</Label>
+                <Select value={tdeeData.gender} onValueChange={(v) => setTdeeData({ ...tdeeData, gender: v })}>
+                  <SelectTrigger data-testid="select-tdee-gender">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Activity Level</Label>
+              <Select value={tdeeData.activityLevel} onValueChange={(v) => setTdeeData({ ...tdeeData, activityLevel: v })}>
+                <SelectTrigger data-testid="select-activity-level">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sedentary">Sedentary (desk job)</SelectItem>
+                  <SelectItem value="light">Light (1-3 days/week)</SelectItem>
+                  <SelectItem value="moderate">Moderate (3-5 days/week)</SelectItem>
+                  <SelectItem value="active">Active (6-7 days/week)</SelectItem>
+                  <SelectItem value="very_active">Very Active (athlete)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={calculateTDEE} size="sm" variant="secondary" data-testid="button-calculate-tdee">
+                Calculate
+              </Button>
+              {tdeeResult && (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-muted-foreground">TDEE: <span className="font-bold text-foreground">{tdeeResult.tdee} cal</span></span>
+                  <Button onClick={applyTDEE} size="sm" variant="outline" data-testid="button-apply-tdee">
+                    Apply
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Goal Mode Section */}
+          <div className="space-y-3">
             <div className="space-y-2">
               <Label>Maintenance Calories (TDEE)</Label>
               <Input
@@ -3111,7 +3187,6 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 placeholder="2500"
                 data-testid="input-maintenance-calories"
               />
-              <p className="text-xs text-muted-foreground">Your estimated daily calorie burn</p>
             </div>
             
             <div className="space-y-2">
@@ -3163,123 +3238,35 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               </p>
             </div>
             
-            <DialogFooter className="pt-4">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={handleSave} data-testid="button-save-goal">Save Goal</Button>
-            </DialogFooter>
-          </TabsContent>
-          
-          <TabsContent value="tdee" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Weight (lbs)</Label>
-                <Input
-                  type="number"
-                  value={tdeeData.weight}
-                  onChange={(e) => setTdeeData({ ...tdeeData, weight: e.target.value })}
-                  placeholder="180"
-                  data-testid="input-tdee-weight"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Height (inches)</Label>
-                <Input
-                  type="number"
-                  value={tdeeData.height}
-                  onChange={(e) => setTdeeData({ ...tdeeData, height: e.target.value })}
-                  placeholder="70"
-                  data-testid="input-tdee-height"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Age</Label>
-                <Input
-                  type="number"
-                  value={tdeeData.age}
-                  onChange={(e) => setTdeeData({ ...tdeeData, age: e.target.value })}
-                  placeholder="30"
-                  data-testid="input-tdee-age"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Gender</Label>
-                <Select value={tdeeData.gender} onValueChange={(v) => setTdeeData({ ...tdeeData, gender: v })}>
-                  <SelectTrigger data-testid="select-tdee-gender">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Activity Level</Label>
-              <Select value={tdeeData.activityLevel} onValueChange={(v) => setTdeeData({ ...tdeeData, activityLevel: v })}>
-                <SelectTrigger data-testid="select-activity-level">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sedentary">Sedentary (desk job, little exercise)</SelectItem>
-                  <SelectItem value="light">Light (1-3 days/week exercise)</SelectItem>
-                  <SelectItem value="moderate">Moderate (3-5 days/week exercise)</SelectItem>
-                  <SelectItem value="active">Active (6-7 days/week exercise)</SelectItem>
-                  <SelectItem value="very_active">Very Active (athlete, physical job)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <Button onClick={calculateTDEE} className="w-full" data-testid="button-calculate-tdee">
-              <Calculator className="h-4 w-4 mr-2" />
-              Calculate TDEE
-            </Button>
-            
-            {tdeeResult && (
-              <div className="bg-muted/50 rounded-md p-4 space-y-2">
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">BMR (Basal Metabolic Rate):</span>
-                  <span className="font-medium">{tdeeResult.bmr} cal</span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground">TDEE (Total Daily Energy):</span>
-                  <span className="font-bold text-lg">{tdeeResult.tdee} cal</span>
-                </div>
-                <Button onClick={applyTDEE} variant="outline" className="w-full mt-2" data-testid="button-apply-tdee">
-                  Use as Maintenance Calories
-                </Button>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="ai" className="space-y-4 mt-4">
-            {chatMessages.length === 0 ? (
-              <div className="text-center py-6 space-y-4">
-                <Sparkles className="h-12 w-12 mx-auto text-muted-foreground" />
-                <div>
-                  <p className="font-medium">AI Goal Advisor</p>
-                  <p className="text-sm text-muted-foreground">
-                    Tell me about your fitness goals and how you want to look. I'll help you find the right calorie targets.
-                  </p>
-                </div>
-                {tdeeResult && (
-                  <p className="text-xs text-muted-foreground">
-                    I'll use your calculated TDEE of {tdeeResult.tdee} cal
-                  </p>
-                )}
-                <Button onClick={startAIChat} disabled={isLoading} data-testid="button-start-ai-chat">
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  {isLoading ? "Starting..." : "Start Conversation"}
-                </Button>
-              </div>
+            {/* Ask AI Button */}
+            {!showAIChat ? (
+              <Button 
+                onClick={() => { setShowAIChat(true); startAIChat(); }} 
+                variant="outline" 
+                className="w-full"
+                disabled={isLoading}
+                data-testid="button-ask-ai"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Ask AI to Help Choose Goal
+              </Button>
             ) : (
-              <div className="space-y-4">
-                <div className="max-h-[250px] overflow-y-auto space-y-3 pr-1">
+              <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    <Label className="font-medium">AI Goal Advisor</Label>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowAIChat(false); setChatMessages([]); setAiRecommendation(null); }}>
+                    Close
+                  </Button>
+                </div>
+                
+                <div className="max-h-[200px] overflow-y-auto space-y-2">
                   {chatMessages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] rounded-md px-3 py-2 text-sm ${
-                        msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                        msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
                       }`}>
                         {msg.content}
                       </div>
@@ -3287,7 +3274,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   ))}
                   {isLoading && (
                     <div className="flex justify-start">
-                      <div className="bg-muted rounded-md px-3 py-2 text-sm text-muted-foreground">
+                      <div className="bg-background border rounded-md px-3 py-2 text-sm text-muted-foreground">
                         Thinking...
                       </div>
                     </div>
@@ -3296,19 +3283,18 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 </div>
                 
                 {aiRecommendation ? (
-                  <div className="bg-muted/50 rounded-md p-4 space-y-3">
+                  <div className="bg-background border rounded-md p-3 space-y-2">
                     <div className="flex items-center gap-2">
-                      <Target className="h-5 w-5 text-primary" />
-                      <span className="font-semibold">{aiRecommendation.goalLabel}</span>
+                      <Target className="h-4 w-4 text-primary" />
+                      <span className="font-semibold text-sm">{aiRecommendation.goalLabel}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>Calories: <span className="font-medium">{aiRecommendation.calorieTarget}</span></div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>Target: <span className="font-medium">{aiRecommendation.calorieTarget} cal</span></div>
                       <div>Protein: <span className="font-medium">{aiRecommendation.proteinTarget}g</span></div>
                     </div>
                     <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
-                    <p className="text-xs">Expected: {aiRecommendation.weeklyChangeEstimate}</p>
-                    <Button onClick={applyAIRecommendation} className="w-full" data-testid="button-apply-ai">
-                      Apply This Recommendation
+                    <Button onClick={applyAIRecommendation} size="sm" className="w-full" data-testid="button-apply-ai">
+                      Apply Recommendation
                     </Button>
                   </div>
                 ) : (
@@ -3328,8 +3314,13 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 )}
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
+        
+        <DialogFooter className="pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} data-testid="button-save-goal">Save Goal</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
