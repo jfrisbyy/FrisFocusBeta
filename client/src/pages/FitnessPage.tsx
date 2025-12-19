@@ -107,6 +107,7 @@ export default function FitnessPage() {
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("weekly");
   const [stepsView, setStepsView] = useState<"today" | "weekly">("today");
   const [stepsDialogOpen, setStepsDialogOpen] = useState(false);
+  const [deficitDialogOpen, setDeficitDialogOpen] = useState(false);
   const [stepsWeekOffset, setStepsWeekOffset] = useState(0);
   const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
 
@@ -818,6 +819,16 @@ export default function FitnessPage() {
               <Button onClick={() => { setEditingNutrition(null); setNutritionDialogOpen(true); }} data-testid="button-add-nutrition">
                 <Plus className="h-4 w-4 mr-2" />
                 Log Nutrition
+              </Button>
+              <DeficitDialog
+                open={deficitDialogOpen}
+                onOpenChange={setDeficitDialogOpen}
+                isDemo={isDemo}
+                nutritionSettings={nutritionSettings}
+              />
+              <Button onClick={() => setDeficitDialogOpen(true)} variant="outline" data-testid="button-add-deficit">
+                <TrendingDown className="h-4 w-4 mr-2" />
+                Log Deficit
               </Button>
             </div>
           </div>
@@ -2366,6 +2377,173 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-nutrition">
             {createMutation.isPending ? "Saving..." : (isEditing ? "Update" : "Save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  nutritionSettings: NutritionSettings | null;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    date: format(new Date(), "yyyy-MM-dd"),
+    deficit: "",
+  });
+  const [activityDescription, setActivityDescription] = useState("");
+  const [aiEstimate, setAiEstimate] = useState<{ estimatedDeficit: number; breakdown: { exerciseCalories: number; neatBonus: number; proteinTEF: number; explanation: string } } | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
+
+  const getAIEstimate = async () => {
+    if (!activityDescription.trim()) {
+      toast({ title: "Please describe your day's activities", variant: "destructive" });
+      return;
+    }
+    setIsEstimating(true);
+    try {
+      const res = await apiRequest("POST", "/api/fitness/deficit/estimate", {
+        activityDescription,
+        maintenanceCalories: nutritionSettings?.maintenanceCalories || 2500,
+        proteinIntake: nutritionSettings?.proteinTarget || 150,
+      });
+      const data = await res.json();
+      setAiEstimate(data);
+      setFormData(prev => ({ ...prev, deficit: data.estimatedDeficit?.toString() || prev.deficit }));
+    } catch (error) {
+      toast({ title: "Failed to get AI estimate", variant: "destructive" });
+    } finally {
+      setIsEstimating(false);
+    }
+  };
+
+  const acceptEstimate = () => {
+    if (aiEstimate) {
+      setFormData(prev => ({ ...prev, deficit: aiEstimate.estimatedDeficit.toString() }));
+    }
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { date: string; deficit: number }) => {
+      const res = await apiRequest("POST", "/api/fitness/nutrition/deficit", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition"] });
+      toast({ title: "Deficit logged" });
+      onOpenChange(false);
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), deficit: "" });
+      setActivityDescription("");
+      setAiEstimate(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to log deficit", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - data not saved" });
+      onOpenChange(false);
+      return;
+    }
+    if (!formData.deficit) {
+      toast({ title: "Please enter a deficit value", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({
+      date: formData.date,
+      deficit: parseInt(formData.deficit),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Log Caloric Deficit</DialogTitle>
+          <DialogDescription>Enter your daily caloric deficit manually or use AI to estimate based on your activities</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-deficit-date" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Deficit (calories)</Label>
+            <Input 
+              type="number" 
+              placeholder="500" 
+              value={formData.deficit} 
+              onChange={(e) => setFormData({ ...formData, deficit: e.target.value })} 
+              data-testid="input-deficit-value" 
+            />
+          </div>
+
+          <div className="border-t pt-4 space-y-3">
+            <Label className="text-base font-medium">AI Estimation</Label>
+            <p className="text-sm text-muted-foreground">Describe your day's activities and let AI estimate your caloric burn</p>
+            <Textarea 
+              placeholder="e.g., I did a 45 minute strength workout focusing on upper body, walked 8000 steps throughout the day, and had a generally active day at work standing and moving around..."
+              value={activityDescription}
+              onChange={(e) => setActivityDescription(e.target.value)}
+              className="min-h-[100px]"
+              data-testid="input-activity-description"
+            />
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={getAIEstimate} 
+              disabled={isEstimating || !activityDescription.trim()}
+              data-testid="button-get-ai-estimate"
+            >
+              {isEstimating ? "Estimating..." : "Get AI Estimate"}
+            </Button>
+
+            {aiEstimate && (
+              <div className="bg-muted/50 rounded-md p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Estimated Deficit:</span>
+                  <Badge variant="secondary" className="text-lg px-3 py-1">{aiEstimate.estimatedDeficit} cal</Badge>
+                </div>
+                {aiEstimate.breakdown && (
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <div className="flex justify-between">
+                      <span>Exercise calories:</span>
+                      <span>{aiEstimate.breakdown.exerciseCalories} cal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>NEAT bonus:</span>
+                      <span>{aiEstimate.breakdown.neatBonus} cal</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Protein TEF:</span>
+                      <span>{aiEstimate.breakdown.proteinTEF} cal</span>
+                    </div>
+                    <p className="pt-2 text-xs">{aiEstimate.breakdown.explanation}</p>
+                  </div>
+                )}
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  onClick={acceptEstimate}
+                  data-testid="button-accept-estimate"
+                >
+                  Use This Estimate
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={updateMutation.isPending} data-testid="button-save-deficit">
+            {updateMutation.isPending ? "Saving..." : "Save Deficit"}
           </Button>
         </DialogFooter>
       </DialogContent>

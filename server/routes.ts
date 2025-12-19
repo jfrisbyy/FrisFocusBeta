@@ -773,6 +773,126 @@ export async function registerRoutes(
     }
   });
 
+  // AI Deficit Estimation
+  const deficitEstimateRequestSchema = z.object({
+    activityDescription: z.string().min(1, "Activity description is required"),
+    maintenanceCalories: z.number().optional().default(2500),
+    proteinIntake: z.number().optional().default(150),
+  });
+
+  const deficitEstimateResponseSchema = z.object({
+    estimatedDeficit: z.number(),
+    breakdown: z.object({
+      exerciseCalories: z.number(),
+      neatBonus: z.number(),
+      proteinTEF: z.number(),
+      explanation: z.string(),
+    }),
+  });
+
+  app.post("/api/fitness/deficit/estimate", isAuthenticated, async (req: any, res) => {
+    try {
+      const parseResult = deficitEstimateRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+      
+      const { activityDescription, maintenanceCalories, proteinIntake } = parseResult.data;
+      
+      const systemPrompt = `You are a nutrition and fitness expert helping estimate daily caloric deficit based on a user's activity description.
+
+The user has a maintenance TDEE of ${maintenanceCalories} calories and typically consumes ${proteinIntake}g of protein per day.
+
+Consider the thermic effect of protein (TEF) - approximately 20-30% of protein calories are burned during digestion. For example, 150g protein = 600 calories, with ~120-180 calories burned from TEF.
+
+Based on the user's description of their day's activities, estimate:
+1. Approximate calories burned from exercise/activities mentioned
+2. Any additional Non-Exercise Activity Thermogenesis (NEAT) factors
+3. The expected caloric deficit for the day
+
+Respond in JSON format:
+{
+  "estimatedDeficit": <number in calories>,
+  "breakdown": {
+    "exerciseCalories": <number>,
+    "neatBonus": <number>,
+    "proteinTEF": <number>,
+    "explanation": "<brief 1-2 sentence explanation>"
+  }
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: activityDescription }
+        ],
+        max_tokens: 500,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      try {
+        const parsed = JSON.parse(rawContent);
+        const validated = deficitEstimateResponseSchema.safeParse(parsed);
+        if (!validated.success) {
+          console.error("AI response validation failed:", validated.error.issues);
+          return res.status(500).json({ error: "AI returned invalid format", estimatedDeficit: 0, breakdown: { exerciseCalories: 0, neatBonus: 0, proteinTEF: 0, explanation: "Could not parse AI response" } });
+        }
+        res.json(validated.data);
+      } catch (parseError) {
+        console.error("Failed to parse AI deficit response:", parseError);
+        res.status(500).json({ error: "Failed to parse AI response" });
+      }
+    } catch (error) {
+      console.error("AI deficit estimation error:", error);
+      res.status(500).json({ error: "Failed to estimate deficit" });
+    }
+  });
+
+  // Update or create deficit for a specific date
+  app.post("/api/fitness/nutrition/deficit", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date, deficit } = req.body;
+      
+      if (!date || typeof deficit !== 'number') {
+        return res.status(400).json({ error: "Date and deficit are required" });
+      }
+      
+      // Normalize date to YYYY-MM-DD format
+      const normalizedDate = date.split('T')[0];
+      
+      // Check if log exists for this date
+      const [existing] = await db.select().from(nutritionLogs)
+        .where(and(eq(nutritionLogs.userId, userId), eq(nutritionLogs.date, normalizedDate)));
+      
+      if (existing) {
+        // Update existing log with deficit
+        const [updated] = await db.update(nutritionLogs)
+          .set({ deficit })
+          .where(eq(nutritionLogs.id, existing.id))
+          .returning();
+        return res.json(updated);
+      } else {
+        // Create new log with just date and deficit - insert directly without full schema validation
+        const [created] = await db.insert(nutritionLogs).values({
+          userId,
+          date: normalizedDate,
+          deficit,
+        }).returning();
+        return res.json(created);
+      }
+    } catch (error) {
+      console.error("Error updating deficit:", error);
+      res.status(400).json({ error: "Failed to update deficit" });
+    }
+  });
+
   // Live Play settings - field visibility and custom fields
   const DEFAULT_LIVE_PLAY_FIELDS = [
     "date", "courtType", "gameType", "gamesPlayed", "wins", "losses",
