@@ -4530,6 +4530,8 @@ function NutritionSettingsDialog({
     maintenanceCalories: String(currentSettings.maintenanceCalories || 2500),
     calorieTarget: String(currentSettings.calorieTarget || 2000),
     proteinTarget: String(currentSettings.proteinTarget || 150),
+    carbTarget: String(currentSettings.carbTarget || ""),
+    fatTarget: String(currentSettings.fatTarget || ""),
   });
 
   // Update form when settings change
@@ -4538,6 +4540,8 @@ function NutritionSettingsDialog({
       maintenanceCalories: String(currentSettings.maintenanceCalories || 2500),
       calorieTarget: String(currentSettings.calorieTarget || 2000),
       proteinTarget: String(currentSettings.proteinTarget || 150),
+      carbTarget: String(currentSettings.carbTarget || ""),
+      fatTarget: String(currentSettings.fatTarget || ""),
     });
   }, [currentSettings]);
 
@@ -4566,6 +4570,8 @@ function NutritionSettingsDialog({
       maintenanceCalories: parseInt(formData.maintenanceCalories) || 2500,
       calorieTarget: parseInt(formData.calorieTarget) || 2000,
       proteinTarget: parseInt(formData.proteinTarget) || 150,
+      carbTarget: formData.carbTarget ? parseInt(formData.carbTarget) : null,
+      fatTarget: formData.fatTarget ? parseInt(formData.fatTarget) : null,
     });
   };
 
@@ -4574,7 +4580,7 @@ function NutritionSettingsDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nutrition Targets</DialogTitle>
-          <DialogDescription>Configure your daily calorie and protein goals</DialogDescription>
+          <DialogDescription>Configure your daily calorie and macro goals</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -4609,6 +4615,30 @@ function NutritionSettingsDialog({
               data-testid="input-protein-target"
             />
             <p className="text-xs text-muted-foreground">Recommended: 0.8-1g per lb of body weight</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Daily Carb Target (g)</Label>
+              <Input 
+                type="number" 
+                placeholder="200" 
+                value={formData.carbTarget} 
+                onChange={(e) => setFormData({ ...formData, carbTarget: e.target.value })} 
+                data-testid="input-carb-target"
+              />
+              <p className="text-xs text-muted-foreground">Optional</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Daily Fat Target (g)</Label>
+              <Input 
+                type="number" 
+                placeholder="65" 
+                value={formData.fatTarget} 
+                onChange={(e) => setFormData({ ...formData, fatTarget: e.target.value })} 
+                data-testid="input-fat-target"
+              />
+              <p className="text-xs text-muted-foreground">Optional</p>
+            </div>
           </div>
         </div>
         <DialogFooter>
