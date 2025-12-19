@@ -38,6 +38,7 @@ interface TodoListPanelProps {
   maxItems?: number;
   isExpanded?: boolean;
   onExpandToggle?: () => void;
+  noCard?: boolean;
 }
 
 export default function TodoListPanel({
@@ -58,6 +59,7 @@ export default function TodoListPanel({
   maxItems,
   isExpanded = true,
   onExpandToggle,
+  noCard = false,
 }: TodoListPanelProps) {
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("0");

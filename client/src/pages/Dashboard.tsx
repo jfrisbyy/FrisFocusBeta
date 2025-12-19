@@ -1916,70 +1916,25 @@ export default function Dashboard() {
             case "alerts":
               return <AlertsPanel alerts={alerts} />;
             case "weeklyTodos":
-              const weeklyTodoStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weeklyTodoWeekOffset * 7);
-              const weeklyTodoEnd = addDays(weeklyTodoStart, 6);
-              const weeklyTodoRange = `${format(weeklyTodoStart, "MMM d")} - ${format(weeklyTodoEnd, "MMM d")}`;
-              const isCurrentWeek = weeklyTodoWeekOffset === 0;
               return (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-sm font-medium">Weekly To-Do List</CardTitle>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setWeeklyTodoWeekOffset(weeklyTodoWeekOffset - 1)}
-                          data-testid="button-weekly-todo-prev-week"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="text-sm text-muted-foreground min-w-[120px] text-center">
-                          {weeklyTodoRange}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setWeeklyTodoWeekOffset(weeklyTodoWeekOffset + 1)}
-                          disabled={weeklyTodoWeekOffset >= 0}
-                          data-testid="button-weekly-todo-next-week"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        {!isCurrentWeek && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setWeeklyTodoWeekOffset(0)}
-                            data-testid="button-weekly-todo-today"
-                          >
-                            This Week
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <TodoListPanel
-                      title=""
-                      prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
-                      items={weeklyTodos}
-                      onItemsChange={handleWeeklyTodosChange}
-                      bonusEnabled={weeklyTodoBonusEnabled}
-                      bonusPoints={weeklyTodoBonusPoints}
-                      bonusAwarded={weeklyTodoBonusAwarded}
-                      onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
-                      onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
-                      isDemo={useMockData}
-                      previousItems={previousWeekItems}
-                      onImportFromPrevious={handleImportFromPreviousWeek}
-                      importLabel="Import from last week"
-                      maxItems={4}
-                      isExpanded={weeklyTodosExpanded}
-                      onExpandToggle={() => setWeeklyTodosExpanded(!weeklyTodosExpanded)}
-                    />
-                  </CardContent>
-                </Card>
+                <TodoListPanel
+                  title="Weekly To-Do List"
+                  prompt="Use this space for things you want to get done at some point this week. Bigger tasks, flexible timing."
+                  items={weeklyTodos}
+                  onItemsChange={handleWeeklyTodosChange}
+                  bonusEnabled={weeklyTodoBonusEnabled}
+                  bonusPoints={weeklyTodoBonusPoints}
+                  bonusAwarded={weeklyTodoBonusAwarded}
+                  onBonusEnabledChange={handleWeeklyTodoBonusEnabledChange}
+                  onBonusPointsChange={handleWeeklyTodoBonusPointsChange}
+                  isDemo={useMockData}
+                  previousItems={previousWeekItems}
+                  onImportFromPrevious={handleImportFromPreviousWeek}
+                  importLabel="Import from last week"
+                  maxItems={4}
+                  isExpanded={weeklyTodosExpanded}
+                  onExpandToggle={() => setWeeklyTodosExpanded(!weeklyTodosExpanded)}
+                />
               );
             case "dueDates":
               return (
