@@ -25,36 +25,36 @@ import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, difference
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend } from "recharts";
 
 const mockNutrition: NutritionLog[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, carbs: 220, fats: 65, creatine: true, waterGallon: true, deficit: 300 },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 1).toISOString().split("T")[0], calories: 2100, protein: 165, carbs: 200, fats: 70, creatine: true, waterGallon: false, deficit: 400 },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 2).toISOString().split("T")[0], calories: 2350, protein: 190, carbs: 240, fats: 60, creatine: true, waterGallon: true, deficit: 150 },
-  { id: "demo-4", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], calories: 2400, protein: 185, carbs: 250, fats: 65, creatine: true, waterGallon: true, deficit: 100 },
-  { id: "demo-5", userId: "demo", date: subDays(new Date(), 4).toISOString().split("T")[0], calories: 2050, protein: 160, carbs: 180, fats: 75, creatine: false, waterGallon: true, deficit: 450 },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, carbs: 220, fats: 65, creatine: true, waterGallon: true, deficit: 300, caloriesBurned: null, meals: [{ id: "m1", name: "Breakfast", calories: 500, protein: 30, time: "8:00 AM" }, { id: "m2", name: "Lunch", calories: 800, protein: 50, time: "12:30 PM" }, { id: "m3", name: "Dinner", calories: 900, protein: 100, time: "7:00 PM" }], completedToggles: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 1).toISOString().split("T")[0], calories: 2100, protein: 165, carbs: 200, fats: 70, creatine: true, waterGallon: false, deficit: 400, caloriesBurned: null, meals: null, completedToggles: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 2).toISOString().split("T")[0], calories: 2350, protein: 190, carbs: 240, fats: 60, creatine: true, waterGallon: true, deficit: 150, caloriesBurned: null, meals: null, completedToggles: null },
+  { id: "demo-4", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], calories: 2400, protein: 185, carbs: 250, fats: 65, creatine: true, waterGallon: true, deficit: 100, caloriesBurned: null, meals: null, completedToggles: null },
+  { id: "demo-5", userId: "demo", date: subDays(new Date(), 4).toISOString().split("T")[0], calories: 2050, protein: 160, carbs: 180, fats: 75, creatine: false, waterGallon: true, deficit: 450, caloriesBurned: null, meals: null, completedToggles: null },
 ];
 
 const mockBodyComp: BodyComposition[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], weight: 185, bodyFat: 15, goalWeight: 180, nextMilestone: 183 },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 7).toISOString().split("T")[0], weight: 187, bodyFat: 16, goalWeight: 180, nextMilestone: 185 },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 14).toISOString().split("T")[0], weight: 189, bodyFat: 17, goalWeight: 180, nextMilestone: 187 },
-  { id: "demo-4", userId: "demo", date: subDays(new Date(), 21).toISOString().split("T")[0], weight: 191, bodyFat: 18, goalWeight: 180, nextMilestone: 189 },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], weight: 185, bodyFat: 15, goalWeight: 180, nextMilestone: 183, photoUrl: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 7).toISOString().split("T")[0], weight: 187, bodyFat: 16, goalWeight: 180, nextMilestone: 185, photoUrl: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 14).toISOString().split("T")[0], weight: 189, bodyFat: 17, goalWeight: 180, nextMilestone: 187, photoUrl: null },
+  { id: "demo-4", userId: "demo", date: subDays(new Date(), 21).toISOString().split("T")[0], weight: 191, bodyFat: 18, goalWeight: 180, nextMilestone: 189, photoUrl: null },
 ];
 
 const mockStrength: StrengthWorkout[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Strength", primaryFocus: "Push", duration: 60, volume: 15000, effort: 8, exercises: [{ name: "Bench Press", sets: 4, reps: 8, weight: 185 }, { name: "Shoulder Press", sets: 3, reps: 10, weight: 95 }] },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 2).toISOString().split("T")[0], type: "Strength", primaryFocus: "Pull", duration: 55, volume: 14200, effort: 7, exercises: [{ name: "Deadlift", sets: 4, reps: 6, weight: 275 }, { name: "Pull-ups", sets: 4, reps: 10, weight: 0 }] },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 4).toISOString().split("T")[0], type: "Strength", primaryFocus: "Legs", duration: 70, volume: 18500, effort: 9, exercises: [{ name: "Squat", sets: 5, reps: 5, weight: 225 }, { name: "RDL", sets: 4, reps: 8, weight: 185 }] },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Strength", primaryFocus: "Push", duration: 60, volume: 15000, effort: 8, exercises: [{ name: "Bench Press", sets: 4, reps: 8, weight: 185 }, { name: "Shoulder Press", sets: 3, reps: 10, weight: 95 }], notes: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 2).toISOString().split("T")[0], type: "Strength", primaryFocus: "Pull", duration: 55, volume: 14200, effort: 7, exercises: [{ name: "Deadlift", sets: 4, reps: 6, weight: 275 }, { name: "Pull-ups", sets: 4, reps: 10, weight: 0 }], notes: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 4).toISOString().split("T")[0], type: "Strength", primaryFocus: "Legs", duration: 70, volume: 18500, effort: 9, exercises: [{ name: "Squat", sets: 5, reps: 5, weight: 225 }, { name: "RDL", sets: 4, reps: 8, weight: 185 }], notes: null },
 ];
 
 const mockSkills: SkillWorkout[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 8, skillFocus: ["3-pointers", "Mid-range"], zoneFocus: ["Corner", "Wing"], drillStats: { makes: 45, attempts: 60 } },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], type: "Skill", drillType: "Ball Handling", effort: 7, skillFocus: ["Crossovers", "Behind back"], zoneFocus: [] },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 6).toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 9, skillFocus: ["Free throws", "Fadeaways"], zoneFocus: ["Paint", "Elbow"], drillStats: { makes: 38, attempts: 50 } },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 8, skillFocus: ["3-pointers", "Mid-range"], zoneFocus: ["Corner", "Wing"], drillStats: { makes: 45, attempts: 60 }, notes: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], type: "Skill", drillType: "Ball Handling", effort: 7, skillFocus: ["Crossovers", "Behind back"], zoneFocus: [], drillStats: null, notes: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 6).toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 9, skillFocus: ["Free throws", "Fadeaways"], zoneFocus: ["Paint", "Elbow"], drillStats: { makes: 38, attempts: 50 }, notes: null },
 ];
 
 const mockRuns: BasketballRun[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Run", gameType: { fullCourt: true }, courtType: "Indoor", competitionLevel: "Competitive", gamesPlayed: 5, wins: 3, losses: 2, performanceGrade: "B+", confidence: 7 },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 5).toISOString().split("T")[0], type: "Run", gameType: { halfCourt: true }, courtType: "Outdoor", competitionLevel: "Pickup", gamesPlayed: 4, wins: 4, losses: 0, performanceGrade: "A", confidence: 9 },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 10).toISOString().split("T")[0], type: "Run", gameType: { fullCourt: true }, courtType: "Indoor", competitionLevel: "Competitive", gamesPlayed: 6, wins: 4, losses: 2, performanceGrade: "A-", confidence: 8 },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Run", gameType: { fullCourt: true }, courtType: "Indoor", competitionLevel: "Competitive", gamesPlayed: 5, wins: 3, losses: 2, performanceGrade: "B+", confidence: 7, positivePoints: null, weakPoints: null, matchupNotes: null, challenges: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 5).toISOString().split("T")[0], type: "Run", gameType: { halfCourt: true }, courtType: "Outdoor", competitionLevel: "Pickup", gamesPlayed: 4, wins: 4, losses: 0, performanceGrade: "A", confidence: 9, positivePoints: null, weakPoints: null, matchupNotes: null, challenges: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 10).toISOString().split("T")[0], type: "Run", gameType: { fullCourt: true }, courtType: "Indoor", competitionLevel: "Competitive", gamesPlayed: 6, wins: 4, losses: 2, performanceGrade: "A-", confidence: 8, positivePoints: null, weakPoints: null, matchupNotes: null, challenges: null },
 ];
 
 const mockNutritionSettings: NutritionSettings = {
@@ -678,25 +678,43 @@ export default function FitnessPage() {
             </CardHeader>
             <CardContent>
               {todayCalories ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-3 bg-muted/50 rounded-md">
-                    <div className="text-2xl font-bold font-mono">{todayCalories.calories}</div>
-                    <div className="text-xs text-muted-foreground">Calories</div>
-                  </div>
-                  <div className="text-center p-3 bg-muted/50 rounded-md">
-                    <div className="text-2xl font-bold font-mono">{todayCalories.protein}g</div>
-                    <div className="text-xs text-muted-foreground">Protein</div>
-                  </div>
-                  {todayCalories.carbs !== null && todayCalories.carbs !== undefined && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{todayCalories.carbs}g</div>
+                      <div className="text-2xl font-bold font-mono">{todayCalories.calories || 0}</div>
+                      <div className="text-xs text-muted-foreground">Calories</div>
+                    </div>
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{todayCalories.protein || 0}g</div>
+                      <div className="text-xs text-muted-foreground">Protein</div>
+                    </div>
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{todayCalories.carbs || 0}g</div>
                       <div className="text-xs text-muted-foreground">Carbs</div>
                     </div>
-                  )}
-                  {todayCalories.fats !== null && todayCalories.fats !== undefined && (
                     <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{todayCalories.fats}g</div>
+                      <div className="text-2xl font-bold font-mono">{todayCalories.fats || 0}g</div>
                       <div className="text-xs text-muted-foreground">Fats</div>
+                    </div>
+                  </div>
+                  {/* Individual Meals */}
+                  {todayCalories.meals && Array.isArray(todayCalories.meals) && todayCalories.meals.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Meals Logged</div>
+                      <div className="space-y-1">
+                        {(todayCalories.meals as Meal[]).map((meal) => (
+                          <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{meal.name}</span>
+                              {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+                            </div>
+                            <div className="flex items-center gap-3 text-muted-foreground">
+                              <span>{meal.calories} cal</span>
+                              <span>{meal.protein}g protein</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1252,9 +1270,35 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
     carbs: "",
     fats: "",
     deficit: "",
-    creatine: false,
-    waterGallon: false,
   });
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [newMeal, setNewMeal] = useState({ name: "", calories: "", protein: "", time: "" });
+
+  const addMeal = () => {
+    if (!newMeal.name || !newMeal.calories) return;
+    const meal: Meal = {
+      id: `meal-${Date.now()}`,
+      name: newMeal.name,
+      calories: parseInt(newMeal.calories) || 0,
+      protein: parseInt(newMeal.protein) || 0,
+      time: newMeal.time || undefined,
+    };
+    setMeals([...meals, meal]);
+    const totalCalories = (parseInt(formData.calories) || 0) + meal.calories;
+    const totalProtein = (parseInt(formData.protein) || 0) + meal.protein;
+    setFormData({ ...formData, calories: totalCalories.toString(), protein: totalProtein.toString() });
+    setNewMeal({ name: "", calories: "", protein: "", time: "" });
+  };
+
+  const removeMeal = (mealId: string) => {
+    const meal = meals.find(m => m.id === mealId);
+    if (meal) {
+      const totalCalories = Math.max(0, (parseInt(formData.calories) || 0) - meal.calories);
+      const totalProtein = Math.max(0, (parseInt(formData.protein) || 0) - meal.protein);
+      setFormData({ ...formData, calories: totalCalories.toString(), protein: totalProtein.toString() });
+    }
+    setMeals(meals.filter(m => m.id !== mealId));
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<NutritionLog>) => {
@@ -1265,7 +1309,8 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition"] });
       toast({ title: "Nutrition logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "", deficit: "", creatine: false, waterGallon: false });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "", deficit: "" });
+      setMeals([]);
     },
     onError: () => {
       toast({ title: "Failed to log nutrition", variant: "destructive" });
@@ -1285,8 +1330,7 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
       carbs: formData.carbs ? parseInt(formData.carbs) : undefined,
       fats: formData.fats ? parseInt(formData.fats) : undefined,
       deficit: formData.deficit ? parseInt(formData.deficit) : undefined,
-      creatine: formData.creatine,
-      waterGallon: formData.waterGallon,
+      meals: meals.length > 0 ? meals : undefined,
     });
   };
 
@@ -1298,23 +1342,82 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
           Log Nutrition
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Log Nutrition</DialogTitle>
-          <DialogDescription>Track your daily food intake and habits</DialogDescription>
+          <DialogDescription>Track your daily food intake with individual meals</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Date</Label>
             <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-nutrition-date" />
           </div>
+          
+          {/* Add Individual Meal */}
+          <div className="space-y-3 p-3 border rounded-md">
+            <div className="text-sm font-medium">Add Meal</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input 
+                placeholder="Meal name" 
+                value={newMeal.name} 
+                onChange={(e) => setNewMeal({ ...newMeal, name: e.target.value })} 
+                data-testid="input-meal-name"
+              />
+              <Input 
+                placeholder="Time (optional)" 
+                value={newMeal.time} 
+                onChange={(e) => setNewMeal({ ...newMeal, time: e.target.value })} 
+                data-testid="input-meal-time"
+              />
+              <Input 
+                type="number" 
+                placeholder="Calories" 
+                value={newMeal.calories} 
+                onChange={(e) => setNewMeal({ ...newMeal, calories: e.target.value })} 
+                data-testid="input-meal-calories"
+              />
+              <Input 
+                type="number" 
+                placeholder="Protein (g)" 
+                value={newMeal.protein} 
+                onChange={(e) => setNewMeal({ ...newMeal, protein: e.target.value })} 
+                data-testid="input-meal-protein"
+              />
+            </div>
+            <Button size="sm" onClick={addMeal} disabled={!newMeal.name || !newMeal.calories} data-testid="button-add-meal">
+              <Plus className="h-4 w-4 mr-1" /> Add Meal
+            </Button>
+          </div>
+
+          {/* Meals List */}
+          {meals.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Meals Added</div>
+              {meals.map((meal) => (
+                <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{meal.name}</span>
+                    {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{meal.calories} cal, {meal.protein}g</span>
+                    <Button size="icon" variant="ghost" onClick={() => removeMeal(meal.id)} data-testid={`button-remove-meal-${meal.id}`}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Totals */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Calories</Label>
+              <Label>Total Calories</Label>
               <Input type="number" placeholder="2000" value={formData.calories} onChange={(e) => setFormData({ ...formData, calories: e.target.value })} data-testid="input-nutrition-calories" />
             </div>
             <div className="space-y-2">
-              <Label>Protein (g)</Label>
+              <Label>Total Protein (g)</Label>
               <Input type="number" placeholder="150" value={formData.protein} onChange={(e) => setFormData({ ...formData, protein: e.target.value })} data-testid="input-nutrition-protein" />
             </div>
             <div className="space-y-2">
@@ -1330,14 +1433,6 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
             <Label>Deficit (cal below maintenance)</Label>
             <Input type="number" placeholder="500" value={formData.deficit} onChange={(e) => setFormData({ ...formData, deficit: e.target.value })} data-testid="input-nutrition-deficit" />
           </div>
-          <div className="flex items-center justify-between">
-            <Label>Drank Gallon of Water</Label>
-            <Switch checked={formData.waterGallon} onCheckedChange={(c) => setFormData({ ...formData, waterGallon: c })} data-testid="switch-nutrition-water" />
-          </div>
-          <div className="flex items-center justify-between">
-            <Label>Took Creatine</Label>
-            <Switch checked={formData.creatine} onCheckedChange={(c) => setFormData({ ...formData, creatine: c })} data-testid="switch-nutrition-creatine" />
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -1350,16 +1445,39 @@ function NutritionDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
   );
 }
 
+type Exercise = { name: string; sets: number; reps: number; weight: number };
+
 function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange: (open: boolean) => void; isDemo: boolean }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     primaryFocus: "Push",
     duration: "",
-    volume: "",
     effort: "",
     notes: "",
   });
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [newExercise, setNewExercise] = useState({ name: "", sets: "", reps: "", weight: "" });
+
+  const addExercise = () => {
+    if (!newExercise.name || !newExercise.sets || !newExercise.reps) return;
+    const exercise: Exercise = {
+      name: newExercise.name,
+      sets: parseInt(newExercise.sets) || 0,
+      reps: parseInt(newExercise.reps) || 0,
+      weight: parseInt(newExercise.weight) || 0,
+    };
+    setExercises([...exercises, exercise]);
+    setNewExercise({ name: "", sets: "", reps: "", weight: "" });
+  };
+
+  const removeExercise = (index: number) => {
+    setExercises(exercises.filter((_, i) => i !== index));
+  };
+
+  const calculateVolume = () => {
+    return exercises.reduce((total, ex) => total + (ex.sets * ex.reps * ex.weight), 0);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<StrengthWorkout>) => {
@@ -1370,7 +1488,8 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/strength"] });
       toast({ title: "Workout logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", volume: "", effort: "", notes: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", effort: "", notes: "" });
+      setExercises([]);
     },
     onError: () => {
       toast({ title: "Failed to log workout", variant: "destructive" });
@@ -1388,9 +1507,10 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
       type: "Strength",
       primaryFocus: formData.primaryFocus,
       duration: formData.duration ? parseInt(formData.duration) : undefined,
-      volume: formData.volume ? parseInt(formData.volume) : undefined,
+      volume: exercises.length > 0 ? calculateVolume() : undefined,
       effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
+      exercises: exercises.length > 0 ? exercises : undefined,
     });
   };
 
@@ -1402,10 +1522,10 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
           Log Workout
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Log Strength Workout</DialogTitle>
-          <DialogDescription>Record your strength training session</DialogDescription>
+          <DialogDescription>Record your exercises and training session</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -1430,14 +1550,69 @@ function StrengthDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+
+          {/* Add Exercise */}
+          <div className="space-y-3 p-3 border rounded-md">
+            <div className="text-sm font-medium">Add Exercise</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input 
+                placeholder="Exercise name" 
+                value={newExercise.name} 
+                onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} 
+                data-testid="input-exercise-name"
+              />
+              <Input 
+                type="number" 
+                placeholder="Weight (lbs)" 
+                value={newExercise.weight} 
+                onChange={(e) => setNewExercise({ ...newExercise, weight: e.target.value })} 
+                data-testid="input-exercise-weight"
+              />
+              <Input 
+                type="number" 
+                placeholder="Sets" 
+                value={newExercise.sets} 
+                onChange={(e) => setNewExercise({ ...newExercise, sets: e.target.value })} 
+                data-testid="input-exercise-sets"
+              />
+              <Input 
+                type="number" 
+                placeholder="Reps" 
+                value={newExercise.reps} 
+                onChange={(e) => setNewExercise({ ...newExercise, reps: e.target.value })} 
+                data-testid="input-exercise-reps"
+              />
+            </div>
+            <Button size="sm" onClick={addExercise} disabled={!newExercise.name || !newExercise.sets || !newExercise.reps} data-testid="button-add-exercise">
+              <Plus className="h-4 w-4 mr-1" /> Add Exercise
+            </Button>
+          </div>
+
+          {/* Exercises List */}
+          {exercises.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Exercises</div>
+                <div className="text-sm text-muted-foreground">Total Volume: {calculateVolume().toLocaleString()} lbs</div>
+              </div>
+              {exercises.map((exercise, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm">
+                  <span className="font-medium">{exercise.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{exercise.sets}x{exercise.reps} @ {exercise.weight}lbs</span>
+                    <Button size="icon" variant="ghost" onClick={() => removeExercise(index)} data-testid={`button-remove-exercise-${index}`}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Duration (min)</Label>
               <Input type="number" placeholder="60" value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: e.target.value })} data-testid="input-strength-duration" />
-            </div>
-            <div className="space-y-2">
-              <Label>Volume (lbs)</Label>
-              <Input type="number" placeholder="15000" value={formData.volume} onChange={(e) => setFormData({ ...formData, volume: e.target.value })} data-testid="input-strength-volume" />
             </div>
             <div className="space-y-2">
               <Label>Effort (1-10)</Label>
