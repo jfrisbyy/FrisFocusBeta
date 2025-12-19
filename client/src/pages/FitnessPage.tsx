@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
-  Trash2, Edit, ChevronRight, Zap, Star, Award
+  Trash2, Edit, ChevronRight, Zap, Star, Award, Calculator
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -88,6 +88,7 @@ export default function FitnessPage() {
   const [bodyCompDialogOpen, setBodyCompDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
+  const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -120,7 +121,7 @@ export default function FitnessPage() {
   });
 
   const nutrition = isDemo ? mockNutrition : nutritionData;
-  const nutritionSettings = isDemo ? mockNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
+  const nutritionSettings = isDemo ? demoNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
   const bodyComp = isDemo ? mockBodyComp : bodyCompData;
   const strength = isDemo ? mockStrength : strengthData;
   const skills = isDemo ? mockSkills : skillsData;
@@ -414,6 +415,14 @@ export default function FitnessPage() {
               <Button 
                 size="icon" 
                 variant="ghost" 
+                onClick={() => setCalculatorDialogOpen(true)}
+                data-testid="button-tdee-calculator"
+              >
+                <Calculator className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="icon" 
+                variant="ghost" 
                 onClick={() => setSettingsDialogOpen(true)}
                 data-testid="button-nutrition-settings"
               >
@@ -427,12 +436,39 @@ export default function FitnessPage() {
             </div>
           </div>
 
-          {/* Settings Dialog - mounted at page level */}
+          {/* Dialogs - mounted at page level */}
           <NutritionSettingsDialog
             open={settingsDialogOpen}
             onOpenChange={setSettingsDialogOpen}
             isDemo={isDemo}
             currentSettings={nutritionSettings}
+          />
+          <TDEECalculatorDialog
+            open={calculatorDialogOpen}
+            onOpenChange={setCalculatorDialogOpen}
+            isDemo={isDemo}
+            onApplyTargets={(maintenance, target, protein) => {
+              if (!isDemo) {
+                // Update settings with calculated values
+                apiRequest("PUT", "/api/fitness/nutrition-settings", {
+                  maintenanceCalories: maintenance,
+                  calorieTarget: target,
+                  proteinTarget: protein,
+                }).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+                  toast({ title: "Targets updated from calculator" });
+                });
+              } else {
+                // Update demo state so UI reflects changes
+                setDemoNutritionSettings(prev => ({
+                  ...prev,
+                  maintenanceCalories: maintenance,
+                  calorieTarget: target,
+                  proteinTarget: protein,
+                }));
+                toast({ title: "Targets updated (demo mode)" });
+              }
+            }}
           />
 
           {/* Macro Progress Bars */}
@@ -1671,6 +1707,240 @@ function NutritionSettingsDialog({
             {updateMutation.isPending ? "Saving..." : "Save Targets"}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Activity level multipliers for TDEE calculation
+const activityMultipliers: Record<string, { label: string; multiplier: number; description: string }> = {
+  sedentary: { label: "Sedentary", multiplier: 1.2, description: "Little or no exercise, desk job" },
+  light: { label: "Lightly Active", multiplier: 1.375, description: "Light exercise 1-3 days/week" },
+  moderate: { label: "Moderately Active", multiplier: 1.55, description: "Moderate exercise 3-5 days/week" },
+  active: { label: "Very Active", multiplier: 1.725, description: "Hard exercise 6-7 days/week" },
+  extreme: { label: "Extremely Active", multiplier: 1.9, description: "Hard daily exercise + physical job" },
+};
+
+function TDEECalculatorDialog({ 
+  open, 
+  onOpenChange,
+  isDemo,
+  onApplyTargets
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  isDemo: boolean;
+  onApplyTargets: (maintenance: number, target: number, protein: number) => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    weight: "",
+    height: "",
+    age: "",
+    gender: "male",
+    activityLevel: "moderate",
+    goalType: "moderate_cut",
+  });
+  
+  const [results, setResults] = useState<{
+    bmr: number;
+    tdee: number;
+    targets: { name: string; calories: number; deficit: number }[];
+    protein: number;
+  } | null>(null);
+
+  // Calculate BMR using Mifflin-St Jeor formula
+  const calculateBMR = (weight: number, height: number, age: number, gender: string) => {
+    // Weight in lbs, height in inches
+    const weightKg = weight * 0.453592;
+    const heightCm = height * 2.54;
+    
+    if (gender === "male") {
+      return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age + 5);
+    } else {
+      return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age - 161);
+    }
+  };
+
+  const handleCalculate = () => {
+    const weight = parseFloat(formData.weight);
+    const height = parseFloat(formData.height);
+    const age = parseInt(formData.age);
+
+    if (!weight || !height || !age) {
+      toast({ title: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
+
+    const bmr = calculateBMR(weight, height, age, formData.gender);
+    const multiplier = activityMultipliers[formData.activityLevel].multiplier;
+    const tdee = Math.round(bmr * multiplier);
+    
+    // Calculate protein target (0.8-1g per lb of body weight)
+    const protein = Math.round(weight * 0.9);
+
+    // Generate target options
+    const targets = [
+      { name: "Maintenance", calories: tdee, deficit: 0 },
+      { name: "Mild Cut (-250)", calories: tdee - 250, deficit: 250 },
+      { name: "Moderate Cut (-500)", calories: tdee - 500, deficit: 500 },
+      { name: "Aggressive Cut (-750)", calories: tdee - 750, deficit: 750 },
+      { name: "Mild Bulk (+250)", calories: tdee + 250, deficit: -250 },
+      { name: "Moderate Bulk (+500)", calories: tdee + 500, deficit: -500 },
+    ];
+
+    setResults({ bmr, tdee, targets, protein });
+  };
+
+  const handleApply = (targetCalories: number) => {
+    if (!results) return;
+    onApplyTargets(results.tdee, targetCalories, results.protein);
+    onOpenChange(false);
+    setResults(null);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(open) => {
+      onOpenChange(open);
+      if (!open) setResults(null);
+    }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>TDEE Calculator</DialogTitle>
+          <DialogDescription>Calculate your Total Daily Energy Expenditure</DialogDescription>
+        </DialogHeader>
+        
+        {!results ? (
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Weight (lbs)</Label>
+                <Input 
+                  type="number" 
+                  placeholder="185" 
+                  value={formData.weight} 
+                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })} 
+                  data-testid="input-calc-weight"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Height (inches)</Label>
+                <Input 
+                  type="number" 
+                  placeholder="72" 
+                  value={formData.height} 
+                  onChange={(e) => setFormData({ ...formData, height: e.target.value })} 
+                  data-testid="input-calc-height"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Age</Label>
+                <Input 
+                  type="number" 
+                  placeholder="28" 
+                  value={formData.age} 
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value })} 
+                  data-testid="input-calc-age"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <Select value={formData.gender} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
+                  <SelectTrigger data-testid="select-calc-gender">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Activity Level</Label>
+              <Select value={formData.activityLevel} onValueChange={(v) => setFormData({ ...formData, activityLevel: v })}>
+                <SelectTrigger data-testid="select-calc-activity">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(activityMultipliers).map(([key, { label, description }]) => (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex flex-col">
+                        <span>{label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {activityMultipliers[formData.activityLevel].description}
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={handleCalculate} data-testid="button-calculate-tdee">
+                Calculate
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">BMR</p>
+                    <p className="text-2xl font-bold font-mono">{results.bmr}</p>
+                    <p className="text-xs text-muted-foreground">cal/day at rest</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">TDEE</p>
+                    <p className="text-2xl font-bold font-mono text-green-500">{results.tdee}</p>
+                    <p className="text-xs text-muted-foreground">maintenance</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Suggested Protein: <span className="font-mono">{results.protein}g</span>/day</p>
+              <p className="text-xs text-muted-foreground">Based on 0.9g per lb of body weight</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Select a target to apply:</Label>
+              <div className="grid gap-2">
+                {results.targets.map((target) => (
+                  <Button 
+                    key={target.name}
+                    variant="outline" 
+                    className="justify-between font-normal"
+                    onClick={() => handleApply(target.calories)}
+                    data-testid={`button-apply-${target.name.toLowerCase().replace(/[^a-z]/g, '-')}`}
+                  >
+                    <span>{target.name}</span>
+                    <span className="font-mono">{target.calories} cal</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setResults(null)}>
+                Recalculate
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
