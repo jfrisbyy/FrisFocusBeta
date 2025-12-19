@@ -784,21 +784,33 @@ export async function registerRoutes(
 
       const systemPrompt = `You are a nutrition expert. The user will describe what they ate. Estimate the nutritional content as accurately as possible.
 
-IMPORTANT GUIDELINES:
-- Be realistic with portions. "Large" servings are bigger than standard.
+CRITICAL: YOUR MATH MUST BE CORRECT
+1. First, identify each individual food item and its quantity
+2. Look up the nutrition facts for each item (use standard nutritional databases like USDA)
+3. Multiply by quantity for each item
+4. Add up ALL items to get the TOTAL - double-check your addition!
+
+GUIDELINES:
+- "Large" servings are bigger than standard portions
 - Consider cooking methods (fried adds fat, grilled is leaner)
-- Include sauces, toppings, and sides that are mentioned
-- If quantities are vague, make reasonable assumptions for a typical serving
+- Include sauces, toppings, and sides
 - Round to whole numbers
+
+EXAMPLE CALCULATION (McChicken meal):
+- 2 McChickens: 2 × 400cal = 800cal, 2 × 14g protein = 28g, etc.
+- Small fries: 230cal, 3g protein, etc.
+- TOTAL = 800 + 230 = 1030cal (add each macro separately too)
+
+In your breakdown, show the per-item values and verify the math adds up correctly.
 
 Respond with ONLY a JSON object in this exact format:
 {
   "mealName": "<brief descriptive name for the meal>",
-  "calories": <number>,
-  "protein": <number in grams>,
-  "carbs": <number in grams>,
-  "fats": <number in grams>,
-  "breakdown": "<brief explanation of how you estimated>"
+  "calories": <number - MUST equal sum of all items>,
+  "protein": <number in grams - MUST equal sum of all items>,
+  "carbs": <number in grams - MUST equal sum of all items>,
+  "fats": <number in grams - MUST equal sum of all items>,
+  "breakdown": "<show per-item breakdown with values that add up to totals>"
 }`;
 
       const response = await openai.chat.completions.create({
