@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Heart, X, ChevronDown, ChevronUp } from "lucide-react";
@@ -37,22 +37,26 @@ export default function WelcomeMessage({
   onDismissFriendMessage,
 }: WelcomeMessageProps) {
   const [showCheerlines, setShowCheerlines] = useState(true);
+  
+  const randomDefaultIndexRef = useRef(Math.floor(Math.random() * defaultMessages.length));
+  const randomCustomIndexRef = useRef(Math.floor(Math.random() * 1000));
 
-  const displayMessage = useMemo(() => {
+  const getDisplayMessage = () => {
     if (!useCustomMessage) {
-      return defaultMessages[Math.floor(Math.random() * defaultMessages.length)];
+      return defaultMessages[randomDefaultIndexRef.current % defaultMessages.length];
     }
     if (savedCustomMessages.length > 0) {
       if (selectedMessageIndex === -1) {
-        const randomIdx = Math.floor(Math.random() * savedCustomMessages.length);
-        return savedCustomMessages[randomIdx];
+        return savedCustomMessages[randomCustomIndexRef.current % savedCustomMessages.length];
       }
       if (selectedMessageIndex >= 0 && savedCustomMessages[selectedMessageIndex]) {
         return savedCustomMessages[selectedMessageIndex];
       }
     }
     return message;
-  }, [useCustomMessage, savedCustomMessages, selectedMessageIndex, message]);
+  };
+  
+  const displayMessage = getDisplayMessage();
 
   const now = new Date();
   const validCheerlines = friendMessages.filter(m => {
