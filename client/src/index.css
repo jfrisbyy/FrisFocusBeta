@@ -165,6 +165,72 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/* Color scheme overrides - these override primary/ring colors */
+.scheme-green {
+  --primary: 142 76% 36%;
+  --primary-foreground: 144 80% 98%;
+  --ring: 142 76% 36%;
+  --sidebar-primary: 142 76% 36%;
+  --sidebar-primary-foreground: 144 80% 98%;
+  --sidebar-ring: 142 76% 36%;
+  --chart-1: 142 76% 36%;
+}
+.dark.scheme-green {
+  --chart-1: 142 76% 65%;
+}
+
+.scheme-blue {
+  --primary: 217 91% 50%;
+  --primary-foreground: 0 0% 98%;
+  --ring: 217 91% 50%;
+  --sidebar-primary: 217 91% 50%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-ring: 217 91% 50%;
+  --chart-1: 217 91% 50%;
+}
+.dark.scheme-blue {
+  --chart-1: 217 91% 68%;
+}
+
+.scheme-purple {
+  --primary: 280 67% 50%;
+  --primary-foreground: 0 0% 98%;
+  --ring: 280 67% 50%;
+  --sidebar-primary: 280 67% 50%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-ring: 280 67% 50%;
+  --chart-1: 280 67% 50%;
+}
+.dark.scheme-purple {
+  --chart-1: 280 67% 68%;
+}
+
+.scheme-orange {
+  --primary: 25 95% 53%;
+  --primary-foreground: 0 0% 98%;
+  --ring: 25 95% 53%;
+  --sidebar-primary: 25 95% 53%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-ring: 25 95% 53%;
+  --chart-1: 25 95% 53%;
+}
+.dark.scheme-orange {
+  --chart-1: 25 95% 68%;
+}
+
+.scheme-rose {
+  --primary: 350 89% 60%;
+  --primary-foreground: 0 0% 98%;
+  --ring: 350 89% 60%;
+  --sidebar-primary: 350 89% 60%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-ring: 350 89% 60%;
+  --chart-1: 350 89% 60%;
+}
+.dark.scheme-rose {
+  --chart-1: 350 89% 70%;
+}
+
 @layer base {
   * {
     @apply border-border;

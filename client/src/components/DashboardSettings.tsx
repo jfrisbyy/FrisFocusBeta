@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Sun, Moon } from "lucide-react";
+import { Settings, Sun, Moon, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +13,16 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import type { DashboardPreferences } from "@shared/schema";
+
+type ColorScheme = "green" | "blue" | "purple" | "orange" | "rose";
+
+const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
+  { value: "green", label: "Green", color: "bg-green-500" },
+  { value: "blue", label: "Blue", color: "bg-blue-500" },
+  { value: "purple", label: "Purple", color: "bg-purple-500" },
+  { value: "orange", label: "Orange", color: "bg-orange-500" },
+  { value: "rose", label: "Rose", color: "bg-rose-500" },
+];
 
 interface DashboardSettingsProps {
   preferences: DashboardPreferences;
@@ -56,10 +66,26 @@ export default function DashboardSettings({
     }
   }, [preferences.theme]);
 
+  useEffect(() => {
+    const scheme = preferences.colorScheme || "green";
+    colorSchemes.forEach(({ value }) => {
+      document.documentElement.classList.remove(`scheme-${value}`);
+    });
+    document.documentElement.classList.add(`scheme-${scheme}`);
+    localStorage.setItem("frisfocus-color-scheme", scheme);
+  }, [preferences.colorScheme]);
+
   const handleThemeToggle = (checked: boolean) => {
     onPreferencesChange({
       ...preferences,
       theme: checked ? "light" : "dark",
+    });
+  };
+
+  const handleColorSchemeChange = (scheme: ColorScheme) => {
+    onPreferencesChange({
+      ...preferences,
+      colorScheme: scheme,
     });
   };
 
@@ -123,6 +149,30 @@ export default function DashboardSettings({
               disabled={isPending}
               data-testid="switch-light-mode"
             />
+          </div>
+          
+          <div>
+            <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+              <Palette className="h-4 w-4" />
+              Color Scheme
+            </Label>
+            <p className="text-xs text-muted-foreground mb-3">Choose your accent color</p>
+            <div className="flex gap-2 flex-wrap">
+              {colorSchemes.map(({ value, label, color }) => (
+                <button
+                  key={value}
+                  onClick={() => handleColorSchemeChange(value)}
+                  disabled={isPending}
+                  className={`w-8 h-8 rounded-full ${color} transition-all ${
+                    preferences.colorScheme === value 
+                      ? "ring-2 ring-offset-2 ring-offset-background ring-foreground scale-110" 
+                      : "opacity-70 hover:opacity-100"
+                  }`}
+                  title={label}
+                  data-testid={`button-scheme-${value}`}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
