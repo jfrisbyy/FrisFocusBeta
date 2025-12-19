@@ -1323,7 +1323,7 @@ export default function FitnessPage() {
                               }}
                               data-testid={`button-edit-nutrition-${log.id}`}
                             >
-                              <Pencil className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
                             <Button 
                               size="icon" 
@@ -1427,7 +1427,7 @@ export default function FitnessPage() {
                                   }}
                                   data-testid={`button-edit-run-${run.id}`}
                                 >
-                                  <Pencil className="h-4 w-4" />
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button size="icon" variant="ghost" onClick={() => deleteRunMutation.mutate(run.id)}>
                                   <Trash2 className="h-4 w-4" />
@@ -1515,7 +1515,7 @@ export default function FitnessPage() {
                                   }}
                                   data-testid={`button-edit-skill-${workout.id}`}
                                 >
-                                  <Pencil className="h-4 w-4" />
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button size="icon" variant="ghost" onClick={() => deleteSkillMutation.mutate(workout.id)}>
                                   <Trash2 className="h-4 w-4" />
@@ -1983,7 +1983,7 @@ export default function FitnessPage() {
                                   }}
                                   data-testid={`button-edit-strength-${workout.id}`}
                                 >
-                                  <Pencil className="h-4 w-4" />
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button size="icon" variant="ghost" onClick={() => deleteStrengthMutation.mutate(workout.id)}>
                                   <Trash2 className="h-4 w-4" />
@@ -2122,7 +2122,7 @@ export default function FitnessPage() {
                                 }}
                                 data-testid={`button-edit-body-${record.id}`}
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Edit className="h-4 w-4" />
                               </Button>
                               <Button size="icon" variant="ghost" onClick={() => deleteBodyCompMutation.mutate(record.id)}>
                                 <Trash2 className="h-4 w-4" />
