@@ -1662,6 +1662,7 @@ export const dashboardPreferencesSchema = z.object({
   cardOrder: z.array(z.string()).default([]),
   theme: z.enum(["light", "dark"]).default("light"),
   colorScheme: z.enum(["green", "blue", "purple", "orange", "rose"]).default("green"),
+  siteTheme: z.enum(["default", "midnight", "sepia", "forest", "ocean"]).default("default"),
   defaultStepGoal: z.number().int().min(100).max(100000).default(10000),
   hasSeenOnboarding: z.boolean().default(false),
 });
@@ -1686,6 +1687,7 @@ export const defaultDashboardPreferences: DashboardPreferences = {
   cardOrder: [...dashboardCardKeys],
   theme: "light",
   colorScheme: "green",
+  siteTheme: "default",
   defaultStepGoal: 10000,
   hasSeenOnboarding: false,
 };

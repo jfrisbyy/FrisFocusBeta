@@ -30,6 +30,16 @@ const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
   { value: "rose", label: "Rose", color: "bg-rose-500" },
 ];
 
+type SiteTheme = "default" | "midnight" | "sepia" | "forest" | "ocean";
+
+const siteThemes: { value: SiteTheme; label: string; description: string }[] = [
+  { value: "default", label: "Default", description: "Standard light/dark theme" },
+  { value: "midnight", label: "Midnight", description: "Deep blue tones" },
+  { value: "sepia", label: "Sepia", description: "Warm brown tones" },
+  { value: "forest", label: "Forest", description: "Deep green tones" },
+  { value: "ocean", label: "Ocean", description: "Blue-gray tones" },
+];
+
 interface WelcomeSettings {
   userName: string;
   message: string;
@@ -105,6 +115,24 @@ export default function DashboardSettingsDialog({
     document.documentElement.classList.add(`scheme-${scheme}`);
     localStorage.setItem("frisfocus-color-scheme", scheme);
   }, [preferences.colorScheme]);
+
+  useEffect(() => {
+    const siteTheme = preferences.siteTheme || "default";
+    siteThemes.forEach(({ value }) => {
+      document.documentElement.classList.remove(`theme-${value}`);
+    });
+    if (siteTheme !== "default") {
+      document.documentElement.classList.add(`theme-${siteTheme}`);
+    }
+    localStorage.setItem("frisfocus-site-theme", siteTheme);
+  }, [preferences.siteTheme]);
+
+  const handleSiteThemeChange = (theme: SiteTheme) => {
+    onPreferencesChange({
+      ...preferences,
+      siteTheme: theme,
+    });
+  };
 
   const handleColorSchemeChange = (scheme: ColorScheme) => {
     onPreferencesChange({
@@ -550,6 +578,34 @@ export default function DashboardSettingsDialog({
                       title={label}
                       data-testid={`button-scheme-${value}`}
                     />
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-md bg-muted/50">
+                <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4" />
+                  Site Theme
+                </Label>
+                <p className="text-xs text-muted-foreground mb-3">Choose a full color palette for the entire site</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {siteThemes.map(({ value, label, description }) => (
+                    <button
+                      key={value}
+                      onClick={() => handleSiteThemeChange(value)}
+                      disabled={isPending}
+                      className={`flex items-center gap-3 p-2 rounded-md transition-all text-left ${
+                        preferences.siteTheme === value 
+                          ? "ring-2 ring-primary bg-primary/10" 
+                          : "bg-muted/50 hover:bg-muted"
+                      }`}
+                      data-testid={`button-site-theme-${value}`}
+                    >
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{label}</div>
+                        <div className="text-xs text-muted-foreground">{description}</div>
+                      </div>
+                    </button>
                   ))}
                 </div>
               </div>
