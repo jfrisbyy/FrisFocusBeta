@@ -630,9 +630,12 @@ export default function Dashboard() {
     enabled: !useMockData,
   });
 
-  const activeSeason = useMockData 
-    ? { id: "demo-season", name: "Demo Season", isActive: true, isArchived: false, weeklyGoal: 350 }
-    : seasons.find((s) => s.isActive && !s.isArchived);
+  const activeSeason = useMemo(() => 
+    useMockData 
+      ? { id: "demo-season", name: "Demo Season", isActive: true, isArchived: false, weeklyGoal: 350 }
+      : seasons.find((s) => s.isActive && !s.isArchived),
+    [useMockData, seasons]
+  );
 
   // Fetch active season data (tasks/categories/penalties) when a season is active
   const { data: activeSeasonData, isFetched: activeSeasonDataFetched } = useQuery<SeasonWithData>({
