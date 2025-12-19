@@ -262,32 +262,32 @@
 }
 
 .theme-sepia {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
-  --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
-  --background: 39 25% 94%;
-  --foreground: 30 10% 15%;
-  --border: 35 15% 82%;
-  --card: 40 20% 90%;
-  --card-foreground: 30 10% 15%;
-  --card-border: 35 15% 85%;
-  --sidebar: 38 18% 88%;
-  --sidebar-foreground: 30 10% 15%;
-  --sidebar-border: 35 15% 82%;
-  --sidebar-accent: 35 15% 82%;
-  --sidebar-accent-foreground: 30 10% 15%;
-  --popover: 38 18% 86%;
-  --popover-foreground: 30 10% 15%;
-  --popover-border: 35 15% 80%;
-  --secondary: 35 15% 82%;
-  --secondary-foreground: 30 10% 15%;
-  --muted: 35 12% 84%;
-  --muted-foreground: 30 8% 45%;
-  --accent: 35 18% 80%;
-  --accent-foreground: 30 10% 15%;
-  --input: 35 12% 70%;
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+  --background: 30 35% 14%;
+  --foreground: 35 70% 92%;
+  --border: 32 30% 24%;
+  --card: 32 32% 18%;
+  --card-foreground: 35 70% 92%;
+  --card-border: 32 28% 22%;
+  --sidebar: 30 34% 16%;
+  --sidebar-foreground: 35 70% 92%;
+  --sidebar-border: 32 28% 22%;
+  --sidebar-accent: 32 30% 24%;
+  --sidebar-accent-foreground: 35 70% 92%;
+  --popover: 32 32% 20%;
+  --popover-foreground: 35 70% 92%;
+  --popover-border: 32 28% 24%;
+  --secondary: 32 30% 24%;
+  --secondary-foreground: 35 70% 92%;
+  --muted: 32 25% 22%;
+  --muted-foreground: 35 40% 60%;
+  --accent: 35 60% 45%;
+  --accent-foreground: 0 0% 100%;
+  --input: 32 25% 28%;
 }
 
 .theme-forest {
