@@ -1061,6 +1061,7 @@ export const userHabitSettings = pgTable("user_habit_settings", {
   penaltyBoostThreshold: integer("penalty_boost_threshold").default(3),
   penaltyBoostPeriod: varchar("penalty_boost_period").default("week"),
   penaltyBoostPoints: integer("penalty_boost_points").default(10),
+  aiInstructions: text("ai_instructions"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
