@@ -2186,7 +2186,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Save season tasks (replaces all tasks for a season)
+  // Save season tasks (preserves IDs for existing tasks, generates new IDs for new tasks)
   app.put("/api/seasons/:id/tasks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2204,21 +2204,63 @@ Create motivating badges that will encourage consistency. Return valid JSON only
         return res.status(400).json({ error: "Cannot modify an archived season" });
       }
 
-      // Delete existing tasks and insert new ones
-      await db.delete(seasonTasks).where(eq(seasonTasks.seasonId, id));
+      // Get existing tasks to determine which to update vs insert
+      const existingTasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, id));
+      const existingIds = new Set(existingTasks.map(t => t.id));
+      
+      // Separate tasks into updates (have ID that exists) and inserts (new or no ID)
+      const tasksToUpdate: any[] = [];
+      const tasksToInsert: any[] = [];
+      const incomingIds = new Set<string>();
       
       if (tasks && tasks.length > 0) {
-        const taskValues = tasks.map((t: any) => ({
-          seasonId: id,
-          name: t.name,
-          value: t.value,
-          category: t.category || "General",
-          priority: t.priority || "shouldDo",
-          boosterRule: t.boosterRule || null,
-          penaltyRule: t.penaltyRule || null,
-          tiers: t.tiers || null,
-        }));
-        await db.insert(seasonTasks).values(taskValues);
+        for (const t of tasks) {
+          if (t.id && existingIds.has(t.id)) {
+            // Existing task - update it
+            tasksToUpdate.push(t);
+            incomingIds.add(t.id);
+          } else {
+            // New task - insert with new ID (don't include client-side ID if it doesn't exist in DB)
+            tasksToInsert.push({
+              seasonId: id,
+              name: t.name,
+              value: t.value,
+              category: t.category || "General",
+              priority: t.priority || "shouldDo",
+              boosterRule: t.boosterRule || null,
+              penaltyRule: t.penaltyRule || null,
+              tiers: t.tiers || null,
+            });
+          }
+        }
+      }
+      
+      // Delete tasks that were removed (not in incoming list)
+      const idsToDelete = existingTasks.filter(t => !incomingIds.has(t.id)).map(t => t.id);
+      if (idsToDelete.length > 0) {
+        await db.delete(seasonTasks).where(
+          and(eq(seasonTasks.seasonId, id), inArray(seasonTasks.id, idsToDelete))
+        );
+      }
+      
+      // Update existing tasks
+      for (const t of tasksToUpdate) {
+        await db.update(seasonTasks)
+          .set({
+            name: t.name,
+            value: t.value,
+            category: t.category || "General",
+            priority: t.priority || "shouldDo",
+            boosterRule: t.boosterRule || null,
+            penaltyRule: t.penaltyRule || null,
+            tiers: t.tiers || null,
+          })
+          .where(eq(seasonTasks.id, t.id));
+      }
+      
+      // Insert new tasks
+      if (tasksToInsert.length > 0) {
+        await db.insert(seasonTasks).values(tasksToInsert);
       }
 
       const updatedTasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, id));
