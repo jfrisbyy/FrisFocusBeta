@@ -1628,9 +1628,9 @@ export type FpActivityDisplay = z.infer<typeof fpActivityDisplaySchema>;
 // Dashboard card keys for ordering
 export const dashboardCardKeys = [
   "weekTotal",
+  "weeklyTable",
   "streaks", 
   "badges",
-  "weeklyTable",
   "alerts",
   "weeklyTodos",
   "dueDates",
