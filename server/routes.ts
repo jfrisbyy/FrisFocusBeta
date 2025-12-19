@@ -824,6 +824,12 @@ export async function registerRoutes(
         ? `Daily goal: ${userSettings.dailyGoal || 0} pts, Weekly goal: ${userSettings.weeklyGoal || 0} pts`
         : "No goals configured.";
 
+      // Get user's custom AI instructions
+      const customInstructions = userSettings?.aiInstructions || "";
+      const customInstructionsSection = customInstructions 
+        ? `\n\nUSER'S CUSTOM INSTRUCTIONS (follow these carefully):\n${customInstructions}`
+        : "";
+
       // Create the personalized system prompt
       const personalizedContext = `You are a personal habit tracking assistant for ${userName} in the FrisFocus app. You have access to their complete habit data and should provide personalized insights, encouragement, and actionable suggestions.
 
@@ -845,7 +851,7 @@ CIRCLES: ${circleSummary}
 
 SEASON: ${seasonSummary}
 
-GOALS: ${goalsSummary}
+GOALS: ${goalsSummary}${customInstructionsSection}
 
 GUIDELINES:
 - Reference specific tasks, milestones, and data when giving advice
@@ -5958,6 +5964,53 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     } catch (error) {
       console.error("Error updating user settings:", error);
       res.status(400).json({ error: "Failed to update settings" });
+    }
+  });
+
+  // Get user AI instructions
+  app.get("/api/ai/instructions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [settings] = await db.select({ aiInstructions: userHabitSettings.aiInstructions })
+        .from(userHabitSettings)
+        .where(eq(userHabitSettings.userId, userId));
+      res.json({ aiInstructions: settings?.aiInstructions || "" });
+    } catch (error) {
+      console.error("Error fetching AI instructions:", error);
+      res.status(500).json({ error: "Failed to fetch AI instructions" });
+    }
+  });
+
+  // Save user AI instructions
+  app.put("/api/ai/instructions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { aiInstructions } = req.body;
+
+      if (typeof aiInstructions !== "string") {
+        return res.status(400).json({ error: "aiInstructions must be a string" });
+      }
+
+      // Check if settings exist
+      const [existing] = await db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId));
+
+      if (existing) {
+        // Update existing settings
+        const [settings] = await db.update(userHabitSettings)
+          .set({ aiInstructions, updatedAt: new Date() })
+          .where(eq(userHabitSettings.userId, userId))
+          .returning();
+        res.json({ aiInstructions: settings.aiInstructions || "" });
+      } else {
+        // Create new settings with just AI instructions
+        const [settings] = await db.insert(userHabitSettings)
+          .values({ userId, aiInstructions })
+          .returning();
+        res.json({ aiInstructions: settings.aiInstructions || "" });
+      }
+    } catch (error) {
+      console.error("Error saving AI instructions:", error);
+      res.status(400).json({ error: "Failed to save AI instructions" });
     }
   });
 
