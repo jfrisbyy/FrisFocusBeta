@@ -1174,6 +1174,11 @@ export async function registerRoutes(
         userCircles,
         activeSeason,
         settings,
+        nutritionData,
+        strengthData,
+        cardioData,
+        runsData,
+        bodyCompData,
       ] = await Promise.all([
         storage.getUser(userId),
         storage.getMilestones(userId),
@@ -1188,6 +1193,11 @@ export async function registerRoutes(
           .where(eq(circleMembers.userId, userId)),
         db.select().from(seasons).where(and(eq(seasons.userId, userId), eq(seasons.isActive, true))).limit(1),
         db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId)).limit(1),
+        db.select().from(nutritionLogs).where(eq(nutritionLogs.userId, userId)).orderBy(desc(nutritionLogs.date)).limit(14),
+        db.select().from(strengthWorkouts).where(eq(strengthWorkouts.userId, userId)).orderBy(desc(strengthWorkouts.date)).limit(10),
+        db.select().from(cardioRuns).where(eq(cardioRuns.userId, userId)).orderBy(desc(cardioRuns.date)).limit(10),
+        db.select().from(basketballRuns).where(eq(basketballRuns.userId, userId)).orderBy(desc(basketballRuns.date)).limit(10),
+        db.select().from(bodyComposition).where(eq(bodyComposition.userId, userId)).orderBy(desc(bodyComposition.date)).limit(5),
       ]);
 
       // Build personalized context for the AI
@@ -1238,6 +1248,27 @@ export async function registerRoutes(
         ? `Daily goal: ${userSettings.dailyGoal || 0} pts, Weekly goal: ${userSettings.weeklyGoal || 0} pts`
         : "No goals configured.";
 
+      // Fitness data summaries
+      const nutritionSummary = nutritionData.length > 0
+        ? `Recent nutrition (${nutritionData.length} entries): ${nutritionData.slice(0, 5).map(n => `${n.date}: ${n.calories || 0} cal, ${n.protein || 0}g protein`).join('; ')}`
+        : "No nutrition data logged.";
+
+      const strengthSummary = strengthData.length > 0
+        ? `Recent strength workouts (${strengthData.length} sessions): ${strengthData.slice(0, 5).map(s => `${s.date}: ${s.type || 'workout'}${s.duration ? ` (${s.duration} min)` : ''}`).join('; ')}`
+        : "No strength workouts logged.";
+
+      const cardioSummary = cardioData.length > 0
+        ? `Recent cardio (${cardioData.length} sessions): ${cardioData.slice(0, 5).map(c => `${c.date}: ${c.type || 'cardio'}${c.duration ? ` (${c.duration} min)` : ''}${c.distance ? `, ${c.distance} mi` : ''}`).join('; ')}`
+        : "No cardio sessions logged.";
+
+      const runsSummary = runsData.length > 0
+        ? `Recent basketball runs (${runsData.length} sessions): ${runsData.slice(0, 5).map(r => `${r.date}: ${r.location || 'session'}${r.duration ? ` (${r.duration} min)` : ''}`).join('; ')}`
+        : "No basketball runs logged.";
+
+      const bodySummary = bodyCompData.length > 0
+        ? `Body composition (${bodyCompData.length} entries): ${bodyCompData.slice(0, 3).map(b => `${b.date}: ${b.weight ? `${b.weight} lbs` : ''}${b.bodyFat ? `, ${b.bodyFat}% BF` : ''}`).join('; ')}`
+        : "No body composition data logged.";
+
       // Get user's custom AI instructions
       const customInstructions = userSettings?.aiInstructions || "";
       const customInstructionsSection = customInstructions 
@@ -1265,7 +1296,14 @@ CIRCLES: ${circleSummary}
 
 SEASON: ${seasonSummary}
 
-GOALS: ${goalsSummary}${customInstructionsSection}
+GOALS: ${goalsSummary}
+
+FITNESS DATA:
+- ${nutritionSummary}
+- ${strengthSummary}
+- ${cardioSummary}
+- ${runsSummary}
+- ${bodySummary}${customInstructionsSection}
 
 GUIDELINES:
 - Reference specific tasks, milestones, and data when giving advice

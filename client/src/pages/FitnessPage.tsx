@@ -2666,12 +2666,6 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button data-testid="button-add-cardio">
-          <Plus className="h-4 w-4 mr-2" />
-          Log Cardio Run
-        </Button>
-      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Log Cardio Run</DialogTitle>
