@@ -17,7 +17,7 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle
+  MessageCircle, MessageSquare, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle
 } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { useDemo } from "@/contexts/DemoContext";
@@ -2643,6 +2643,13 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   } | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  
+  // Photo adjustment mode state
+  const [adjustMode, setAdjustMode] = useState(false);
+  const [adjustMessages, setAdjustMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [adjustInput, setAdjustInput] = useState("");
+  const [adjustAnalyzing, setAdjustAnalyzing] = useState(false);
+  const adjustChatEndRef = useRef<HTMLDivElement>(null);
 
   const isEditing = !!editData;
 
@@ -2654,6 +2661,10 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     setAiChatMessages([]);
     setAiUserInput("");
     setAiResult(null);
+    setAdjustMode(false);
+    setAdjustMessages([]);
+    setAdjustInput("");
+    setAdjustAnalyzing(false);
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     
@@ -2678,6 +2689,46 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   useEffect(() => {
     aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [aiChatMessages]);
+
+  useEffect(() => {
+    adjustChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [adjustMessages]);
+
+  const sendAdjustMessage = async () => {
+    if (!adjustInput.trim() || !photoResult || adjustAnalyzing) return;
+    const userMessage = adjustInput.trim();
+    const updatedMessages = [...adjustMessages, { role: 'user' as const, content: userMessage }];
+    setAdjustMessages(updatedMessages);
+    setAdjustInput("");
+    setAdjustAnalyzing(true);
+    try {
+      const res = await apiRequest("POST", "/api/food/analyze/adjust", {
+        currentAnalysis: photoResult,
+        history: updatedMessages,
+      });
+      if (!res.ok) {
+        throw new Error("Failed to adjust analysis");
+      }
+      const data = await res.json();
+      if (data.updated) {
+        setPhotoResult(data.analysis);
+        setAdjustMessages([...updatedMessages, { role: 'assistant', content: data.message || "Updated the analysis based on your feedback." }]);
+      } else {
+        setAdjustMessages([...updatedMessages, { role: 'assistant', content: data.message }]);
+      }
+    } catch (error) {
+      toast({ title: "Failed to adjust analysis", description: "Please try again", variant: "destructive" });
+      setAdjustMessages(adjustMessages);
+    } finally {
+      setAdjustAnalyzing(false);
+    }
+  };
+
+  const resetAdjustMode = () => {
+    setAdjustMode(false);
+    setAdjustMessages([]);
+    setAdjustInput("");
+  };
 
   const sendAiMessage = async () => {
     if (!aiUserInput.trim()) return;
@@ -2744,6 +2795,9 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   const resetPhoto = () => {
     setPhotoImageData(null);
     setPhotoResult(null);
+    setAdjustMode(false);
+    setAdjustMessages([]);
+    setAdjustInput("");
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
@@ -3107,10 +3161,45 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
                       <Button size="sm" onClick={applyPhotoResult} data-testid="button-apply-photo">
                         <Check className="h-4 w-4 mr-1" /> Add as Meal
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setAdjustMode(!adjustMode)} data-testid="button-adjust-analysis">
+                        <MessageSquare className="h-4 w-4 mr-1" /> {adjustMode ? "Hide Adjustment" : "Adjust Analysis"}
+                      </Button>
                       <Button size="sm" variant="outline" onClick={resetPhoto} data-testid="button-retake-photo">
                         Retake Photo
                       </Button>
                     </div>
+                    
+                    {adjustMode && (
+                      <div className="space-y-2 border rounded-md p-3">
+                        <div className="text-sm font-medium">Adjust the analysis</div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Tell me what to change - portions, food types, or items to add/remove
+                        </div>
+                        {adjustMessages.length > 0 && (
+                          <div className="max-h-32 overflow-y-auto space-y-2 mb-2">
+                            {adjustMessages.map((msg, i) => (
+                              <div key={i} className={`text-sm p-2 rounded-md ${msg.role === 'user' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'}`}>
+                                {msg.content}
+                              </div>
+                            ))}
+                            <div ref={adjustChatEndRef} />
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Input 
+                            placeholder="e.g., 'the rice is actually 2 cups' or 'add a fried egg'" 
+                            value={adjustInput} 
+                            onChange={(e) => setAdjustInput(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendAdjustMessage()}
+                            disabled={adjustAnalyzing}
+                            data-testid="input-adjust-analysis"
+                          />
+                          <Button size="sm" onClick={sendAdjustMessage} disabled={adjustAnalyzing || !adjustInput.trim()} data-testid="button-send-adjustment">
+                            {adjustAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

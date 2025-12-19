@@ -8570,5 +8570,81 @@ Be as accurate as possible with portion estimates. If you can't identify somethi
     }
   });
 
+  // Adjust food photo analysis based on user feedback
+  app.post("/api/food/analyze/adjust", isAuthenticated, async (req: any, res) => {
+    try {
+      const { currentAnalysis, history } = req.body;
+      
+      if (!currentAnalysis || !history || !Array.isArray(history)) {
+        return res.status(400).json({ error: "Current analysis and conversation history are required" });
+      }
+
+      const systemPrompt = `You are a nutrition analysis assistant helping adjust food estimates based on user feedback.
+
+The user has a food photo analysis that they want to adjust. Here's the current analysis:
+${JSON.stringify(currentAnalysis, null, 2)}
+
+The user will tell you what changes to make (e.g., "the rice is actually 2 cups", "add a fried egg", "remove the bread", "the portion is smaller").
+
+If the user's message clearly indicates a change to make, respond with a JSON object:
+{
+  "updated": true,
+  "message": "Brief description of what you changed",
+  "analysis": {
+    "totalCalories": number,
+    "totalProtein": number,
+    "totalCarbs": number,
+    "totalFat": number,
+    "items": [
+      {
+        "name": "food item name",
+        "portion": "estimated portion size",
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fat": number
+      }
+    ],
+    "confidence": "high" | "medium" | "low",
+    "notes": "optional notes"
+  }
+}
+
+If the user's message is unclear or you need more information, respond with:
+{
+  "updated": false,
+  "message": "Your clarifying question or response"
+}
+
+Always recalculate totals when items change. Round all numbers to whole integers.`;
+
+      const messages: any[] = [
+        { role: "system", content: systemPrompt },
+        ...history.map((msg: { role: string; content: string }) => ({
+          role: msg.role,
+          content: msg.content
+        }))
+      ];
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages,
+        max_tokens: 1000,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const result = JSON.parse(content);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error adjusting food analysis:", error);
+      res.status(500).json({ error: error.message || "Failed to adjust food analysis" });
+    }
+  });
+
   return httpServer;
 }
