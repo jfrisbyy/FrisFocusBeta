@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
-  Trash2, Edit, ChevronRight, Zap, Star, Award, Calculator, CheckCircle2
+  Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -92,6 +92,7 @@ export default function FitnessPage() {
   const [habitsDialogOpen, setHabitsDialogOpen] = useState(false);
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
+  const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -178,6 +179,7 @@ export default function FitnessPage() {
 
   const getLatestWeight = () => bodyComp.length > 0 ? bodyComp.sort((a, b) => b.date.localeCompare(a.date))[0] : null;
   const getTodayCalories = () => nutrition.find(n => n.date === format(new Date(), "yyyy-MM-dd"));
+  const getSelectedDateCalories = () => nutrition.find(n => n.date === format(selectedNutritionDate, "yyyy-MM-dd"));
   const getAvgDeficit = () => {
     const recent = nutrition.filter(n => n.deficit).slice(0, 7);
     if (recent.length === 0) return 0;
@@ -290,6 +292,7 @@ export default function FitnessPage() {
 
   const latestWeight = getLatestWeight();
   const todayCalories = getTodayCalories();
+  const selectedDateCalories = getSelectedDateCalories();
   const weeklyWorkouts = getThisWeekWorkouts();
   const weeklyStreak = getWeeklyStreak();
   const avgDeficit = getAvgDeficit();
@@ -477,6 +480,43 @@ export default function FitnessPage() {
             </div>
           </div>
 
+          {/* Date Navigation */}
+          <div className="flex items-center justify-center gap-2">
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              onClick={() => setSelectedNutritionDate(subDays(selectedNutritionDate, 1))}
+              data-testid="button-prev-date"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2 min-w-[140px] justify-center">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium" data-testid="text-selected-date">
+                {isToday(selectedNutritionDate) ? "Today" : format(selectedNutritionDate, "MMM d, yyyy")}
+              </span>
+            </div>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              onClick={() => setSelectedNutritionDate(subDays(selectedNutritionDate, -1))}
+              disabled={isToday(selectedNutritionDate)}
+              data-testid="button-next-date"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {!isToday(selectedNutritionDate) && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => setSelectedNutritionDate(new Date())}
+                data-testid="button-today"
+              >
+                Today
+              </Button>
+            )}
+          </div>
+
           {/* Dialogs - mounted at page level */}
           <NutritionSettingsDialog
             open={settingsDialogOpen}
@@ -542,13 +582,13 @@ export default function FitnessPage() {
                 <CardTitle className="text-sm flex items-center justify-between gap-2">
                   <span>Calories</span>
                   <span className="font-mono text-xs text-muted-foreground">
-                    {todayCalories?.calories || 0} / {nutritionSettings.calorieTarget}
+                    {selectedDateCalories?.calories || 0} / {nutritionSettings.calorieTarget}
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const eaten = todayCalories?.calories || 0;
+                  const eaten = selectedDateCalories?.calories || 0;
                   const target = nutritionSettings.calorieTarget || 2000;
                   const percentage = Math.min((eaten / target) * 100, 150);
                   const isOver = eaten > target;
@@ -575,13 +615,13 @@ export default function FitnessPage() {
                 <CardTitle className="text-sm flex items-center justify-between gap-2">
                   <span>Protein</span>
                   <span className="font-mono text-xs text-muted-foreground">
-                    {todayCalories?.protein || 0}g / {nutritionSettings.proteinTarget}g
+                    {selectedDateCalories?.protein || 0}g / {nutritionSettings.proteinTarget}g
                   </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const eaten = todayCalories?.protein || 0;
+                  const eaten = selectedDateCalories?.protein || 0;
                   const target = nutritionSettings.proteinTarget || 150;
                   const percentage = Math.min((eaten / target) * 100, 150);
                   const isOver = eaten > target * 1.2; // Over 120% of target
@@ -617,8 +657,8 @@ export default function FitnessPage() {
               <CardContent>
                 {(() => {
                   const maintenance = nutritionSettings.maintenanceCalories || 2500;
-                  const eaten = todayCalories?.calories || 0;
-                  const burned = todayCalories?.deficit ? todayCalories.deficit : 0;
+                  const eaten = selectedDateCalories?.calories || 0;
+                  const burned = selectedDateCalories?.deficit ? selectedDateCalories.deficit : 0;
                   const netBalance = maintenance - eaten + burned;
                   const isDeficit = netBalance > 0;
                   return (
@@ -662,7 +702,7 @@ export default function FitnessPage() {
               </CardHeader>
               <CardContent>
                 <DailyHabitsContent 
-                  todayCalories={todayCalories}
+                  todayCalories={selectedDateCalories}
                   nutritionSettings={nutritionSettings}
                   isDemo={isDemo}
                   onToggleHabit={handleToggleHabit}
@@ -671,38 +711,38 @@ export default function FitnessPage() {
             </Card>
           </div>
 
-          {/* Today's Quick Stats */}
+          {/* Day's Quick Stats */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Today's Breakdown</CardTitle>
+              <CardTitle className="text-sm">{isToday(selectedNutritionDate) ? "Today's Breakdown" : format(selectedNutritionDate, "MMM d") + " Breakdown"}</CardTitle>
             </CardHeader>
             <CardContent>
-              {todayCalories ? (
+              {selectedDateCalories ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{todayCalories.calories || 0}</div>
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.calories || 0}</div>
                       <div className="text-xs text-muted-foreground">Calories</div>
                     </div>
                     <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{todayCalories.protein || 0}g</div>
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.protein || 0}g</div>
                       <div className="text-xs text-muted-foreground">Protein</div>
                     </div>
                     <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{todayCalories.carbs || 0}g</div>
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.carbs || 0}g</div>
                       <div className="text-xs text-muted-foreground">Carbs</div>
                     </div>
                     <div className="text-center p-3 bg-muted/50 rounded-md">
-                      <div className="text-2xl font-bold font-mono">{todayCalories.fats || 0}g</div>
+                      <div className="text-2xl font-bold font-mono">{selectedDateCalories.fats || 0}g</div>
                       <div className="text-xs text-muted-foreground">Fats</div>
                     </div>
                   </div>
                   {/* Individual Meals */}
-                  {todayCalories.meals && Array.isArray(todayCalories.meals) && todayCalories.meals.length > 0 && (
+                  {selectedDateCalories.meals && Array.isArray(selectedDateCalories.meals) && selectedDateCalories.meals.length > 0 && (
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Meals Logged</div>
                       <div className="space-y-1">
-                        {(todayCalories.meals as Meal[]).map((meal) => (
+                        {(selectedDateCalories.meals as Meal[]).map((meal) => (
                           <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md text-sm">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{meal.name}</span>
@@ -719,7 +759,7 @@ export default function FitnessPage() {
                   )}
                 </div>
               ) : (
-                <p className="text-muted-foreground text-sm text-center py-4">No data logged today. Use the button above to log your nutrition.</p>
+                <p className="text-muted-foreground text-sm text-center py-4">No data logged for this day. Use the button above to log nutrition.</p>
               )}
             </CardContent>
           </Card>
@@ -2297,12 +2337,6 @@ function TDEECalculatorDialog({
   );
 }
 
-// Default built-in habits
-const defaultHabits = [
-  { id: "water", name: "Gallon of Water", field: "waterGallon", icon: "droplets" },
-  { id: "creatine", name: "Creatine", field: "creatine", icon: "zap" },
-];
-
 function DailyHabitsContent({ 
   todayCalories, 
   nutritionSettings, 
@@ -2320,32 +2354,17 @@ function DailyHabitsContent({
   
   const hasNoLog = !todayCalories;
   
+  if (enabledCustomToggles.length === 0) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">No habits configured</p>
+        <p className="text-xs text-muted-foreground mt-1">Click the settings icon to add custom habits</p>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Droplets className="h-4 w-4 text-blue-500" />
-          <span className="text-sm">Gallon of Water</span>
-        </div>
-        <Switch 
-          checked={todayCalories?.waterGallon || false}
-          onCheckedChange={(checked) => onToggleHabit("water", "waterGallon", checked)}
-          disabled={hasNoLog}
-          data-testid="toggle-water"
-        />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-purple-500" />
-          <span className="text-sm">Creatine</span>
-        </div>
-        <Switch 
-          checked={todayCalories?.creatine || false}
-          onCheckedChange={(checked) => onToggleHabit("creatine", "creatine", checked)}
-          disabled={hasNoLog}
-          data-testid="toggle-creatine"
-        />
-      </div>
       {enabledCustomToggles.map((toggle) => (
         <div key={toggle.id} className="flex items-center justify-between">
           <div className="flex items-center gap-2">
