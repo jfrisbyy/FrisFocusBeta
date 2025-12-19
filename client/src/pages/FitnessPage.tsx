@@ -2627,7 +2627,7 @@ function CardioRunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpen
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<CardioRun>) => {
-      const res = await apiRequest("POST", "/api/fitness/cardio-runs", data);
+      const res = await apiRequest("POST", "/api/fitness/cardio", data);
       return res.json();
     },
     onSuccess: () => {
