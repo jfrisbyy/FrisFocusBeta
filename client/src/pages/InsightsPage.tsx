@@ -341,8 +341,8 @@ export default function InsightsPage() {
                         </form>
                       ) : (
                         <>
-                          <div className="flex-1 overflow-hidden">
-                            <p className="truncate text-sm">{conversation.title}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm break-words">{conversation.title}</p>
                             <p className="text-xs text-muted-foreground">
                               {conversation.createdAt ? format(new Date(conversation.createdAt), "MMM d") : ""}
                             </p>
