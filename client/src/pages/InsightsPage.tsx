@@ -261,7 +261,7 @@ export default function InsightsPage() {
       {/* Conversation History Sidebar */}
       {!isDemo && (
         <div 
-          className={`flex flex-col border-r bg-muted/30 transition-all duration-200 ${
+          className={`sticky top-0 self-start h-screen z-50 flex flex-col border-r bg-muted/30 transition-all duration-200 ${
             sidebarCollapsed ? "w-12" : "w-64"
           }`}
         >
