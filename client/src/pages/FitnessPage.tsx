@@ -25,7 +25,7 @@ import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, Bask
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend, PieChart, Pie } from "recharts";
 
 const mockNutrition: NutritionLog[] = [
   { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, carbs: 220, fats: 65, creatine: true, waterGallon: true, deficit: 300, caloriesBurned: null, meals: [{ id: "m1", name: "Breakfast", calories: 500, protein: 30, time: "8:00 AM" }, { id: "m2", name: "Lunch", calories: 800, protein: 50, time: "12:30 PM" }, { id: "m3", name: "Dinner", calories: 900, protein: 100, time: "7:00 PM" }], completedToggles: null },
@@ -106,6 +106,7 @@ export default function FitnessPage() {
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("weekly");
+  const [stepsView, setStepsView] = useState<"today" | "weekly">("today");
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -423,14 +424,104 @@ export default function FitnessPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="md:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-sm font-medium">Today's Steps</CardTitle>
-                <Footprints className="h-4 w-4 text-emerald-500" />
+                <div className="flex items-center gap-2">
+                  <Footprints className="h-4 w-4 text-emerald-500" />
+                  <CardTitle className="text-sm font-medium">Steps</CardTitle>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    size="sm" 
+                    variant={stepsView === "today" ? "default" : "ghost"}
+                    onClick={() => setStepsView("today")}
+                    data-testid="button-steps-today"
+                  >
+                    Today
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant={stepsView === "weekly" ? "default" : "ghost"}
+                    onClick={() => setStepsView("weekly")}
+                    data-testid="button-steps-weekly"
+                  >
+                    Weekly
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{isDemo ? "8,432" : "--"}</div>
-                <p className="text-xs text-muted-foreground">Goal: 10,000 steps</p>
+                {(() => {
+                  const demoStepsData = [
+                    { day: 'Mon', steps: 8432, goal: 10000 },
+                    { day: 'Tue', steps: 12150, goal: 10000 },
+                    { day: 'Wed', steps: 9876, goal: 10000 },
+                    { day: 'Thu', steps: 6543, goal: 10000 },
+                    { day: 'Fri', steps: 11234, goal: 10000 },
+                    { day: 'Sat', steps: 14567, goal: 10000 },
+                    { day: 'Sun', steps: 7890, goal: 10000 },
+                  ];
+                  
+                  const todaySteps = isDemo ? demoStepsData[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1].steps : 0;
+                  const avgSteps = isDemo ? Math.round(demoStepsData.reduce((sum, d) => sum + d.steps, 0) / demoStepsData.length) : 0;
+                  const daysOverGoal = demoStepsData.filter(d => d.steps >= d.goal).length;
+
+                  if (stepsView === "today") {
+                    const progress = Math.min((todaySteps / 10000) * 100, 100);
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-baseline gap-2">
+                          <div className="text-2xl font-bold font-mono">{todaySteps.toLocaleString()}</div>
+                          <span className="text-sm text-muted-foreground">/ 10,000</span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                        <p className="text-xs text-muted-foreground">
+                          {todaySteps >= 10000 ? 'Goal reached!' : `${(10000 - todaySteps).toLocaleString()} steps to go`}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (!isDemo) {
+                    return (
+                      <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+                        No steps data available
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Avg: </span>
+                          <span className="font-bold font-mono">{avgSteps.toLocaleString()}</span>
+                          <span className="text-muted-foreground">/day</span>
+                        </div>
+                        <Badge variant={daysOverGoal >= 5 ? "default" : "secondary"}>
+                          {daysOverGoal}/7 days over goal
+                        </Badge>
+                      </div>
+                      <ResponsiveContainer width="100%" height={100}>
+                        <BarChart data={demoStepsData}>
+                          <XAxis dataKey="day" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                          <Tooltip 
+                            formatter={(value: number) => [`${value.toLocaleString()} steps`, '']}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                          <ReferenceLine y={10000} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                          <Bar dataKey="steps" radius={[3, 3, 0, 0]}>
+                            {demoStepsData.map((entry, index) => (
+                              <Cell 
+                                key={`cell-${index}`} 
+                                fill={entry.steps >= entry.goal ? 'hsl(142 76% 36%)' : 'hsl(var(--muted-foreground))'} 
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
@@ -1323,6 +1414,192 @@ export default function FitnessPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Strength Analytics Section */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Volume Progression Chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Volume Progression
+                </CardTitle>
+                <CardDescription className="text-xs">Weekly training volume (lbs)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const last4Weeks = Array.from({ length: 4 }, (_, i) => {
+                    const weekStart = startOfWeek(subDays(new Date(), i * 7), { weekStartsOn: 1 });
+                    const weekEnd = subDays(startOfWeek(subDays(new Date(), (i - 1) * 7), { weekStartsOn: 1 }), 1);
+                    const weekWorkouts = strength.filter(s => {
+                      try {
+                        const d = parseISO(s.date);
+                        return d >= weekStart && d <= weekEnd;
+                      } catch { return false; }
+                    });
+                    const totalVolume = weekWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0);
+                    return {
+                      week: i === 0 ? 'This Week' : i === 1 ? 'Last Week' : `${i}w ago`,
+                      volume: totalVolume,
+                      workouts: weekWorkouts.length
+                    };
+                  }).reverse();
+
+                  if (last4Weeks.every(w => w.volume === 0)) {
+                    return (
+                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                        Log workouts to see volume trends
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <ResponsiveContainer width="100%" height={160}>
+                      <BarChart data={last4Weeks}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="week" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                        <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip 
+                          formatter={(value: number) => [`${value.toLocaleString()} lbs`, 'Volume']}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                        />
+                        <Bar dataKey="volume" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Focus Breakdown Pie Chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Focus Breakdown
+                </CardTitle>
+                <CardDescription className="text-xs">Distribution by muscle group (last 30 days)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const thirtyDaysAgo = subDays(new Date(), 30);
+                  const recentWorkouts = strength.filter(s => {
+                    try { return parseISO(s.date) >= thirtyDaysAgo; } catch { return false; }
+                  });
+                  
+                  const focusCounts: Record<string, number> = {};
+                  recentWorkouts.forEach(w => {
+                    const focus = w.primaryFocus || 'Other';
+                    focusCounts[focus] = (focusCounts[focus] || 0) + 1;
+                  });
+                  
+                  const pieData = Object.entries(focusCounts).map(([name, value]) => ({ name, value }));
+                  
+                  const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(142 76% 36%)', 'hsl(48 96% 53%)', 'hsl(280 87% 60%)'];
+
+                  if (pieData.length === 0) {
+                    return (
+                      <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+                        Log workouts to see focus breakdown
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex items-center gap-4">
+                      <ResponsiveContainer width={120} height={120}>
+                        <PieChart>
+                          <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={30}
+                            outerRadius={50}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {pieData.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value: number) => [`${value} workouts`, '']}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="flex-1 space-y-1">
+                        {pieData.map((entry, index) => (
+                          <div key={entry.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-sm" 
+                                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                              />
+                              <span>{entry.name}</span>
+                            </div>
+                            <span className="font-mono text-muted-foreground">{entry.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* PR Tracker */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                Personal Records
+              </CardTitle>
+              <CardDescription className="text-xs">Your heaviest lifts for each exercise</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const exercisePRs: Record<string, { weight: number; date: string; sets: number; reps: number }> = {};
+                
+                strength.forEach(workout => {
+                  const exercises = Array.isArray(workout.exercises) ? workout.exercises as Array<{ name: string; sets: number; reps: number; weight: number }> : [];
+                  exercises.forEach(ex => {
+                    if (!exercisePRs[ex.name] || ex.weight > exercisePRs[ex.name].weight) {
+                      exercisePRs[ex.name] = { weight: ex.weight, date: workout.date, sets: ex.sets, reps: ex.reps };
+                    }
+                  });
+                });
+                
+                const prList = Object.entries(exercisePRs).sort((a, b) => b[1].weight - a[1].weight);
+                
+                if (prList.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
+                      Log exercises with weights to track PRs
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                    {prList.slice(0, 6).map(([name, pr]) => (
+                      <div key={name} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+                        <div>
+                          <div className="font-medium text-sm">{name}</div>
+                          <div className="text-xs text-muted-foreground">{pr.sets}x{pr.reps}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold font-mono">{pr.weight} lbs</div>
+                          <div className="text-xs text-muted-foreground">{format(parseISO(pr.date), 'MMM d')}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
