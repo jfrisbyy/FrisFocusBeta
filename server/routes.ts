@@ -739,18 +739,126 @@ export async function registerRoutes(
 
   // ==================== AI ROUTES (Protected) ====================
 
-  app.post("/api/ai/insights", isAuthenticated, async (req, res) => {
+  app.post("/api/ai/insights", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const { message, history } = req.body;
 
       if (!message || typeof message !== "string") {
         return res.status(400).json({ error: "Message is required" });
       }
 
-      const systemPrompt = INSIGHTS_ASSISTANT_PROMPT;
+      // Fetch all user data in parallel for personalized context
+      const [
+        user,
+        milestones,
+        dueDates,
+        tasks,
+        penalties,
+        dailyLogs,
+        journalEntries,
+        userCircles,
+        activeSeason,
+        settings,
+      ] = await Promise.all([
+        storage.getUser(userId),
+        storage.getMilestones(userId),
+        storage.getDueDates(userId),
+        db.select().from(userTasks).where(eq(userTasks.userId, userId)),
+        db.select().from(userPenalties).where(eq(userPenalties.userId, userId)),
+        db.select().from(userDailyLogs).where(eq(userDailyLogs.userId, userId)).orderBy(desc(userDailyLogs.date)).limit(30),
+        db.select().from(userJournalEntries).where(eq(userJournalEntries.userId, userId)).orderBy(desc(userJournalEntries.createdAt)).limit(20),
+        db.select({ id: circles.id, name: circles.name, description: circles.description })
+          .from(circleMembers)
+          .innerJoin(circles, eq(circleMembers.circleId, circles.id))
+          .where(eq(circleMembers.userId, userId)),
+        db.select().from(seasons).where(and(eq(seasons.userId, userId), eq(seasons.isActive, true))).limit(1),
+        db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId)).limit(1),
+      ]);
+
+      // Build personalized context for the AI
+      const userName = user?.firstName || user?.displayName || "there";
+      const activeSeasonData = activeSeason[0];
+      const userSettings = settings[0];
+
+      // Summarize user data for the AI context
+      const milestoneSummary = milestones.length > 0 
+        ? `User has ${milestones.length} milestones: ${milestones.slice(0, 5).map(m => `"${m.name}" (${m.achieved ? 'achieved' : 'in progress'}${m.deadline ? `, deadline: ${m.deadline}` : ''})`).join(', ')}${milestones.length > 5 ? ` and ${milestones.length - 5} more` : ''}`
+        : "No milestones set yet.";
+
+      const dueDateSummary = dueDates.length > 0 
+        ? `User has ${dueDates.length} due dates: ${dueDates.slice(0, 5).map(d => `"${d.title}" due ${d.dueDate} (${d.status})`).join(', ')}${dueDates.length > 5 ? ` and ${dueDates.length - 5} more` : ''}`
+        : "No due dates set.";
+
+      const taskSummary = tasks.length > 0 
+        ? `User tracks ${tasks.length} daily tasks: ${tasks.slice(0, 8).map(t => `"${t.name}" (${t.value} pts, ${t.category || 'uncategorized'})`).join(', ')}${tasks.length > 8 ? ` and ${tasks.length - 8} more` : ''}`
+        : "No tasks set up yet.";
+
+      const penaltySummary = penalties.length > 0 
+        ? `User has ${penalties.length} penalties to avoid: ${penalties.slice(0, 5).map(p => `"${p.name}" (-${Math.abs(p.value)} pts)`).join(', ')}${penalties.length > 5 ? ` and ${penalties.length - 5} more` : ''}`
+        : "No penalties set.";
+
+      // Calculate recent progress from daily logs (guard against null values)
+      const recentLogs = dailyLogs.slice(0, 7);
+      const recentProgress = recentLogs.length > 0 
+        ? `Recent activity (last ${recentLogs.length} days): ${recentLogs.map(log => {
+            const taskIds = log.completedTaskIds;
+            const completedCount = Array.isArray(taskIds) ? taskIds.length : 0;
+            return `${log.date}: ${completedCount} tasks, ${log.taskPoints || 0} pts`;
+          }).join('; ')}`
+        : "No recent activity logged.";
+
+      const journalSummary = journalEntries.length > 0 
+        ? `Recent journal entries: ${journalEntries.slice(0, 3).map(j => `"${j.content?.slice(0, 100)}..." (${j.date})`).join('; ')}`
+        : "No journal entries yet.";
+
+      const circleSummary = userCircles.length > 0 
+        ? `Member of ${userCircles.length} circles: ${userCircles.map(c => `"${c.name}"`).join(', ')}`
+        : "Not part of any circles yet.";
+
+      const seasonSummary = activeSeasonData 
+        ? `Active season: "${activeSeasonData.name}" (created ${activeSeasonData.createdAt ? new Date(activeSeasonData.createdAt).toLocaleDateString() : 'recently'})`
+        : "No active season.";
+
+      const goalsSummary = userSettings 
+        ? `Daily goal: ${userSettings.dailyGoal || 0} pts, Weekly goal: ${userSettings.weeklyGoal || 0} pts`
+        : "No goals configured.";
+
+      // Create the personalized system prompt
+      const personalizedContext = `You are a personal habit tracking assistant for ${userName} in the FrisFocus app. You have access to their complete habit data and should provide personalized insights, encouragement, and actionable suggestions.
+
+USER'S CURRENT DATA:
+
+MILESTONES: ${milestoneSummary}
+
+DUE DATES: ${dueDateSummary}
+
+DAILY TASKS: ${taskSummary}
+
+PENALTIES: ${penaltySummary}
+
+RECENT PROGRESS: ${recentProgress}
+
+JOURNAL: ${journalSummary}
+
+CIRCLES: ${circleSummary}
+
+SEASON: ${seasonSummary}
+
+GOALS: ${goalsSummary}
+
+GUIDELINES:
+- Reference specific tasks, milestones, and data when giving advice
+- Celebrate progress and achievements with genuine encouragement
+- Identify patterns in their habits (what's working, what needs attention)
+- Give specific, actionable suggestions based on their actual data
+- Be warm, supportive, and personalized - you know their goals and progress
+- If they ask about something not in their data, guide them to set it up
+- Keep responses concise but meaningful (2-3 paragraphs max unless they ask for more detail)
+- Never make up data - only reference what's in their actual records`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: personalizedContext },
       ];
 
       if (Array.isArray(history)) {
@@ -766,7 +874,7 @@ export async function registerRoutes(
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages,
-        max_tokens: 500,
+        max_tokens: 1000,
       });
 
       const content = response.choices[0]?.message?.content || "I'm here to help! Could you tell me more about what you'd like to know?";

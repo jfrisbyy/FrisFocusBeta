@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Sparkles, Lock } from "lucide-react";
+import { Send, Bot, User, Sparkles } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useDemo } from "@/contexts/DemoContext";
@@ -28,6 +28,15 @@ export default function InsightsPage() {
   const { isDemo } = useDemo();
   const [messages, setMessages] = useState<AIMessage[]>(isDemo ? sampleMessages : []);
   const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -168,6 +177,7 @@ export default function InsightsPage() {
                     </div>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
             )}
           </ScrollArea>
