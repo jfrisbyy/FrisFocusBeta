@@ -500,7 +500,7 @@ export default function FitnessPage() {
   };
 
   const updateGoalMutation = useMutation({
-    mutationFn: async (data: { goalType: string; calorieTarget: number; maintenanceCalories: number }) => {
+    mutationFn: async (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; activityLevel?: string }) => {
       const res = await apiRequest("PUT", "/api/fitness/nutrition-settings", data);
       return res.json();
     },
@@ -600,29 +600,29 @@ export default function FitnessPage() {
         <TabsContent value="overview" className="space-y-6">
           {/* Goal Banner */}
           <Card className={`border-2 ${
-            nutritionSettings.goalType === 'maintenance' ? 'border-blue-500/50 bg-blue-500/5' :
-            nutritionSettings.goalType?.includes('surplus') ? 'border-green-500/50 bg-green-500/5' :
+            (nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'border-blue-500/50 bg-blue-500/5' :
+            (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'border-green-500/50 bg-green-500/5' :
             'border-orange-500/50 bg-orange-500/5'
           }`}>
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className={`p-2 rounded-full ${
-                    nutritionSettings.goalType === 'maintenance' ? 'bg-blue-500/20' :
-                    nutritionSettings.goalType?.includes('surplus') ? 'bg-green-500/20' :
+                    (nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'bg-blue-500/20' :
+                    (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'bg-green-500/20' :
                     'bg-orange-500/20'
                   }`}>
                     <Target className={`h-5 w-5 ${
-                      nutritionSettings.goalType === 'maintenance' ? 'text-blue-500' :
-                      nutritionSettings.goalType?.includes('surplus') ? 'text-green-500' :
+                      (nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'text-blue-500' :
+                      (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'text-green-500' :
                       'text-orange-500'
                     }`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold">
-                        {nutritionSettings.goalType === 'maintenance' ? 'Maintenance Mode' :
-                         nutritionSettings.goalType?.includes('surplus') ? 'Surplus Mode' :
+                        {(nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'Maintenance Mode' :
+                         (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'Surplus Mode' :
                          'Deficit Mode'}
                       </span>
                       <Badge variant="secondary" className="text-xs">
@@ -630,9 +630,9 @@ export default function FitnessPage() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {nutritionSettings.goalType === 'maintenance' 
+                      {(nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500)
                         ? 'Maintaining current weight'
-                        : nutritionSettings.goalType?.includes('surplus')
+                        : (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500)
                         ? `+${(nutritionSettings.calorieTarget || 2500) - (nutritionSettings.maintenanceCalories || 2500)} cal above maintenance`
                         : `-${(nutritionSettings.maintenanceCalories || 2500) - (nutritionSettings.calorieTarget || 2000)} cal below maintenance`}
                     </p>
@@ -2877,7 +2877,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   onOpenChange: (open: boolean) => void;
   isDemo: boolean;
   nutritionSettings: NutritionSettings;
-  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number }) => void;
+  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; activityLevel?: string }) => void;
 }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("settings");
@@ -2926,6 +2926,31 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       setCustomGoalLabel(!presetModes.includes(currentGoal) ? currentGoal : "");
       setMaintenance(nutritionSettings.maintenanceCalories?.toString() || '2500');
       setTarget(nutritionSettings.calorieTarget?.toString() || '2000');
+      
+      // Pre-populate TDEE data from saved settings
+      setTdeeData({
+        weight: nutritionSettings.weight?.toString() || "",
+        height: nutritionSettings.height?.toString() || "",
+        age: nutritionSettings.age?.toString() || "",
+        gender: nutritionSettings.gender || "male",
+        activityLevel: nutritionSettings.activityLevel || "moderate",
+      });
+      
+      // If we have saved TDEE data, recalculate the result
+      if (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age) {
+        const weightKg = nutritionSettings.weight * 0.453592;
+        const heightCm = nutritionSettings.height * 2.54;
+        const gender = nutritionSettings.gender || "male";
+        const bmr = gender === "male"
+          ? Math.round(10 * weightKg + 6.25 * heightCm - 5 * nutritionSettings.age + 5)
+          : Math.round(10 * weightKg + 6.25 * heightCm - 5 * nutritionSettings.age - 161);
+        const multipliers: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+        const multiplier = multipliers[nutritionSettings.activityLevel || "moderate"] || 1.55;
+        const tdee = Math.round(bmr * multiplier);
+        setTdeeResult({ bmr, tdee });
+      } else {
+        setTdeeResult(null);
+      }
     }
   }, [open, nutritionSettings]);
 
@@ -2991,17 +3016,21 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     setChatMessages([]);
     setAiRecommendation(null);
     
+    // Use TDEE result if available, otherwise use saved nutrition settings
+    const hasStats = tdeeResult || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age);
+    const currentStats = hasStats ? {
+      weight: tdeeData.weight || nutritionSettings.weight?.toString() || "",
+      height: tdeeData.height || nutritionSettings.height?.toString() || "",
+      age: tdeeData.age || nutritionSettings.age?.toString() || "",
+      gender: tdeeData.gender || nutritionSettings.gender || "male",
+      activityLevel: tdeeData.activityLevel || nutritionSettings.activityLevel || "moderate",
+      tdee: tdeeResult?.tdee || nutritionSettings.maintenanceCalories || null,
+    } : null;
+    
     try {
       const res = await apiRequest("POST", "/api/fitness/goal/chat", {
         history: [],
-        currentStats: tdeeResult ? {
-          weight: tdeeData.weight,
-          height: tdeeData.height,
-          age: tdeeData.age,
-          gender: tdeeData.gender,
-          activityLevel: tdeeData.activityLevel,
-          tdee: tdeeResult.tdee,
-        } : null,
+        currentStats,
       });
       const data = await res.json();
       setChatMessages([{ role: 'assistant', content: data.message }]);
@@ -3024,17 +3053,21 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     setUserInput("");
     setIsLoading(true);
     
+    // Use TDEE result if available, otherwise use saved nutrition settings
+    const hasStats = tdeeResult || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age);
+    const currentStats = hasStats ? {
+      weight: tdeeData.weight || nutritionSettings.weight?.toString() || "",
+      height: tdeeData.height || nutritionSettings.height?.toString() || "",
+      age: tdeeData.age || nutritionSettings.age?.toString() || "",
+      gender: tdeeData.gender || nutritionSettings.gender || "male",
+      activityLevel: tdeeData.activityLevel || nutritionSettings.activityLevel || "moderate",
+      tdee: tdeeResult?.tdee || nutritionSettings.maintenanceCalories || null,
+    } : null;
+    
     try {
       const res = await apiRequest("POST", "/api/fitness/goal/chat", {
         history: updatedHistory,
-        currentStats: tdeeResult ? {
-          weight: tdeeData.weight,
-          height: tdeeData.height,
-          age: tdeeData.age,
-          gender: tdeeData.gender,
-          activityLevel: tdeeData.activityLevel,
-          tdee: tdeeResult.tdee,
-        } : null,
+        currentStats,
       });
       const data = await res.json();
       setChatMessages([...updatedHistory, { role: 'assistant', content: data.message }]);
@@ -3072,6 +3105,12 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       goalType: finalGoalType,
       calorieTarget: parseInt(target) || 2000,
       maintenanceCalories: parseInt(maintenance) || 2500,
+      // Include TDEE data if available
+      weight: tdeeData.weight ? parseInt(tdeeData.weight) : undefined,
+      height: tdeeData.height ? parseInt(tdeeData.height) : undefined,
+      age: tdeeData.age ? parseInt(tdeeData.age) : undefined,
+      gender: tdeeData.gender || undefined,
+      activityLevel: tdeeData.activityLevel || undefined,
     });
   };
 
