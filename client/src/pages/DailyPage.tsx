@@ -11,10 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
 import { cn } from "@/lib/utils";
-import { HelpCircle, Apple } from "lucide-react";
+import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpDialog } from "@/components/HelpDialog";
-import { FoodAnalyzerDialog } from "@/components/FoodAnalyzerDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   loadTasksFromStorage,
@@ -106,7 +105,6 @@ export default function DailyPage() {
   const [todoBonusPoints, setTodoBonusPoints] = useState(10);
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
-  const [foodAnalyzerOpen, setFoodAnalyzerOpen] = useState(false);
   const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
   const [taskTiers, setTaskTiers] = useState<Record<string, string>>({});
   const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
@@ -746,9 +744,6 @@ export default function DailyPage() {
             <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-daily-help">
               <HelpCircle className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => setFoodAnalyzerOpen(true)} data-testid="button-food-analyzer">
-              <Apple className="h-5 w-5" />
-            </Button>
           </div>
           <DatePicker date={date} onDateChange={setDate} />
         </div>
@@ -759,7 +754,6 @@ export default function DailyPage() {
           </p>
         </div>
         <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} />
-        <FoodAnalyzerDialog open={foodAnalyzerOpen} onOpenChange={setFoodAnalyzerOpen} />
       </div>
     );
   }
@@ -775,14 +769,10 @@ export default function DailyPage() {
           <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-daily-help">
             <HelpCircle className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setFoodAnalyzerOpen(true)} data-testid="button-food-analyzer">
-            <Apple className="h-5 w-5" />
-          </Button>
         </div>
         <DatePicker date={date} onDateChange={setDate} />
       </div>
       <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} />
-      <FoodAnalyzerDialog open={foodAnalyzerOpen} onOpenChange={setFoodAnalyzerOpen} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">

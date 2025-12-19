@@ -2604,7 +2604,7 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   onEdit?: (id: string, data: Partial<NutritionLog>) => void;
 }) {
   const { toast } = useToast();
-  const [logMode, setLogMode] = useState<"meal" | "total" | "ai">("total");
+  const [logMode, setLogMode] = useState<"meal" | "total" | "ai" | "photo">("total");
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     calories: "",
@@ -2628,6 +2628,21 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     breakdown: string;
   } | null>(null);
   const aiChatEndRef = useRef<HTMLDivElement>(null);
+  
+  // Photo mode state
+  const [photoImageData, setPhotoImageData] = useState<string | null>(null);
+  const [photoAnalyzing, setPhotoAnalyzing] = useState(false);
+  const [photoResult, setPhotoResult] = useState<{
+    totalCalories: number;
+    totalProtein: number;
+    totalCarbs: number;
+    totalFat: number;
+    items: { name: string; portion: string; calories: number; protein: number; carbs: number; fat: number }[];
+    confidence: "high" | "medium" | "low";
+    notes?: string;
+  } | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!editData;
 
@@ -2650,6 +2665,9 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       setAiChatMessages([]);
       setAiUserInput("");
       setAiResult(null);
+      setPhotoImageData(null);
+      setPhotoResult(null);
+      setPhotoAnalyzing(false);
     }
   }, [editData]);
 
@@ -2685,6 +2703,66 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     setAiChatMessages([]);
     setAiUserInput("");
     setAiResult(null);
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Please select an image under 10MB", variant: "destructive" });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotoImageData(ev.target?.result as string);
+        setPhotoResult(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePhotoAnalyze = async () => {
+    if (!photoImageData) return;
+    setPhotoAnalyzing(true);
+    try {
+      const res = await apiRequest("POST", "/api/food/analyze", { image: photoImageData });
+      if (!res.ok) throw new Error("Failed to analyze");
+      const data = await res.json();
+      if (!data.items || !Array.isArray(data.items)) throw new Error("Invalid response");
+      setPhotoResult(data);
+    } catch (error) {
+      toast({ title: "Analysis failed", variant: "destructive" });
+    } finally {
+      setPhotoAnalyzing(false);
+    }
+  };
+
+  const resetPhoto = () => {
+    setPhotoImageData(null);
+    setPhotoResult(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const applyPhotoResult = () => {
+    if (!photoResult) return;
+    const meal: Meal = {
+      id: `photo-meal-${Date.now()}`,
+      name: photoResult.items.length === 1 ? photoResult.items[0].name : `Photo Meal (${photoResult.items.length} items)`,
+      calories: photoResult.totalCalories,
+      protein: photoResult.totalProtein,
+      time: format(new Date(), "h:mm a"),
+    };
+    const newMeals = [...meals, meal];
+    setMeals(newMeals);
+    const totalCalories = (parseInt(formData.calories) || 0) + photoResult.totalCalories;
+    const totalProtein = (parseInt(formData.protein) || 0) + photoResult.totalProtein;
+    const totalCarbs = (parseInt(formData.carbs) || 0) + photoResult.totalCarbs;
+    const totalFats = (parseInt(formData.fats) || 0) + photoResult.totalFat;
+    setFormData({ ...formData, calories: totalCalories.toString(), protein: totalProtein.toString(), carbs: totalCarbs.toString(), fats: totalFats.toString() });
+    setLogMode("meal");
+    resetPhoto();
+    toast({ title: "Meal added", description: `Added ${meal.name} to your log` });
   };
 
   const applyAiResult = () => {
@@ -2825,6 +2903,15 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
             >
               <Sparkles className="h-4 w-4 mr-1" /> Log by AI
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={logMode === "photo" ? "default" : "outline"}
+              onClick={() => setLogMode("photo")}
+              data-testid="button-log-mode-photo"
+            >
+              <Camera className="h-4 w-4 mr-1" /> Log by Photo
+            </Button>
           </div>
           
           {/* Add Individual Meal - only shown in meal mode */}
@@ -2950,8 +3037,85 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
           </div>
           )}
 
+          {/* Photo Mode */}
+          {logMode === "photo" && (
+          <div className="space-y-3 p-3 border rounded-md">
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoSelect}
+              className="hidden"
+              data-testid="input-photo-camera"
+            />
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoSelect}
+              className="hidden"
+              data-testid="input-photo-upload"
+            />
+            
+            {!photoImageData ? (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Take a photo of your food</div>
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" onClick={() => cameraInputRef.current?.click()} data-testid="button-take-photo">
+                    <Camera className="h-4 w-4 mr-1" /> Take Photo
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => photoInputRef.current?.click()} data-testid="button-upload-photo">
+                    Upload Photo
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="relative">
+                  <img src={photoImageData} alt="Food" className="w-full rounded-md object-cover max-h-48" />
+                  <Button size="icon" variant="secondary" className="absolute top-2 right-2" onClick={resetPhoto} data-testid="button-clear-photo">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {!photoResult && (
+                  <Button size="sm" onClick={handlePhotoAnalyze} disabled={photoAnalyzing} data-testid="button-analyze-photo">
+                    {photoAnalyzing ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Analyzing...</> : "Analyze Food"}
+                  </Button>
+                )}
+                
+                {photoResult && (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-muted/50 rounded-md">
+                      <div className="font-medium text-sm mb-2">Found {photoResult.items.length} item(s):</div>
+                      {photoResult.items.map((item: { name: string; portion: string; calories: number; protein: number }, i: number) => (
+                        <div key={i} className="flex justify-between text-sm py-1 border-b last:border-b-0">
+                          <span>{item.name} ({item.portion})</span>
+                          <span className="text-muted-foreground">{item.calories} cal, {item.protein}g P</span>
+                        </div>
+                      ))}
+                      <div className="mt-2 pt-2 border-t font-medium text-sm">
+                        Total: {photoResult.totalCalories} cal, {photoResult.totalProtein}g P, {photoResult.totalCarbs}g C, {photoResult.totalFat}g F
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" onClick={applyPhotoResult} data-testid="button-apply-photo">
+                        <Check className="h-4 w-4 mr-1" /> Add as Meal
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={resetPhoto} data-testid="button-retake-photo">
+                        Retake Photo
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          )}
+
           {/* Totals - only shown in total or meal mode */}
-          {logMode !== "ai" && (
+          {logMode !== "ai" && logMode !== "photo" && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Total Calories</Label>
