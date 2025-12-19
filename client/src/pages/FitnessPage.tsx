@@ -2339,6 +2339,14 @@ export default function FitnessPage() {
         isDemo={isDemo}
         nutritionSettings={nutritionSettings}
       />
+      
+      <GoalDialog
+        open={goalDialogOpen}
+        onOpenChange={setGoalDialogOpen}
+        isDemo={isDemo}
+        nutritionSettings={nutritionSettings}
+        onSave={(data) => updateGoalMutation.mutate(data)}
+      />
     </div>
   );
 }
@@ -2857,6 +2865,146 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={updateMutation.isPending} data-testid="button-save-deficit">
             {updateMutation.isPending ? "Saving..." : "Save Deficit"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isDemo: boolean;
+  nutritionSettings: NutritionSettings;
+  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number }) => void;
+}) {
+  const { toast } = useToast();
+  const [goalMode, setGoalMode] = useState(nutritionSettings.goalType || 'moderate_cut');
+  const [maintenance, setMaintenance] = useState(nutritionSettings.maintenanceCalories?.toString() || '2500');
+  const [target, setTarget] = useState(nutritionSettings.calorieTarget?.toString() || '2000');
+
+  useEffect(() => {
+    if (open) {
+      setGoalMode(nutritionSettings.goalType || 'moderate_cut');
+      setMaintenance(nutritionSettings.maintenanceCalories?.toString() || '2500');
+      setTarget(nutritionSettings.calorieTarget?.toString() || '2000');
+    }
+  }, [open, nutritionSettings]);
+
+  useEffect(() => {
+    const maintenanceCal = parseInt(maintenance) || 2500;
+    let newTarget = maintenanceCal;
+    
+    switch (goalMode) {
+      case 'aggressive_cut':
+        newTarget = maintenanceCal - 750;
+        break;
+      case 'moderate_cut':
+        newTarget = maintenanceCal - 500;
+        break;
+      case 'light_cut':
+        newTarget = maintenanceCal - 250;
+        break;
+      case 'maintenance':
+        newTarget = maintenanceCal;
+        break;
+      case 'lean_bulk':
+        newTarget = maintenanceCal + 250;
+        break;
+      case 'bulk':
+        newTarget = maintenanceCal + 500;
+        break;
+    }
+    setTarget(newTarget.toString());
+  }, [goalMode, maintenance]);
+
+  const handleSave = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - changes not saved" });
+      onOpenChange(false);
+      return;
+    }
+    
+    onSave({
+      goalType: goalMode,
+      calorieTarget: parseInt(target) || 2000,
+      maintenanceCalories: parseInt(maintenance) || 2500,
+    });
+  };
+
+  const goalOptions = [
+    { value: 'aggressive_cut', label: 'Aggressive Cut', description: '-750 cal/day' },
+    { value: 'moderate_cut', label: 'Moderate Cut', description: '-500 cal/day' },
+    { value: 'light_cut', label: 'Light Cut', description: '-250 cal/day' },
+    { value: 'maintenance', label: 'Maintenance', description: 'No change' },
+    { value: 'lean_bulk', label: 'Lean Bulk', description: '+250 cal/day' },
+    { value: 'bulk', label: 'Bulk', description: '+500 cal/day' },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Adjust Your Goal</DialogTitle>
+          <DialogDescription>
+            Set your nutrition goal and calorie targets
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Maintenance Calories</Label>
+            <Input
+              type="number"
+              value={maintenance}
+              onChange={(e) => setMaintenance(e.target.value)}
+              placeholder="2500"
+              data-testid="input-maintenance-calories"
+            />
+            <p className="text-xs text-muted-foreground">Your estimated daily calorie burn</p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Goal Mode</Label>
+            <Select value={goalMode} onValueChange={setGoalMode}>
+              <SelectTrigger data-testid="select-goal-mode">
+                <SelectValue placeholder="Select goal" />
+              </SelectTrigger>
+              <SelectContent>
+                {goalOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{option.label}</span>
+                      <span className="text-xs text-muted-foreground">({option.description})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Daily Calorie Target</Label>
+            <Input
+              type="number"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="2000"
+              data-testid="input-calorie-target"
+            />
+            <p className="text-xs text-muted-foreground">
+              {goalMode === 'maintenance' 
+                ? 'Eating at maintenance level'
+                : goalMode.includes('cut') 
+                  ? `${parseInt(maintenance) - parseInt(target)} cal deficit per day`
+                  : `${parseInt(target) - parseInt(maintenance)} cal surplus per day`}
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} data-testid="button-save-goal">
+            Save Goal
           </Button>
         </DialogFooter>
       </DialogContent>
