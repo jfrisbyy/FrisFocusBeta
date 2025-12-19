@@ -2308,7 +2308,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Save season penalties (replaces all penalties for a season)
+  // Save season penalties (preserves IDs for existing penalties, generates new IDs for new penalties)
   app.put("/api/seasons/:id/penalties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -2326,20 +2326,61 @@ Create motivating badges that will encourage consistency. Return valid JSON only
         return res.status(400).json({ error: "Cannot modify an archived season" });
       }
 
-      // Delete existing penalties and insert new ones
-      await db.delete(seasonPenalties).where(eq(seasonPenalties.seasonId, id));
+      // Get existing penalties to determine which to update vs insert
+      const existingPenalties = await db.select().from(seasonPenalties).where(eq(seasonPenalties.seasonId, id));
+      const existingIds = new Set(existingPenalties.map(p => p.id));
+      
+      // Separate penalties into updates (have ID that exists) and inserts (new or no ID)
+      const penaltiesToUpdate: any[] = [];
+      const penaltiesToInsert: any[] = [];
+      const incomingIds = new Set<string>();
       
       if (penalties && penalties.length > 0) {
-        const penaltyValues = penalties.map((p: any) => ({
-          seasonId: id,
-          name: p.name,
-          value: p.value,
-          negativeBoostEnabled: p.negativeBoostEnabled || false,
-          timesThreshold: p.timesThreshold || null,
-          period: p.period || null,
-          boostPenaltyPoints: p.boostPenaltyPoints || null,
-        }));
-        await db.insert(seasonPenalties).values(penaltyValues);
+        for (const p of penalties) {
+          if (p.id && existingIds.has(p.id)) {
+            // Existing penalty - update it
+            penaltiesToUpdate.push(p);
+            incomingIds.add(p.id);
+          } else {
+            // New penalty - insert with new ID
+            penaltiesToInsert.push({
+              seasonId: id,
+              name: p.name,
+              value: p.value,
+              negativeBoostEnabled: p.negativeBoostEnabled || false,
+              timesThreshold: p.timesThreshold || null,
+              period: p.period || null,
+              boostPenaltyPoints: p.boostPenaltyPoints || null,
+            });
+          }
+        }
+      }
+      
+      // Delete penalties that were removed (not in incoming list)
+      const idsToDelete = existingPenalties.filter(p => !incomingIds.has(p.id)).map(p => p.id);
+      if (idsToDelete.length > 0) {
+        await db.delete(seasonPenalties).where(
+          and(eq(seasonPenalties.seasonId, id), inArray(seasonPenalties.id, idsToDelete))
+        );
+      }
+      
+      // Update existing penalties
+      for (const p of penaltiesToUpdate) {
+        await db.update(seasonPenalties)
+          .set({
+            name: p.name,
+            value: p.value,
+            negativeBoostEnabled: p.negativeBoostEnabled || false,
+            timesThreshold: p.timesThreshold || null,
+            period: p.period || null,
+            boostPenaltyPoints: p.boostPenaltyPoints || null,
+          })
+          .where(eq(seasonPenalties.id, p.id));
+      }
+      
+      // Insert new penalties
+      if (penaltiesToInsert.length > 0) {
+        await db.insert(seasonPenalties).values(penaltiesToInsert);
       }
 
       const updatedPenalties = await db.select().from(seasonPenalties).where(eq(seasonPenalties.seasonId, id));
