@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -98,13 +97,13 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-6">
-      <Card className="flex h-[calc(100vh-12rem)] flex-col">
-        <CardHeader className="flex flex-row items-center gap-2 border-b pb-4">
+    <div className="flex h-full w-full flex-col">
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-2 border-b p-4">
           <Sparkles className="h-5 w-5 text-muted-foreground" />
-          <CardTitle>AI Insights</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col p-0">
+          <h1 className="text-lg font-semibold">AI Insights</h1>
+        </div>
+        <div className="flex flex-1 flex-col overflow-hidden">
           <ScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-4 text-center text-muted-foreground">
@@ -200,8 +199,8 @@ export default function InsightsPage() {
               <Send className="h-4 w-4" />
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
