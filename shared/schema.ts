@@ -1841,3 +1841,19 @@ export const aiGenerateBadgesResponseSchema = z.object({
   badges: z.array(aiGeneratedBadgeSchema),
 });
 export type AIGenerateBadgesResponse = z.infer<typeof aiGenerateBadgesResponseSchema>;
+
+// ==================== AI CONVERSATIONS ====================
+
+// AI Conversations table - stores chat sessions with the AI insights coach
+export const aiConversations = pgTable("ai_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title").notNull().default("New Conversation"),
+  messages: jsonb("messages").notNull().default([]), // Array of AIMessage objects
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAIConversation = z.infer<typeof insertAIConversationSchema>;
+export type AIConversation = typeof aiConversations.$inferSelect;

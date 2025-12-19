@@ -6311,6 +6311,86 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
+  // ==================== AI CONVERSATIONS ====================
+
+  // Get all AI conversations for the user
+  app.get("/api/ai/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversations = await storage.getAIConversations(userId);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching AI conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations" });
+    }
+  });
+
+  // Get a single AI conversation
+  app.get("/api/ai/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const conversation = await storage.getAIConversation(id, userId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error fetching AI conversation:", error);
+      res.status(500).json({ error: "Failed to fetch conversation" });
+    }
+  });
+
+  // Create a new AI conversation
+  app.post("/api/ai/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, messages } = req.body;
+      const conversation = await storage.createAIConversation({
+        userId,
+        title: title || "New Conversation",
+        messages: messages || [],
+      });
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error creating AI conversation:", error);
+      res.status(400).json({ error: "Failed to create conversation" });
+    }
+  });
+
+  // Update an AI conversation (add messages or rename)
+  app.put("/api/ai/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { title, messages } = req.body;
+      const conversation = await storage.updateAIConversation(id, userId, { title, messages });
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error updating AI conversation:", error);
+      res.status(400).json({ error: "Failed to update conversation" });
+    }
+  });
+
+  // Delete an AI conversation
+  app.delete("/api/ai/conversations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteAIConversation(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting AI conversation:", error);
+      res.status(400).json({ error: "Failed to delete conversation" });
+    }
+  });
+
   // Get user dashboard preferences
   app.get("/api/dashboard/preferences", isAuthenticated, async (req: any, res) => {
     try {
