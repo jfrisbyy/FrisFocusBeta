@@ -17,7 +17,7 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, Send, Sparkles, Check, Loader2
+  MessageCircle, Send, Sparkles, Check, Loader2, X
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1717,6 +1717,7 @@ export default function FitnessPage() {
                 isDemo={isDemo}
                 defaultFields={DEFAULT_LIVE_PLAY_FIELDS}
                 currentVisibleFields={livePlayVisibleFields}
+                settingsData={livePlaySettingsData}
               />
 
               <div className="grid gap-4 md:grid-cols-3">
@@ -3992,30 +3993,55 @@ function LivePlaySettingsDialog({
   onOpenChange, 
   isDemo, 
   defaultFields,
-  currentVisibleFields 
+  currentVisibleFields,
+  settingsData
 }: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void; 
   isDemo: boolean;
-  defaultFields: { id: string; label: string; enabled: boolean }[];
+  defaultFields: LivePlayField[];
   currentVisibleFields: string[];
+  settingsData: LivePlaySettings | undefined;
 }) {
   const { toast } = useToast();
   const [selectedFields, setSelectedFields] = useState<string[]>(currentVisibleFields);
+  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [showAddField, setShowAddField] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<"text" | "number" | "select" | "textarea">("text");
+
+  const customTemplates = (settingsData?.customTemplates as SportTemplate[]) || [];
+  const activeTemplateId = (settingsData?.activeTemplateId as string) || "basketball";
+  const customFields = (settingsData?.customFields as LivePlayField[]) || [];
+
+  const BASKETBALL_DEFAULT: SportTemplate = {
+    id: "basketball",
+    name: "Basketball",
+    isDefault: true,
+    fields: defaultFields,
+  };
+
+  const allTemplates = [BASKETBALL_DEFAULT, ...customTemplates];
+  const activeTemplate = allTemplates.find(t => t.id === activeTemplateId) || BASKETBALL_DEFAULT;
 
   useEffect(() => {
     setSelectedFields(currentVisibleFields);
   }, [currentVisibleFields]);
 
   const updateMutation = useMutation({
-    mutationFn: async (visibleFields: string[]) => {
-      const res = await apiRequest("PUT", "/api/fitness/live-play-settings", { visibleFields });
+    mutationFn: async (data: Partial<LivePlaySettings>) => {
+      const currentSettings = {
+        visibleFields: settingsData?.visibleFields || currentVisibleFields,
+        customFields: settingsData?.customFields || [],
+        customTemplates: settingsData?.customTemplates || [],
+        activeTemplateId: settingsData?.activeTemplateId || "basketball",
+      };
+      const res = await apiRequest("PUT", "/api/fitness/live-play-settings", { ...currentSettings, ...data });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/live-play-settings"] });
-      toast({ title: "Settings saved" });
-      onOpenChange(false);
     },
     onError: () => {
       toast({ title: "Failed to save settings", variant: "destructive" });
@@ -4036,29 +4062,315 @@ function LivePlaySettingsDialog({
       onOpenChange(false);
       return;
     }
-    updateMutation.mutate(selectedFields);
+    updateMutation.mutate({ visibleFields: selectedFields }, {
+      onSuccess: () => {
+        toast({ title: "Settings saved" });
+        onOpenChange(false);
+      }
+    });
   };
+
+  const handleCreateTemplate = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot create templates" });
+      return;
+    }
+    if (!newTemplateName.trim()) {
+      toast({ title: "Please enter a template name", variant: "destructive" });
+      return;
+    }
+    const selectedFieldsFromDisplay = displayFields.filter(f => selectedFields.includes(f.id));
+    const newTemplate: SportTemplate = {
+      id: `custom-${Date.now()}`,
+      name: newTemplateName.trim(),
+      isDefault: false,
+      fields: selectedFieldsFromDisplay,
+    };
+    const updatedTemplates = [...customTemplates, newTemplate];
+    const newFieldIds = selectedFieldsFromDisplay.map(f => f.id);
+    updateMutation.mutate({ 
+      customTemplates: updatedTemplates,
+      activeTemplateId: newTemplate.id,
+      visibleFields: newFieldIds
+    }, {
+      onSuccess: () => {
+        toast({ title: `Template "${newTemplate.name}" created` });
+        setNewTemplateName("");
+        setShowCreateTemplate(false);
+        setSelectedFields(newFieldIds);
+      }
+    });
+  };
+
+  const handleSwitchTemplate = (templateId: string) => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot switch templates" });
+      return;
+    }
+    const template = allTemplates.find(t => t.id === templateId);
+    let fieldIds: string[] = [];
+    if (template) {
+      fieldIds = template.fields.map(f => f.id);
+      if (template.isDefault) {
+        const customFieldIds = customFields.map(f => f.id);
+        fieldIds = [...fieldIds, ...customFieldIds];
+      }
+    }
+    updateMutation.mutate({ 
+      activeTemplateId: templateId,
+      visibleFields: fieldIds
+    }, {
+      onSuccess: () => {
+        setSelectedFields(fieldIds);
+      }
+    });
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot delete templates" });
+      return;
+    }
+    const template = customTemplates.find(t => t.id === templateId);
+    if (!template) return;
+    const updatedTemplates = customTemplates.filter(t => t.id !== templateId);
+    updateMutation.mutate({ 
+      customTemplates: updatedTemplates,
+      activeTemplateId: activeTemplateId === templateId ? "basketball" : activeTemplateId
+    }, {
+      onSuccess: () => {
+        toast({ title: `Template "${template.name}" deleted` });
+      }
+    });
+  };
+
+  const handleAddField = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot add fields" });
+      return;
+    }
+    if (!newFieldLabel.trim()) {
+      toast({ title: "Please enter a field label", variant: "destructive" });
+      return;
+    }
+    const newField: LivePlayField = {
+      id: `custom-field-${Date.now()}`,
+      label: newFieldLabel.trim(),
+      enabled: true,
+      type: newFieldType,
+    };
+    
+    if (activeTemplate.isDefault) {
+      const existingCustomFields = (settingsData?.customFields as LivePlayField[]) || [];
+      updateMutation.mutate({ 
+        customFields: [...existingCustomFields, newField],
+        visibleFields: [...selectedFields, newField.id]
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => [...prev, newField.id]);
+          toast({ title: `Field "${newField.label}" added` });
+          setNewFieldLabel("");
+          setNewFieldType("text");
+          setShowAddField(false);
+        }
+      });
+    } else {
+      const updatedTemplates = customTemplates.map(t => 
+        t.id === activeTemplateId 
+          ? { ...t, fields: [...t.fields, newField] }
+          : t
+      );
+      updateMutation.mutate({ 
+        customTemplates: updatedTemplates,
+        visibleFields: [...selectedFields, newField.id]
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => [...prev, newField.id]);
+          toast({ title: `Field "${newField.label}" added` });
+          setNewFieldLabel("");
+          setNewFieldType("text");
+          setShowAddField(false);
+        }
+      });
+    }
+  };
+
+  const handleRemoveField = (fieldId: string) => {
+    if (isDemo) {
+      toast({ title: "Demo mode - cannot remove fields" });
+      return;
+    }
+    if (activeTemplate.isDefault) {
+      const existingCustomFields = (settingsData?.customFields as LivePlayField[]) || [];
+      const updatedFields = existingCustomFields.filter(f => f.id !== fieldId);
+      updateMutation.mutate({ 
+        customFields: updatedFields,
+        visibleFields: selectedFields.filter(id => id !== fieldId)
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => prev.filter(id => id !== fieldId));
+          toast({ title: "Field removed" });
+        }
+      });
+    } else {
+      const updatedTemplates = customTemplates.map(t => 
+        t.id === activeTemplateId 
+          ? { ...t, fields: t.fields.filter(f => f.id !== fieldId) }
+          : t
+      );
+      updateMutation.mutate({ 
+        customTemplates: updatedTemplates,
+        visibleFields: selectedFields.filter(id => id !== fieldId)
+      }, {
+        onSuccess: () => {
+          setSelectedFields(prev => prev.filter(id => id !== fieldId));
+          toast({ title: "Field removed" });
+        }
+      });
+    }
+  };
+
+  const displayFields = activeTemplate.isDefault 
+    ? [...activeTemplate.fields, ...customFields]
+    : activeTemplate.fields;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Live Play Form Fields</DialogTitle>
-          <DialogDescription>Choose which fields to show when logging a session</DialogDescription>
+          <DialogTitle>Live Play Settings</DialogTitle>
+          <DialogDescription>Configure your sport template and visible fields</DialogDescription>
         </DialogHeader>
+        
         <div className="space-y-4 py-4">
-          {defaultFields.map((field) => (
-            <div key={field.id} className="flex items-center space-x-3">
-              <Checkbox 
-                id={field.id}
-                checked={selectedFields.includes(field.id)}
-                onCheckedChange={() => toggleField(field.id)}
-                data-testid={`checkbox-field-${field.id}`}
-              />
-              <Label htmlFor={field.id} className="cursor-pointer">{field.label}</Label>
+          <div className="space-y-2">
+            <Label>Current Template</Label>
+            <div className="flex gap-2">
+              <Select value={activeTemplateId} onValueChange={handleSwitchTemplate}>
+                <SelectTrigger data-testid="select-template">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {allTemplates.map(template => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name} {template.isDefault && "(Default)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!activeTemplate.isDefault && (
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => handleDeleteTemplate(activeTemplateId)}
+                  data-testid="button-delete-template"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              )}
             </div>
-          ))}
+          </div>
+
+          {showCreateTemplate ? (
+            <div className="space-y-2 p-3 border rounded-md">
+              <Label>New Template Name</Label>
+              <Input 
+                placeholder="e.g., Soccer, Tennis, Volleyball"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                data-testid="input-template-name"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setShowCreateTemplate(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleCreateTemplate} data-testid="button-confirm-create-template">Create</Button>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={() => setShowCreateTemplate(true)}
+              data-testid="button-create-template"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create New Template
+            </Button>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Visible Fields</Label>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {displayFields.map((field) => (
+                <div key={field.id} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Checkbox 
+                      id={field.id}
+                      checked={selectedFields.includes(field.id)}
+                      onCheckedChange={() => toggleField(field.id)}
+                      data-testid={`checkbox-field-${field.id}`}
+                    />
+                    <Label htmlFor={field.id} className="cursor-pointer text-sm">{field.label}</Label>
+                  </div>
+                  {field.id.startsWith("custom-field-") && (
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => handleRemoveField(field.id)}
+                      data-testid={`button-remove-field-${field.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {showAddField ? (
+            <div className="space-y-2 p-3 border rounded-md">
+              <div className="space-y-2">
+                <Label>Field Label</Label>
+                <Input 
+                  placeholder="e.g., Energy Level, Weather"
+                  value={newFieldLabel}
+                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                  data-testid="input-field-label"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Field Type</Label>
+                <Select value={newFieldType} onValueChange={(v) => setNewFieldType(v as typeof newFieldType)}>
+                  <SelectTrigger data-testid="select-field-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="textarea">Text Area</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setShowAddField(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleAddField} data-testid="button-confirm-add-field">Add Field</Button>
+              </div>
+            </div>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="w-full" 
+              onClick={() => setShowAddField(true)}
+              data-testid="button-add-field"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Custom Field
+            </Button>
+          )}
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-live-play-settings">
