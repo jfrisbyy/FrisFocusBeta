@@ -459,6 +459,27 @@ export const insertNutritionSettingsSchema = createInsertSchema(nutritionSetting
 export type InsertNutritionSettings = z.infer<typeof insertNutritionSettingsSchema>;
 export type NutritionSettings = typeof nutritionSettings.$inferSelect;
 
+// Live Play settings - stores customizable field visibility
+export const livePlayFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  enabled: z.boolean(),
+  type: z.enum(["text", "number", "select", "textarea"]),
+  options: z.array(z.string()).optional(),
+});
+export type LivePlayField = z.infer<typeof livePlayFieldSchema>;
+
+export const livePlaySettings = pgTable("live_play_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  visibleFields: jsonb("visible_fields"), // Array of field IDs that are visible
+  customFields: jsonb("custom_fields"), // Array of LivePlayField for custom fields
+});
+
+export const insertLivePlaySettingsSchema = createInsertSchema(livePlaySettings).omit({ id: true });
+export type InsertLivePlaySettings = z.infer<typeof insertLivePlaySettingsSchema>;
+export type LivePlaySettings = typeof livePlaySettings.$inferSelect;
+
 // ==================== GPT OAuth Tables ====================
 
 // OAuth access tokens for GPT integration

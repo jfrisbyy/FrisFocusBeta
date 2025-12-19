@@ -327,7 +327,7 @@ export default function FitnessPage() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto" data-testid="page-fitness">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">FrisFit Dashboard</h1>
+        <h1 className="text-2xl font-bold">Fitness</h1>
         <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
       </div>
 
@@ -1023,11 +1023,11 @@ export default function FitnessPage() {
             <TabsList>
               <TabsTrigger value="runs" data-testid="subtab-runs">
                 <Trophy className="h-4 w-4 mr-2" />
-                Pickup Games
+                Live Play
               </TabsTrigger>
               <TabsTrigger value="drills" data-testid="subtab-drills">
                 <Target className="h-4 w-4 mr-2" />
-                Skill Drills
+                Practice
               </TabsTrigger>
               <TabsTrigger value="cardio" data-testid="subtab-cardio">
                 <Footprints className="h-4 w-4 mr-2" />
@@ -1049,7 +1049,7 @@ export default function FitnessPage() {
                   <Card className="md:col-span-3">
                     <CardContent className="py-8 text-center">
                       <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No pickup games logged yet</p>
+                      <p className="text-muted-foreground">No live play sessions logged yet</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -1971,8 +1971,8 @@ function RunDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenChange
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Basketball Run</DialogTitle>
-          <DialogDescription>Record your pickup games</DialogDescription>
+          <DialogTitle>Log Live Play Session</DialogTitle>
+          <DialogDescription>Record your live play session</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
