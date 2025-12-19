@@ -36,7 +36,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2 } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
@@ -189,6 +190,7 @@ export default function TasksPage() {
   const [aiSelectedPenalties, setAiSelectedPenalties] = useState<Set<number>>(new Set());
   const [aiSelectedCategories, setAiSelectedCategories] = useState<Set<number>>(new Set());
   const aiChatEndRef = useRef<HTMLDivElement>(null);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
 
   // Fetch seasons from API (available to all authenticated users)
   const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Season[]>({
@@ -1287,10 +1289,16 @@ export default function TasksPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
-        <p className="text-muted-foreground text-sm">Manage your tasks and point values</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
+          <p className="text-muted-foreground text-sm">Manage your tasks and point values</p>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-tasks-help">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
       </div>
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[2, 3]} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
         <Card>

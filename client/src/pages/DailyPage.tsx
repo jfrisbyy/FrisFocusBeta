@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
 import { cn } from "@/lib/utils";
+import { HelpCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { HelpDialog } from "@/components/HelpDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   loadTasksFromStorage,
@@ -89,6 +92,7 @@ export default function DailyPage() {
   const [todoBonusEnabled, setTodoBonusEnabled] = useState(false);
   const [todoBonusPoints, setTodoBonusPoints] = useState(10);
   const [todoBonusAwarded, setTodoBonusAwarded] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
   const [taskTiers, setTaskTiers] = useState<Record<string, string>>({});
   const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
@@ -720,9 +724,14 @@ export default function DailyPage() {
     return (
       <div className="p-4 md:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight" data-testid="heading-daily-log">Daily Log</h2>
-            <p className="text-muted-foreground text-sm">Track your tasks for the day</p>
+          <div className="flex items-center gap-2">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight" data-testid="heading-daily-log">Daily Log</h2>
+              <p className="text-muted-foreground text-sm">Track your tasks for the day</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-daily-help">
+              <HelpCircle className="h-5 w-5" />
+            </Button>
           </div>
           <DatePicker date={date} onDateChange={setDate} />
         </div>
@@ -732,6 +741,7 @@ export default function DailyPage() {
             Go to the Tasks page to add tasks and penalties to track.
           </p>
         </div>
+        <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} />
       </div>
     );
   }
@@ -739,12 +749,18 @@ export default function DailyPage() {
   return (
     <div className="p-4 md:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight" data-testid="heading-daily-log">Daily Log</h2>
-          <p className="text-muted-foreground text-sm">Track your tasks for the day</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight" data-testid="heading-daily-log">Daily Log</h2>
+            <p className="text-muted-foreground text-sm">Track your tasks for the day</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-daily-help">
+            <HelpCircle className="h-5 w-5" />
+          </Button>
         </div>
         <DatePicker date={date} onDateChange={setDate} />
       </div>
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">

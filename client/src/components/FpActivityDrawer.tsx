@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { Flame, Plus } from "lucide-react";
+import { Flame, Plus, HelpCircle } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
+import { Button } from "@/components/ui/button";
 import {
   Drawer,
   DrawerContent,
@@ -17,6 +20,7 @@ interface FpActivityDrawerProps {
 }
 
 export default function FpActivityDrawer({ open, onOpenChange }: FpActivityDrawerProps) {
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const { data: activities, isLoading } = useQuery<FpActivityLog[]>({
     queryKey: ["/api/fp/activity"],
     enabled: open,
@@ -36,11 +40,17 @@ export default function FpActivityDrawer({ open, onOpenChange }: FpActivityDrawe
               <Flame className="h-5 w-5 text-orange-500" />
               Focus Points Activity
             </DrawerTitle>
-            <Badge variant="secondary" className="font-mono">
-              {fpData?.fpTotal?.toLocaleString() || 0} FP
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-fp-help">
+                <HelpCircle className="h-5 w-5" />
+              </Button>
+              <Badge variant="secondary" className="font-mono">
+                {fpData?.fpTotal?.toLocaleString() || 0} FP
+              </Badge>
+            </div>
           </div>
         </DrawerHeader>
+        <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[4]} />
 
         <ScrollArea className="flex-1 px-4 py-4 max-h-[60vh]">
           {isLoading ? (

@@ -71,7 +71,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
+  HelpCircle,
 } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import type { 
   StoredFriend, 
   StoredCircle, 
@@ -2527,6 +2529,7 @@ export default function CommunityPage() {
   const [newTaskType, setNewTaskType] = useState<CircleTaskType>("per_person");
   const [newTaskNote, setNewTaskNote] = useState("");
   const [newTaskIsPenalty, setNewTaskIsPenalty] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [newTaskTiersEnabled, setNewTaskTiersEnabled] = useState(false);
   const [newTaskTiers, setNewTaskTiers] = useState<StoredTaskTier[]>([]);
   const [circleTasks, setCircleTasks] = useState<Record<string, StoredCircleTask[]>>({});
@@ -5782,17 +5785,23 @@ export default function CommunityPage() {
 
   return (
     <div className="container max-w-5xl mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Users className="w-8 h-8 text-foreground" />
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            Community
-          </h1>
-          <p className="text-muted-foreground">
-            Connect with friends and join circles to stay motivated together
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Users className="w-8 h-8 text-foreground" />
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              Community
+            </h1>
+            <p className="text-muted-foreground">
+              Connect with friends and join circles to stay motivated together
+            </p>
+          </div>
         </div>
+        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-community-help">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
       </div>
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[6]} />
 
       <Tabs value={communityTab} onValueChange={(v) => {
         setCommunityTab(v as "friends" | "circles" | "feed");

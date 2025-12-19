@@ -1,0 +1,456 @@
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+export type HelpCardId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
+interface HelpCard {
+  id: HelpCardId;
+  title: string;
+  subtitle: string;
+  icon: typeof HelpCircle;
+  content: {
+    intro?: string;
+    sections: {
+      title?: string;
+      items?: string[];
+      text?: string;
+    }[];
+    outro?: string;
+  };
+}
+
+const helpCards: HelpCard[] = [
+  {
+    id: 1,
+    title: "Welcome",
+    subtitle: "Welcome to FrisFocus",
+    icon: Sparkles,
+    content: {
+      intro: "FrisFocus helps you organize your life around what actually matters and follow through with structure, accountability, and visibility.",
+      sections: [
+        {
+          text: "This isn't about doing more. It's about doing what matters, consistently.",
+        },
+        {
+          items: [
+            "You can start solo or build with others.",
+            "You can keep things simple or make it competitive.",
+            "You can adjust anytime.",
+          ],
+        },
+      ],
+      outro: "There's no perfect setup — just one that fits you right now.",
+    },
+  },
+  {
+    id: 2,
+    title: "Seasons",
+    subtitle: "Seasons Give Direction",
+    icon: Target,
+    content: {
+      intro: "Life doesn't stay static — your goals, responsibilities, and energy change over time. FrisFocus is built to move with you.",
+      sections: [
+        {
+          text: "A Season represents a phase of your life, usually lasting a few months, where you define what matters right now — without locking yourself into a single path.",
+        },
+        {
+          title: "A Season can include multiple priorities:",
+          items: [
+            "Fitness or body goals",
+            "Athletic training or performance",
+            "Discipline and consistency",
+            "Mental clarity or balance",
+            "Career, school, or personal growth",
+          ],
+        },
+        {
+          text: "Seasons aren't about narrowing your life down to one thing. They help you organize your effort around what's relevant in this chapter — and adjust as life shifts.",
+        },
+      ],
+      outro: "Your Season doesn't need to be perfect. Clarity comes from action, not overplanning.",
+    },
+  },
+  {
+    id: 3,
+    title: "Tasks & To-Dos",
+    subtitle: "How Your Daily System Works",
+    icon: CheckSquare,
+    content: {
+      intro: "FrisFocus separates repeatable habits from one-time responsibilities — so everything has its place.",
+      sections: [
+        {
+          title: "Tasks (Repeatable Habits)",
+          text: "Tasks represent actions you repeat regularly to support your current Season — like workouts, training sessions, journaling, recovery habits, or daily routines. Tasks are checked off daily and earn personal points when completed. They form the foundation of your consistency.",
+        },
+        {
+          title: "To-Do Lists (One-Time Actions)",
+          text: "To-Dos are for things that don't repeat — like doctor's appointments, errands, meetings, and admin tasks. You can add a daily to-do list and a weekly to-do list for flexible, non-urgent items.",
+        },
+        {
+          title: "Milestones & Due Dates",
+          text: "Milestones represent major goals you want to complete in the near future — like buying a car, finishing a project, or preparing for an event. Due dates help you track time-sensitive items such as bills, assignments, and deadlines.",
+        },
+        {
+          title: "Daily & Weekly Point Goals",
+          text: "You set a daily personal point goal and a weekly personal point goal. Completing tasks earns personal points that roll up toward those goals. Important actions should carry more weight than optional ones.",
+        },
+        {
+          title: "Breaking Habits & Reinforcing Good Ones",
+          items: [
+            "Add penalties for habits you're trying to reduce (awareness, not punishment)",
+            "Add boosters that reward consistency, streaks, or hitting weekly goals repeatedly",
+          ],
+        },
+      ],
+      outro: "If you're unsure how to structure your tasks, scoring, penalties, or milestones, AI can help you explore realistic setups. You stay in control — AI supports your thinking, it doesn't replace it.",
+    },
+  },
+  {
+    id: 4,
+    title: "Focus Points",
+    subtitle: "The Universal Score",
+    icon: Zap,
+    content: {
+      intro: "Focus Points are a separate, universal point system used to reflect outcomes and compare progress across people and groups. Unlike personal points, Focus Points are not tied to specific tasks.",
+      sections: [
+        {
+          title: "They're earned by:",
+          items: [
+            "Hitting daily or weekly goals",
+            "Staying consistent over time",
+            "Completing workouts or training sessions",
+            "Participating in Circles",
+            "Winning challenges or competitions",
+            "Reaching milestones",
+          ],
+        },
+        {
+          title: "Focus Points allow you to:",
+          items: [
+            "Compare progress without exposing your personal task system",
+            "Compete fairly across different goals and sports",
+            "Track momentum, not micromanagement",
+          ],
+        },
+      ],
+      outro: "Personal points are how you work. Focus Points are what the outcome looks like.",
+    },
+  },
+  {
+    id: 5,
+    title: "Fitness & Sports",
+    subtitle: "Built for Everyday Life and Serious Training",
+    icon: Dumbbell,
+    content: {
+      intro: "FrisFocus includes a fully integrated fitness and sports system designed for everyone — from everyday people prioritizing their health to serious athletes training with intent.",
+      sections: [
+        {
+          title: "Whether you're:",
+          items: [
+            "Focused on general health and movement",
+            "Trying to lose, gain, or maintain weight",
+            "Rebuilding consistency after time off",
+            "Training casually for enjoyment",
+            "Preparing for competition or performance",
+          ],
+        },
+        {
+          title: "You can track:",
+          items: [
+            "Workouts and strength training",
+            "Cardio, conditioning, and endurance",
+            "Nutrition and calorie intake",
+            "Body metrics and long-term trends",
+            "Sport-specific training and performance sessions",
+          ],
+        },
+        {
+          text: "Sports tracking is template-based and fully customizable. Basketball, running, swimming, and other sports use tailored fields — and you can edit or create your own templates to match how you train.",
+        },
+        {
+          title: "AI is available to help you:",
+          items: [
+            "Clarify fitness or body goals at any level",
+            "Estimate calories burned",
+            "Estimate calories eaten",
+            "Understand patterns in your data",
+            "Adjust goals intelligently as training or life demands change",
+          ],
+        },
+      ],
+      outro: "Your fitness data stays connected to your broader life system — not isolated in a separate app. FrisFocus meets you where you are — and grows with you as your goals evolve.",
+    },
+  },
+  {
+    id: 6,
+    title: "Community",
+    subtitle: "Accountability, Circles & Competition",
+    icon: Users,
+    content: {
+      intro: "FrisFocus works solo — but becomes more powerful with others.",
+      sections: [
+        {
+          title: "You can create or join Circles with:",
+          items: [
+            "Friends",
+            "Family",
+            "Teams",
+            "Classrooms",
+            "Coaches and athletes",
+            "Accountability partners",
+          ],
+        },
+        {
+          title: "Circles support:",
+          items: [
+            "Shared goals and milestones",
+            "Badges and recognition",
+            "Leaderboards and rankings",
+            "One-on-one challenges",
+            "Circle vs Circle competitions",
+          ],
+        },
+        {
+          title: "FrisFocus is also a full social platform. You can:",
+          items: [
+            "Post updates, reflections, or wins to the feed",
+            "Journal publicly or privately",
+            "Interact with friends and Circles",
+            "Send direct messages for support, planning, or accountability",
+          ],
+        },
+      ],
+      outro: "Competition is optional and fully customizable. Use it when it motivates you. Turn it down when it doesn't. FrisFocus adapts to how you work best — whether that's quiet consistency or visible competition.",
+    },
+  },
+  {
+    id: 7,
+    title: "Customization",
+    subtitle: "Make It Yours",
+    icon: Palette,
+    content: {
+      intro: "FrisFocus is built to adapt to you.",
+      sections: [
+        {
+          title: "You can:",
+          items: [
+            "Customize your dashboard by adding or removing cards",
+            "Focus only on what's relevant to you",
+            "Switch between light and dark mode",
+            "Personalize your welcome message",
+            "Choose what insights appear first",
+          ],
+        },
+        {
+          text: "You can also send cheerlines — short encouragement messages — to friends or Circle members. Cheerlines show up directly on their dashboard as a reminder that someone's rooting for them.",
+        },
+      ],
+      outro: "Your system should feel personal, flexible, and supportive — not rigid.",
+    },
+  },
+  {
+    id: 8,
+    title: "Reflect & Learn",
+    subtitle: "Progress Comes From Awareness",
+    icon: TrendingUp,
+    content: {
+      intro: "",
+      sections: [
+        {
+          title: "Use journaling, summaries, and insights to reflect on:",
+          items: [
+            "What's working",
+            "What feels heavy",
+            "Where energy is leaking",
+            "What needs adjusting",
+          ],
+        },
+      ],
+      outro: "FrisFocus is designed to evolve with you. You're allowed to refine your setup, reset goals, and rebuild structure whenever life changes.",
+    },
+  },
+  {
+    id: 9,
+    title: "Get Started",
+    subtitle: "Build the System That Fits Your Life",
+    icon: Sparkles,
+    content: {
+      intro: "",
+      sections: [
+        {
+          items: [
+            "You don't need to use every feature.",
+            "You don't need to get it perfect.",
+            "Start where you are.",
+            "Use what helps.",
+            "Adjust when needed.",
+          ],
+        },
+      ],
+      outro: "FrisFocus is here to support progress — not pressure.",
+    },
+  },
+];
+
+interface HelpDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  filterCards?: HelpCardId[];
+  startCard?: HelpCardId;
+}
+
+export function HelpDialog({ open, onOpenChange, filterCards, startCard }: HelpDialogProps) {
+  const displayCards = filterCards 
+    ? helpCards.filter(card => filterCards.includes(card.id))
+    : helpCards;
+  
+  const initialIndex = startCard 
+    ? displayCards.findIndex(card => card.id === startCard)
+    : 0;
+  
+  const [currentIndex, setCurrentIndex] = useState(Math.max(0, initialIndex));
+  
+  // Reset to initial index when dialog opens
+  const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen) {
+      const newIndex = startCard 
+        ? displayCards.findIndex(card => card.id === startCard)
+        : 0;
+      setCurrentIndex(Math.max(0, newIndex));
+    }
+    onOpenChange(newOpen);
+  };
+
+  const currentCard = displayCards[currentIndex];
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < displayCards.length - 1;
+  const Icon = currentCard?.icon || HelpCircle;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col" data-testid="dialog-help">
+        <DialogHeader className="flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-md bg-primary/10">
+              <Icon className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-lg">{currentCard?.subtitle}</DialogTitle>
+              <p className="text-xs text-muted-foreground">
+                {currentIndex + 1} of {displayCards.length}
+              </p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+          {currentCard?.content.intro && (
+            <p className="text-sm text-foreground leading-relaxed">
+              {currentCard.content.intro}
+            </p>
+          )}
+
+          {currentCard?.content.sections.map((section, idx) => (
+            <div key={idx} className="space-y-2">
+              {section.title && (
+                <h4 className="text-sm font-medium text-foreground">{section.title}</h4>
+              )}
+              {section.text && (
+                <p className="text-sm text-muted-foreground leading-relaxed">{section.text}</p>
+              )}
+              {section.items && (
+                <ul className="space-y-1 ml-1">
+                  {section.items.map((item, itemIdx) => (
+                    <li key={itemIdx} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <span className="text-primary mt-1.5 h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+
+          {currentCard?.content.outro && (
+            <p className="text-sm text-foreground font-medium leading-relaxed pt-2 border-t border-border">
+              {currentCard.content.outro}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t border-border flex-shrink-0 gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCurrentIndex(i => i - 1)}
+            disabled={!hasPrev}
+            data-testid="button-help-prev"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Previous
+          </Button>
+
+          <div className="flex gap-1">
+            {displayCards.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  idx === currentIndex ? "bg-primary" : "bg-muted-foreground/30"
+                }`}
+                data-testid={`button-help-dot-${idx}`}
+              />
+            ))}
+          </div>
+
+          {hasNext ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentIndex(i => i + 1)}
+              data-testid="button-help-next"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              data-testid="button-help-done"
+            >
+              Got it
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface HelpButtonProps {
+  onClick: () => void;
+  className?: string;
+}
+
+export function HelpButton({ onClick, className }: HelpButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onClick}
+      className={className}
+      data-testid="button-help"
+    >
+      <HelpCircle className="h-5 w-5" />
+    </Button>
+  );
+}

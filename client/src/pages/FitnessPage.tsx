@@ -17,8 +17,9 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, Send, Sparkles, Check, Loader2, X, Pencil
+  MessageCircle, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle
 } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -103,6 +104,7 @@ export default function FitnessPage() {
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
   const [livePlaySettingsOpen, setLivePlaySettingsOpen] = useState(false);
   const [practiceSettingsOpen, setPracticeSettingsOpen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
   const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
@@ -648,10 +650,16 @@ export default function FitnessPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto" data-testid="page-fitness">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Fitness</h1>
-        <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Fitness</h1>
+          <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-fitness-help">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
       </div>
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[5]} />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5 h-auto">

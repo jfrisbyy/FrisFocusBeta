@@ -6,8 +6,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useDemo } from "@/contexts/DemoContext";
 import { useAuth } from "@/hooks/useAuth";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HelpDialog } from "@/components/HelpDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PointsCard from "@/components/PointsCard";
 import WeeklyTable from "@/components/WeeklyTable";
@@ -431,6 +432,7 @@ export default function Dashboard() {
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   
   // Track if we've loaded real data to prevent mock data from overwriting
   const hasLoadedRealDataRef = useRef(false);
@@ -540,6 +542,24 @@ export default function Dashboard() {
       setLocalDashboardPrefs(apiDashboardPrefs);
     }
   }, [apiDashboardPrefs]);
+
+  // Auto-trigger help dialog for new users (when hasSeenOnboarding is false)
+  const hasTriggeredOnboardingRef = useRef(false);
+  useEffect(() => {
+    if (!useMockData && apiDashboardPrefs && !apiDashboardPrefs.hasSeenOnboarding && !hasTriggeredOnboardingRef.current) {
+      hasTriggeredOnboardingRef.current = true;
+      setHelpDialogOpen(true);
+    }
+  }, [apiDashboardPrefs, useMockData]);
+
+  // Mark onboarding as seen when help dialog closes
+  const handleHelpDialogClose = (open: boolean) => {
+    setHelpDialogOpen(open);
+    if (!open && !useMockData && dashboardPrefs && !dashboardPrefs.hasSeenOnboarding) {
+      const updatedPrefs = { ...dashboardPrefs, hasSeenOnboarding: true };
+      handlePreferencesChange(updatedPrefs);
+    }
+  };
 
   // Mutation for updating dashboard preferences
   const updatePrefsMutation = useMutation({
@@ -1658,14 +1678,29 @@ export default function Dashboard() {
             onDismissFriendMessage={handleDismissFriendMessage}
           />
         </div>
-        <DashboardSettingsDialog
-          preferences={dashboardPrefs}
-          onPreferencesChange={handlePreferencesChange}
-          welcomeSettings={welcomeSettings}
-          onWelcomeSettingsChange={handleWelcomeSettingsChange}
-          isPending={updatePrefsMutation.isPending}
-        />
+        <div className="flex flex-col items-center gap-1">
+          <DashboardSettingsDialog
+            preferences={dashboardPrefs}
+            onPreferencesChange={handlePreferencesChange}
+            welcomeSettings={welcomeSettings}
+            onWelcomeSettingsChange={handleWelcomeSettingsChange}
+            isPending={updatePrefsMutation.isPending}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setHelpDialogOpen(true)}
+            data-testid="button-dashboard-help"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
+
+      <HelpDialog 
+        open={helpDialogOpen} 
+        onOpenChange={handleHelpDialogClose}
+      />
 
       {(() => {
         const cardOrder = (dashboardPrefs.cardOrder?.length > 0 
