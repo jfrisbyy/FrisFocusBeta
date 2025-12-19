@@ -257,11 +257,11 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-[calc(100vh-8rem)] w-full overflow-hidden">
       {/* Conversation History Sidebar */}
       {!isDemo && (
         <div 
-          className={`sticky top-0 self-start h-screen z-50 flex flex-col border-r bg-muted/30 transition-all duration-200 ${
+          className={`flex-shrink-0 flex flex-col border-r bg-muted/30 transition-all duration-200 ${
             sidebarCollapsed ? "w-12" : "w-64"
           }`}
         >
