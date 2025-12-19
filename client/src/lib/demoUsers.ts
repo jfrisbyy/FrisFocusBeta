@@ -193,18 +193,6 @@ export const demoUsers: DemoUser[] = [
     bio: "HIIT enthusiast",
   },
   {
-    id: "available-1",
-    username: "taylorswift",
-    displayName: "Taylor Swift Fan",
-    firstName: "Taylor",
-    lastName: "S",
-    profileImageUrl: null,
-    createdAt: "2024-11-01",
-    weeklyPoints: 520,
-    dayStreak: 18,
-    bio: "Music lover and fitness enthusiast",
-  },
-  {
     id: "available-2",
     username: "mikejones",
     displayName: "Mike Jones",
