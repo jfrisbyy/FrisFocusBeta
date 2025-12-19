@@ -647,9 +647,9 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const { id } = req.params;
-      const { calories, protein, carbs, fats, creatine, waterGallon, deficit, caloriesBurned, meals, date } = req.body;
+      const { calories, protein, carbs, fats, creatine, waterGallon, deficit, caloriesBurned, meals, date, completedToggles } = req.body;
       const [log] = await db.update(nutritionLogs)
-        .set({ calories, protein, carbs, fats, creatine, waterGallon, deficit, caloriesBurned, meals, date })
+        .set({ calories, protein, carbs, fats, creatine, waterGallon, deficit, caloriesBurned, meals, date, completedToggles })
         .where(and(eq(nutritionLogs.id, id), eq(nutritionLogs.userId, userId)))
         .returning();
       if (!log) return res.status(404).json({ error: "Nutrition log not found" });
@@ -657,6 +657,50 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating nutrition log:", error);
       res.status(400).json({ error: "Failed to update nutrition log" });
+    }
+  });
+
+  // Quick PATCH endpoint for toggling a single habit
+  app.patch("/api/fitness/nutrition/:id/toggle", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { toggleId, field, value } = req.body;
+      
+      // First get the current log
+      const [currentLog] = await db.select().from(nutritionLogs)
+        .where(and(eq(nutritionLogs.id, id), eq(nutritionLogs.userId, userId)));
+      
+      if (!currentLog) return res.status(404).json({ error: "Nutrition log not found" });
+      
+      let updateData: any = {};
+      
+      // Handle built-in toggles (creatine, waterGallon)
+      if (field === 'creatine' || field === 'waterGallon') {
+        updateData[field] = value;
+      } else if (toggleId) {
+        // Handle custom toggles
+        const currentToggles = (currentLog.completedToggles as string[]) || [];
+        if (value) {
+          // Add toggle if not already present
+          if (!currentToggles.includes(toggleId)) {
+            updateData.completedToggles = [...currentToggles, toggleId];
+          }
+        } else {
+          // Remove toggle
+          updateData.completedToggles = currentToggles.filter((t: string) => t !== toggleId);
+        }
+      }
+      
+      const [log] = await db.update(nutritionLogs)
+        .set(updateData)
+        .where(and(eq(nutritionLogs.id, id), eq(nutritionLogs.userId, userId)))
+        .returning();
+      
+      res.json(log);
+    } catch (error) {
+      console.error("Error toggling habit:", error);
+      res.status(400).json({ error: "Failed to toggle habit" });
     }
   });
 

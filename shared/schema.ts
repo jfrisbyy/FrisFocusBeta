@@ -316,6 +316,7 @@ export const nutritionLogs = pgTable("nutrition_logs", {
   deficit: integer("deficit"),
   caloriesBurned: integer("calories_burned"),
   meals: jsonb("meals"),
+  completedToggles: jsonb("completed_toggles"),
 });
 
 export const insertNutritionLogSchema = createInsertSchema(nutritionLogs).omit({ id: true });

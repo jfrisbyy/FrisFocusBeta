@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { 
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
-  Trash2, Edit, ChevronRight, Zap, Star, Award, Calculator
+  Trash2, Edit, ChevronRight, Zap, Star, Award, Calculator, CheckCircle2
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -88,7 +88,9 @@ export default function FitnessPage() {
   const [bodyCompDialogOpen, setBodyCompDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
+  const [habitsDialogOpen, setHabitsDialogOpen] = useState(false);
   const [demoNutritionSettings, setDemoNutritionSettings] = useState(mockNutritionSettings);
+  const [demoNutritionData, setDemoNutritionData] = useState(mockNutrition);
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -120,7 +122,7 @@ export default function FitnessPage() {
     enabled: !isDemo,
   });
 
-  const nutrition = isDemo ? mockNutrition : nutritionData;
+  const nutrition = isDemo ? demoNutritionData : nutritionData;
   const nutritionSettings = isDemo ? demoNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
   const bodyComp = isDemo ? mockBodyComp : bodyCompData;
   const strength = isDemo ? mockStrength : strengthData;
@@ -230,6 +232,44 @@ export default function FitnessPage() {
       toast({ title: "Record deleted" });
     },
   });
+
+  const toggleHabitMutation = useMutation({
+    mutationFn: async ({ logId, toggleId, field, value }: { logId: string; toggleId?: string; field?: string; value: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/fitness/nutrition/${logId}/toggle`, { toggleId, field, value });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition"] });
+    },
+  });
+
+  const handleToggleHabit = (toggleId: string, field: string | undefined, value: boolean) => {
+    const todayLog = getTodayCalories();
+    if (!todayLog) {
+      toast({ title: "No nutrition log for today", description: "Log your nutrition first to track habits", variant: "destructive" });
+      return;
+    }
+    
+    if (isDemo) {
+      // Update demo data
+      setDemoNutritionData(prev => prev.map(log => {
+        if (log.date === format(new Date(), "yyyy-MM-dd")) {
+          if (field === 'creatine') return { ...log, creatine: value };
+          if (field === 'waterGallon') return { ...log, waterGallon: value };
+          // Handle custom toggles
+          const current = (log.completedToggles as string[]) || [];
+          const updated = value 
+            ? [...current, toggleId]
+            : current.filter(t => t !== toggleId);
+          return { ...log, completedToggles: updated };
+        }
+        return log;
+      }));
+      return;
+    }
+    
+    toggleHabitMutation.mutate({ logId: todayLog.id, toggleId, field, value });
+  };
 
   if (isLoading) {
     return (
@@ -470,6 +510,29 @@ export default function FitnessPage() {
               }
             }}
           />
+          <EditHabitsDialog
+            open={habitsDialogOpen}
+            onOpenChange={setHabitsDialogOpen}
+            nutritionSettings={nutritionSettings}
+            isDemo={isDemo}
+            onSave={(toggles) => {
+              if (!isDemo) {
+                apiRequest("PUT", "/api/fitness/nutrition-settings", {
+                  ...nutritionSettings,
+                  customToggles: toggles,
+                }).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+                  toast({ title: "Habits updated" });
+                });
+              } else {
+                setDemoNutritionSettings(prev => ({
+                  ...prev,
+                  customToggles: toggles,
+                }));
+                toast({ title: "Habits updated (demo mode)" });
+              }
+            }}
+          />
 
           {/* Macro Progress Bars */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -585,34 +648,24 @@ export default function FitnessPage() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-sm">Daily Habits</CardTitle>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => setHabitsDialogOpen(true)}
+                  data-testid="button-edit-habits"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Droplets className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm">Gallon of Water</span>
-                    </div>
-                    <Switch 
-                      checked={todayCalories?.waterGallon || false} 
-                      disabled={true}
-                      data-testid="toggle-water"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm">Creatine</span>
-                    </div>
-                    <Switch 
-                      checked={todayCalories?.creatine || false} 
-                      disabled={true}
-                      data-testid="toggle-creatine"
-                    />
-                  </div>
-                </div>
+                <DailyHabitsContent 
+                  todayCalories={todayCalories}
+                  nutritionSettings={nutritionSettings}
+                  isDemo={isDemo}
+                  onToggleHabit={handleToggleHabit}
+                />
               </CardContent>
             </Card>
           </div>
@@ -1941,6 +1994,199 @@ function TDEECalculatorDialog({
             </DialogFooter>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Default built-in habits
+const defaultHabits = [
+  { id: "water", name: "Gallon of Water", field: "waterGallon", icon: "droplets" },
+  { id: "creatine", name: "Creatine", field: "creatine", icon: "zap" },
+];
+
+function DailyHabitsContent({ 
+  todayCalories, 
+  nutritionSettings, 
+  isDemo,
+  onToggleHabit 
+}: { 
+  todayCalories: NutritionLog | undefined;
+  nutritionSettings: NutritionSettings;
+  isDemo: boolean;
+  onToggleHabit: (toggleId: string, field: string | undefined, value: boolean) => void;
+}) {
+  const customToggles = (nutritionSettings.customToggles as { id: string; name: string; enabled: boolean }[]) || [];
+  const completedToggles = (todayCalories?.completedToggles as string[]) || [];
+  const enabledCustomToggles = customToggles.filter(t => t.enabled);
+  
+  const hasNoLog = !todayCalories;
+  
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Droplets className="h-4 w-4 text-blue-500" />
+          <span className="text-sm">Gallon of Water</span>
+        </div>
+        <Switch 
+          checked={todayCalories?.waterGallon || false}
+          onCheckedChange={(checked) => onToggleHabit("water", "waterGallon", checked)}
+          disabled={hasNoLog}
+          data-testid="toggle-water"
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-purple-500" />
+          <span className="text-sm">Creatine</span>
+        </div>
+        <Switch 
+          checked={todayCalories?.creatine || false}
+          onCheckedChange={(checked) => onToggleHabit("creatine", "creatine", checked)}
+          disabled={hasNoLog}
+          data-testid="toggle-creatine"
+        />
+      </div>
+      {enabledCustomToggles.map((toggle) => (
+        <div key={toggle.id} className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <span className="text-sm">{toggle.name}</span>
+          </div>
+          <Switch 
+            checked={completedToggles.includes(toggle.id)}
+            onCheckedChange={(checked) => onToggleHabit(toggle.id, undefined, checked)}
+            disabled={hasNoLog}
+            data-testid={`toggle-custom-${toggle.id}`}
+          />
+        </div>
+      ))}
+      {hasNoLog && (
+        <p className="text-xs text-muted-foreground text-center pt-2">Log nutrition to track habits</p>
+      )}
+    </div>
+  );
+}
+
+function EditHabitsDialog({ 
+  open, 
+  onOpenChange,
+  nutritionSettings,
+  isDemo,
+  onSave
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  nutritionSettings: NutritionSettings;
+  isDemo: boolean;
+  onSave: (toggles: { id: string; name: string; enabled: boolean }[]) => void;
+}) {
+  const [toggles, setToggles] = useState<{ id: string; name: string; enabled: boolean }[]>([]);
+  const [newHabitName, setNewHabitName] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      const existing = (nutritionSettings.customToggles as { id: string; name: string; enabled: boolean }[]) || [];
+      setToggles(existing);
+    }
+  }, [open, nutritionSettings.customToggles]);
+
+  const handleAddHabit = () => {
+    if (!newHabitName.trim()) return;
+    const newToggle = {
+      id: `custom-${Date.now()}`,
+      name: newHabitName.trim(),
+      enabled: true,
+    };
+    setToggles([...toggles, newToggle]);
+    setNewHabitName("");
+  };
+
+  const handleRemoveHabit = (id: string) => {
+    setToggles(toggles.filter(t => t.id !== id));
+  };
+
+  const handleToggleEnabled = (id: string, enabled: boolean) => {
+    setToggles(toggles.map(t => t.id === id ? { ...t, enabled } : t));
+  };
+
+  const handleSave = () => {
+    onSave(toggles);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Manage Daily Habits</DialogTitle>
+          <DialogDescription>Add or remove custom daily habits to track</DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Built-in Habits</Label>
+            <div className="space-y-2 p-3 bg-muted/50 rounded-md">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Droplets className="h-4 w-4" />
+                <span>Gallon of Water</span>
+                <span className="ml-auto text-xs">(always shown)</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Zap className="h-4 w-4" />
+                <span>Creatine</span>
+                <span className="ml-auto text-xs">(always shown)</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Custom Habits</Label>
+            {toggles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No custom habits yet</p>
+            ) : (
+              <div className="space-y-2">
+                {toggles.map((toggle) => (
+                  <div key={toggle.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                    <Switch 
+                      checked={toggle.enabled}
+                      onCheckedChange={(checked) => handleToggleEnabled(toggle.id, checked)}
+                      data-testid={`toggle-edit-${toggle.id}`}
+                    />
+                    <span className="text-sm flex-1">{toggle.name}</span>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => handleRemoveHabit(toggle.id)}
+                      data-testid={`button-remove-${toggle.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Input 
+              placeholder="New habit name..."
+              value={newHabitName}
+              onChange={(e) => setNewHabitName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddHabit()}
+              data-testid="input-new-habit"
+            />
+            <Button onClick={handleAddHabit} disabled={!newHabitName.trim()} data-testid="button-add-habit">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} data-testid="button-save-habits">Save Changes</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
