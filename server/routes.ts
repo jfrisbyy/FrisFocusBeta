@@ -773,53 +773,72 @@ export async function registerRoutes(
     }
   });
 
-  // AI Nutrition Analysis - estimate calories/macros from food description
+  // AI Nutrition Analysis - conversational flow for precise estimates
   app.post("/api/fitness/nutrition/analyze", isAuthenticated, async (req: any, res) => {
     try {
-      const { description } = req.body;
+      const { history } = req.body;
       
-      if (!description || typeof description !== 'string' || description.trim().length === 0) {
-        return res.status(400).json({ error: "Food description is required" });
+      if (!history || !Array.isArray(history) || history.length === 0) {
+        return res.status(400).json({ error: "Chat history is required" });
       }
 
-      const systemPrompt = `You are a nutrition expert. The user will describe what they ate. Estimate the nutritional content as accurately as possible.
+      const systemPrompt = `You are a helpful nutrition assistant. Your goal is to provide accurate calorie and macro estimates by asking clarifying questions when details are missing.
 
-CRITICAL: YOUR MATH MUST BE CORRECT
-1. First, identify each individual food item and its quantity
-2. Look up the nutrition facts for each item (use standard nutritional databases like USDA)
-3. Multiply by quantity for each item
-4. Add up ALL items to get the TOTAL - double-check your addition!
+CONVERSATION FLOW:
+1. When the user describes food, identify what details are MISSING that would significantly affect the estimate
+2. Ask ONE follow-up question at a time about the most important missing detail (portion size, preparation method, specific ingredients, brand if relevant)
+3. Once you have enough information for an accurate estimate (usually 2-3 exchanges), provide the final estimate
 
-GUIDELINES:
-- "Large" servings are bigger than standard portions
-- Consider cooking methods (fried adds fat, grilled is leaner)
-- Include sauces, toppings, and sides
-- Round to whole numbers
+WHAT TO ASK ABOUT:
+- Portion size: "regular", "large", actual oz/g if relevant
+- Preparation: fried vs grilled, with or without oil
+- Toppings/extras: cheese, sauces, dressings
+- Brand for packaged/fast food (McDonald's vs homemade matters)
+- Sides and drinks if mentioned vaguely
 
-EXAMPLE CALCULATION (McChicken meal):
-- 2 McChickens: 2 × 400cal = 800cal, 2 × 14g protein = 28g, etc.
-- Small fries: 230cal, 3g protein, etc.
-- TOTAL = 800 + 230 = 1030cal (add each macro separately too)
+WHEN TO FINALIZE:
+- You have specific portion information
+- You know the preparation method
+- Major toppings/additions are clarified
+- OR user says "just estimate" or seems impatient
 
-In your breakdown, show the per-item values and verify the math adds up correctly.
+MATH RULES (CRITICAL):
+- Calculate each item separately with quantity
+- Show your work: 2 x 400cal = 800cal
+- Add all items for total - double-check addition!
 
-Respond with ONLY a JSON object in this exact format:
+RESPONSE FORMAT:
+If you need more information, respond with:
 {
-  "mealName": "<brief descriptive name for the meal>",
-  "calories": <number - MUST equal sum of all items>,
-  "protein": <number in grams - MUST equal sum of all items>,
-  "carbs": <number in grams - MUST equal sum of all items>,
-  "fats": <number in grams - MUST equal sum of all items>,
-  "breakdown": "<show per-item breakdown with values that add up to totals>"
+  "isFinal": false,
+  "message": "<your clarifying question>"
+}
+
+When you have enough details for an accurate estimate, respond with:
+{
+  "isFinal": true,
+  "mealName": "<descriptive name>",
+  "calories": <number>,
+  "protein": <number>,
+  "carbs": <number>,
+  "fats": <number>,
+  "breakdown": "<per-item breakdown showing math>"
 }`;
+
+      const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemPrompt },
+      ];
+      
+      for (const msg of history) {
+        if (msg.role === "user" || msg.role === "assistant") {
+          messages.push({ role: msg.role, content: msg.content });
+        }
+      }
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: description }
-        ],
-        max_tokens: 400,
+        messages,
+        max_tokens: 500,
         response_format: { type: "json_object" },
       });
 

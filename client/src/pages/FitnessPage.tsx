@@ -2370,8 +2370,9 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [newMeal, setNewMeal] = useState({ name: "", calories: "", protein: "", time: "" });
   
-  // AI mode state
-  const [aiDescription, setAiDescription] = useState("");
+  // AI chat mode state
+  const [aiChatMessages, setAiChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [aiUserInput, setAiUserInput] = useState("");
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<{
     mealName: string;
@@ -2381,6 +2382,7 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     fats: number;
     breakdown: string;
   } | null>(null);
+  const aiChatEndRef = useRef<HTMLDivElement>(null);
 
   const isEditing = !!editData;
 
@@ -2400,24 +2402,44 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "" });
       setMeals([]);
       setLogMode("total");
-      setAiDescription("");
+      setAiChatMessages([]);
+      setAiUserInput("");
       setAiResult(null);
     }
   }, [editData]);
 
-  const analyzeWithAI = async () => {
-    if (!aiDescription.trim()) return;
+  useEffect(() => {
+    aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [aiChatMessages]);
+
+  const sendAiMessage = async () => {
+    if (!aiUserInput.trim()) return;
+    const userMessage = aiUserInput.trim();
+    const updatedMessages = [...aiChatMessages, { role: 'user' as const, content: userMessage }];
+    setAiChatMessages(updatedMessages);
+    setAiUserInput("");
     setAiAnalyzing(true);
     setAiResult(null);
     try {
-      const res = await apiRequest("POST", "/api/fitness/nutrition/analyze", { description: aiDescription });
+      const res = await apiRequest("POST", "/api/fitness/nutrition/analyze", { history: updatedMessages });
       const data = await res.json();
-      setAiResult(data);
+      if (data.isFinal) {
+        setAiResult(data);
+        setAiChatMessages([...updatedMessages, { role: 'assistant', content: `Got it! Here's my estimate for "${data.mealName}": ${data.calories} cal, ${data.protein}g protein, ${data.carbs}g carbs, ${data.fats}g fat.` }]);
+      } else {
+        setAiChatMessages([...updatedMessages, { role: 'assistant', content: data.message }]);
+      }
     } catch (error) {
       toast({ title: "Failed to analyze food", variant: "destructive" });
     } finally {
       setAiAnalyzing(false);
     }
+  };
+
+  const resetAiChat = () => {
+    setAiChatMessages([]);
+    setAiUserInput("");
+    setAiResult(null);
   };
 
   const applyAiResult = () => {
@@ -2446,7 +2468,8 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     });
     setLogMode("meal"); // Switch to meal mode so they can see it and add more
     setAiResult(null);
-    setAiDescription("");
+    setAiChatMessages([]);
+    setAiUserInput("");
     toast({ title: `Added "${aiResult.mealName}" to meals` });
   };
 
@@ -2618,34 +2641,52 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
           </div>
           )}
 
-          {/* AI Mode */}
+          {/* AI Mode - Conversational */}
           {logMode === "ai" && (
           <div className="space-y-3 p-3 border rounded-md">
-            <div className="text-sm font-medium">Describe what you ate</div>
-            <Textarea
-              placeholder="e.g., I had a large chicken burrito with guacamole and sour cream, a side of chips and salsa, and a large horchata..."
-              value={aiDescription}
-              onChange={(e) => setAiDescription(e.target.value)}
-              className="min-h-[80px]"
-              data-testid="input-ai-description"
-            />
-            <Button 
-              size="sm" 
-              onClick={analyzeWithAI} 
-              disabled={!aiDescription.trim() || aiAnalyzing}
-              data-testid="button-ai-analyze"
-            >
-              {aiAnalyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Analyzing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-1" /> Analyze
-                </>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium">Chat with AI to log your food</div>
+              {aiChatMessages.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={resetAiChat} data-testid="button-ai-reset">
+                  Start Over
+                </Button>
               )}
-            </Button>
+            </div>
+            
+            {/* Chat Messages */}
+            {aiChatMessages.length > 0 && (
+              <div className="max-h-48 overflow-y-auto space-y-2 p-2 bg-muted/30 rounded-md">
+                {aiChatMessages.map((msg, i) => (
+                  <div key={i} className={`text-sm p-2 rounded-md ${msg.role === 'user' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'}`}>
+                    <span className="text-xs text-muted-foreground">{msg.role === 'user' ? 'You' : 'AI'}:</span>
+                    <p>{msg.content}</p>
+                  </div>
+                ))}
+                <div ref={aiChatEndRef} />
+              </div>
+            )}
 
+            {/* Input Area */}
+            <div className="flex gap-2">
+              <Input
+                placeholder={aiChatMessages.length === 0 ? "What did you eat? e.g., I had a burrito..." : "Type your answer..."}
+                value={aiUserInput}
+                onChange={(e) => setAiUserInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !aiAnalyzing && sendAiMessage()}
+                disabled={aiAnalyzing}
+                data-testid="input-ai-chat"
+              />
+              <Button 
+                size="icon" 
+                onClick={sendAiMessage} 
+                disabled={!aiUserInput.trim() || aiAnalyzing}
+                data-testid="button-ai-send"
+              >
+                {aiAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {/* Result Card */}
             {aiResult && (
               <div className="space-y-2 p-3 bg-muted/50 rounded-md">
                 <div className="font-medium">{aiResult.mealName}</div>
