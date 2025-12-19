@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export type HelpCardId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type HelpCardId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 interface HelpCard {
   id: HelpCardId;
@@ -295,6 +295,58 @@ const helpCards: HelpCard[] = [
         },
       ],
       outro: "FrisFocus is here to support progress — not pressure.",
+    },
+  },
+  {
+    id: 10,
+    title: "Getting Started",
+    subtitle: "Getting Started",
+    icon: Rocket,
+    content: {
+      intro: "You don't need to set everything up at once. Start with the basics — you can always build more later.",
+      sections: [
+        {
+          title: "Step 1: Create Your Season",
+          text: "Give your current phase of life a name. This helps anchor your goals without locking you into anything permanent.",
+        },
+        {
+          title: "Step 2: Add Core Tasks",
+          text: "Create a set of repeatable habits that matter right now — fitness, routines, focus, or recovery. Score them based on importance, not how often they happen, or use AI to help you figure out what those tasks should look like.",
+        },
+        {
+          title: "Step 3: Set Your Point Goals",
+          text: "Choose a realistic daily and weekly personal point goal. This gives you a clear target to aim for each day.",
+        },
+        {
+          title: "Step 4: Use To-Dos, Milestones, and Schedules to Plan Your Days",
+          items: [
+            "Add daily to-dos for what you plan to work on today",
+            "Create weekly to-dos for flexible items you'll get to throughout the week",
+            "Track milestones for bigger near-term goals",
+            "Set due dates for bills, assignments, or deadlines",
+            "Build schedule templates for different types of days — like a Monday routine, work-from-home day, training day, or rest day",
+          ],
+        },
+        {
+          text: "These tools help you plan realistically without turning everything into a habit. Use them as lightly or as structured as you want — FrisFocus adapts to how you think and plan.",
+        },
+        {
+          title: "Step 5: Check In Daily",
+          items: [
+            "Toggle completed tasks",
+            "Update your to-do list",
+            "Log fitness or training if relevant",
+            "See how you're trending toward your goals",
+          ],
+        },
+        {
+          text: "That's all you need to begin. From there, feel free to explore. FrisFocus includes a lot of powerful features — fitness tracking, AI support, Circles, competition, journaling, milestones, schedule templates, and more.",
+        },
+        {
+          text: "You don't need to use everything. Explore what's interesting, ignore what isn't, and add tools as they become useful.",
+        },
+      ],
+      outro: "Start simple. Stay consistent. Build the system as your life evolves.",
     },
   },
 ];
