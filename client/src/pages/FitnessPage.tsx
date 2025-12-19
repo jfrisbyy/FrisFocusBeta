@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,8 @@ import {
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal } from "@shared/schema";
+import { Settings } from "lucide-react";
 import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays } from "date-fns";
 
 const mockNutrition: NutritionLog[] = [
@@ -55,6 +56,23 @@ const mockRuns: BasketballRun[] = [
   { id: "demo-3", userId: "demo", date: subDays(new Date(), 10).toISOString().split("T")[0], type: "Run", gameType: { fullCourt: true }, courtType: "Indoor", competitionLevel: "Competitive", gamesPlayed: 6, wins: 4, losses: 2, performanceGrade: "A-", confidence: 8 },
 ];
 
+const mockNutritionSettings: NutritionSettings = {
+  id: "demo",
+  userId: "demo",
+  maintenanceCalories: 2500,
+  calorieTarget: 2000,
+  proteinTarget: 180,
+  carbTarget: 200,
+  fatTarget: 70,
+  goalType: "moderate_cut",
+  weight: 185,
+  height: 72,
+  age: 28,
+  gender: "male",
+  activityLevel: "moderate",
+  customToggles: null,
+};
+
 type ActiveTab = "overview" | "nutrition" | "sports" | "strength" | "body-comp";
 type SportsSubTab = "runs" | "drills";
 
@@ -68,6 +86,8 @@ export default function FitnessPage() {
   const [skillDialogOpen, setSkillDialogOpen] = useState(false);
   const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [bodyCompDialogOpen, setBodyCompDialogOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [calculatorDialogOpen, setCalculatorDialogOpen] = useState(false);
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -94,7 +114,13 @@ export default function FitnessPage() {
     enabled: !isDemo,
   });
 
+  const { data: nutritionSettingsData } = useQuery<NutritionSettings>({
+    queryKey: ["/api/fitness/nutrition-settings"],
+    enabled: !isDemo,
+  });
+
   const nutrition = isDemo ? mockNutrition : nutritionData;
+  const nutritionSettings = isDemo ? mockNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
   const bodyComp = isDemo ? mockBodyComp : bodyCompData;
   const strength = isDemo ? mockStrength : strengthData;
   const skills = isDemo ? mockSkills : skillsData;
@@ -382,47 +408,143 @@ export default function FitnessPage() {
 
         {/* NUTRITION TAB */}
         <TabsContent value="nutrition" className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-xl font-semibold">Nutrition Tracking</h2>
-            <NutritionDialog 
-              open={nutritionDialogOpen} 
-              onOpenChange={setNutritionDialogOpen}
-              isDemo={isDemo}
-            />
+            <div className="flex items-center gap-2">
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                onClick={() => setSettingsDialogOpen(true)}
+                data-testid="button-nutrition-settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <NutritionDialog 
+                open={nutritionDialogOpen} 
+                onOpenChange={setNutritionDialogOpen}
+                isDemo={isDemo}
+              />
+            </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          {/* Settings Dialog - mounted at page level */}
+          <NutritionSettingsDialog
+            open={settingsDialogOpen}
+            onOpenChange={setSettingsDialogOpen}
+            isDemo={isDemo}
+            currentSettings={nutritionSettings}
+          />
+
+          {/* Macro Progress Bars */}
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Today's Intake</CardTitle>
+                <CardTitle className="text-sm flex items-center justify-between gap-2">
+                  <span>Calories</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {todayCalories?.calories || 0} / {nutritionSettings.calorieTarget}
+                  </span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {todayCalories ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Calories</span>
-                      <span className="font-medium">{todayCalories.calories}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Protein</span>
-                      <span className="font-medium">{todayCalories.protein}g</span>
-                    </div>
-                    {todayCalories.carbs && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Carbs</span>
-                        <span className="font-medium">{todayCalories.carbs}g</span>
+                {(() => {
+                  const eaten = todayCalories?.calories || 0;
+                  const target = nutritionSettings.calorieTarget || 2000;
+                  const percentage = Math.min((eaten / target) * 100, 150);
+                  const isOver = eaten > target;
+                  const remaining = target - eaten;
+                  return (
+                    <div className="space-y-2">
+                      <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={`absolute left-0 top-0 h-full rounded-full transition-all ${isOver ? 'bg-red-500' : 'bg-green-500'}`}
+                          style={{ width: `${Math.min(percentage, 100)}%` }}
+                        />
                       </div>
-                    )}
-                    {todayCalories.fats && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Fats</span>
-                        <span className="font-medium">{todayCalories.fats}g</span>
+                      <p className={`text-xs ${isOver ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        {isOver ? `${Math.abs(remaining)} over target` : `${remaining} remaining`}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center justify-between gap-2">
+                  <span>Protein</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {todayCalories?.protein || 0}g / {nutritionSettings.proteinTarget}g
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const eaten = todayCalories?.protein || 0;
+                  const target = nutritionSettings.proteinTarget || 150;
+                  const percentage = Math.min((eaten / target) * 100, 150);
+                  const isOver = eaten > target * 1.2; // Over 120% of target
+                  const hitTarget = eaten >= target && !isOver;
+                  const remaining = target - eaten;
+                  const barColor = isOver ? 'bg-red-500' : hitTarget ? 'bg-green-500' : 'bg-amber-500';
+                  const textColor = isOver ? 'text-red-500' : hitTarget ? 'text-green-500' : 'text-muted-foreground';
+                  return (
+                    <div className="space-y-2">
+                      <div className="relative h-3 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={`absolute left-0 top-0 h-full rounded-full transition-all ${barColor}`}
+                          style={{ width: `${Math.min(percentage, 100)}%` }}
+                        />
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No data logged today</p>
-                )}
+                      <p className={`text-xs ${textColor}`}>
+                        {isOver ? `${Math.abs(remaining)}g over target` : hitTarget ? 'Target reached!' : `${remaining}g remaining`}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Deficit Bank & Daily Habits */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Deficit Bank</CardTitle>
+                <CardDescription className="text-xs">Net calorie balance for the day</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const maintenance = nutritionSettings.maintenanceCalories || 2500;
+                  const eaten = todayCalories?.calories || 0;
+                  const burned = todayCalories?.deficit ? todayCalories.deficit : 0;
+                  const netBalance = maintenance - eaten + burned;
+                  const isDeficit = netBalance > 0;
+                  return (
+                    <div className="space-y-3">
+                      <div className={`text-3xl font-bold font-mono ${isDeficit ? 'text-green-500' : 'text-red-500'}`}>
+                        {isDeficit ? '+' : ''}{netBalance}
+                      </div>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Maintenance</span>
+                          <span className="font-mono">{maintenance}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Eaten</span>
+                          <span className="font-mono text-red-400">-{eaten}</span>
+                        </div>
+                        {burned > 0 && (
+                          <div className="flex justify-between">
+                            <span>Burned</span>
+                            <span className="font-mono text-green-400">+{burned}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
@@ -437,45 +559,64 @@ export default function FitnessPage() {
                       <Droplets className="h-4 w-4 text-blue-500" />
                       <span className="text-sm">Gallon of Water</span>
                     </div>
-                    {todayCalories?.waterGallon ? (
-                      <Badge variant="secondary">Done</Badge>
-                    ) : (
-                      <Badge variant="outline">Pending</Badge>
-                    )}
+                    <Switch 
+                      checked={todayCalories?.waterGallon || false} 
+                      disabled={true}
+                      data-testid="toggle-water"
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-purple-500" />
                       <span className="text-sm">Creatine</span>
                     </div>
-                    {todayCalories?.creatine ? (
-                      <Badge variant="secondary">Done</Badge>
-                    ) : (
-                      <Badge variant="outline">Pending</Badge>
-                    )}
+                    <Switch 
+                      checked={todayCalories?.creatine || false} 
+                      disabled={true}
+                      data-testid="toggle-creatine"
+                    />
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Deficit Tracking</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {todayCalories?.deficit ? (
-                  <div>
-                    <div className="text-2xl font-bold">{todayCalories.deficit}</div>
-                    <p className="text-xs text-muted-foreground">calories below maintenance</p>
-                    <Progress value={Math.min((todayCalories.deficit / 500) * 100, 100)} className="mt-2" />
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">Log deficit to track</p>
-                )}
-              </CardContent>
-            </Card>
           </div>
 
+          {/* Today's Quick Stats */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Today's Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {todayCalories ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <div className="text-2xl font-bold font-mono">{todayCalories.calories}</div>
+                    <div className="text-xs text-muted-foreground">Calories</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/50 rounded-md">
+                    <div className="text-2xl font-bold font-mono">{todayCalories.protein}g</div>
+                    <div className="text-xs text-muted-foreground">Protein</div>
+                  </div>
+                  {todayCalories.carbs !== null && todayCalories.carbs !== undefined && (
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{todayCalories.carbs}g</div>
+                      <div className="text-xs text-muted-foreground">Carbs</div>
+                    </div>
+                  )}
+                  {todayCalories.fats !== null && todayCalories.fats !== undefined && (
+                    <div className="text-center p-3 bg-muted/50 rounded-md">
+                      <div className="text-2xl font-bold font-mono">{todayCalories.fats}g</div>
+                      <div className="text-xs text-muted-foreground">Fats</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-4">No data logged today. Use the button above to log your nutrition.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Nutrition History */}
           <Card>
             <CardHeader>
               <CardTitle>Nutrition History</CardTitle>
@@ -485,33 +626,39 @@ export default function FitnessPage() {
                 {nutrition.length === 0 ? (
                   <p className="text-muted-foreground">No nutrition logs yet</p>
                 ) : (
-                  nutrition.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((log) => (
-                    <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`log-nutrition-${log.id}`}>
-                      <div className="flex items-center gap-4">
-                        <div className="text-sm font-medium w-24">{formatShortDate(log.date)}</div>
-                        <div className="flex gap-4 text-sm text-muted-foreground">
-                          <span>{log.calories} cal</span>
-                          <span>{log.protein}g P</span>
-                          {log.carbs && <span>{log.carbs}g C</span>}
-                          {log.fats && <span>{log.fats}g F</span>}
+                  nutrition.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((log) => {
+                    const calTarget = nutritionSettings.calorieTarget || 2000;
+                    const proteinTarget = nutritionSettings.proteinTarget || 150;
+                    const calOk = log.calories <= calTarget;
+                    const proteinOk = log.protein >= proteinTarget;
+                    return (
+                      <div key={log.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`log-nutrition-${log.id}`}>
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <div className="text-sm font-medium w-20">{formatShortDate(log.date)}</div>
+                          <div className="flex gap-3 text-sm">
+                            <span className={calOk ? 'text-green-500' : 'text-red-500'}>{log.calories} cal</span>
+                            <span className={proteinOk ? 'text-green-500' : 'text-amber-500'}>{log.protein}g P</span>
+                            {log.carbs && <span className="text-muted-foreground">{log.carbs}g C</span>}
+                            {log.fats && <span className="text-muted-foreground">{log.fats}g F</span>}
+                          </div>
+                          <div className="flex gap-2">
+                            {log.waterGallon && <Badge variant="outline" className="text-xs">Water</Badge>}
+                            {log.creatine && <Badge variant="outline" className="text-xs">Creatine</Badge>}
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          {log.waterGallon && <Badge variant="outline" className="text-xs">Water</Badge>}
-                          {log.creatine && <Badge variant="outline" className="text-xs">Creatine</Badge>}
-                        </div>
+                        {!isDemo && (
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            onClick={() => deleteNutritionMutation.mutate(log.id)}
+                            data-testid={`button-delete-nutrition-${log.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
-                      {!isDemo && (
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          onClick={() => deleteNutritionMutation.mutate(log.id)}
-                          data-testid={`button-delete-nutrition-${log.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>
@@ -1414,6 +1561,114 @@ function BodyCompDialog({ open, onOpenChange, isDemo }: { open: boolean; onOpenC
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-body-comp">
             {createMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function NutritionSettingsDialog({ 
+  open, 
+  onOpenChange, 
+  isDemo,
+  currentSettings 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  isDemo: boolean;
+  currentSettings: NutritionSettings;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    maintenanceCalories: String(currentSettings.maintenanceCalories || 2500),
+    calorieTarget: String(currentSettings.calorieTarget || 2000),
+    proteinTarget: String(currentSettings.proteinTarget || 150),
+  });
+
+  // Update form when settings change
+  useEffect(() => {
+    setFormData({
+      maintenanceCalories: String(currentSettings.maintenanceCalories || 2500),
+      calorieTarget: String(currentSettings.calorieTarget || 2000),
+      proteinTarget: String(currentSettings.proteinTarget || 150),
+    });
+  }, [currentSettings]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: Partial<NutritionSettings>) => {
+      const res = await apiRequest("PUT", "/api/fitness/nutrition-settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+      toast({ title: "Nutrition targets updated" });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update settings", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - settings not saved" });
+      onOpenChange(false);
+      return;
+    }
+    updateMutation.mutate({
+      maintenanceCalories: parseInt(formData.maintenanceCalories) || 2500,
+      calorieTarget: parseInt(formData.calorieTarget) || 2000,
+      proteinTarget: parseInt(formData.proteinTarget) || 150,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Nutrition Targets</DialogTitle>
+          <DialogDescription>Configure your daily calorie and protein goals</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Maintenance Calories</Label>
+            <Input 
+              type="number" 
+              placeholder="2500" 
+              value={formData.maintenanceCalories} 
+              onChange={(e) => setFormData({ ...formData, maintenanceCalories: e.target.value })} 
+              data-testid="input-maintenance-calories"
+            />
+            <p className="text-xs text-muted-foreground">Your TDEE - calories to maintain current weight</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Daily Calorie Target</Label>
+            <Input 
+              type="number" 
+              placeholder="2000" 
+              value={formData.calorieTarget} 
+              onChange={(e) => setFormData({ ...formData, calorieTarget: e.target.value })} 
+              data-testid="input-calorie-target"
+            />
+            <p className="text-xs text-muted-foreground">Target intake for your goal (cut/bulk/maintain)</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Daily Protein Target (g)</Label>
+            <Input 
+              type="number" 
+              placeholder="150" 
+              value={formData.proteinTarget} 
+              onChange={(e) => setFormData({ ...formData, proteinTarget: e.target.value })} 
+              data-testid="input-protein-target"
+            />
+            <p className="text-xs text-muted-foreground">Recommended: 0.8-1g per lb of body weight</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={updateMutation.isPending} data-testid="button-save-nutrition-settings">
+            {updateMutation.isPending ? "Saving..." : "Save Targets"}
           </Button>
         </DialogFooter>
       </DialogContent>
