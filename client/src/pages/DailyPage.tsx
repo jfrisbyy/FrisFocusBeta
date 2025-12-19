@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { format, addDays } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DatePicker from "@/components/DatePicker";
@@ -96,6 +96,10 @@ export default function DailyPage() {
   
   // Track which date we've already loaded log data for to prevent re-running
   const loadedLogDateRef = useRef<string | null>(null);
+  
+  // Debounce timeout for auto-saving task toggles
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingCompletedIdsRef = useRef<Set<string> | null>(null);
 
   const dateStr = format(date, "yyyy-MM-dd");
 
@@ -363,15 +367,78 @@ export default function DailyPage() {
   }, [categories, allTasks]);
 
   const handleTaskToggle = (taskId: string, checked: boolean) => {
-    setCompletedIds((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        next.add(taskId);
-      } else {
-        next.delete(taskId);
-      }
-      return next;
-    });
+    // Update local state immediately for visual feedback
+    const newCompletedIds = new Set(completedIds);
+    if (checked) {
+      newCompletedIds.add(taskId);
+    } else {
+      newCompletedIds.delete(taskId);
+    }
+    setCompletedIds(newCompletedIds);
+    
+    // Store pending state and debounce auto-save
+    pendingCompletedIdsRef.current = newCompletedIds;
+    
+    // Clear any existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce save by 500ms to batch rapid toggles
+    if (!isDemo) {
+      saveTimeoutRef.current = setTimeout(async () => {
+        const idsToSave = pendingCompletedIdsRef.current;
+        if (!idsToSave) return;
+        
+        try {
+          // Calculate points with the pending completed set
+          const newPositivePoints = allTasks
+            .filter(t => idsToSave.has(t.id) && t.value > 0)
+            .reduce((sum, t) => sum + t.value + (taskTiers[t.id] ? (t.tiers?.find(tier => tier.id === taskTiers[t.id])?.bonusPoints || 0) : 0), 0);
+          const newNegativePoints = allTasks
+            .filter(t => idsToSave.has(t.id) && t.value < 0)
+            .reduce((sum, t) => sum + t.value, 0);
+          
+          await saveDailyLogMutation.mutateAsync({
+            date: dateStr,
+            completedTaskIds: Array.from(idsToSave),
+            notes: "",
+            todoPoints: totalTodoPoints,
+            penaltyPoints: Math.abs(newNegativePoints),
+            taskPoints: newPositivePoints,
+            seasonId: activeSeason?.id || null,
+            taskNotes,
+            taskTiers,
+          });
+          
+          // Also save to localStorage as backup
+          saveDailyLogToStorage({
+            date: dateStr,
+            completedTaskIds: Array.from(idsToSave),
+            notes: "",
+            todoPoints: totalTodoPoints,
+            penaltyPoints: Math.abs(newNegativePoints),
+            taskNotes,
+            taskTiers,
+          });
+        } catch (e) {
+          console.error("Error auto-saving task toggle:", e);
+          // Fallback to localStorage - recalculate penalty points
+          const fallbackNegativePoints = allTasks
+            .filter(t => idsToSave.has(t.id) && t.value < 0)
+            .reduce((sum, t) => sum + t.value, 0);
+          saveDailyLogToStorage({
+            date: dateStr,
+            completedTaskIds: Array.from(idsToSave),
+            notes: "",
+            todoPoints: totalTodoPoints,
+            penaltyPoints: Math.abs(fallbackNegativePoints),
+            taskNotes,
+            taskTiers,
+          });
+        }
+      }, 500);
+    }
   };
 
   const handleTaskNoteChange = (taskId: string, note: string) => {

@@ -1,28 +1,8 @@
 /**
- * AI System Prompt Configuration
- * 
- * This file contains the custom instructions that guide the AI when generating
- * tasks, penalties, and categories for users. Edit the CUSTOM_AI_INSTRUCTIONS
- * constant below to shape how the AI responds.
- * 
- * These instructions are prepended to every AI task generation request but are
- * never shown to users - they only see the results.
+ * AI System Prompt Configuration - All AI prompts centralized here
  */
 
-/**
- * CUSTOM AI INSTRUCTIONS
- * 
- * Paste your custom coaching philosophy, guidelines, or specific instructions here.
- * This will be included at the start of every AI task generation request.
- * 
- * Example areas to customize:
- * - Your app's philosophy on habit building
- * - Point value guidelines (what makes a task worth more/less)
- * - Preferred task structures or naming conventions
- * - Categories you want to encourage or discourage
- * - Tone and style (motivational, practical, gentle, challenging)
- * - Any specific rules about penalties
- */
+// Custom coaching philosophy - prepended to task generation prompts
 export const CUSTOM_AI_INSTRUCTIONS = `
 [Paste your custom AI instructions here. These will guide how the AI generates tasks for users.]
 
@@ -34,53 +14,137 @@ Example instructions you might add:
 - Penalties should be gentle reminders, not harsh punishments
 `;
 
-/**
- * BASE SYSTEM PROMPT
- * 
- * This is the core prompt that defines the AI's behavior. The CUSTOM_AI_INSTRUCTIONS
- * above are prepended to this. Only modify this if you need to change the fundamental
- * behavior of task generation.
- */
-export const BASE_AI_SYSTEM_PROMPT = `You are an expert habit coach and life design specialist. Your task is to analyze a user's vision for their ideal life and generate practical, achievable daily habits and tasks.
+// Insights assistant for general help chat
+export const INSIGHTS_ASSISTANT_PROMPT = `You are a helpful assistant for FrisFocus, a habit tracking app. You help users understand the app's features and provide insights.
 
-Guidelines for generating tasks:
-- Create 8-15 specific, actionable daily habits
-- Assign realistic point values (5-30 points based on effort/impact)
-- Group tasks into meaningful categories (Health, Productivity, Spiritual, Social, Learning, etc.)
-- Set appropriate priorities: mustDo (critical habits), shouldDo (important), couldDo (nice to have)
-- Consider the user's time availability when setting task counts
-- Create 2-5 penalty items for behaviors to avoid (negative point values from -5 to -15)
-- Suggest relevant categories that align with their goals
+Key features you can explain:
+- Tasks: Daily habits with point values (mustDo, shouldDo, couldDo priorities)
+- Penalties: Negative point items for behaviors to avoid
+- Boosters: Bonus points for completing tasks consistently (e.g., 5 times per week)
+- Seasons: Time periods (typically 6 months) for focused goal pursuit
+- Badges: Achievements earned through consistent behavior
+- Weekly/Daily goals: Point targets to hit each day/week
 
-Time availability guidelines:
-- minimal: 4-6 tasks, focus on essentials only
-- moderate: 8-12 tasks, balanced approach
-- dedicated: 12-30 tasks, comprehensive habit system
+When users ask about their progress, provide encouraging and actionable insights.
+Keep responses concise but helpful.`;
 
-Return a JSON object with this exact structure:
+// Multi-turn conversation flow for task generation
+export function getConversationFlowPrompt(currentStep: string): string {
+  return `You are a friendly habit coach helping a user set up their personalized task system.
+
+Current conversation step: ${currentStep}
+
+CONVERSATION FLOW:
+1. "goals" - Ask about their vision and goals for the next 6 months
+2. "time" - Ask about their daily time availability (minimal/moderate/dedicated)
+3. "aggressiveness" - Ask how intense they want their routine (gentle/moderate/aggressive/intense)
+4. "hobbies" - Ask about hobbies or fun activities to include
+
+GUIDELINES:
+- Be warm, encouraging, and conversational
+- Keep responses brief (2-3 sentences max)
+- Ask ONE question at a time
+
+Return JSON:
 {
-  "seasonTheme": "A short inspiring name for this life season (2-4 words)",
-  "summary": "Brief 1-2 sentence summary of the recommended approach",
-  "tasks": [
-    {"name": "Task name", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why this matters"}
-  ],
-  "penalties": [
-    {"name": "Penalty name", "value": -5, "description": "Why to avoid this"}
-  ],
-  "categories": [
-    {"name": "Category name"}
+  "message": "Your conversational response",
+  "extractedData": {
+    "goals": ["goal1", "goal2"] or null,
+    "timeAvailability": "minimal|moderate|dedicated" or null,
+    "aggressiveness": "gentle|moderate|aggressive|intense" or null,
+    "hobbies": ["hobby1", "hobby2"] or null
+  },
+  "nextStep": "goals|time|aggressiveness|hobbies|complete",
+  "isComplete": false
+}`;
+}
+
+// Task finalization - converts conversation to tasks
+export const TASK_FINALIZATION_PROMPT = `You are an expert habit coach. Based on a detailed conversation with a user, generate personalized daily habits and penalties.
+
+CRITICAL GUIDELINES:
+1. POINT SCALE: Target a 50-point daily goal.
+2. ACTIONABLE TASKS: Every task must be specific, measurable, and clear-cut.
+3. BOOSTERS & PENALTIES: Add boosters for mustDo tasks (period="week", timesRequired=4-5, bonusPoints=10-20).
+4. AGGRESSIVENESS affects task count and difficulty.
+5. HOBBIES: Include hobby-related tasks as "shouldDo" or "couldDo".
+
+Time availability task counts:
+- minimal: 4-6 tasks total
+- moderate: 8-12 tasks total  
+- dedicated: 12-18 tasks total
+
+Return JSON:
+{
+  "seasonTheme": "Inspiring 2-4 word theme",
+  "summary": "1-2 sentence summary",
+  "tasks": [{"name": "Task", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why", "boosterRule": {"period": "week", "enabled": true, "timesRequired": 5, "bonusPoints": 15} or null}],
+  "penalties": [{"name": "Penalty", "value": -5, "description": "Why"}],
+  "categories": [{"name": "Category"}]
+}`;
+
+// Badge generation
+export const BADGE_GENERATION_PROMPT = `You are an expert gamification designer. Generate achievement badges that motivate consistent behavior.
+
+Badge types:
+- taskCompletions: Completing a specific task X times
+- perfectDaysStreak: Hitting daily goal for X days in a row
+- negativeFreeStreak: Days without penalties in a row
+- weeklyGoalStreak: Hitting weekly goal for X weeks in a row
+
+Return JSON:
+{
+  "badges": [
+    {
+      "name": "Badge Name",
+      "description": "What this badge rewards",
+      "icon": "flame",
+      "conditionType": "taskCompletions",
+      "taskName": "Task Name",
+      "levels": [{"level": 1, "required": 10}, {"level": 2, "required": 30}]
+    }
   ]
 }`;
 
-/**
- * Get the complete system prompt with custom instructions prepended
- */
-export function getAISystemPrompt(): string {
-  const customInstructions = CUSTOM_AI_INSTRUCTIONS.trim();
-  
-  if (customInstructions && !customInstructions.includes("[Paste your custom AI instructions here")) {
-    return `${customInstructions}\n\n---\n\n${BASE_AI_SYSTEM_PROMPT}`;
+// Simple/quick task generation
+export const SIMPLE_TASK_GENERATION_PROMPT = `You are an expert habit coach. Analyze a user's vision and generate practical daily habits.
+
+Guidelines:
+- Create 8-15 specific, actionable daily habits
+- Assign realistic point values (5-30 points)
+- Group tasks into meaningful categories
+- Set priorities: mustDo, shouldDo, couldDo
+- Create 2-5 penalty items (-5 to -15 points)
+
+Return JSON:
+{
+  "seasonTheme": "2-4 word theme",
+  "summary": "Brief summary",
+  "tasks": [{"name": "Task", "value": 10, "category": "Category", "priority": "mustDo|shouldDo|couldDo", "description": "Why"}],
+  "penalties": [{"name": "Penalty", "value": -5, "description": "Why"}],
+  "categories": [{"name": "Category"}]
+}`;
+
+// Helper: Get simple task prompt with custom instructions
+export function getSimpleTaskGenerationPrompt(): string {
+  const custom = CUSTOM_AI_INSTRUCTIONS.trim();
+  if (custom && !custom.includes("[Paste your custom AI instructions here")) {
+    return `${custom}\n\n---\n\n${SIMPLE_TASK_GENERATION_PROMPT}`;
   }
-  
-  return BASE_AI_SYSTEM_PROMPT;
+  return SIMPLE_TASK_GENERATION_PROMPT;
+}
+
+// Helper: Get task finalization prompt with custom instructions  
+export function getTaskFinalizationPrompt(): string {
+  const custom = CUSTOM_AI_INSTRUCTIONS.trim();
+  if (custom && !custom.includes("[Paste your custom AI instructions here")) {
+    return `${custom}\n\n---\n\n${TASK_FINALIZATION_PROMPT}`;
+  }
+  return TASK_FINALIZATION_PROMPT;
+}
+
+// Legacy compatibility
+export const BASE_AI_SYSTEM_PROMPT = SIMPLE_TASK_GENERATION_PROMPT;
+export function getAISystemPrompt(): string {
+  return getSimpleTaskGenerationPrompt();
 }
