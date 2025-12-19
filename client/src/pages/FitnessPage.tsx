@@ -1327,21 +1327,63 @@ export default function FitnessPage() {
           {/* Deficit Bank & Daily Habits */}
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Deficit Bank</CardTitle>
-                <CardDescription className="text-xs">Net calorie balance for the day</CardDescription>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+                <div>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    {(() => {
+                      const target = nutritionSettings.calorieTarget || 2000;
+                      const maintenance = nutritionSettings.maintenanceCalories || 2500;
+                      const isDeficit = target < maintenance;
+                      const isSurplus = target > maintenance;
+                      return isDeficit ? (
+                        <TrendingDown className="h-4 w-4 text-green-500" />
+                      ) : isSurplus ? (
+                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                      ) : (
+                        <Target className="h-4 w-4 text-amber-500" />
+                      );
+                    })()}
+                    Calorie Delta
+                  </CardTitle>
+                  <CardDescription className="text-xs">Calories vs. maintenance</CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 {(() => {
+                  const target = nutritionSettings.calorieTarget || 2000;
                   const maintenance = nutritionSettings.maintenanceCalories || 2500;
-                  const eaten = selectedDateCalories?.calories || 0;
-                  const burned = selectedDateCalories?.deficit ? selectedDateCalories.deficit : 0;
-                  const netBalance = maintenance - eaten + burned;
-                  const isDeficit = netBalance > 0;
+                  const isDeficitMode = target < maintenance;
+                  const isSurplusMode = target > maintenance;
+                  const dailyCalories = selectedDateCalories?.calories || 0;
+                  const delta = maintenance - dailyCalories;
+                  const hasDelta = dailyCalories > 0;
+                  
+                  if (!hasDelta) {
+                    return (
+                      <div className="flex flex-col items-center justify-center h-16 text-muted-foreground text-sm">
+                        <p>No calories logged</p>
+                      </div>
+                    );
+                  }
+                  
+                  const targetDelta = maintenance - target;
+                  const onTarget = isDeficitMode 
+                    ? delta >= targetDelta * 0.9
+                    : isSurplusMode 
+                      ? delta <= targetDelta * 0.9
+                      : Math.abs(delta) <= 100;
+                  
+                  const displayDelta = delta > 0 ? `-${delta}` : `+${Math.abs(delta)}`;
+                  
                   return (
                     <div className="space-y-3">
-                      <div className={`text-3xl font-bold font-mono ${isDeficit ? 'text-green-500' : 'text-red-500'}`}>
-                        {isDeficit ? '+' : ''}{netBalance}
+                      <div className="flex items-center justify-between">
+                        <div className={`text-3xl font-bold font-mono ${delta > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {displayDelta}
+                        </div>
+                        <Badge variant={onTarget ? "default" : "outline"} className="text-xs">
+                          {onTarget ? "On Target" : isDeficitMode ? "Low" : isSurplusMode ? "Low" : "Off"}
+                        </Badge>
                       </div>
                       <div className="space-y-1 text-xs text-muted-foreground">
                         <div className="flex justify-between">
@@ -1350,14 +1392,12 @@ export default function FitnessPage() {
                         </div>
                         <div className="flex justify-between">
                           <span>Eaten</span>
-                          <span className="font-mono text-red-400">-{eaten}</span>
+                          <span className="font-mono">{dailyCalories}</span>
                         </div>
-                        {burned > 0 && (
-                          <div className="flex justify-between">
-                            <span>Burned</span>
-                            <span className="font-mono text-green-400">+{burned}</span>
-                          </div>
-                        )}
+                        <div className="flex justify-between">
+                          <span>Goal</span>
+                          <span className="font-mono">{target} ({isDeficitMode ? 'deficit' : isSurplusMode ? 'surplus' : 'maintain'})</span>
+                        </div>
                       </div>
                     </div>
                   );
