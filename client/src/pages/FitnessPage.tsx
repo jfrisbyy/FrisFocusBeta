@@ -2151,13 +2151,13 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   onEdit?: (id: string, data: Partial<NutritionLog>) => void;
 }) {
   const { toast } = useToast();
+  const [logMode, setLogMode] = useState<"meal" | "total">("total");
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     calories: "",
     protein: "",
     carbs: "",
     fats: "",
-    deficit: "",
   });
   const [meals, setMeals] = useState<Meal[]>([]);
   const [newMeal, setNewMeal] = useState({ name: "", calories: "", protein: "", time: "" });
@@ -2172,12 +2172,14 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
         protein: editData.protein?.toString() || "",
         carbs: editData.carbs?.toString() || "",
         fats: editData.fats?.toString() || "",
-        deficit: editData.deficit?.toString() || "",
       });
-      setMeals(Array.isArray(editData.meals) ? editData.meals as Meal[] : []);
+      const editMeals = Array.isArray(editData.meals) ? editData.meals as Meal[] : [];
+      setMeals(editMeals);
+      setLogMode(editMeals.length > 0 ? "meal" : "total");
     } else {
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "", deficit: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "" });
       setMeals([]);
+      setLogMode("total");
     }
   }, [editData]);
 
@@ -2216,8 +2218,9 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition"] });
       toast({ title: "Nutrition logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "", deficit: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "" });
       setMeals([]);
+      setLogMode("total");
     },
     onError: () => {
       toast({ title: "Failed to log nutrition", variant: "destructive" });
@@ -2236,8 +2239,7 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       protein: formData.protein ? parseInt(formData.protein) : undefined,
       carbs: formData.carbs ? parseInt(formData.carbs) : undefined,
       fats: formData.fats ? parseInt(formData.fats) : undefined,
-      deficit: formData.deficit ? parseInt(formData.deficit) : undefined,
-      meals: meals.length > 0 ? meals : undefined,
+      meals: logMode === "meal" && meals.length > 0 ? meals : undefined,
     };
     if (isEditing && editData && onEdit) {
       onEdit(editData.id, payload);
@@ -2258,8 +2260,31 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
             <Label>Date</Label>
             <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-nutrition-date" />
           </div>
+
+          {/* Log Mode Toggle */}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={logMode === "total" ? "default" : "outline"}
+              onClick={() => setLogMode("total")}
+              data-testid="button-log-mode-total"
+            >
+              Log Totals
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={logMode === "meal" ? "default" : "outline"}
+              onClick={() => setLogMode("meal")}
+              data-testid="button-log-mode-meal"
+            >
+              Log by Meal
+            </Button>
+          </div>
           
-          {/* Add Individual Meal */}
+          {/* Add Individual Meal - only shown in meal mode */}
+          {logMode === "meal" && (
           <div className="space-y-3 p-3 border rounded-md">
             <div className="text-sm font-medium">Add Meal</div>
             <div className="grid grid-cols-2 gap-2">
@@ -2293,27 +2318,28 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
             <Button size="sm" onClick={addMeal} disabled={!newMeal.name || !newMeal.calories} data-testid="button-add-meal">
               <Plus className="h-4 w-4 mr-1" /> Add Meal
             </Button>
-          </div>
 
-          {/* Meals List */}
-          {meals.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-sm font-medium">Meals Added</div>
-              {meals.map((meal) => (
-                <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{meal.name}</span>
-                    {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+            {/* Meals List */}
+            {meals.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Meals Added</div>
+                {meals.map((meal) => (
+                  <div key={meal.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{meal.name}</span>
+                      {meal.time && <span className="text-muted-foreground text-xs">{meal.time}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{meal.calories} cal, {meal.protein}g</span>
+                      <Button size="icon" variant="ghost" onClick={() => removeMeal(meal.id)} data-testid={`button-remove-meal-${meal.id}`}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{meal.calories} cal, {meal.protein}g</span>
-                    <Button size="icon" variant="ghost" onClick={() => removeMeal(meal.id)} data-testid={`button-remove-meal-${meal.id}`}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+          </div>
           )}
 
           {/* Totals */}
@@ -2334,10 +2360,6 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
               <Label>Fats (g)</Label>
               <Input type="number" placeholder="65" value={formData.fats} onChange={(e) => setFormData({ ...formData, fats: e.target.value })} data-testid="input-nutrition-fats" />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Deficit (cal below maintenance)</Label>
-            <Input type="number" placeholder="500" value={formData.deficit} onChange={(e) => setFormData({ ...formData, deficit: e.target.value })} data-testid="input-nutrition-deficit" />
           </div>
         </div>
         <DialogFooter>
