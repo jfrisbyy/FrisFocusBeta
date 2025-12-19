@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Sparkles } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Send, Bot, User, Sparkles, Settings, Loader2 } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useDemo } from "@/contexts/DemoContext";
+import { useToast } from "@/hooks/use-toast";
 import type { AIMessage } from "@shared/schema";
 
 const sampleMessages: AIMessage[] = [
@@ -25,8 +27,11 @@ const sampleMessages: AIMessage[] = [
 
 export default function InsightsPage() {
   const { isDemo } = useDemo();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<AIMessage[]>(isDemo ? sampleMessages : []);
   const [input, setInput] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [instructionsInput, setInstructionsInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -36,6 +41,32 @@ export default function InsightsPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const instructionsQuery = useQuery<{ aiInstructions: string }>({
+    queryKey: ["/api/ai/instructions"],
+    enabled: !isDemo,
+  });
+
+  useEffect(() => {
+    if (instructionsQuery.data) {
+      setInstructionsInput(instructionsQuery.data.aiInstructions || "");
+    }
+  }, [instructionsQuery.data]);
+
+  const saveInstructionsMutation = useMutation({
+    mutationFn: async (aiInstructions: string) => {
+      const response = await apiRequest("PUT", "/api/ai/instructions", { aiInstructions });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/instructions"] });
+      toast({ title: "AI instructions saved", description: "Your AI will now follow these custom instructions." });
+      setSettingsOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to save", description: "Could not save your AI instructions.", variant: "destructive" });
+    },
+  });
 
   const sendMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -99,10 +130,63 @@ export default function InsightsPage() {
   return (
     <div className="flex h-full w-full flex-col">
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-2 border-b p-4">
-          <Sparkles className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold">AI Insights</h1>
+        <div className="flex items-center justify-between gap-2 border-b p-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-muted-foreground" />
+            <h1 className="text-lg font-semibold">AI Insights</h1>
+          </div>
+          {!isDemo && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSettingsOpen(true)}
+              data-testid="button-ai-settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
         </div>
+
+        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>AI Custom Instructions</DialogTitle>
+              <DialogDescription>
+                Tell your AI assistant about yourself, your preferences, and how you'd like it to respond. These instructions will be remembered across all conversations.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={instructionsInput}
+              onChange={(e) => setInstructionsInput(e.target.value)}
+              placeholder="Example: I'm a morning person who works out at 6am. I prefer brief, direct responses. Focus on my fitness and reading goals. My name is [Your Name]."
+              className="min-h-[150px]"
+              data-testid="input-ai-instructions"
+            />
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setInstructionsInput(instructionsQuery.data?.aiInstructions || "");
+                  setSettingsOpen(false);
+                }}
+                data-testid="button-cancel-instructions"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => saveInstructionsMutation.mutate(instructionsInput)}
+                disabled={saveInstructionsMutation.isPending}
+                data-testid="button-save-instructions"
+              >
+                {saveInstructionsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Save Instructions"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <div className="flex flex-1 flex-col overflow-hidden">
           <ScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (

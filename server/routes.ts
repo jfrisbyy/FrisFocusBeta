@@ -6002,9 +6002,15 @@ Create motivating badges that will encourage consistency. Return valid JSON only
           .returning();
         res.json({ aiInstructions: settings.aiInstructions || "" });
       } else {
-        // Create new settings with just AI instructions
+        // Create new settings with AI instructions and required defaults
         const [settings] = await db.insert(userHabitSettings)
-          .values({ userId, aiInstructions })
+          .values({ 
+            userId, 
+            aiInstructions,
+            dailyGoal: 50,
+            weeklyGoal: 350,
+            userName: "You"
+          })
           .returning();
         res.json({ aiInstructions: settings.aiInstructions || "" });
       }
