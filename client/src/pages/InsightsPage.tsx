@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Send, Bot, User, Sparkles, Settings, Loader2 } from "lucide-react";
+import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useDemo } from "@/contexts/DemoContext";
 import { useToast } from "@/hooks/use-toast";
-import type { AIMessage } from "@shared/schema";
+import type { AIMessage, AIConversation } from "@shared/schema";
+import { format } from "date-fns";
 
 const sampleMessages: AIMessage[] = [
   {
@@ -32,6 +33,8 @@ export default function InsightsPage() {
   const [input, setInput] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [instructionsInput, setInstructionsInput] = useState("");
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,11 +50,61 @@ export default function InsightsPage() {
     enabled: !isDemo,
   });
 
+  const conversationsQuery = useQuery<AIConversation[]>({
+    queryKey: ["/api/ai/conversations"],
+    enabled: !isDemo,
+  });
+
   useEffect(() => {
     if (instructionsQuery.data) {
       setInstructionsInput(instructionsQuery.data.aiInstructions || "");
     }
   }, [instructionsQuery.data]);
+
+  // Load the most recent conversation on mount
+  useEffect(() => {
+    if (conversationsQuery.data && conversationsQuery.data.length > 0 && !activeConversationId) {
+      const mostRecent = conversationsQuery.data[0];
+      setActiveConversationId(mostRecent.id);
+      setMessages((mostRecent.messages as AIMessage[]) || []);
+    }
+  }, [conversationsQuery.data, activeConversationId]);
+
+  const createConversationMutation = useMutation({
+    mutationFn: async (data: { title?: string; messages?: AIMessage[] }) => {
+      const response = await apiRequest("POST", "/api/ai/conversations", data);
+      return response.json() as Promise<AIConversation>;
+    },
+    onSuccess: (newConversation) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations"] });
+      setActiveConversationId(newConversation.id);
+      setMessages((newConversation.messages as AIMessage[]) || []);
+    },
+  });
+
+  const updateConversationMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { title?: string; messages?: AIMessage[] } }) => {
+      const response = await apiRequest("PUT", `/api/ai/conversations/${id}`, data);
+      return response.json() as Promise<AIConversation>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations"] });
+    },
+  });
+
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/ai/conversations/${id}`);
+    },
+    onSuccess: (_, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations"] });
+      if (activeConversationId === deletedId) {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+      toast({ title: "Conversation deleted" });
+    },
+  });
 
   const saveInstructionsMutation = useMutation({
     mutationFn: async (aiInstructions: string) => {
@@ -69,25 +122,50 @@ export default function InsightsPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({ message, currentMessages }: { message: string; currentMessages: AIMessage[] }) => {
       const response = await apiRequest("POST", "/api/ai/insights", {
         message,
-        history: messages,
+        history: currentMessages,
       });
-      return response.json();
+      const data = await response.json();
+      return { data, currentMessages };
     },
-    onSuccess: (data) => {
+    onSuccess: async ({ data, currentMessages }) => {
       const assistantMessage: AIMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
         content: data.content,
         timestamp: new Date().toISOString(),
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+      const updatedMessages = [...currentMessages, assistantMessage];
+      setMessages(updatedMessages);
+      
+      // Save to database
+      if (!isDemo && activeConversationId) {
+        const firstUserMessage = updatedMessages.find(m => m.role === "user");
+        const title = firstUserMessage ? firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? "..." : "") : "New Conversation";
+        updateConversationMutation.mutate({ 
+          id: activeConversationId, 
+          data: { messages: updatedMessages, title } 
+        });
+      }
     },
   });
 
-  const handleSend = () => {
+  const handleNewConversation = () => {
+    if (isDemo) {
+      setMessages(sampleMessages);
+      return;
+    }
+    createConversationMutation.mutate({ title: "New Conversation", messages: [] });
+  };
+
+  const handleSelectConversation = (conversation: AIConversation) => {
+    setActiveConversationId(conversation.id);
+    setMessages((conversation.messages as AIMessage[]) || []);
+  };
+
+  const handleSend = async () => {
     if (!input.trim() || sendMutation.isPending) return;
     
     if (isDemo) {
@@ -115,9 +193,32 @@ export default function InsightsPage() {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // If no active conversation, create one first
+    if (!activeConversationId) {
+      const newConversation = await createConversationMutation.mutateAsync({ 
+        title: input.trim().slice(0, 50) + (input.trim().length > 50 ? "..." : ""),
+        messages: [userMessage] 
+      });
+      setActiveConversationId(newConversation.id);
+      setMessages([userMessage]);
+      setInput("");
+      sendMutation.mutate({ message: input.trim(), currentMessages: [userMessage] });
+      return;
+    }
+
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setInput("");
-    sendMutation.mutate(input.trim());
+    
+    // Save user message immediately
+    const firstUserMessage = updatedMessages.find(m => m.role === "user");
+    const title = firstUserMessage ? firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? "..." : "") : "New Conversation";
+    updateConversationMutation.mutate({ 
+      id: activeConversationId, 
+      data: { messages: updatedMessages, title } 
+    });
+    
+    sendMutation.mutate({ message: input.trim(), currentMessages: updatedMessages });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -128,8 +229,103 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="flex h-full flex-col">
+    <div className="flex h-full w-full">
+      {/* Conversation History Sidebar */}
+      {!isDemo && (
+        <div 
+          className={`flex flex-col border-r bg-muted/30 transition-all duration-200 ${
+            sidebarCollapsed ? "w-12" : "w-64"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1 border-b p-2">
+            {!sidebarCollapsed && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 gap-1"
+                onClick={handleNewConversation}
+                disabled={createConversationMutation.isPending}
+                data-testid="button-new-conversation"
+              >
+                <Plus className="h-4 w-4" />
+                New Chat
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              data-testid="button-toggle-sidebar"
+            >
+              {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          </div>
+          
+          {!sidebarCollapsed && (
+            <ScrollArea className="flex-1">
+              <div className="flex flex-col gap-1 p-2">
+                {conversationsQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : conversationsQuery.data?.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    No conversations yet
+                  </p>
+                ) : (
+                  conversationsQuery.data?.map((conversation) => (
+                    <div
+                      key={conversation.id}
+                      className={`group flex items-center gap-2 rounded-md p-2 cursor-pointer hover-elevate ${
+                        activeConversationId === conversation.id ? "bg-accent" : ""
+                      }`}
+                      onClick={() => handleSelectConversation(conversation)}
+                      data-testid={`conversation-item-${conversation.id}`}
+                    >
+                      <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 overflow-hidden">
+                        <p className="truncate text-sm">{conversation.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {conversation.createdAt ? format(new Date(conversation.createdAt), "MMM d") : ""}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteConversationMutation.mutate(conversation.id);
+                        }}
+                        data-testid={`button-delete-conversation-${conversation.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          )}
+          
+          {sidebarCollapsed && (
+            <div className="flex flex-col items-center gap-2 py-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNewConversation}
+                disabled={createConversationMutation.isPending}
+                data-testid="button-new-conversation-collapsed"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex flex-1 flex-col">
         <div className="flex items-center justify-between gap-2 border-b p-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-muted-foreground" />
@@ -187,6 +383,7 @@ export default function InsightsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        
         <div className="flex flex-1 flex-col overflow-hidden">
           <ScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (
