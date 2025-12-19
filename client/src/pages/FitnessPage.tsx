@@ -1396,7 +1396,7 @@ export default function FitnessPage() {
                 
                 const chartData = periodDays.map(day => {
                   const dateStr = format(day, 'yyyy-MM-dd');
-                  const log = nutrition.find(n => n.date === dateStr);
+                  const log = aggregateNutritionForDate(dateStr);
                   return {
                     day: chartPeriod === "weekly" ? format(day, 'EEE') : format(day, 'd'),
                     fullDate: format(day, 'MMM d'),
