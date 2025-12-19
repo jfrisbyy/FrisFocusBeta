@@ -74,23 +74,25 @@ export default function DashboardSettingsDialog({
 }: DashboardSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("welcome");
-  const [isLightMode, setIsLightMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("theme");
-      return stored === "light";
-    }
-    return false;
-  });
+  
+  const isLightMode = preferences.theme === "light";
 
   useEffect(() => {
-    if (isLightMode) {
+    if (preferences.theme === "light") {
       document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
+      localStorage.setItem("frisfocus-theme", "light");
     } else {
       document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
+      localStorage.setItem("frisfocus-theme", "dark");
     }
-  }, [isLightMode]);
+  }, [preferences.theme]);
+
+  const handleThemeToggle = (checked: boolean) => {
+    onPreferencesChange({
+      ...preferences,
+      theme: checked ? "light" : "dark",
+    });
+  };
 
   const [nameInput, setNameInput] = useState(welcomeSettings.userName);
   const [messageInput, setMessageInput] = useState(welcomeSettings.message);
@@ -496,7 +498,8 @@ export default function DashboardSettingsDialog({
                 <Switch
                   id="toggle-theme"
                   checked={isLightMode}
-                  onCheckedChange={setIsLightMode}
+                  onCheckedChange={handleThemeToggle}
+                  disabled={isPending}
                   data-testid="switch-light-mode"
                 />
               </div>

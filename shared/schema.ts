@@ -1660,6 +1660,7 @@ export const dashboardPreferencesSchema = z.object({
   feed: z.boolean().default(true),
   selectedCircles: z.array(z.string()).default([]),
   cardOrder: z.array(z.string()).default([]),
+  theme: z.enum(["light", "dark"]).default("light"),
 });
 export type DashboardPreferences = z.infer<typeof dashboardPreferencesSchema>;
 
@@ -1680,6 +1681,7 @@ export const defaultDashboardPreferences: DashboardPreferences = {
   feed: true,
   selectedCircles: [],
   cardOrder: [...dashboardCardKeys],
+  theme: "light",
 };
 
 // Dashboard preferences table - stores user dashboard card visibility settings
