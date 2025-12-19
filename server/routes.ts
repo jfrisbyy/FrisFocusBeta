@@ -124,6 +124,8 @@ import {
   userDueDates,
   insertUserMilestoneSchema,
   insertUserDueDateSchema,
+  dailySteps,
+  insertDailyStepsSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray, gte, sql } from "drizzle-orm";
@@ -1073,6 +1075,79 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting cardio run:", error);
       res.status(400).json({ error: "Failed to delete cardio run" });
+    }
+  });
+
+  // Daily Steps - filtered by user
+  app.get("/api/fitness/steps", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const steps = await db.select().from(dailySteps).where(eq(dailySteps.userId, userId));
+      res.json(steps);
+    } catch (error) {
+      console.error("Error fetching steps:", error);
+      res.status(500).json({ error: "Failed to fetch steps" });
+    }
+  });
+
+  app.post("/api/fitness/steps", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date, steps, goal } = req.body;
+      
+      // Check if entry exists for this date
+      const existing = await db.select().from(dailySteps)
+        .where(and(eq(dailySteps.userId, userId), eq(dailySteps.date, date)))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Update existing entry
+        const [updated] = await db.update(dailySteps)
+          .set({ steps, goal: goal || 10000 })
+          .where(eq(dailySteps.id, existing[0].id))
+          .returning();
+        res.json(updated);
+      } else {
+        // Create new entry
+        const parsed = insertDailyStepsSchema.parse({ userId, date, steps, goal: goal || 10000 });
+        const [created] = await db.insert(dailySteps).values(parsed).returning();
+        res.json(created);
+      }
+    } catch (error) {
+      console.error("Error creating/updating steps:", error);
+      res.status(400).json({ error: "Failed to save steps" });
+    }
+  });
+
+  app.put("/api/fitness/steps/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { steps, goal } = req.body;
+      const [updated] = await db.update(dailySteps)
+        .set({ steps, goal })
+        .where(and(eq(dailySteps.id, id), eq(dailySteps.userId, userId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Steps entry not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating steps:", error);
+      res.status(400).json({ error: "Failed to update steps" });
+    }
+  });
+
+  app.delete("/api/fitness/steps/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const [deleted] = await db.delete(dailySteps)
+        .where(and(eq(dailySteps.id, id), eq(dailySteps.userId, userId)))
+        .returning();
+      if (!deleted) return res.status(404).json({ error: "Steps entry not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting steps:", error);
+      res.status(400).json({ error: "Failed to delete steps" });
     }
   });
 

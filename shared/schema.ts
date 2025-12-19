@@ -419,6 +419,19 @@ export const insertCardioRunSchema = createInsertSchema(cardioRuns).omit({ id: t
 export type InsertCardioRun = z.infer<typeof insertCardioRunSchema>;
 export type CardioRun = typeof cardioRuns.$inferSelect;
 
+// Daily steps tracking
+export const dailySteps = pgTable("daily_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: text("date").notNull(), // YYYY-MM-DD format
+  steps: integer("steps").notNull(),
+  goal: integer("goal").default(10000),
+});
+
+export const insertDailyStepsSchema = createInsertSchema(dailySteps).omit({ id: true });
+export type InsertDailySteps = z.infer<typeof insertDailyStepsSchema>;
+export type DailySteps = typeof dailySteps.$inferSelect;
+
 // Meal schema for nutrition logging
 export const mealSchema = z.object({
   id: z.string(),

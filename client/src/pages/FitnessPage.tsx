@@ -21,7 +21,7 @@ import {
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
@@ -107,6 +107,8 @@ export default function FitnessPage() {
   const [selectedNutritionDate, setSelectedNutritionDate] = useState(new Date());
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>("weekly");
   const [stepsView, setStepsView] = useState<"today" | "weekly">("today");
+  const [stepsDialogOpen, setStepsDialogOpen] = useState(false);
+  const [stepsWeekOffset, setStepsWeekOffset] = useState(0);
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -135,6 +137,11 @@ export default function FitnessPage() {
 
   const { data: cardioData = [], isLoading: loadingCardio } = useQuery<CardioRun[]>({
     queryKey: ["/api/fitness/cardio"],
+    enabled: !isDemo,
+  });
+
+  const { data: stepsData = [], isLoading: loadingSteps } = useQuery<DailySteps[]>({
+    queryKey: ["/api/fitness/steps"],
     enabled: !isDemo,
   });
 
@@ -169,8 +176,9 @@ export default function FitnessPage() {
   const skills = isDemo ? mockSkills : skillsData;
   const runs = isDemo ? mockRuns : runsData;
   const cardioRuns = isDemo ? mockCardioRuns : cardioData;
+  const steps = isDemo ? [] : stepsData;
 
-  const isLoading = !isDemo && (loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns || loadingCardio);
+  const isLoading = !isDemo && (loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns || loadingCardio || loadingSteps);
 
   const formatDate = (dateStr: string) => {
     try {
@@ -272,6 +280,28 @@ export default function FitnessPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/cardio"] });
       toast({ title: "Cardio run deleted" });
+    },
+  });
+
+  const saveStepsMutation = useMutation({
+    mutationFn: async ({ date, steps, goal }: { date: string; steps: number; goal?: number }) => {
+      const res = await apiRequest("POST", "/api/fitness/steps", { date, steps, goal: goal || 10000 });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/steps"] });
+      toast({ title: "Steps saved" });
+      setStepsDialogOpen(false);
+    },
+  });
+
+  const deleteStepsMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/fitness/steps/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/steps"] });
+      toast({ title: "Steps deleted" });
     },
   });
 
@@ -447,44 +477,64 @@ export default function FitnessPage() {
                   >
                     Weekly
                   </Button>
+                  <Button 
+                    size="icon" 
+                    variant="ghost"
+                    onClick={() => setStepsDialogOpen(true)}
+                    data-testid="button-add-steps"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const demoStepsData = [
-                    { day: 'Mon', steps: 8432, goal: 10000 },
-                    { day: 'Tue', steps: 12150, goal: 10000 },
-                    { day: 'Wed', steps: 9876, goal: 10000 },
-                    { day: 'Thu', steps: 6543, goal: 10000 },
-                    { day: 'Fri', steps: 11234, goal: 10000 },
-                    { day: 'Sat', steps: 14567, goal: 10000 },
-                    { day: 'Sun', steps: 7890, goal: 10000 },
-                  ];
+                  const today = format(new Date(), "yyyy-MM-dd");
+                  const todayEntry = steps.find(s => s.date === today);
+                  const todaySteps = todayEntry?.steps || 0;
+                  const todayGoal = todayEntry?.goal || 10000;
                   
-                  const todaySteps = isDemo ? demoStepsData[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1].steps : 0;
-                  const avgSteps = isDemo ? Math.round(demoStepsData.reduce((sum, d) => sum + d.steps, 0) / demoStepsData.length) : 0;
-                  const daysOverGoal = demoStepsData.filter(d => d.steps >= d.goal).length;
+                  const weekStart = startOfWeek(subDays(new Date(), stepsWeekOffset * 7), { weekStartsOn: 1 });
+                  const weekDays = eachDayOfInterval({ start: weekStart, end: subDays(weekStart, -6) });
+                  const weekData = weekDays.map(day => {
+                    const dateStr = format(day, "yyyy-MM-dd");
+                    const entry = steps.find(s => s.date === dateStr);
+                    return {
+                      day: format(day, "EEE"),
+                      date: dateStr,
+                      steps: entry?.steps || 0,
+                      goal: entry?.goal || 10000,
+                    };
+                  });
+                  
+                  const avgSteps = weekData.length > 0 
+                    ? Math.round(weekData.reduce((sum, d) => sum + d.steps, 0) / weekData.filter(d => d.steps > 0).length || 0) 
+                    : 0;
+                  const daysOverGoal = weekData.filter(d => d.steps >= d.goal).length;
 
                   if (stepsView === "today") {
-                    const progress = Math.min((todaySteps / 10000) * 100, 100);
+                    const progress = Math.min((todaySteps / todayGoal) * 100, 100);
                     return (
                       <div className="space-y-2">
                         <div className="flex items-baseline gap-2">
                           <div className="text-2xl font-bold font-mono">{todaySteps.toLocaleString()}</div>
-                          <span className="text-sm text-muted-foreground">/ 10,000</span>
+                          <span className="text-sm text-muted-foreground">/ {todayGoal.toLocaleString()}</span>
                         </div>
                         <Progress value={progress} className="h-2" />
                         <p className="text-xs text-muted-foreground">
-                          {todaySteps >= 10000 ? 'Goal reached!' : `${(10000 - todaySteps).toLocaleString()} steps to go`}
+                          {todaySteps >= todayGoal ? 'Goal reached!' : `${(todayGoal - todaySteps).toLocaleString()} steps to go`}
                         </p>
                       </div>
                     );
                   }
 
-                  if (!isDemo) {
+                  if (steps.length === 0) {
                     return (
-                      <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
-                        No steps data available
+                      <div className="flex flex-col items-center justify-center h-24 text-muted-foreground text-sm gap-2">
+                        <p>No steps data available</p>
+                        <Button size="sm" variant="outline" onClick={() => setStepsDialogOpen(true)} data-testid="button-add-steps-empty">
+                          <Plus className="h-3 w-3 mr-1" /> Add Steps
+                        </Button>
                       </div>
                     );
                   }
@@ -492,17 +542,23 @@ export default function FitnessPage() {
                   return (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Avg: </span>
-                          <span className="font-bold font-mono">{avgSteps.toLocaleString()}</span>
-                          <span className="text-muted-foreground">/day</span>
+                        <div className="flex items-center gap-2">
+                          <Button size="icon" variant="ghost" onClick={() => setStepsWeekOffset(o => o + 1)} data-testid="button-steps-prev-week">
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span className="text-xs text-muted-foreground">
+                            {format(weekStart, "MMM d")} - {format(subDays(weekStart, -6), "MMM d")}
+                          </span>
+                          <Button size="icon" variant="ghost" onClick={() => setStepsWeekOffset(o => Math.max(0, o - 1))} disabled={stepsWeekOffset === 0} data-testid="button-steps-next-week">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
                         </div>
                         <Badge variant={daysOverGoal >= 5 ? "default" : "secondary"}>
-                          {daysOverGoal}/7 days over goal
+                          {daysOverGoal}/7 over goal
                         </Badge>
                       </div>
                       <ResponsiveContainer width="100%" height={100}>
-                        <BarChart data={demoStepsData}>
+                        <BarChart data={weekData}>
                           <XAxis dataKey="day" tick={{ fontSize: 10 }} className="text-muted-foreground" />
                           <Tooltip 
                             formatter={(value: number) => [`${value.toLocaleString()} steps`, '']}
@@ -510,7 +566,7 @@ export default function FitnessPage() {
                           />
                           <ReferenceLine y={10000} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
                           <Bar dataKey="steps" radius={[3, 3, 0, 0]}>
-                            {demoStepsData.map((entry, index) => (
+                            {weekData.map((entry, index) => (
                               <Cell 
                                 key={`cell-${index}`} 
                                 fill={entry.steps >= entry.goal ? 'hsl(142 76% 36%)' : 'hsl(var(--muted-foreground))'} 
@@ -519,6 +575,11 @@ export default function FitnessPage() {
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
+                      {avgSteps > 0 && (
+                        <div className="text-xs text-muted-foreground text-center">
+                          Avg: <span className="font-mono font-medium">{avgSteps.toLocaleString()}</span> steps/day
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -741,6 +802,44 @@ export default function FitnessPage() {
               }
             }}
           />
+
+          {/* Steps Dialog */}
+          <Dialog open={stepsDialogOpen} onOpenChange={setStepsDialogOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Log Steps</DialogTitle>
+                <DialogDescription>Add your daily step count</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target as HTMLFormElement);
+                saveStepsMutation.mutate({
+                  date: formData.get('date') as string,
+                  steps: parseInt(formData.get('steps') as string),
+                  goal: parseInt(formData.get('goal') as string) || 10000,
+                });
+              }}>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Date</Label>
+                    <Input type="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required data-testid="input-steps-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Steps</Label>
+                    <Input type="number" name="steps" placeholder="e.g. 10000" required min="0" data-testid="input-steps-count" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Goal</Label>
+                    <Input type="number" name="goal" defaultValue="10000" min="0" data-testid="input-steps-goal" />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setStepsDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={saveStepsMutation.isPending} data-testid="button-save-steps">Save</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           {/* Macro Progress Bars */}
           <div className="grid gap-4 md:grid-cols-2">

@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useDemo } from "@/contexts/DemoContext";
@@ -35,6 +36,8 @@ export default function InsightsPage() {
   const [instructionsInput, setInstructionsInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -105,6 +108,31 @@ export default function InsightsPage() {
       toast({ title: "Conversation deleted" });
     },
   });
+
+  const handleStartEditingTitle = (e: React.MouseEvent, conversation: AIConversation) => {
+    e.stopPropagation();
+    setEditingConversationId(conversation.id);
+    setEditingTitle(conversation.title || "");
+  };
+
+  const handleSaveTitle = (e: React.FormEvent, conversationId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!editingTitle.trim()) return;
+    updateConversationMutation.mutate({ 
+      id: conversationId, 
+      data: { title: editingTitle.trim() } 
+    });
+    setEditingConversationId(null);
+    setEditingTitle("");
+    toast({ title: "Conversation renamed" });
+  };
+
+  const handleCancelEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingConversationId(null);
+    setEditingTitle("");
+  };
 
   const saveInstructionsMutation = useMutation({
     mutationFn: async (aiInstructions: string) => {
@@ -279,28 +307,71 @@ export default function InsightsPage() {
                       className={`group flex items-center gap-2 rounded-md p-2 cursor-pointer hover-elevate ${
                         activeConversationId === conversation.id ? "bg-accent" : ""
                       }`}
-                      onClick={() => handleSelectConversation(conversation)}
+                      onClick={() => editingConversationId !== conversation.id && handleSelectConversation(conversation)}
                       data-testid={`conversation-item-${conversation.id}`}
                     >
                       <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="flex-1 overflow-hidden">
-                        <p className="truncate text-sm">{conversation.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {conversation.createdAt ? format(new Date(conversation.createdAt), "MMM d") : ""}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteConversationMutation.mutate(conversation.id);
-                        }}
-                        data-testid={`button-delete-conversation-${conversation.id}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {editingConversationId === conversation.id ? (
+                        <form 
+                          className="flex flex-1 items-center gap-1"
+                          onSubmit={(e) => handleSaveTitle(e, conversation.id)}
+                        >
+                          <Input
+                            value={editingTitle}
+                            onChange={(e) => setEditingTitle(e.target.value)}
+                            className="h-7 text-sm"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") {
+                                handleCancelEditing(e as unknown as React.MouseEvent);
+                              }
+                            }}
+                            data-testid={`input-edit-conversation-${conversation.id}`}
+                          />
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            data-testid={`button-save-title-${conversation.id}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="flex-1 overflow-hidden">
+                            <p className="truncate text-sm">{conversation.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {conversation.createdAt ? format(new Date(conversation.createdAt), "MMM d") : ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100" style={{ visibility: editingConversationId === conversation.id ? "hidden" : "visible" }}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => handleStartEditingTitle(e, conversation)}
+                              data-testid={`button-edit-conversation-${conversation.id}`}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteConversationMutation.mutate(conversation.id);
+                              }}
+                              data-testid={`button-delete-conversation-${conversation.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))
                 )}
