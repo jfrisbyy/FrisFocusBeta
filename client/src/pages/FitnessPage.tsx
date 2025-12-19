@@ -110,6 +110,8 @@ export default function FitnessPage() {
   const [stepsDialogOpen, setStepsDialogOpen] = useState(false);
   const [deficitDialogOpen, setDeficitDialogOpen] = useState(false);
   const [stepsWeekOffset, setStepsWeekOffset] = useState(0);
+  const [habitsManageOpen, setHabitsManageOpen] = useState(false);
+  const [newHabitName, setNewHabitName] = useState("");
   const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
 
   // Editing state for each fitness log type
@@ -448,6 +450,53 @@ export default function FitnessPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition"] });
     },
   });
+
+  const updateCustomHabitsMutation = useMutation({
+    mutationFn: async (customToggles: { id: string; name: string; enabled: boolean }[]) => {
+      const res = await apiRequest("PUT", "/api/fitness/nutrition-settings", { customToggles });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+      toast({ title: "Habits updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update habits", variant: "destructive" });
+    },
+  });
+
+  const handleAddHabit = (name: string) => {
+    if (!name.trim()) return;
+    const currentToggles = (nutritionSettings.customToggles as { id: string; name: string; enabled: boolean }[]) || [];
+    const newToggle = { id: `habit-${Date.now()}`, name: name.trim(), enabled: true };
+    
+    if (isDemo) {
+      setDemoNutritionSettings(prev => ({
+        ...prev,
+        customToggles: [...currentToggles, newToggle]
+      }));
+      setNewHabitName("");
+      return;
+    }
+    
+    updateCustomHabitsMutation.mutate([...currentToggles, newToggle]);
+    setNewHabitName("");
+  };
+
+  const handleRemoveHabit = (habitId: string) => {
+    const currentToggles = (nutritionSettings.customToggles as { id: string; name: string; enabled: boolean }[]) || [];
+    const updated = currentToggles.filter(t => t.id !== habitId);
+    
+    if (isDemo) {
+      setDemoNutritionSettings(prev => ({
+        ...prev,
+        customToggles: updated
+      }));
+      return;
+    }
+    
+    updateCustomHabitsMutation.mutate(updated);
+  };
 
   const handleToggleHabit = (toggleId: string, field: string | undefined, value: boolean) => {
     const todayLog = getTodayCalories();
@@ -859,12 +908,6 @@ export default function FitnessPage() {
                 <Plus className="h-4 w-4 mr-2" />
                 Log Nutrition
               </Button>
-              <DeficitDialog
-                open={deficitDialogOpen}
-                onOpenChange={setDeficitDialogOpen}
-                isDemo={isDemo}
-                nutritionSettings={nutritionSettings}
-              />
               <Button onClick={() => setDeficitDialogOpen(true)} variant="outline" data-testid="button-add-deficit">
                 <TrendingDown className="h-4 w-4 mr-2" />
                 Log Deficit
@@ -1173,8 +1216,16 @@ export default function FitnessPage() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                 <CardTitle className="text-sm">Daily Habits</CardTitle>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => setHabitsManageOpen(!habitsManageOpen)}
+                  data-testid="button-manage-habits"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
               </CardHeader>
               <CardContent>
                 <DailyHabitsContent 
@@ -1182,7 +1233,30 @@ export default function FitnessPage() {
                   nutritionSettings={nutritionSettings}
                   isDemo={isDemo}
                   onToggleHabit={handleToggleHabit}
+                  manageMode={habitsManageOpen}
+                  onRemoveHabit={handleRemoveHabit}
                 />
+                {habitsManageOpen && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="New habit name..."
+                        value={newHabitName}
+                        onChange={(e) => setNewHabitName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddHabit(newHabitName)}
+                        data-testid="input-new-habit"
+                      />
+                      <Button 
+                        size="icon"
+                        onClick={() => handleAddHabit(newHabitName)}
+                        disabled={!newHabitName.trim()}
+                        data-testid="button-add-habit"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -2189,6 +2263,13 @@ export default function FitnessPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      <DeficitDialog
+        open={deficitDialogOpen}
+        onOpenChange={setDeficitDialogOpen}
+        isDemo={isDemo}
+        nutritionSettings={nutritionSettings}
+      />
     </div>
   );
 }
@@ -3144,6 +3225,7 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit
     losses: "",
     performanceGrade: "",
     confidence: "",
+    notes: "",
   });
   const isEditing = !!editData;
 
@@ -3161,9 +3243,10 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit
         losses: editData.losses?.toString() || "",
         performanceGrade: editData.performanceGrade || "",
         confidence: editData.confidence?.toString() || "",
+        notes: editData.matchupNotes || "",
       });
     } else {
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), courtType: "Indoor", gameType: "fullCourt", gamesPlayed: "", wins: "", losses: "", performanceGrade: "", confidence: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), courtType: "Indoor", gameType: "fullCourt", gamesPlayed: "", wins: "", losses: "", performanceGrade: "", confidence: "", notes: "" });
     }
   }, [editData]);
 
@@ -3176,7 +3259,7 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/runs"] });
       toast({ title: "Run logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), courtType: "Indoor", gameType: "fullCourt", gamesPlayed: "", wins: "", losses: "", performanceGrade: "", confidence: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), courtType: "Indoor", gameType: "fullCourt", gamesPlayed: "", wins: "", losses: "", performanceGrade: "", confidence: "", notes: "" });
     },
     onError: () => {
       toast({ title: "Failed to log run", variant: "destructive" });
@@ -3199,6 +3282,7 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit
       losses: formData.losses ? parseInt(formData.losses) : undefined,
       performanceGrade: formData.performanceGrade || undefined,
       confidence: formData.confidence ? parseInt(formData.confidence) : undefined,
+      matchupNotes: formData.notes || undefined,
     };
     if (isEditing && editData && onEdit) {
       onEdit(editData.id, data);
@@ -3299,6 +3383,17 @@ function RunDialog({ open, onOpenChange, isDemo, visibleFields, editData, onEdit
                 <Input type="number" min="1" max="10" placeholder="7" value={formData.confidence} onChange={(e) => setFormData({ ...formData, confidence: e.target.value })} data-testid="input-run-confidence" />
               </div>
             )}
+          </div>
+          <div className="space-y-2">
+            <Label>Notes</Label>
+            <Textarea 
+              placeholder="How did you play? Any highlights or areas to improve?" 
+              value={formData.notes} 
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
+              className="resize-none"
+              rows={3}
+              data-testid="textarea-run-notes" 
+            />
           </div>
         </div>
         <DialogFooter>
@@ -3907,12 +4002,16 @@ function DailyHabitsContent({
   todayCalories, 
   nutritionSettings, 
   isDemo,
-  onToggleHabit 
+  onToggleHabit,
+  manageMode = false,
+  onRemoveHabit
 }: { 
   todayCalories: NutritionLog | undefined;
   nutritionSettings: NutritionSettings;
   isDemo: boolean;
   onToggleHabit: (toggleId: string, field: string | undefined, value: boolean) => void;
+  manageMode?: boolean;
+  onRemoveHabit?: (habitId: string) => void;
 }) {
   const customToggles = (nutritionSettings.customToggles as { id: string; name: string; enabled: boolean }[]) || [];
   const completedToggles = (todayCalories?.completedToggles as string[]) || [];
@@ -3920,10 +4019,18 @@ function DailyHabitsContent({
   
   const hasNoLog = !todayCalories;
   
-  if (enabledCustomToggles.length === 0) {
+  if (enabledCustomToggles.length === 0 && !manageMode) {
     return (
       <div className="text-center py-4">
         <p className="text-sm text-muted-foreground">No custom habits configured</p>
+      </div>
+    );
+  }
+  
+  if (enabledCustomToggles.length === 0 && manageMode) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">Add your first habit below</p>
       </div>
     );
   }
@@ -3936,15 +4043,29 @@ function DailyHabitsContent({
             <CheckCircle2 className="h-4 w-4 text-green-500" />
             <span className="text-sm">{toggle.name}</span>
           </div>
-          <Switch 
-            checked={completedToggles.includes(toggle.id)}
-            onCheckedChange={(checked) => onToggleHabit(toggle.id, undefined, checked)}
-            disabled={hasNoLog}
-            data-testid={`toggle-custom-${toggle.id}`}
-          />
+          <div className="flex items-center gap-2">
+            {manageMode && onRemoveHabit && (
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                onClick={() => onRemoveHabit(toggle.id)}
+                data-testid={`button-remove-habit-${toggle.id}`}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            )}
+            {!manageMode && (
+              <Switch 
+                checked={completedToggles.includes(toggle.id)}
+                onCheckedChange={(checked) => onToggleHabit(toggle.id, undefined, checked)}
+                disabled={hasNoLog}
+                data-testid={`toggle-custom-${toggle.id}`}
+              />
+            )}
+          </div>
         </div>
       ))}
-      {hasNoLog && (
+      {hasNoLog && !manageMode && (
         <p className="text-xs text-muted-foreground text-center pt-2">Log nutrition to track habits</p>
       )}
     </div>
