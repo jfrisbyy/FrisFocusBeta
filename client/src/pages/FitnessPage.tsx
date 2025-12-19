@@ -17,7 +17,7 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, Send, Sparkles
+  MessageCircle, Send, Sparkles, Check, Loader2
 } from "lucide-react";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -2359,7 +2359,7 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   onEdit?: (id: string, data: Partial<NutritionLog>) => void;
 }) {
   const { toast } = useToast();
-  const [logMode, setLogMode] = useState<"meal" | "total">("total");
+  const [logMode, setLogMode] = useState<"meal" | "total" | "ai">("total");
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     calories: "",
@@ -2369,6 +2369,18 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
   });
   const [meals, setMeals] = useState<Meal[]>([]);
   const [newMeal, setNewMeal] = useState({ name: "", calories: "", protein: "", time: "" });
+  
+  // AI mode state
+  const [aiDescription, setAiDescription] = useState("");
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<{
+    mealName: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    breakdown: string;
+  } | null>(null);
 
   const isEditing = !!editData;
 
@@ -2388,8 +2400,40 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), calories: "", protein: "", carbs: "", fats: "" });
       setMeals([]);
       setLogMode("total");
+      setAiDescription("");
+      setAiResult(null);
     }
   }, [editData]);
+
+  const analyzeWithAI = async () => {
+    if (!aiDescription.trim()) return;
+    setAiAnalyzing(true);
+    setAiResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/fitness/nutrition/analyze", { description: aiDescription });
+      const data = await res.json();
+      setAiResult(data);
+    } catch (error) {
+      toast({ title: "Failed to analyze food", variant: "destructive" });
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
+  const applyAiResult = () => {
+    if (!aiResult) return;
+    setFormData({
+      ...formData,
+      calories: aiResult.calories.toString(),
+      protein: aiResult.protein.toString(),
+      carbs: aiResult.carbs.toString(),
+      fats: aiResult.fats.toString(),
+    });
+    setLogMode("total");
+    setAiResult(null);
+    setAiDescription("");
+    toast({ title: "Applied AI estimate" });
+  };
 
   const addMeal = () => {
     if (!newMeal.name || !newMeal.calories) return;
@@ -2489,6 +2533,15 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
             >
               Log by Meal
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={logMode === "ai" ? "default" : "outline"}
+              onClick={() => setLogMode("ai")}
+              data-testid="button-log-mode-ai"
+            >
+              <Sparkles className="h-4 w-4 mr-1" /> Log by AI
+            </Button>
           </div>
           
           {/* Add Individual Meal - only shown in meal mode */}
@@ -2550,7 +2603,54 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
           </div>
           )}
 
-          {/* Totals */}
+          {/* AI Mode */}
+          {logMode === "ai" && (
+          <div className="space-y-3 p-3 border rounded-md">
+            <div className="text-sm font-medium">Describe what you ate</div>
+            <Textarea
+              placeholder="e.g., I had a large chicken burrito with guacamole and sour cream, a side of chips and salsa, and a large horchata..."
+              value={aiDescription}
+              onChange={(e) => setAiDescription(e.target.value)}
+              className="min-h-[80px]"
+              data-testid="input-ai-description"
+            />
+            <Button 
+              size="sm" 
+              onClick={analyzeWithAI} 
+              disabled={!aiDescription.trim() || aiAnalyzing}
+              data-testid="button-ai-analyze"
+            >
+              {aiAnalyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-1" /> Analyze
+                </>
+              )}
+            </Button>
+
+            {aiResult && (
+              <div className="space-y-2 p-3 bg-muted/50 rounded-md">
+                <div className="font-medium">{aiResult.mealName}</div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Calories: <span className="font-medium">{aiResult.calories}</span></div>
+                  <div>Protein: <span className="font-medium">{aiResult.protein}g</span></div>
+                  <div>Carbs: <span className="font-medium">{aiResult.carbs}g</span></div>
+                  <div>Fats: <span className="font-medium">{aiResult.fats}g</span></div>
+                </div>
+                <p className="text-xs text-muted-foreground">{aiResult.breakdown}</p>
+                <Button size="sm" onClick={applyAiResult} data-testid="button-ai-apply">
+                  <Check className="h-4 w-4 mr-1" /> Use This Estimate
+                </Button>
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* Totals - only shown in total or meal mode */}
+          {logMode !== "ai" && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Total Calories</Label>
@@ -2569,6 +2669,7 @@ function NutritionDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
               <Input type="number" placeholder="65" value={formData.fats} onChange={(e) => setFormData({ ...formData, fats: e.target.value })} data-testid="input-nutrition-fats" />
             </div>
           </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

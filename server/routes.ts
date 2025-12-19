@@ -773,6 +773,62 @@ export async function registerRoutes(
     }
   });
 
+  // AI Nutrition Analysis - estimate calories/macros from food description
+  app.post("/api/fitness/nutrition/analyze", isAuthenticated, async (req: any, res) => {
+    try {
+      const { description } = req.body;
+      
+      if (!description || typeof description !== 'string' || description.trim().length === 0) {
+        return res.status(400).json({ error: "Food description is required" });
+      }
+
+      const systemPrompt = `You are a nutrition expert. The user will describe what they ate. Estimate the nutritional content as accurately as possible.
+
+IMPORTANT GUIDELINES:
+- Be realistic with portions. "Large" servings are bigger than standard.
+- Consider cooking methods (fried adds fat, grilled is leaner)
+- Include sauces, toppings, and sides that are mentioned
+- If quantities are vague, make reasonable assumptions for a typical serving
+- Round to whole numbers
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "mealName": "<brief descriptive name for the meal>",
+  "calories": <number>,
+  "protein": <number in grams>,
+  "carbs": <number in grams>,
+  "fats": <number in grams>,
+  "breakdown": "<brief explanation of how you estimated>"
+}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: description }
+        ],
+        max_tokens: 400,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      try {
+        const parsed = JSON.parse(rawContent);
+        res.json(parsed);
+      } catch (parseError) {
+        console.error("Failed to parse AI nutrition response:", parseError);
+        res.status(500).json({ error: "Failed to parse AI response" });
+      }
+    } catch (error) {
+      console.error("AI nutrition analysis error:", error);
+      res.status(500).json({ error: "Failed to analyze nutrition" });
+    }
+  });
+
   // Conversational AI Deficit Estimation - fetches user's logs and has a conversation
   app.post("/api/fitness/deficit/chat", isAuthenticated, async (req: any, res) => {
     try {
