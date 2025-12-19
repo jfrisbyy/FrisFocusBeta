@@ -1063,6 +1063,22 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/fitness/cardio/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const [updated] = await db.update(cardioRuns)
+        .set(req.body)
+        .where(and(eq(cardioRuns.id, id), eq(cardioRuns.userId, userId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Cardio run not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating cardio run:", error);
+      res.status(400).json({ error: "Failed to update cardio run" });
+    }
+  });
+
   app.delete("/api/fitness/cardio/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
