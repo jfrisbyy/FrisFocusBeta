@@ -30,14 +30,17 @@ const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
   { value: "rose", label: "Rose", color: "bg-rose-500" },
 ];
 
-type SiteTheme = "default" | "midnight" | "sepia" | "forest" | "ocean" | "sunrise" | "aurora" | "citrus" | "orchid";
+type SiteTheme = "default" | "midnight" | "sepia" | "forest" | "ocean" | "rosegold" | "hotpink" | "peach" | "sunrise" | "aurora" | "citrus" | "orchid";
 
 const siteThemes: { value: SiteTheme; label: string; description: string }[] = [
   { value: "default", label: "Default", description: "Standard light/dark theme" },
   { value: "midnight", label: "Midnight", description: "Deep blue tones" },
-  { value: "sepia", label: "Sepia", description: "Warm brown tones" },
+  { value: "sepia", label: "Sepia", description: "Deep warm brown" },
   { value: "forest", label: "Forest", description: "Deep green tones" },
-  { value: "ocean", label: "Ocean", description: "Blue-gray tones" },
+  { value: "ocean", label: "Ocean", description: "Deep blue-gray" },
+  { value: "rosegold", label: "Rose Gold", description: "Bright blush pink" },
+  { value: "hotpink", label: "Hot Pink", description: "Bright vibrant pink" },
+  { value: "peach", label: "Peach", description: "Bright warm peach" },
   { value: "sunrise", label: "Sunrise", description: "Deep burnt orange" },
   { value: "aurora", label: "Aurora", description: "Deep teal" },
   { value: "citrus", label: "Citrus", description: "Deep golden amber" },
