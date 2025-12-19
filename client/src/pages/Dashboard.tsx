@@ -436,6 +436,9 @@ export default function Dashboard() {
   const [weeklyTodoBonusAwarded, setWeeklyTodoBonusAwarded] = useState(false);
   const [dueDates, setDueDates] = useState<StoredDueDateItem[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
+  
+  // Track if we've loaded real data to prevent mock data from overwriting
+  const hasLoadedRealDataRef = useRef(false);
   const [weeklyTodoWeekOffset, setWeeklyTodoWeekOffset] = useState(0);
   const [weekStartDate, setWeekStartDate] = useState("");
   const [weekEndDate, setWeekEndDate] = useState("");
@@ -609,7 +612,8 @@ export default function Dashboard() {
   // Load data from localStorage on mount or when API data changes
   useEffect(() => {
     // Use mock data during demo/onboarding, otherwise load from storage
-    if (useMockData) {
+    // BUT: Don't overwrite with mock data if we've already loaded real user data
+    if (useMockData && !hasLoadedRealDataRef.current) {
       setDays(getMockWeekData(weekOffset, true));
       // Update week date strings for mock data too
       const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -645,6 +649,14 @@ export default function Dashboard() {
       setDueDates(getMockDueDates());
       return;
     }
+    
+    // If we're in mock mode but have already loaded real data, skip this effect entirely
+    if (useMockData) {
+      return;
+    }
+    
+    // Mark that we're loading real data
+    hasLoadedRealDataRef.current = true;
 
     // Load user profile - prefer storage name, then auth display name, then first name, then "You"
     const profile = loadUserProfileFromStorage();
