@@ -27,8 +27,6 @@ import FeedCard from "@/components/FeedCard";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels, DashboardPreferences, DashboardCardKey } from "@shared/schema";
 import { defaultDashboardPreferences, dashboardCardKeys } from "@shared/schema";
 import {
-  loadMilestonesFromStorage,
-  saveMilestonesToStorage,
   loadDailyGoalFromStorage,
   saveDailyGoalToStorage,
   loadWeeklyGoalFromStorage,
@@ -41,10 +39,7 @@ import {
   loadBadgesFromStorage,
   loadWeeklyTodoListFromStorage,
   saveWeeklyTodoListToStorage,
-  loadDueDatesFromStorage,
-  saveDueDatesToStorage,
   getWeekId,
-  StoredMilestone,
   StoredTodoItem,
   StoredDueDateItem,
   StoredFriendWelcomeMessage,
@@ -698,20 +693,9 @@ export default function Dashboard() {
       setWeeklyGoal(loadWeeklyGoalFromStorage());
     }
 
-    // Load milestones - prefer API data, fallback to localStorage
-    if (apiMilestones && apiMilestones.length > 0) {
-      setMilestones(apiMilestones.map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        description: m.description || "",
-        points: m.points,
-        deadline: m.deadline,
-        achieved: m.achieved,
-        achievedAt: m.achievedAt,
-      })));
-    } else if (!milestonesFetched) {
-      const storedMilestones = loadMilestonesFromStorage();
-      setMilestones(storedMilestones.map(m => ({
+    // Load milestones from API (database persistence only)
+    if (milestonesFetched) {
+      setMilestones((apiMilestones || []).map((m: any) => ({
         id: m.id,
         name: m.name,
         description: m.description || "",
@@ -758,9 +742,9 @@ export default function Dashboard() {
       }
     }
 
-    // Load due dates - prefer API data, fallback to localStorage
-    if (apiDueDates && apiDueDates.length > 0) {
-      setDueDates(apiDueDates.map((d: any) => ({
+    // Load due dates from API (database persistence only)
+    if (dueDatesFetched) {
+      setDueDates((apiDueDates || []).map((d: any) => ({
         id: d.id,
         title: d.title,
         dueDate: d.dueDate,
@@ -770,9 +754,6 @@ export default function Dashboard() {
         completedAt: d.completedAt,
         isRecurring: d.isRecurring,
       })));
-    } else if (!dueDatesFetched) {
-      const storedDueDates = loadDueDatesFromStorage();
-      setDueDates(storedDueDates);
     }
 
     // Wait for API queries to complete before processing data
