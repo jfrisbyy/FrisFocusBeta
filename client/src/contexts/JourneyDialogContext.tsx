@@ -142,18 +142,20 @@ function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             Set Up Your Profile
           </DialogTitle>
           <DialogDescription asChild>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400">
-                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>
-                  You're currently viewing <strong>demo data</strong> to explore how the app works. 
-                  When you start your journey, all sample data will be cleared.
-                </span>
+            <div className="space-y-4 text-sm text-muted-foreground">
+              <div>
+                <p className="font-medium text-foreground">Ready to begin?</p>
+                <p>
+                  Fill in your profile to start building your own system. You'll still have 
+                  access to guides, tips, and help along the way.
+                </p>
               </div>
               <p>
-                Ready to begin? Fill in your profile below. Or click "Keep Exploring" to 
-                continue learning about the app - the "Start My Journey" button will be 
-                waiting for you when you're ready.
+                Or choose <strong>Keep Exploring</strong> to continue interacting with the demo 
+                data and learning how everything works.
+              </p>
+              <p>
+                The <strong>Start My Journey</strong> button will be here whenever you're ready.
               </p>
             </div>
           </DialogDescription>
