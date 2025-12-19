@@ -8497,5 +8497,78 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
+  // ==================== FOOD ANALYZER API ====================
+
+  // Analyze food photo using OpenAI Vision
+  app.post("/api/food/analyze", isAuthenticated, async (req: any, res) => {
+    try {
+      const { image } = req.body;
+      
+      if (!image || typeof image !== "string") {
+        return res.status(400).json({ error: "Image data is required" });
+      }
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a nutrition analysis expert. Analyze the food in the image and provide detailed nutritional estimates.
+
+Return a JSON object with this exact structure:
+{
+  "totalCalories": number,
+  "totalProtein": number (grams),
+  "totalCarbs": number (grams),
+  "totalFat": number (grams),
+  "items": [
+    {
+      "name": "food item name",
+      "portion": "estimated portion size",
+      "calories": number,
+      "protein": number,
+      "carbs": number,
+      "fat": number
+    }
+  ],
+  "confidence": "high" | "medium" | "low",
+  "notes": "optional notes about the estimate"
+}
+
+Be as accurate as possible with portion estimates. If you can't identify something clearly, use "medium" or "low" confidence. Round all numbers to whole integers.`
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Please analyze the food in this image and provide nutritional estimates."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: image
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        response_format: { type: "json_object" }
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+
+      const result = JSON.parse(content);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error analyzing food:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze food" });
+    }
+  });
+
   return httpServer;
 }
