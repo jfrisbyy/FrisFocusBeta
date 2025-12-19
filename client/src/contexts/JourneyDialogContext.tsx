@@ -151,8 +151,9 @@ function StartJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChang
                 </span>
               </div>
               <p>
-                Fill in your profile to begin your personal habit tracking journey. 
-                Your friends will be able to find you by your username.
+                Ready to begin? Fill in your profile below. Or click "Keep Exploring" to 
+                continue learning about the app - the "Start My Journey" button will be 
+                waiting for you when you're ready.
               </p>
             </div>
           </DialogDescription>
