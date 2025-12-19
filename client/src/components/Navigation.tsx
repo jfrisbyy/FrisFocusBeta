@@ -10,6 +10,7 @@ import { SiGoogle } from "react-icons/si";
 import ProfileDialog from "@/components/ProfileDialog";
 import NotificationBell from "@/components/NotificationBell";
 import FpBar from "@/components/FpBar";
+import logoUrl from "@assets/ChatGPT_Image_Dec_19,_2025,_12_27_45_AM_1766122092280.png";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -72,7 +73,10 @@ export default function Navigation() {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-6">
-        <h1 className="text-xl font-semibold tracking-tight">FrisFocus</h1>
+        <div className="flex items-center gap-2">
+          <img src={logoUrl} alt="FrisFocus logo" className="h-8 w-8" />
+          <h1 className="text-xl font-semibold tracking-tight">FrisFocus</h1>
+        </div>
         <nav className="flex items-center gap-1 flex-wrap">
           {navItems.map((item) => {
             const isActive = location === item.path;
