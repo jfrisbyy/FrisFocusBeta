@@ -3269,40 +3269,43 @@ export default function FitnessPage() {
                     const prevRecord = arr[idx + 1];
                     const weightChange = prevRecord ? (record.weight || 0) - (prevRecord.weight || 0) : 0;
                     return (
-                      <div key={record.id} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`record-body-${record.id}`}>
-                        <div className="flex items-center gap-4">
-                          <div className="text-sm font-medium w-28">{formatDate(record.date)}</div>
+                      <div key={record.id} className="py-2 border-b last:border-0" data-testid={`record-body-${record.id}`}>
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <span className="font-medium">{record.weight} lbs</span>
-                            {record.bodyFat && <span className="text-muted-foreground">{record.bodyFat}% BF</span>}
-                            {weightChange !== 0 && (
-                              <Badge variant={weightChange < 0 ? "secondary" : "outline"} className="text-xs">
-                                {weightChange > 0 ? "+" : ""}{weightChange} lbs
-                              </Badge>
+                            <div className="text-sm font-medium w-28">{formatDate(record.date)}</div>
+                            <div className="flex items-center gap-4">
+                              <span className="font-medium">{record.weight} lbs</span>
+                              {record.bodyFat && <span className="text-muted-foreground">{record.bodyFat}% BF</span>}
+                              {weightChange !== 0 && (
+                                <Badge variant={weightChange < 0 ? "secondary" : "outline"} className="text-xs">
+                                  {weightChange > 0 ? "+" : ""}{weightChange} lbs
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {record.photoUrl && <Camera className="h-4 w-4 text-muted-foreground" />}
+                            {!isDemo && (
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  onClick={() => {
+                                    setEditingBodyComp(record);
+                                    setBodyCompDialogOpen(true);
+                                  }}
+                                  data-testid={`button-edit-body-${record.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => deleteBodyCompMutation.mutate(record.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {record.photoUrl && <Camera className="h-4 w-4 text-muted-foreground" />}
-                          {!isDemo && (
-                            <div className="flex gap-1">
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                onClick={() => {
-                                  setEditingBodyComp(record);
-                                  setBodyCompDialogOpen(true);
-                                }}
-                                data-testid={`button-edit-body-${record.id}`}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => deleteBodyCompMutation.mutate(record.id)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                        {record.notes && <p className="text-sm text-muted-foreground mt-1 ml-32">{record.notes}</p>}
                       </div>
                     );
                   })
@@ -6639,6 +6642,7 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     weight: "",
     bodyFat: "",
     goalWeight: "",
+    notes: "",
   });
 
   const isEditing = !!editData;
@@ -6650,9 +6654,10 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
         weight: editData.weight?.toString() || "",
         bodyFat: editData.bodyFat?.toString() || "",
         goalWeight: editData.goalWeight?.toString() || "",
+        notes: editData.notes || "",
       });
     } else {
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "", notes: "" });
     }
   }, [editData]);
 
@@ -6665,7 +6670,7 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/body-comp"] });
       toast({ title: "Body composition logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "", notes: "" });
     },
     onError: () => {
       toast({ title: "Failed to log body composition", variant: "destructive" });
@@ -6683,6 +6688,7 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       weight: formData.weight ? parseInt(formData.weight) : undefined,
       bodyFat: formData.bodyFat ? parseInt(formData.bodyFat) : undefined,
       goalWeight: formData.goalWeight ? parseInt(formData.goalWeight) : undefined,
+      notes: formData.notes || undefined,
     };
     if (isEditing && editData && onEdit) {
       onEdit(editData.id, payload);
@@ -6716,6 +6722,10 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
           <div className="space-y-2">
             <Label>Goal Weight (lbs)</Label>
             <Input type="number" placeholder="180" value={formData.goalWeight} onChange={(e) => setFormData({ ...formData, goalWeight: e.target.value })} data-testid="input-body-goal" />
+          </div>
+          <div className="space-y-2">
+            <Label>Notes (optional)</Label>
+            <Textarea placeholder="e.g., Weighed in after eating, morning weight, etc." value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} data-testid="input-body-notes" />
           </div>
         </div>
         <DialogFooter>
