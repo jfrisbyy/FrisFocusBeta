@@ -5021,9 +5021,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             </p>
           </div>
 
-          {/* Goal Direction Section - show after BMR is calculated */}
-          {bmrResult && (
-            <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+          {/* Goal Direction Section - greyed out until BMR is calculated */}
+          <div className={`space-y-3 p-4 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2 mb-2">
                 <Target className="h-4 w-4" />
                 <Label className="font-medium">What's your goal?</Label>
@@ -5050,12 +5049,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 {goalDirection === "maintain" && "Balance calories in vs out to maintain your current weight."}
                 {goalDirection === "gain" && "Create a calorie surplus to build muscle and gain weight."}
               </p>
-            </div>
-          )}
+          </div>
 
-          {/* Goal Weight & Timeframe Section - only show if lose or gain */}
-          {bmrResult && goalDirection !== "maintain" && (
-          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+          {/* Goal Weight & Timeframe Section - greyed out until BMR, hidden if maintain */}
+          {goalDirection !== "maintain" && (
+          <div className={`space-y-3 p-4 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4" />
               <Label className="font-medium">Weight Goal</Label>
@@ -5117,8 +5115,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
           )}
 
           {/* MAINTAIN FLOW */}
-          {bmrResult && goalDirection === "maintain" && (
-          <div className="space-y-4 p-4 bg-muted/30 rounded-md">
+          {goalDirection === "maintain" && (
+          <div className={`space-y-4 p-4 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
               <Activity className="h-4 w-4" />
               <Label className="font-medium">How active are you?</Label>
@@ -5160,8 +5158,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
           )}
 
           {/* GAIN WEIGHT FLOW */}
-          {bmrResult && goalDirection === "gain" && (
-          <div className="space-y-4 p-4 bg-muted/30 rounded-md">
+          {goalDirection === "gain" && (
+          <div className={`space-y-4 p-4 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2 mb-2">
               <Activity className="h-4 w-4" />
               <Label className="font-medium">How active are you?</Label>
@@ -5246,8 +5244,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
           )}
 
           {/* LOSE WEIGHT FLOW */}
-          {bmrResult && goalDirection === "lose" && (
-          <div className="space-y-4 p-4 bg-muted/30 rounded-md">
+          {goalDirection === "lose" && (
+          <div className={`space-y-4 p-4 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Show deficit needed */}
             {calculatedDeficit !== 0 && (
               <div className="p-3 bg-background rounded-md border">
@@ -5355,8 +5353,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
           )}
 
           {/* Manual Override */}
-          {bmrResult && (
-            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md">
+          <div className={`flex items-center gap-3 p-3 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="text-sm text-muted-foreground flex-shrink-0">Daily Target:</div>
               <div className="flex items-center gap-1">
                 <Button
@@ -5394,14 +5391,13 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 </Button>
               </div>
               <div className="text-sm text-muted-foreground">cal/day</div>
-            </div>
-          )}
+          </div>
 
           {/* Ask AI Button */}
-          {bmrResult && !showAIChat && (
+          {!showAIChat && (
             <Button 
               variant="outline" 
-              className="w-full"
+              className={`w-full ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}
               onClick={() => setShowAIChat(true)}
               data-testid="button-ask-ai-goal"
             >
