@@ -1672,8 +1672,8 @@ Be encouraging and realistic. Help them understand what's achievable.`;
     }
   });
 
-  // AI Routine Generation
-  app.post("/api/fitness/routines/generate", isAuthenticated, async (req: any, res) => {
+  // AI Routine Clarifying Questions
+  app.post("/api/fitness/routines/clarify", isAuthenticated, async (req: any, res) => {
     try {
       const { goals } = req.body;
       
@@ -1686,7 +1686,85 @@ Be encouraging and realistic. Help them understand what's achievable.`;
         messages: [
           {
             role: "system",
-            content: `You are an expert personal trainer and strength coach creating comprehensive workout programs. Generate a complete weekly workout split based on the user's goals.
+            content: `You are an expert personal trainer gathering information to create a personalized workout program. Based on the user's initial goals, ask 3-5 clarifying questions to better understand their needs.
+
+IMPORTANT: Return a JSON object with this exact structure:
+{
+  "questions": [
+    {
+      "id": "unique-id",
+      "question": "The question text",
+      "type": "choice" | "text" | "number",
+      "options": ["Option 1", "Option 2", "Option 3"] // Only for choice type
+    }
+  ]
+}
+
+Ask about:
+1. Training frequency (how many days per week they can commit)
+2. Equipment availability (gym, home, minimal equipment)
+3. Experience level (beginner, intermediate, advanced)
+4. Any injuries or limitations
+5. Specific preferences (preferred exercises, muscle groups to focus on, etc.)
+
+Keep questions concise and friendly. Make the options practical and cover common scenarios.`
+          },
+          {
+            role: "user",
+            content: `I want to create a workout program. My goals are: ${goals}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0].message.content;
+      if (!content) {
+        return res.status(500).json({ error: "Failed to generate questions" });
+      }
+
+      const parsed = JSON.parse(content);
+      res.json({
+        questions: (parsed.questions || []).map((q: any, idx: number) => ({
+          id: q.id || `q-${idx}`,
+          question: q.question || "Tell me more",
+          type: q.type || "text",
+          options: q.options || null,
+        }))
+      });
+    } catch (error) {
+      console.error("Error generating clarifying questions:", error);
+      res.status(500).json({ error: "Failed to generate clarifying questions" });
+    }
+  });
+
+  // AI Routine Generation
+  app.post("/api/fitness/routines/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { goals, answers, feedback } = req.body;
+      
+      if (!goals || typeof goals !== "string") {
+        return res.status(400).json({ error: "Goals description is required" });
+      }
+
+      // Build context from answers and feedback
+      let additionalContext = "";
+      if (answers && Array.isArray(answers)) {
+        additionalContext += "\n\nAdditional information from user:\n";
+        answers.forEach((a: { question: string; answer: string }) => {
+          additionalContext += `- ${a.question}: ${a.answer}\n`;
+        });
+      }
+      if (feedback && typeof feedback === "string") {
+        additionalContext += `\n\nUser feedback on previous suggestion: ${feedback}\n`;
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert personal trainer and strength coach creating comprehensive workout programs. Generate a complete weekly workout split based on the user's goals and the additional context they've provided.
 
 IMPORTANT: Return a JSON object with this exact structure:
 {
@@ -1722,7 +1800,7 @@ Guidelines:
           },
           {
             role: "user",
-            content: `Create a personalized workout program for these goals: ${goals}`
+            content: `Create a personalized workout program for these goals: ${goals}${additionalContext}`
           }
         ],
         response_format: { type: "json_object" },

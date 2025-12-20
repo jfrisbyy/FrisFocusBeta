@@ -209,24 +209,16 @@ function RoutineForm({ initialData, onSave, onGenerate, isGenerating, isSaving }
           <Sparkles className="h-4 w-4" />
           Generate with AI
         </Label>
-        <div className="flex gap-2">
-          <Textarea
-            value={aiGoals}
-            onChange={(e) => setAiGoals(e.target.value)}
-            placeholder="Describe your goals: e.g., 'Build upper body strength, focus on chest and shoulders'"
-            className="resize-none flex-1"
-            rows={2}
-            data-testid="input-ai-routine-goals"
-          />
-          <Button
-            variant="secondary"
-            onClick={() => onGenerate(aiGoals)}
-            disabled={!aiGoals.trim() || isGenerating}
-            data-testid="button-generate-routine"
-          >
-            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          </Button>
-        </div>
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={() => onGenerate("")}
+          disabled={isGenerating}
+          data-testid="button-open-ai-wizard"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Start AI Workout Builder
+        </Button>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -301,6 +293,23 @@ export default function FitnessPage() {
     routines: GeneratedRoutine[];
   } | null>(null);
   const [routinePreviewOpen, setRoutinePreviewOpen] = useState(false);
+
+  // AI Wizard state for clarifying questions
+  type AIQuestion = {
+    id: string;
+    question: string;
+    type: "choice" | "text" | "number";
+    options: string[] | null;
+  };
+  type AIAnswer = {
+    question: string;
+    answer: string;
+  };
+  const [aiWizardOpen, setAiWizardOpen] = useState(false);
+  const [aiWizardStep, setAiWizardStep] = useState<"goals" | "questions" | "generating">("goals");
+  const [aiWizardGoals, setAiWizardGoals] = useState("");
+  const [aiWizardQuestions, setAiWizardQuestions] = useState<AIQuestion[]>([]);
+  const [aiWizardAnswers, setAiWizardAnswers] = useState<Record<string, string>>({});
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -645,9 +654,29 @@ export default function FitnessPage() {
     },
   });
 
-  const generateRoutineMutation = useMutation({
+  // Clarify questions mutation for AI wizard
+  const clarifyQuestionsMutation = useMutation({
     mutationFn: async (goals: string) => {
-      const res = await apiRequest("POST", "/api/fitness/routines/generate", { goals });
+      const res = await apiRequest("POST", "/api/fitness/routines/clarify", { goals });
+      return res.json();
+    },
+    onSuccess: (data: { questions: Array<{ id: string; question: string; type: string; options: string[] | null }> }) => {
+      setAiWizardQuestions(data.questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        type: q.type as "choice" | "text" | "number",
+        options: q.options,
+      })));
+      setAiWizardStep("questions");
+    },
+    onError: () => {
+      toast({ title: "Failed to get clarifying questions", variant: "destructive" });
+    },
+  });
+
+  const generateRoutineMutation = useMutation({
+    mutationFn: async ({ goals, answers, feedback }: { goals: string; answers?: Array<{ question: string; answer: string }>; feedback?: string }) => {
+      const res = await apiRequest("POST", "/api/fitness/routines/generate", { goals, answers, feedback });
       return res.json();
     },
     onSuccess: (data: { splitName: string; splitDescription: string; routines: Array<{ id: string; name: string; description: string; dayOfWeek: string; exercises: RoutineExercise[] }> }) => {
@@ -662,12 +691,19 @@ export default function FitnessPage() {
         routines: routinesWithSelection,
       });
       setRoutineDialogOpen(false);
+      setAiWizardOpen(false);
       setRoutinePreviewOpen(true);
       setAiRoutineGoals("");
+      // Reset wizard state
+      setAiWizardStep("goals");
+      setAiWizardGoals("");
+      setAiWizardQuestions([]);
+      setAiWizardAnswers({});
       toast({ title: `Generated ${data.routines.length} routines! Review and save.` });
     },
     onError: () => {
       toast({ title: "Failed to generate routines", variant: "destructive" });
+      setAiWizardStep("questions");
     },
   });
 
@@ -2436,12 +2472,17 @@ export default function FitnessPage() {
                     createRoutineMutation.mutate(data);
                   }
                 }}
-                onGenerate={(goals) => {
+                onGenerate={() => {
                   if (isDemo) {
                     toast({ title: "Demo mode - AI not available" });
                     return;
                   }
-                  generateRoutineMutation.mutate(goals);
+                  setRoutineDialogOpen(false);
+                  setAiWizardOpen(true);
+                  setAiWizardStep("goals");
+                  setAiWizardGoals("");
+                  setAiWizardQuestions([]);
+                  setAiWizardAnswers({});
                 }}
                 isGenerating={generateRoutineMutation.isPending}
                 isSaving={createRoutineMutation.isPending || updateRoutineMutation.isPending}
@@ -2522,6 +2563,135 @@ export default function FitnessPage() {
                   </Button>
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* AI Workout Wizard Dialog */}
+          <Dialog open={aiWizardOpen} onOpenChange={(open) => {
+            setAiWizardOpen(open);
+            if (!open) {
+              setAiWizardStep("goals");
+              setAiWizardGoals("");
+              setAiWizardQuestions([]);
+              setAiWizardAnswers({});
+            }
+          }}>
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  AI Workout Builder
+                </DialogTitle>
+                <DialogDescription>
+                  {aiWizardStep === "goals" && "Tell me about your fitness goals and I'll create a personalized program."}
+                  {aiWizardStep === "questions" && "A few quick questions to customize your program."}
+                  {aiWizardStep === "generating" && "Creating your personalized workout program..."}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Step 1: Goals */}
+              {aiWizardStep === "goals" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>What are your fitness goals?</Label>
+                    <Textarea
+                      value={aiWizardGoals}
+                      onChange={(e) => setAiWizardGoals(e.target.value)}
+                      placeholder="e.g., Build muscle and strength for basketball, lose 15 lbs while maintaining muscle, train for a marathon..."
+                      className="resize-none"
+                      rows={4}
+                      data-testid="input-ai-wizard-goals"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setAiWizardOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => clarifyQuestionsMutation.mutate(aiWizardGoals)}
+                      disabled={!aiWizardGoals.trim() || clarifyQuestionsMutation.isPending}
+                      data-testid="button-get-questions"
+                    >
+                      {clarifyQuestionsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : null}
+                      Continue
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Clarifying Questions */}
+              {aiWizardStep === "questions" && (
+                <div className="space-y-4">
+                  <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                    {aiWizardQuestions.map((q, idx) => (
+                      <div key={q.id} className="space-y-2">
+                        <Label className="text-sm font-medium">{idx + 1}. {q.question}</Label>
+                        {q.type === "choice" && q.options ? (
+                          <div className="flex flex-wrap gap-2">
+                            {q.options.map((option) => (
+                              <Button
+                                key={option}
+                                size="sm"
+                                variant={aiWizardAnswers[q.id] === option ? "default" : "outline"}
+                                onClick={() => setAiWizardAnswers(prev => ({ ...prev, [q.id]: option }))}
+                                data-testid={`button-option-${q.id}-${option}`}
+                              >
+                                {option}
+                              </Button>
+                            ))}
+                          </div>
+                        ) : q.type === "number" ? (
+                          <Input
+                            type="number"
+                            value={aiWizardAnswers[q.id] || ""}
+                            onChange={(e) => setAiWizardAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                            placeholder="Enter a number"
+                            data-testid={`input-number-${q.id}`}
+                          />
+                        ) : (
+                          <Textarea
+                            value={aiWizardAnswers[q.id] || ""}
+                            onChange={(e) => setAiWizardAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                            placeholder="Your answer..."
+                            className="resize-none"
+                            rows={2}
+                            data-testid={`input-text-${q.id}`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between gap-2 pt-2 border-t">
+                    <Button variant="ghost" onClick={() => setAiWizardStep("goals")}>
+                      Back
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        const answers = aiWizardQuestions.map(q => ({
+                          question: q.question,
+                          answer: aiWizardAnswers[q.id] || "(not answered)",
+                        }));
+                        setAiWizardStep("generating");
+                        generateRoutineMutation.mutate({ goals: aiWizardGoals, answers });
+                      }}
+                      disabled={generateRoutineMutation.isPending}
+                      data-testid="button-generate-program"
+                    >
+                      Generate Program
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Generating */}
+              {aiWizardStep === "generating" && (
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-muted-foreground text-sm">Building your personalized workout program...</p>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
 
