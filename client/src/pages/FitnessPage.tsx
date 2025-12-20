@@ -283,6 +283,22 @@ export default function FitnessPage() {
   const [editingRoutine, setEditingRoutine] = useState<WorkoutRoutine | null>(null);
   const [aiRoutineGenerating, setAiRoutineGenerating] = useState(false);
   const [aiRoutineGoals, setAiRoutineGoals] = useState("");
+  
+  // AI Generated routines preview state
+  type GeneratedRoutine = {
+    id: string;
+    name: string;
+    description: string;
+    dayOfWeek: string;
+    exercises: RoutineExercise[];
+    selected: boolean;
+  };
+  const [generatedRoutinesPreview, setGeneratedRoutinesPreview] = useState<{
+    splitName: string;
+    splitDescription: string;
+    routines: GeneratedRoutine[];
+  } | null>(null);
+  const [routinePreviewOpen, setRoutinePreviewOpen] = useState(false);
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -632,21 +648,44 @@ export default function FitnessPage() {
       const res = await apiRequest("POST", "/api/fitness/routines/generate", { goals });
       return res.json();
     },
-    onSuccess: (data: { name: string; description: string; exercises: RoutineExercise[] }) => {
-      setEditingRoutine({
-        id: "",
-        userId: "",
-        name: data.name,
-        description: data.description,
-        exercises: data.exercises,
-        createdAt: null,
-        updatedAt: null,
+    onSuccess: (data: { splitName: string; splitDescription: string; routines: Array<{ id: string; name: string; description: string; dayOfWeek: string; exercises: RoutineExercise[] }> }) => {
+      // Transform response to include selected state for each routine
+      const routinesWithSelection = data.routines.map(r => ({
+        ...r,
+        selected: true, // Default all to selected
+      }));
+      setGeneratedRoutinesPreview({
+        splitName: data.splitName,
+        splitDescription: data.splitDescription,
+        routines: routinesWithSelection,
       });
+      setRoutineDialogOpen(false);
+      setRoutinePreviewOpen(true);
       setAiRoutineGoals("");
-      toast({ title: "Routine generated! Review and save." });
+      toast({ title: `Generated ${data.routines.length} routines! Review and save.` });
     },
     onError: () => {
-      toast({ title: "Failed to generate routine", variant: "destructive" });
+      toast({ title: "Failed to generate routines", variant: "destructive" });
+    },
+  });
+
+  const saveGeneratedRoutinesMutation = useMutation({
+    mutationFn: async (routines: Array<{ name: string; description?: string; exercises: RoutineExercise[] }>) => {
+      const results = await Promise.all(
+        routines.map(routine =>
+          apiRequest("POST", "/api/fitness/routines", routine).then(res => res.json())
+        )
+      );
+      return results;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/routines"] });
+      toast({ title: `Saved ${data.length} routines!` });
+      setRoutinePreviewOpen(false);
+      setGeneratedRoutinesPreview(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to save routines", variant: "destructive" });
     },
   });
 
@@ -2470,6 +2509,82 @@ export default function FitnessPage() {
                 isGenerating={generateRoutineMutation.isPending}
                 isSaving={createRoutineMutation.isPending || updateRoutineMutation.isPending}
               />
+            </DialogContent>
+          </Dialog>
+
+          {/* AI Generated Routines Preview Dialog */}
+          <Dialog open={routinePreviewOpen} onOpenChange={setRoutinePreviewOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{generatedRoutinesPreview?.splitName || "Generated Workout Program"}</DialogTitle>
+                <DialogDescription>{generatedRoutinesPreview?.splitDescription}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {generatedRoutinesPreview?.routines.map((routine, idx) => (
+                  <Card key={routine.id} className={routine.selected ? "border-primary" : "opacity-60"}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={routine.selected}
+                          onCheckedChange={(checked) => {
+                            setGeneratedRoutinesPreview(prev => prev ? {
+                              ...prev,
+                              routines: prev.routines.map((r, i) => 
+                                i === idx ? { ...r, selected: !!checked } : r
+                              )
+                            } : null);
+                          }}
+                          data-testid={`checkbox-routine-${idx}`}
+                        />
+                        <div className="flex-1">
+                          <CardTitle className="text-base">{routine.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground">{routine.dayOfWeek} - {routine.description}</p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-1 text-sm">
+                        {routine.exercises.map((ex) => (
+                          <div key={ex.id} className="flex items-center gap-2 py-1 border-b last:border-0">
+                            <span className="font-medium">{ex.name}</span>
+                            <Badge variant="secondary">{ex.sets}x{ex.reps}</Badge>
+                            {ex.notes && <span className="text-muted-foreground text-xs">{ex.notes}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              <div className="flex justify-between items-center pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  {generatedRoutinesPreview?.routines.filter(r => r.selected).length || 0} of {generatedRoutinesPreview?.routines.length || 0} routines selected
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setRoutinePreviewOpen(false); setGeneratedRoutinesPreview(null); }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const selected = generatedRoutinesPreview?.routines.filter(r => r.selected) || [];
+                      if (selected.length === 0) {
+                        toast({ title: "Select at least one routine" });
+                        return;
+                      }
+                      saveGeneratedRoutinesMutation.mutate(selected.map(r => ({
+                        name: r.name,
+                        description: r.description,
+                        exercises: r.exercises
+                      })));
+                    }}
+                    disabled={saveGeneratedRoutinesMutation.isPending}
+                    data-testid="button-save-selected-routines"
+                  >
+                    {saveGeneratedRoutinesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Save Selected
+                  </Button>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
 

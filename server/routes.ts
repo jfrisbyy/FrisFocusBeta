@@ -1686,16 +1686,43 @@ Be encouraging and realistic. Help them understand what's achievable.`;
         messages: [
           {
             role: "system",
-            content: `You are a professional fitness coach creating workout routines. Generate personalized workout splits based on user goals. Return a JSON array of routines, where each routine has:
-- name: string (e.g., "Push Day", "Pull Day", "Leg Day")
-- description: string (brief description of the routine's focus)
-- exercises: array of { id: string (unique), name: string, sets: number, reps: number, notes?: string }
+            content: `You are an expert personal trainer and strength coach creating comprehensive workout programs. Generate a complete weekly workout split based on the user's goals.
 
-Create 3-5 balanced routines that form a complete workout split. Be specific with exercise names and provide appropriate sets/reps for the goal.`
+IMPORTANT: Return a JSON object with this exact structure:
+{
+  "splitName": "Name of the overall program (e.g., 'Push/Pull/Legs Split', '5-Day Hypertrophy Program')",
+  "splitDescription": "Brief overview of the program and why it suits their goals",
+  "routines": [
+    {
+      "id": "unique-id-string",
+      "name": "Day name (e.g., 'Push Day A', 'Upper Body', 'Leg Day')",
+      "description": "What this session targets and its purpose",
+      "dayOfWeek": "Suggested day (e.g., 'Monday', 'Day 1')",
+      "exercises": [
+        {
+          "id": "unique-exercise-id",
+          "name": "Specific exercise name (e.g., 'Barbell Bench Press', 'Romanian Deadlift')",
+          "sets": 4,
+          "reps": 8,
+          "notes": "Form cues, tempo, or intensity notes"
+        }
+      ]
+    }
+  ]
+}
+
+Guidelines:
+- Create 3-6 routines that form a balanced weekly program
+- Include 5-8 exercises per routine
+- Be specific with exercise names (not just "chest exercise")
+- Include compound movements first, then isolation exercises
+- Add helpful notes for form, tempo (e.g., "3-1-2 tempo"), or RPE targets
+- Vary rep ranges based on goals: strength (3-5), hypertrophy (8-12), endurance (15-20)
+- Consider recovery between muscle groups`
           },
           {
             role: "user",
-            content: `Create a personalized workout split for these goals: ${goals}`
+            content: `Create a personalized workout program for these goals: ${goals}`
           }
         ],
         response_format: { type: "json_object" },
@@ -1708,7 +1735,28 @@ Create 3-5 balanced routines that form a complete workout split. Be specific wit
       }
 
       const parsed = JSON.parse(content);
-      res.json(parsed.routines || parsed);
+      
+      // Ensure consistent response structure
+      const routines = parsed.routines || [];
+      const response = {
+        splitName: parsed.splitName || "Custom Workout Split",
+        splitDescription: parsed.splitDescription || "A personalized workout program",
+        routines: routines.map((r: any, idx: number) => ({
+          id: r.id || crypto.randomUUID(),
+          name: r.name || `Workout ${idx + 1}`,
+          description: r.description || "",
+          dayOfWeek: r.dayOfWeek || `Day ${idx + 1}`,
+          exercises: (r.exercises || []).map((ex: any) => ({
+            id: ex.id || crypto.randomUUID(),
+            name: ex.name || "Exercise",
+            sets: ex.sets || 3,
+            reps: ex.reps || 10,
+            notes: ex.notes || ""
+          }))
+        }))
+      };
+      
+      res.json(response);
     } catch (error) {
       console.error("Error generating workout routines:", error);
       res.status(500).json({ error: "Failed to generate workout routines" });
