@@ -1582,6 +1582,50 @@ export default function CommunityPage() {
     },
   });
 
+  // Update circle mutation (owner only)
+  const updateCircleMutation = useMutation({
+    mutationFn: async ({ circleId, data }: { circleId: string; data: { name?: string; description?: string; dailyPointGoal?: number | null; weeklyPointGoal?: number | null } }) => {
+      const res = await apiRequest("PUT", `/api/circles/${circleId}`, data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update circle');
+      }
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', variables.circleId] });
+      setShowCircleSettings(false);
+      toast({ title: "Circle updated", description: "Circle settings have been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update circle", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Delete circle mutation (owner only)
+  const deleteCircleMutation = useMutation({
+    mutationFn: async (circleId: string) => {
+      const res = await apiRequest("DELETE", `/api/circles/${circleId}`);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete circle');
+      }
+      return res.json();
+    },
+    onSuccess: (_, circleId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/circles'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/circles', circleId] });
+      setSelectedCircle(null);
+      setShowCircleSettings(false);
+      setShowDeleteCircleConfirm(false);
+      toast({ title: "Circle deleted", description: "The circle has been permanently deleted." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete circle", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Leave circle mutation
   const leaveCircleMutation = useMutation({
     mutationFn: async (circleId: string) => {
@@ -3163,6 +3207,9 @@ export default function CommunityPage() {
   const [showCircleSettings, setShowCircleSettings] = useState(false);
   const [editDailyGoal, setEditDailyGoal] = useState("");
   const [editWeeklyGoal, setEditWeeklyGoal] = useState("");
+  const [editCircleName, setEditCircleName] = useState("");
+  const [editCircleDescription, setEditCircleDescription] = useState("");
+  const [showDeleteCircleConfirm, setShowDeleteCircleConfirm] = useState(false);
 
   const getInitials = (firstName: string, lastName: string) => {
     const first = firstName?.charAt(0) ?? "";
@@ -3502,9 +3549,24 @@ export default function CommunityPage() {
 
   const openCircleSettings = () => {
     if (!selectedCircle) return;
+    setEditCircleName(selectedCircle.name);
+    setEditCircleDescription(selectedCircle.description || "");
     setEditDailyGoal(selectedCircle.dailyPointGoal?.toString() || "");
     setEditWeeklyGoal(selectedCircle.weeklyPointGoal?.toString() || "");
+    setShowDeleteCircleConfirm(false);
     setShowCircleSettings(true);
+  };
+
+  const isCircleOwner = (circleId: string) => {
+    // In API mode, use the userRole from the selected circle data (returned by backend)
+    if (!isDemo && selectedCircle && selectedCircle.id === circleId) {
+      return selectedCircle.userRole === "owner";
+    }
+    // Fallback to local state for demo mode or other circles
+    const members = circleMembers[circleId] || [];
+    const currentUserId = isDemo ? "you" : user?.id;
+    const me = members.find(m => m.userId === currentUserId);
+    return me?.role === "owner";
   };
 
   const handleSaveCircleSettings = () => {
@@ -3513,8 +3575,35 @@ export default function CommunityPage() {
     const dailyGoal = editDailyGoal ? parseInt(editDailyGoal) : undefined;
     const weeklyGoal = editWeeklyGoal ? parseInt(editWeeklyGoal) : undefined;
     
+    // Non-demo mode: call API
+    if (!isDemo && user) {
+      updateCircleMutation.mutate({
+        circleId: selectedCircle.id,
+        data: {
+          name: editCircleName,
+          description: editCircleDescription || undefined,
+          dailyPointGoal: dailyGoal ?? null,
+          weeklyPointGoal: weeklyGoal ?? null,
+        },
+      });
+      // Update local state optimistically
+      const updatedCircle: StoredCircle = {
+        ...selectedCircle,
+        name: editCircleName,
+        description: editCircleDescription || undefined,
+        dailyPointGoal: dailyGoal,
+        weeklyPointGoal: weeklyGoal,
+      };
+      setCircles(circles.map(c => c.id === selectedCircle.id ? updatedCircle : c));
+      setSelectedCircle(updatedCircle);
+      return;
+    }
+    
+    // Demo mode: local state only
     const updatedCircle: StoredCircle = {
       ...selectedCircle,
+      name: editCircleName,
+      description: editCircleDescription || undefined,
       dailyPointGoal: dailyGoal,
       weeklyPointGoal: weeklyGoal,
     };
@@ -3525,7 +3614,27 @@ export default function CommunityPage() {
     
     toast({
       title: "Circle settings updated",
-      description: "Point goals have been saved successfully.",
+      description: "Settings have been saved successfully.",
+    });
+  };
+
+  const handleDeleteCircle = () => {
+    if (!selectedCircle) return;
+    
+    // Non-demo mode: call API
+    if (!isDemo && user) {
+      deleteCircleMutation.mutate(selectedCircle.id);
+      return;
+    }
+    
+    // Demo mode: local state only
+    setCircles(circles.filter(c => c.id !== selectedCircle.id));
+    setSelectedCircle(null);
+    setShowCircleSettings(false);
+    setShowDeleteCircleConfirm(false);
+    toast({
+      title: "Circle deleted",
+      description: "The circle has been permanently deleted.",
     });
   };
 
@@ -7524,14 +7633,41 @@ export default function CommunityPage() {
 
               {/* Circle Settings Dialog */}
               <Dialog open={showCircleSettings} onOpenChange={setShowCircleSettings}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                   <DialogHeader>
                     <DialogTitle>Circle Settings</DialogTitle>
                     <DialogDescription>
-                      Configure point goals for circle members. These goals help motivate everyone to stay on track.
+                      {isCircleOwner(selectedCircle.id) 
+                        ? "Edit circle details and configure point goals for members."
+                        : "Configure point goals for circle members."}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
+                    {isCircleOwner(selectedCircle.id) && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="circleName">Circle Name</Label>
+                          <Input
+                            id="circleName"
+                            placeholder="Enter circle name"
+                            value={editCircleName}
+                            onChange={(e) => setEditCircleName(e.target.value)}
+                            data-testid="input-circle-name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="circleDescription">Description</Label>
+                          <Input
+                            id="circleDescription"
+                            placeholder="Enter circle description (optional)"
+                            value={editCircleDescription}
+                            onChange={(e) => setEditCircleDescription(e.target.value)}
+                            data-testid="input-circle-description"
+                          />
+                        </div>
+                        <div className="border-t pt-4" />
+                      </>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="dailyGoal">Daily Point Goal (per member)</Label>
                       <Input
@@ -7560,13 +7696,58 @@ export default function CommunityPage() {
                         Leave empty to disable weekly goals
                       </p>
                     </div>
+                    {isCircleOwner(selectedCircle.id) && (
+                      <div className="border-t pt-4 space-y-2">
+                        <Label className="text-destructive">Danger Zone</Label>
+                        {!showDeleteCircleConfirm ? (
+                          <Button
+                            variant="destructive"
+                            className="w-full"
+                            onClick={() => setShowDeleteCircleConfirm(true)}
+                            data-testid="button-delete-circle"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Circle
+                          </Button>
+                        ) : (
+                          <div className="space-y-2 p-3 border border-destructive rounded-md bg-destructive/10">
+                            <p className="text-sm text-destructive font-medium">
+                              Are you sure? This will permanently delete the circle and all its data.
+                            </p>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowDeleteCircleConfirm(false)}
+                                data-testid="button-cancel-delete"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleDeleteCircle}
+                                disabled={deleteCircleMutation.isPending}
+                                data-testid="button-confirm-delete"
+                              >
+                                {deleteCircleMutation.isPending ? "Deleting..." : "Yes, Delete"}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShowCircleSettings(false)} data-testid="button-cancel-settings">
                       Cancel
                     </Button>
-                    <Button onClick={handleSaveCircleSettings} data-testid="button-save-settings">
-                      Save Goals
+                    <Button 
+                      onClick={handleSaveCircleSettings} 
+                      disabled={updateCircleMutation.isPending || (isCircleOwner(selectedCircle.id) && !editCircleName.trim())}
+                      data-testid="button-save-settings"
+                    >
+                      {updateCircleMutation.isPending ? "Saving..." : "Save Settings"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>

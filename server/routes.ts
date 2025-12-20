@@ -4609,6 +4609,78 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
+  // Update a circle (owner only)
+  app.put("/api/circles/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check if circle exists
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      // Check if user is the owner
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership || membership.role !== "owner") {
+        return res.status(403).json({ error: "Only the owner can edit this circle" });
+      }
+
+      // Update circle with allowed fields
+      const { name, description, isPrivate, dailyPointGoal, weeklyPointGoal } = req.body;
+      const updateData: Partial<typeof circles.$inferInsert> = {};
+      
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (isPrivate !== undefined) updateData.isPrivate = isPrivate;
+      if (dailyPointGoal !== undefined) updateData.dailyPointGoal = dailyPointGoal;
+      if (weeklyPointGoal !== undefined) updateData.weeklyPointGoal = weeklyPointGoal;
+
+      const [updatedCircle] = await db.update(circles)
+        .set(updateData)
+        .where(eq(circles.id, circleId))
+        .returning();
+
+      res.json(updatedCircle);
+    } catch (error) {
+      console.error("Error updating circle:", error);
+      res.status(400).json({ error: "Failed to update circle" });
+    }
+  });
+
+  // Delete a circle (owner only)
+  app.delete("/api/circles/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const circleId = req.params.id;
+
+      // Check if circle exists
+      const [circle] = await db.select().from(circles).where(eq(circles.id, circleId));
+      if (!circle) {
+        return res.status(404).json({ error: "Circle not found" });
+      }
+
+      // Check if user is the owner
+      const [membership] = await db.select().from(circleMembers).where(
+        and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId))
+      );
+      if (!membership || membership.role !== "owner") {
+        return res.status(403).json({ error: "Only the owner can delete this circle" });
+      }
+
+      // Delete circle - cascade should handle members, messages, tasks, etc.
+      await db.delete(circles).where(eq(circles.id, circleId));
+
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting circle:", error);
+      res.status(500).json({ error: "Failed to delete circle" });
+    }
+  });
+
   // Join a circle
   app.post("/api/circles/:id/join", isAuthenticated, async (req: any, res) => {
     try {
