@@ -28,7 +28,7 @@ import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, Bask
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend, PieChart, Pie } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend, PieChart, Pie, Area, AreaChart } from "recharts";
 
 const mockNutrition: NutritionLog[] = [
   { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], calories: 2200, protein: 180, carbs: 220, fats: 65, creatine: true, waterGallon: true, deficit: 300, caloriesBurned: null, meals: [{ id: "m1", name: "Breakfast", calories: 500, protein: 30, time: "8:00 AM" }, { id: "m2", name: "Lunch", calories: 800, protein: 50, time: "12:30 PM" }, { id: "m3", name: "Dinner", calories: 900, protein: 100, time: "7:00 PM" }], completedToggles: null },
@@ -261,6 +261,7 @@ export default function FitnessPage() {
   const [volumeChartView, setVolumeChartView] = useState<"weekly" | "monthly">("weekly");
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
   const [stepGoalSettingsOpen, setStepGoalSettingsOpen] = useState(false);
+  const [bodyTrendPeriod, setBodyTrendPeriod] = useState<30 | 60 | 90 | 365>(30);
 
   // Editing state for each fitness log type
   const [editingNutrition, setEditingNutrition] = useState<NutritionLog | null>(null);
@@ -3213,13 +3214,21 @@ export default function FitnessPage() {
               <CardContent>
                 <div className="text-2xl font-bold">{latestWeight?.weight || "--"}</div>
                 <p className="text-xs text-muted-foreground">lbs</p>
-                {latestWeight && bodyComp.length > 1 && (() => {
+                {latestWeight && (() => {
                   const sorted = [...bodyComp].sort((a, b) => b.date.localeCompare(a.date));
-                  const diff = (sorted[0].weight || 0) - (sorted[1].weight || 0);
+                  const daysSinceLast = differenceInDays(new Date(), parseISO(sorted[0]?.date || new Date().toISOString().split("T")[0]));
+                  const diff = sorted.length > 1 ? (sorted[0].weight || 0) - (sorted[1].weight || 0) : 0;
                   return (
-                    <div className={`flex items-center gap-1 mt-1 text-xs ${diff < 0 ? "text-green-500" : diff > 0 ? "text-red-500" : "text-muted-foreground"}`}>
-                      {diff < 0 ? <TrendingDown className="h-3 w-3" /> : diff > 0 ? <TrendingUp className="h-3 w-3" /> : null}
-                      {diff !== 0 && <span>{Math.abs(diff)} lbs from last</span>}
+                    <div className="mt-2 space-y-1">
+                      {diff !== 0 && (
+                        <div className={`flex items-center gap-1 text-xs ${diff < 0 ? "text-green-500" : diff > 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                          {diff < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                          <span>{diff > 0 ? "+" : ""}{diff.toFixed(1)} lbs from last</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {daysSinceLast === 0 ? "Logged today" : daysSinceLast === 1 ? "1 day ago" : `${daysSinceLast} days ago`}
+                      </p>
                     </div>
                   );
                 })()}
@@ -3241,20 +3250,134 @@ export default function FitnessPage() {
                 <CardTitle className="text-sm">Goal Progress</CardTitle>
               </CardHeader>
               <CardContent>
-                {latestWeight?.goalWeight && latestWeight?.weight ? (
-                  <>
-                    <div className="text-sm mb-2">
-                      <span className="font-medium">{latestWeight.weight}</span> / <span className="text-muted-foreground">{latestWeight.goalWeight} lbs</span>
-                    </div>
-                    <Progress value={Math.max(0, Math.min(100, ((latestWeight.weight - latestWeight.goalWeight) / (bodyComp[bodyComp.length - 1]?.weight || latestWeight.weight) - latestWeight.goalWeight) * 100))} />
-                    <p className="text-xs text-muted-foreground mt-1">{Math.abs(latestWeight.weight - latestWeight.goalWeight)} lbs to go</p>
-                  </>
-                ) : (
+                {latestWeight?.goalWeight && latestWeight?.weight ? (() => {
+                  const sortedByDate = [...bodyComp].sort((a, b) => a.date.localeCompare(b.date));
+                  const startWeight = sortedByDate[0]?.weight || latestWeight.weight;
+                  const currentWeight = latestWeight.weight;
+                  const goalWeight = latestWeight.goalWeight;
+                  const totalToLose = Math.abs(startWeight - goalWeight);
+                  const lost = Math.abs(startWeight - currentWeight);
+                  const remaining = Math.abs(currentWeight - goalWeight);
+                  const progressPercent = totalToLose > 0 ? Math.min(100, (lost / totalToLose) * 100) : 0;
+                  
+                  const firstDate = sortedByDate[0]?.date ? parseISO(sortedByDate[0].date) : new Date();
+                  const daysSinceStart = differenceInDays(new Date(), firstDate) || 1;
+                  const weeksSinceStart = daysSinceStart / 7;
+                  const currentPace = weeksSinceStart > 0 ? lost / weeksSinceStart : 0;
+                  const isDeficit = startWeight > goalWeight;
+                  
+                  return (
+                    <>
+                      <div className="text-sm mb-2">
+                        <span className="font-medium">{currentWeight}</span> / <span className="text-muted-foreground">{goalWeight} lbs</span>
+                      </div>
+                      <Progress value={progressPercent} />
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-muted-foreground">{remaining.toFixed(1)} lbs to go</p>
+                        <p className="text-xs text-muted-foreground">
+                          Pace: {currentPace.toFixed(2)} lbs/week {isDeficit ? "lost" : "gained"}
+                        </p>
+                      </div>
+                    </>
+                  );
+                })() : (
                   <p className="text-muted-foreground text-sm">Set a goal weight to track</p>
                 )}
               </CardContent>
             </Card>
           </div>
+
+          {/* Body Trend Graph */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+              <CardTitle>Weight Trend</CardTitle>
+              <div className="flex gap-1">
+                {([30, 60, 90, 365] as const).map((period) => (
+                  <Button
+                    key={period}
+                    size="sm"
+                    variant={bodyTrendPeriod === period ? "default" : "outline"}
+                    onClick={() => setBodyTrendPeriod(period)}
+                    data-testid={`button-trend-${period}d`}
+                  >
+                    {period === 365 ? "1Y" : `${period}D`}
+                  </Button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const cutoffDate = format(subDays(new Date(), bodyTrendPeriod), "yyyy-MM-dd");
+                const filteredData = bodyComp
+                  .filter(r => r.date >= cutoffDate && r.weight)
+                  .sort((a, b) => a.date.localeCompare(b.date))
+                  .map(r => ({
+                    date: format(parseISO(r.date), bodyTrendPeriod <= 60 ? "MMM d" : "MMM d"),
+                    weight: r.weight,
+                    fullDate: r.date,
+                  }));
+
+                if (filteredData.length === 0) {
+                  return <p className="text-muted-foreground text-sm py-8 text-center">No weight data for this period</p>;
+                }
+
+                const weights = filteredData.map(d => d.weight || 0);
+                const minWeight = Math.floor(Math.min(...weights) - 2);
+                const maxWeight = Math.ceil(Math.max(...weights) + 2);
+
+                return (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={filteredData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 11 }} 
+                        className="text-muted-foreground"
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis 
+                        domain={[minWeight, maxWeight]} 
+                        tick={{ fontSize: 11 }} 
+                        className="text-muted-foreground"
+                        tickFormatter={(v) => `${v}`}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--card))', 
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px'
+                        }}
+                        formatter={(value: number) => [`${value} lbs`, 'Weight']}
+                      />
+                      {latestWeight?.goalWeight && (
+                        <ReferenceLine 
+                          y={latestWeight.goalWeight} 
+                          stroke="hsl(var(--destructive))" 
+                          strokeDasharray="5 5"
+                          label={{ value: `Goal: ${latestWeight.goalWeight}`, fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                        />
+                      )}
+                      <Area 
+                        type="monotone" 
+                        dataKey="weight" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
+                        fill="url(#weightGradient)"
+                        dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                );
+              })()}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
