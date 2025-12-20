@@ -5145,12 +5145,13 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             
             {(() => {
               const multipliers = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725 };
-              const tdee = Math.round(bmrResult * multipliers[activityLevel]);
+              const bmr = bmrResult ?? 0;
+              const tdee = Math.round(bmr * multipliers[activityLevel]);
               return (
                 <div className="mt-4 p-3 bg-background rounded-md border">
                   <div className="text-xs text-muted-foreground mb-1">Suggested Daily Calories</div>
                   <div className="text-2xl font-bold">{tdee}</div>
-                  <div className="text-xs text-muted-foreground">TDEE = BMR ({bmrResult}) x {multipliers[activityLevel]}</div>
+                  <div className="text-xs text-muted-foreground">TDEE = BMR ({bmr}) x {multipliers[activityLevel]}</div>
                 </div>
               );
             })()}
@@ -5217,7 +5218,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             
             {(() => {
               const multipliers = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725 };
-              const tdee = Math.round(bmrResult * multipliers[activityLevel]);
+              const bmr = bmrResult ?? 0;
+              const tdee = Math.round(bmr * multipliers[activityLevel]);
               const surplus = workoutWillingness === "minimal" ? 250 : workoutWillingness === "moderate" ? 350 : 500;
               const recommendedCalories = tdee + surplus;
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
@@ -5315,7 +5317,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 activity: { steps: 12000, strengthSessions: 4.5, strength: "4-5x/week", deficitPct: 0.45, activityMult: 1.6 },
               };
               const config = strategies[strategyBias];
-              const tdee = Math.round(bmrResult * config.activityMult);
+              const bmr = bmrResult ?? 0;
+              const tdee = Math.round(bmr * config.activityMult);
               const targetDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
               const foodDeficit = Math.round(targetDeficit * config.deficitPct);
               const recommendedCalories = tdee - foodDeficit;

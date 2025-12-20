@@ -1,0 +1,126 @@
+1. Required Daily Deficit
+
+Calculate the fixed daily calorie deficit required to reach the weight goal in the given timeframe.
+
+total_weight_change_lbs = current_weight - goal_weight
+total_days = timeframe_weeks * 7
+required_daily_deficit = (total_weight_change_lbs * 3500) / total_days
+
+
+This value is immutable and must be met through a combination of food reduction and activity burn.
+
+2. Baseline Energy (BMR)
+
+BMR represents calories burned at rest.
+
+BMR = calculated using Mifflin-St Jeor (or existing formula)
+
+
+All intentional movement calories are added dynamically on top of BMR.
+
+3. Safety Floors & Hard Constraints
+Minimum Daily Intake
+
+Calories should not drop below safe levels unless activity capacity has been fully utilized.
+
+min_calories = max(BMR * 0.75, gender_floor)
+
+gender_floor:
+- Male: 1500 kcal
+- Female: 1200 kcal
+
+4. Strategy Bias (Deficit Distribution Only)
+
+Strategy bias controls where the deficit comes from, not how large it is.
+
+strategy_allocation = {
+  diet_focus:      { activity: 0.30, food: 0.70 },
+  balanced:        { activity: 0.50, food: 0.50 },
+  activity_focus:  { activity: 0.65, food: 0.35 }
+}
+
+target_activity_deficit = required_daily_deficit * activity_ratio
+target_food_deficit = required_daily_deficit * food_ratio
+
+5. Activity Capacity (Expanded Limits)
+
+These are upper bounds, not defaults.
+
+activity_caps = {
+  steps: {
+    min: 6000,
+    max: 20000
+  },
+  strength_training: {
+    max_sessions_per_week: 6,
+    avg_calories_per_session: 250
+  },
+  cardio_optional: true
+}
+
+
+Step calories can be estimated dynamically (e.g., ~0.04–0.06 kcal/step depending on weight).
+
+6. Movement-First Rule (Aggressive Deficit Guardrail)
+
+For aggressive fat loss:
+
+if required_daily_deficit >= 750:
+
+
+Apply this order strictly:
+
+Increase daily steps (up to 20k/day)
+
+Increase strength training frequency (up to 6×/week)
+
+Apply protein thermic effect (TEF)
+
+Only then reduce food calories further
+
+if daily_calories < min_calories:
+  increase_steps_until_cap
+  increase_strength_sessions_until_cap
+  apply_protein_TEF
+
+
+Calories must not be pushed lower if activity capacity remains unused.
+
+7. Activity Burn Calculation
+step_burn = steps * calories_per_step
+strength_burn = (weekly_sessions * calories_per_session) / 7
+total_activity_burn = step_burn + strength_burn + optional_cardio
+
+8. Daily Calorie Target Calculation
+daily_calorie_target = BMR + total_activity_burn - required_daily_deficit
+
+
+Enforce:
+
+daily_calorie_target >= min_calories
+
+
+If violated → reallocate deficit to activity.
+
+9. Validation Rule (Non-Negotiable)
+
+Before saving or displaying results:
+
+food_deficit + activity_deficit == required_daily_deficit
+
+
+If false → auto-rebalance.
+
+10. Output Derivation (UI Layer)
+
+From final values, derive and display:
+
+Daily step target (≤ 20k)
+
+Strength training frequency (≤ 6×/week)
+
+Protein target (for TEF + lean mass preservation)
+
+Daily calorie intake
+
+All outputs must remain mathematically consistent with the required deficit.
