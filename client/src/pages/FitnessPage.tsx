@@ -978,13 +978,13 @@ export default function FitnessPage() {
   const avgDeficit = getAvgDeficit();
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto" data-testid="page-fitness">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto" data-testid="page-health">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Fitness</h1>
+          <h1 className="text-2xl font-bold">Health</h1>
           <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-fitness-help">
+        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-health-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>

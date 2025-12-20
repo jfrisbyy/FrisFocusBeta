@@ -44,7 +44,7 @@ function Router() {
         <Route path="/badges" component={BadgesPage} />
         <Route path="/journal" component={JournalPage} />
         <Route path="/insights" component={InsightsPage} />
-        <Route path="/fitness" component={FitnessPage} />
+        <Route path="/health" component={FitnessPage} />
         <Route path="/community" component={CommunityPage} />
         <Route path="/friends" component={FriendsPage} />
         <Route component={NotFound} />

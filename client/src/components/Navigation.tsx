@@ -19,7 +19,7 @@ const navItems = [
   { path: "/badges", label: "Badges", icon: Award },
   { path: "/journal", label: "Journal", icon: BookOpen },
   { path: "/insights", label: "Insights", icon: Sparkles },
-  { path: "/fitness", label: "Fitness", icon: Dumbbell },
+  { path: "/health", label: "Health", icon: Dumbbell },
   { path: "/community", label: "Community", icon: Users },
 ];
 
