@@ -86,8 +86,9 @@ const mockNutritionSettings: NutritionSettings = {
   customToggles: null,
 };
 
-type ActiveTab = "overview" | "nutrition" | "sports" | "strength" | "body-comp";
-type SportsSubTab = "runs" | "drills" | "cardio";
+type ActiveTab = "overview" | "nutrition" | "sports" | "gym" | "body-comp";
+type SportsSubTab = "runs" | "drills";
+type GymSubTab = "strength" | "cardio";
 type ChartPeriod = "weekly" | "monthly";
 
 // RoutineForm component for creating/editing workout routines
@@ -243,6 +244,7 @@ export default function FitnessPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [sportsSubTab, setSportsSubTab] = useState<SportsSubTab>("runs");
+  const [gymSubTab, setGymSubTab] = useState<GymSubTab>("strength");
   const [nutritionDialogOpen, setNutritionDialogOpen] = useState(false);
   const [strengthDialogOpen, setStrengthDialogOpen] = useState(false);
   const [skillDialogOpen, setSkillDialogOpen] = useState(false);
@@ -952,9 +954,9 @@ export default function FitnessPage() {
             <Trophy className="h-4 w-4" />
             <span className="text-xs">Sports</span>
           </TabsTrigger>
-          <TabsTrigger value="strength" className="flex flex-col gap-1 py-2" data-testid="tab-strength">
+          <TabsTrigger value="gym" className="flex flex-col gap-1 py-2" data-testid="tab-gym">
             <Dumbbell className="h-4 w-4" />
-            <span className="text-xs">Strength</span>
+            <span className="text-xs">Gym</span>
           </TabsTrigger>
           <TabsTrigger value="body-comp" className="flex flex-col gap-1 py-2" data-testid="tab-body-comp">
             <Scale className="h-4 w-4" />
@@ -2058,10 +2060,6 @@ export default function FitnessPage() {
                 <Target className="h-4 w-4 mr-2" />
                 Practice
               </TabsTrigger>
-              <TabsTrigger value="cardio" data-testid="subtab-cardio">
-                <Footprints className="h-4 w-4 mr-2" />
-                Cardio
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="runs" className="space-y-4 mt-4">
@@ -2273,102 +2271,41 @@ export default function FitnessPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="cardio" className="space-y-4 mt-4">
-              <div className="flex justify-end">
-                <Button onClick={() => setCardioDialogOpen(true)} data-testid="button-log-cardio">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Log Cardio Run
-                </Button>
-                <CardioRunDialog 
-                  open={cardioDialogOpen} 
-                  onOpenChange={(open) => {
-                    setCardioDialogOpen(open);
-                    if (!open) setEditingCardio(null);
-                  }}
-                  isDemo={isDemo}
-                  editData={editingCardio}
-                  onEdit={(id, data) => editCardioMutation.mutate({ id, data })}
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                {cardioRuns.length === 0 ? (
-                  <Card className="md:col-span-3">
-                    <CardContent className="py-8 text-center">
-                      <Footprints className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No cardio runs logged yet</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  cardioRuns.sort((a, b) => b.date.localeCompare(a.date)).map((run) => (
-                    <Card key={run.id} data-testid={`card-cardio-${run.id}`}>
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <CardTitle className="text-sm">{formatDate(run.date)}</CardTitle>
-                          {!isDemo && (
-                            <div className="flex items-center gap-1">
-                              <Button size="icon" variant="ghost" onClick={() => { setEditingCardio(run); setCardioDialogOpen(true); }} data-testid={`button-edit-cardio-${run.id}`}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => deleteCardioMutation.mutate(run.id)} data-testid={`button-delete-cardio-${run.id}`}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <CardDescription>{run.terrain} - {run.location}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Distance</span>
-                            <span>{((run.distance || 0) / 1609.34).toFixed(2)} mi</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Duration</span>
-                            <span>{run.duration} min</span>
-                          </div>
-                          {run.pace && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Pace</span>
-                              <span>{run.pace}/mi</span>
-                            </div>
-                          )}
-                          {run.effort && (
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Effort</span>
-                              <span>{run.effort}/10</span>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </TabsContent>
           </Tabs>
         </TabsContent>
 
-        {/* STRENGTH TAB */}
-        <TabsContent value="strength" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Strength Training</h2>
-            <StrengthDialog 
-              open={strengthDialogOpen} 
-              onOpenChange={(open) => {
-                setStrengthDialogOpen(open);
-                if (!open) setEditingStrength(null);
-              }}
-              isDemo={isDemo}
-              editData={editingStrength}
-              onEdit={(id, data) => editStrengthMutation.mutate({ id, data })}
-            />
-            <Button onClick={() => { setEditingStrength(null); setStrengthDialogOpen(true); }} data-testid="button-add-strength">
-              <Plus className="h-4 w-4 mr-2" />
-              Log Workout
-            </Button>
-          </div>
+        {/* GYM TAB */}
+        <TabsContent value="gym" className="space-y-6">
+          <Tabs value={gymSubTab} onValueChange={(v) => setGymSubTab(v as GymSubTab)}>
+            <TabsList>
+              <TabsTrigger value="strength" data-testid="subtab-strength">
+                <Dumbbell className="h-4 w-4 mr-2" />
+                Strength
+              </TabsTrigger>
+              <TabsTrigger value="cardio" data-testid="subtab-cardio">
+                <Footprints className="h-4 w-4 mr-2" />
+                Cardio
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="strength" className="space-y-6 mt-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Strength Training</h2>
+                <StrengthDialog 
+                  open={strengthDialogOpen} 
+                  onOpenChange={(open) => {
+                    setStrengthDialogOpen(open);
+                    if (!open) setEditingStrength(null);
+                  }}
+                  isDemo={isDemo}
+                  editData={editingStrength}
+                  onEdit={(id, data) => editStrengthMutation.mutate({ id, data })}
+                />
+                <Button onClick={() => { setEditingStrength(null); setStrengthDialogOpen(true); }} data-testid="button-add-strength">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Workout
+                </Button>
+              </div>
 
           {/* My Routines Collapsible Section */}
           <Collapsible open={routinesExpanded} onOpenChange={setRoutinesExpanded}>
@@ -2943,6 +2880,129 @@ export default function FitnessPage() {
               </div>
             </CardContent>
           </Card>
+            </TabsContent>
+
+            {/* CARDIO SUB-TAB */}
+            <TabsContent value="cardio" className="space-y-6 mt-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Cardio Training</h2>
+                <CardioRunDialog 
+                  open={cardioDialogOpen}
+                  onOpenChange={(open) => {
+                    setCardioDialogOpen(open);
+                    if (!open) setEditingCardio(null);
+                  }}
+                  isDemo={isDemo}
+                  editData={editingCardio}
+                  onEdit={(id, data) => editCardioMutation.mutate({ id, data })}
+                />
+                <Button onClick={() => { setEditingCardio(null); setCardioDialogOpen(true); }} data-testid="button-add-cardio">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Log Cardio
+                </Button>
+              </div>
+
+              {/* Cardio Stats Cards */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Total Runs</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{cardioRuns.length}</div>
+                    <p className="text-xs text-muted-foreground">this month</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Total Distance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{cardioRuns.reduce((sum, r) => sum + (r.distance || 0), 0).toFixed(1)}</div>
+                    <p className="text-xs text-muted-foreground">miles</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Avg Pace</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const runsWithPace = cardioRuns.filter(r => r.pace);
+                      if (runsWithPace.length === 0) return <div className="text-2xl font-bold">--</div>;
+                      const avgPace = runsWithPace.reduce((sum, r) => sum + (r.pace || 0), 0) / runsWithPace.length;
+                      const mins = Math.floor(avgPace);
+                      const secs = Math.round((avgPace - mins) * 60);
+                      return <div className="text-2xl font-bold">{mins}:{secs.toString().padStart(2, '0')}</div>;
+                    })()}
+                    <p className="text-xs text-muted-foreground">min/mile</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Total Time</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{Math.round(cardioRuns.reduce((sum, r) => sum + (r.duration || 0), 0))}</div>
+                    <p className="text-xs text-muted-foreground">minutes</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Cardio Run History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Run History</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {cardioRuns.length === 0 ? (
+                      <p className="text-muted-foreground">No cardio runs logged yet</p>
+                    ) : (
+                      cardioRuns.sort((a, b) => b.date.localeCompare(a.date)).map((run) => (
+                        <div key={run.id} className="border rounded-md p-4" data-testid={`card-cardio-${run.id}`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium">{run.runType || "Run"}</h4>
+                              <p className="text-sm text-muted-foreground">{formatDate(run.date)}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              {run.distance && <Badge variant="secondary">{run.distance} mi</Badge>}
+                              {run.duration && <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />{run.duration}min</Badge>}
+                              {run.pace && (
+                                <Badge variant="outline">
+                                  {Math.floor(run.pace)}:{Math.round((run.pace - Math.floor(run.pace)) * 60).toString().padStart(2, '0')}/mi
+                                </Badge>
+                              )}
+                              {!isDemo && (
+                                <div className="flex gap-1">
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    onClick={() => {
+                                      setEditingCardio(run);
+                                      setCardioDialogOpen(true);
+                                    }}
+                                    data-testid={`button-edit-cardio-${run.id}`}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" onClick={() => deleteCardioMutation.mutate(run.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          {run.notes && <p className="text-sm text-muted-foreground mt-2">{run.notes}</p>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         {/* BODY COMP TAB */}
