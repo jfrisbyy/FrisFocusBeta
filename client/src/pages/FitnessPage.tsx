@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
-  Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
+  Dumbbell, Utensils, Scale, Target, Trophy, Plus, Minus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
   MessageCircle, MessageSquare, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle, ChevronDown, ChevronUp, RefreshCw
@@ -4754,6 +4754,33 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     ? calculateDailyDeficit(parseFloat(bmrData.weight), parseFloat(goalWeight), parseInt(goalTimeframe))
     : 0;
 
+  // Auto-update target based on flow selections
+  useEffect(() => {
+    if (!bmrResult) return;
+    
+    const multipliers = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725 };
+    
+    if (goalDirection === "maintain") {
+      const tdee = Math.round(bmrResult * multipliers[activityLevel]);
+      setTarget(tdee.toString());
+    } else if (goalDirection === "gain") {
+      const tdee = Math.round(bmrResult * multipliers[activityLevel]);
+      const surplus = workoutWillingness === "minimal" ? 250 : workoutWillingness === "moderate" ? 350 : 500;
+      setTarget((tdee + surplus).toString());
+    } else if (goalDirection === "lose") {
+      const strategies = {
+        diet: { deficitPct: 0.85, activityMult: 1.3 },
+        balanced: { deficitPct: 0.65, activityMult: 1.45 },
+        activity: { deficitPct: 0.45, activityMult: 1.6 },
+      };
+      const config = strategies[strategyBias];
+      const tdee = Math.round(bmrResult * config.activityMult);
+      const targetDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
+      const foodDeficit = Math.round(targetDeficit * config.deficitPct);
+      setTarget((tdee - foodDeficit).toString());
+    }
+  }, [bmrResult, goalDirection, activityLevel, workoutWillingness, strategyBias, calculatedDeficit]);
+
   const computeBMR = () => {
     const weight = parseFloat(bmrData.weight);
     const height = parseFloat(bmrData.height);
@@ -5126,14 +5153,6 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   <div className="text-xs text-muted-foreground mb-1">Suggested Daily Calories</div>
                   <div className="text-2xl font-bold">{tdee}</div>
                   <div className="text-xs text-muted-foreground">TDEE = BMR ({bmrResult}) x {multipliers[activityLevel]}</div>
-                  <Button 
-                    onClick={() => setTarget(tdee.toString())}
-                    variant="outline" 
-                    className="w-full mt-3"
-                    data-testid="button-apply-maintain-calories"
-                  >
-                    Apply This Target
-                  </Button>
                 </div>
               );
             })()}
@@ -5220,14 +5239,6 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                       <div className="text-xs text-muted-foreground">2g per kg bodyweight</div>
                     </div>
                   </div>
-                  <Button 
-                    onClick={() => setTarget(recommendedCalories.toString())}
-                    variant="outline" 
-                    className="w-full"
-                    data-testid="button-apply-gain-calories"
-                  >
-                    Apply Suggested Calories
-                  </Button>
                 </div>
               );
             })()}
@@ -5337,18 +5348,53 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   <div className="text-xs text-muted-foreground">
                     ~{Math.round((1 - config.deficitPct) * 100)}% deficit from activity, ~{Math.round(config.deficitPct * 100)}% from food
                   </div>
-                  <Button 
-                    onClick={() => setTarget(recommendedCalories.toString())}
-                    variant="outline" 
-                    className="w-full"
-                    data-testid="button-apply-lose-calories"
-                  >
-                    Apply Suggested Calories
-                  </Button>
                 </div>
               );
             })()}
           </div>
+          )}
+
+          {/* Manual Override */}
+          {bmrResult && (
+            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-md">
+              <div className="text-sm text-muted-foreground flex-shrink-0">Daily Target:</div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    const current = parseInt(target) || 2000;
+                    setTarget(Math.max(1000, current - 50).toString());
+                  }}
+                  data-testid="button-decrease-target"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <Input
+                  type="number"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                  className="w-20 text-center h-8"
+                  data-testid="input-calorie-target"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    const current = parseInt(target) || 2000;
+                    setTarget((current + 50).toString());
+                  }}
+                  data-testid="button-increase-target"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">cal/day</div>
+            </div>
           )}
 
           {/* Ask AI Button */}
