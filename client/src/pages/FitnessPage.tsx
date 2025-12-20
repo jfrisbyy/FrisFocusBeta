@@ -5378,21 +5378,29 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               // Cap activity deficit at maximum capacity
               targetActivityDeficit = Math.min(targetActivityDeficit, maxActivityBurn);
               
-              // === STEP 2: ALLOCATE ACTIVITY (STEPS FIRST, THEN STRENGTH) ===
+              // === STEP 2: ALLOCATE ACTIVITY BASED ON STRATEGY ===
+              // For diet focus: prioritize food deficit, minimal activity
+              // For activity focus: prioritize activity, less food restriction
               let finalSteps = MIN_STEPS;
               let finalStrength = 0;
-              let remainingActivity = targetActivityDeficit;
               
-              // Allocate to steps first
-              const stepsForDeficit = Math.min(
-                Math.ceil(remainingActivity / CAL_PER_STEP),
-                caps.maxSteps
-              );
-              finalSteps = Math.max(MIN_STEPS, stepsForDeficit);
+              // Calculate steps needed to achieve target activity deficit
+              const stepsForDeficit = Math.ceil(targetActivityDeficit / CAL_PER_STEP);
+              
+              // Cap at max steps allowed by willingness, but DON'T force minimum
+              // This allows diet-focused strategies to recommend fewer steps
+              finalSteps = Math.min(stepsForDeficit, caps.maxSteps);
+              
+              // For diet focus, allow steps below health minimum (user prefers food restriction)
+              // For activity focus, ensure at least minimum healthy steps
+              if (strategyBias === "activity") {
+                finalSteps = Math.max(MIN_STEPS, finalSteps);
+              }
+              
               const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
-              remainingActivity = Math.max(0, remainingActivity - stepsBurn);
+              let remainingActivity = Math.max(0, targetActivityDeficit - stepsBurn);
               
-              // Allocate remaining to strength
+              // Allocate remaining to strength training
               if (remainingActivity > 0) {
                 const sessionsNeeded = Math.ceil((remainingActivity * 7) / CAL_PER_STRENGTH_SESSION);
                 finalStrength = Math.min(sessionsNeeded, caps.maxStrength);
