@@ -1554,84 +1554,6 @@ export default function FitnessPage() {
             }}
           />
 
-          {/* Steps Dialog */}
-          <Dialog open={stepsDialogOpen} onOpenChange={setStepsDialogOpen}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Log Steps</DialogTitle>
-                <DialogDescription>Add your daily step count</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                saveStepsMutation.mutate({
-                  date: formData.get('date') as string,
-                  steps: parseInt(formData.get('steps') as string),
-                  goal: parseInt(formData.get('goal') as string) || defaultStepGoal,
-                });
-              }}>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Date</Label>
-                    <Input type="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required data-testid="input-steps-date" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Steps</Label>
-                    <Input type="number" name="steps" placeholder="e.g. 10000" required min="0" data-testid="input-steps-count" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Goal</Label>
-                    <Input type="number" name="goal" defaultValue={defaultStepGoal} min="0" data-testid="input-steps-goal" />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setStepsDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={saveStepsMutation.isPending} data-testid="button-save-steps">Save</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Step Goal Settings Dialog */}
-          <Dialog open={stepGoalSettingsOpen} onOpenChange={setStepGoalSettingsOpen}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Step Goal Settings</DialogTitle>
-                <DialogDescription>Set your daily step goal target</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                const newGoal = parseInt(formData.get('stepGoal') as string);
-                if (newGoal && newGoal >= 100) {
-                  updateStepGoalMutation.mutate(newGoal);
-                }
-              }}>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Daily Step Goal</Label>
-                    <Input 
-                      type="number" 
-                      name="stepGoal" 
-                      defaultValue={defaultStepGoal} 
-                      min="100" 
-                      max="100000"
-                      required 
-                      data-testid="input-default-step-goal" 
-                    />
-                    <p className="text-xs text-muted-foreground">This will be your default goal for new step entries</p>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setStepGoalSettingsOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={updateStepGoalMutation.isPending} data-testid="button-save-step-goal">
-                    {updateStepGoalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
           {/* Today's Breakdown - Main Card */}
           <Card>
             <CardHeader className="pb-2">
@@ -3405,6 +3327,84 @@ export default function FitnessPage() {
         nutritionSettings={nutritionSettings}
         onSave={(data) => updateGoalMutation.mutate(data)}
       />
+      
+      {/* Steps Dialog */}
+      <Dialog open={stepsDialogOpen} onOpenChange={setStepsDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Log Steps</DialogTitle>
+            <DialogDescription>Add your daily step count</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            saveStepsMutation.mutate({
+              date: formData.get('date') as string,
+              steps: parseInt(formData.get('steps') as string),
+              goal: parseInt(formData.get('goal') as string) || defaultStepGoal,
+            });
+          }}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input type="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required data-testid="input-steps-date" />
+              </div>
+              <div className="space-y-2">
+                <Label>Steps</Label>
+                <Input type="number" name="steps" placeholder="e.g. 10000" required min="0" data-testid="input-steps-count" />
+              </div>
+              <div className="space-y-2">
+                <Label>Goal</Label>
+                <Input type="number" name="goal" defaultValue={defaultStepGoal} min="0" data-testid="input-steps-goal" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setStepsDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={saveStepsMutation.isPending} data-testid="button-save-steps">Save</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Step Goal Settings Dialog */}
+      <Dialog open={stepGoalSettingsOpen} onOpenChange={setStepGoalSettingsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Step Goal Settings</DialogTitle>
+            <DialogDescription>Set your daily step goal target</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target as HTMLFormElement);
+            const newGoal = parseInt(formData.get('stepGoal') as string);
+            if (newGoal && newGoal >= 100) {
+              updateStepGoalMutation.mutate(newGoal);
+            }
+          }}>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Daily Step Goal</Label>
+                <Input 
+                  type="number" 
+                  name="stepGoal" 
+                  defaultValue={defaultStepGoal} 
+                  min="100" 
+                  max="100000"
+                  required 
+                  data-testid="input-default-step-goal" 
+                />
+                <p className="text-xs text-muted-foreground">This will be your default goal for new step entries</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setStepGoalSettingsOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={updateStepGoalMutation.isPending} data-testid="button-save-step-goal">
+                {updateStepGoalMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
