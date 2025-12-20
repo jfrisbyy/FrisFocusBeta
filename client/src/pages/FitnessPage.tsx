@@ -18,7 +18,7 @@ import {
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, MessageSquare, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle, ChevronDown, ChevronUp
+  MessageCircle, MessageSquare, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle, ChevronDown, ChevronUp, RefreshCw
 } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { useDemo } from "@/contexts/DemoContext";
@@ -310,6 +310,15 @@ export default function FitnessPage() {
   const [aiWizardGoals, setAiWizardGoals] = useState("");
   const [aiWizardQuestions, setAiWizardQuestions] = useState<AIQuestion[]>([]);
   const [aiWizardAnswers, setAiWizardAnswers] = useState<Record<string, string>>({});
+  
+  // Persist generation context for feedback/iteration
+  const [lastGenerationContext, setLastGenerationContext] = useState<{
+    goals: string;
+    answers: AIAnswer[];
+  } | null>(null);
+  const [feedbackMode, setFeedbackMode] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
@@ -694,16 +703,21 @@ export default function FitnessPage() {
       setAiWizardOpen(false);
       setRoutinePreviewOpen(true);
       setAiRoutineGoals("");
-      // Reset wizard state
+      // Reset wizard state but keep generation context for feedback
       setAiWizardStep("goals");
       setAiWizardGoals("");
       setAiWizardQuestions([]);
       setAiWizardAnswers({});
+      // Reset feedback state
+      setFeedbackMode(false);
+      setFeedbackText("");
+      setIsRegenerating(false);
       toast({ title: `Generated ${data.routines.length} routines! Review and save.` });
     },
     onError: () => {
       toast({ title: "Failed to generate routines", variant: "destructive" });
       setAiWizardStep("questions");
+      setIsRegenerating(false);
     },
   });
 
@@ -2534,12 +2548,84 @@ export default function FitnessPage() {
                   </Card>
                 ))}
               </div>
-              <div className="flex justify-between items-center pt-4 border-t">
-                <p className="text-sm text-muted-foreground">
-                  {generatedRoutinesPreview?.routines.filter(r => r.selected).length || 0} of {generatedRoutinesPreview?.routines.length || 0} routines selected
-                </p>
+              {/* Feedback Section */}
+              {feedbackMode && (
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      What would you like to change?
+                    </Label>
+                    <Textarea
+                      value={feedbackText}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                      placeholder="e.g., Add more leg exercises, reduce to 4 days per week, include more compound movements..."
+                      className="resize-none"
+                      rows={3}
+                      data-testid="input-feedback"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFeedbackMode(false);
+                        setFeedbackText("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (!feedbackText.trim() || !lastGenerationContext) {
+                          toast({ title: "Please enter your feedback" });
+                          return;
+                        }
+                        setIsRegenerating(true);
+                        generateRoutineMutation.mutate({
+                          goals: lastGenerationContext.goals,
+                          answers: lastGenerationContext.answers,
+                          feedback: feedbackText,
+                          isRegeneration: true,
+                        });
+                      }}
+                      disabled={!feedbackText.trim() || isRegenerating}
+                      data-testid="button-regenerate-with-feedback"
+                    >
+                      {isRegenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Regenerate
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center pt-4 border-t gap-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    {generatedRoutinesPreview?.routines.filter(r => r.selected).length || 0} of {generatedRoutinesPreview?.routines.length || 0} selected
+                  </p>
+                  {lastGenerationContext && !feedbackMode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setFeedbackMode(true)}
+                      data-testid="button-request-changes"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Request Changes
+                    </Button>
+                  )}
+                </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => { setRoutinePreviewOpen(false); setGeneratedRoutinesPreview(null); }}>
+                  <Button variant="outline" onClick={() => { 
+                    setRoutinePreviewOpen(false); 
+                    setGeneratedRoutinesPreview(null);
+                    setLastGenerationContext(null);
+                    setFeedbackMode(false);
+                    setFeedbackText("");
+                  }}>
                     Cancel
                   </Button>
                   <Button
@@ -2555,7 +2641,7 @@ export default function FitnessPage() {
                         exercises: r.exercises
                       })));
                     }}
-                    disabled={saveGeneratedRoutinesMutation.isPending}
+                    disabled={saveGeneratedRoutinesMutation.isPending || isRegenerating}
                     data-testid="button-save-selected-routines"
                   >
                     {saveGeneratedRoutinesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -2673,6 +2759,8 @@ export default function FitnessPage() {
                           question: q.question,
                           answer: aiWizardAnswers[q.id] || "(not answered)",
                         }));
+                        // Save context for potential feedback iterations BEFORE generating
+                        setLastGenerationContext({ goals: aiWizardGoals, answers });
                         setAiWizardStep("generating");
                         generateRoutineMutation.mutate({ goals: aiWizardGoals, answers });
                       }}
