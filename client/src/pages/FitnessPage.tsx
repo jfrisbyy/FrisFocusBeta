@@ -5309,44 +5309,54 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             </div>
             
             {(() => {
-              const strategies = {
-                diet: { steps: 8000, strengthSessions: 2.5, strength: "2-3x/week", deficitPct: 0.85, activityMult: 1.3 },
-                balanced: { steps: 10000, strengthSessions: 3.5, strength: "3-4x/week", deficitPct: 0.65, activityMult: 1.45 },
-                activity: { steps: 12000, strengthSessions: 4.5, strength: "4-5x/week", deficitPct: 0.45, activityMult: 1.6 },
-              };
-              const config = strategies[strategyBias];
-              const tdee = Math.round(bmrResult * config.activityMult);
               const targetDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
-              const foodDeficit = Math.round(targetDeficit * config.deficitPct);
-              const recommendedCalories = tdee - foodDeficit;
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
               const proteinTarget = Math.round(weightKg * 1.8);
               
-              // Calorie burn estimates
-              const stepsCaloriesBurned = Math.round(config.steps * 0.04); // ~0.04 cal per step
-              const strengthCaloriesPerSession = 250; // avg calories per strength session
-              const strengthWeeklyCalories = Math.round(config.strengthSessions * strengthCaloriesPerSession);
-              const strengthDailyCalories = Math.round(strengthWeeklyCalories / 7);
+              // Activity/food split based on strategy
+              const strategies = {
+                diet: { activityPct: 0.15, strength: "2-3x/week", strengthSessions: 2.5 },
+                balanced: { activityPct: 0.35, strength: "3-4x/week", strengthSessions: 3.5 },
+                activity: { activityPct: 0.55, strength: "4-5x/week", strengthSessions: 4.5 },
+              };
+              const config = strategies[strategyBias];
+              
+              // Calculate activity deficit target
+              const activityDeficit = Math.round(targetDeficit * config.activityPct);
+              const foodDeficit = targetDeficit - activityDeficit;
+              
               // Thermic effect of protein: ~25% of protein calories
               const proteinCalories = proteinTarget * 4;
               const proteinThermicEffect = Math.round(proteinCalories * 0.25);
               
-              // Total daily activity burn
+              // Strength training calories (average per session, spread across week)
+              const strengthCaloriesPerSession = 250;
+              const strengthDailyCalories = Math.round((config.strengthSessions * strengthCaloriesPerSession) / 7);
+              
+              // Remaining deficit from steps
+              const stepsDeficitNeeded = Math.max(0, activityDeficit - strengthDailyCalories - proteinThermicEffect);
+              const stepsNeeded = Math.round(stepsDeficitNeeded / 0.04); // ~0.04 cal per step
+              const stepsCaloriesBurned = Math.round(stepsNeeded * 0.04);
+              
+              // Total daily activity burn should equal activity deficit
               const totalActivityBurn = stepsCaloriesBurned + strengthDailyCalories + proteinThermicEffect;
+              
+              // Recommended calories = BMR + activity burn - total deficit = BMR - food deficit
+              const recommendedCalories = bmrResult - foodDeficit;
               
               return (
                 <div className="mt-4 space-y-3">
-                  <div className="text-sm font-medium">Recommendations</div>
+                  <div className="text-sm font-medium">Recommendations (to hit {targetDeficit} cal/day deficit)</div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Daily Steps</div>
-                      <div className="font-bold">{config.steps.toLocaleString()}</div>
+                      <div className="font-bold">{stepsNeeded.toLocaleString()}</div>
                       <div className="text-xs text-green-500">~{stepsCaloriesBurned} cal/day</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Strength Training</div>
                       <div className="font-bold">{config.strength}</div>
-                      <div className="text-xs text-green-500">~{strengthCaloriesPerSession} cal/session</div>
+                      <div className="text-xs text-green-500">~{strengthCaloriesPerSession} cal/session ({strengthDailyCalories}/day avg)</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Protein</div>
@@ -5356,10 +5366,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Daily Calories</div>
                       <div className="font-bold">{recommendedCalories}</div>
+                      <div className="text-xs text-orange-500">~{foodDeficit} cal below BMR</div>
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Activity burn: ~{totalActivityBurn} cal/day | ~{Math.round((1 - config.deficitPct) * 100)}% from activity, ~{Math.round(config.deficitPct * 100)}% from food
+                    Activity: ~{totalActivityBurn} cal ({Math.round(config.activityPct * 100)}%) + Food: ~{foodDeficit} cal ({Math.round((1 - config.activityPct) * 100)}%) = {targetDeficit} deficit
                   </div>
                 </div>
               );
