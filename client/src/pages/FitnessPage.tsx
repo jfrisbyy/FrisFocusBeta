@@ -5248,52 +5248,65 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
           {/* LOSE WEIGHT FLOW */}
           {goalDirection === "lose" && (
           <div className={`space-y-4 p-4 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
-            {/* Show deficit needed */}
+            {/* Show deficit needed - this is the non-negotiable goal */}
             {calculatedDeficit !== 0 && (
               <div className="p-3 bg-background rounded-md border">
                 <div className="text-sm">
-                  You need a <span className="font-bold text-green-500">{Math.abs(calculatedDeficit)} cal/day</span> deficit to reach your goal.
+                  Required deficit: <span className="font-bold text-green-500">{Math.abs(calculatedDeficit)} cal/day</span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  This can come from eating less, moving more, or both.
+                  This deficit is fixed based on your goal. The system will determine how to achieve it.
                 </div>
               </div>
             )}
 
+            {/* Activity Willingness - sets upper bounds */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                <Label className="font-medium">How active are you willing to be?</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This sets the maximum activity the system can recommend:
+              </p>
+              <div className="flex gap-2">
+                {(["minimal", "moderate", "very_active"] as const).map((level) => (
+                  <Button
+                    key={level}
+                    type="button"
+                    variant={activityLevel === level ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setActivityLevel(level)}
+                    data-testid={`button-lose-activity-${level}`}
+                  >
+                    {level === "minimal" && "Minimal"}
+                    {level === "moderate" && "Moderate"}
+                    {level === "very_active" && "Very Active"}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {activityLevel === "minimal" && "Up to 8k steps, 2x strength/week"}
+                {activityLevel === "moderate" && "Up to 12k steps, 4x strength/week"}
+                {activityLevel === "very_active" && "Up to 20k steps, 6x strength/week"}
+              </p>
+            </div>
+
+            {/* Strategy Bias - controls distribution, NOT deficit size */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 <Label className="font-medium">Strategy Bias</Label>
               </div>
               <p className="text-xs text-muted-foreground">
-                Choose how you want to create your deficit:
+                How do you prefer to create your deficit?
               </p>
               <div className="space-y-2">
                 {([
-                  { 
-                    key: "diet", 
-                    label: "Diet Focus", 
-                    desc: "2-3 strength sessions, 8k steps, bigger food deficit",
-                    steps: 8000,
-                    strength: "2-3x/week",
-                    deficitPct: 0.85
-                  },
-                  { 
-                    key: "balanced", 
-                    label: "Balanced", 
-                    desc: "3-4 strength sessions, 10k steps, moderate deficit",
-                    steps: 10000,
-                    strength: "3-4x/week",
-                    deficitPct: 0.65
-                  },
-                  { 
-                    key: "activity", 
-                    label: "Activity Focus", 
-                    desc: "4-5 strength sessions, 12-15k steps, smaller food deficit",
-                    steps: 12000,
-                    strength: "4-5x/week",
-                    deficitPct: 0.45
-                  },
+                  { key: "diet", label: "Diet Focus", desc: "70% from food, 30% from activity" },
+                  { key: "balanced", label: "Balanced", desc: "50% from food, 50% from activity" },
+                  { key: "activity", label: "Activity Focus", desc: "35% from food, 65% from activity" },
                 ] as const).map((strategy) => (
                   <Button
                     key={strategy.key}
@@ -5310,54 +5323,179 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               </div>
             </div>
             
+            {/* Calculated Recommendations */}
             {(() => {
-              const strategies = {
-                diet: { steps: 8000, strengthSessions: 2.5, strength: "2-3x/week", deficitPct: 0.85, activityMult: 1.3 },
-                balanced: { steps: 10000, strengthSessions: 3.5, strength: "3-4x/week", deficitPct: 0.65, activityMult: 1.45 },
-                activity: { steps: 12000, strengthSessions: 4.5, strength: "4-5x/week", deficitPct: 0.45, activityMult: 1.6 },
-              };
-              const config = strategies[strategyBias];
-              const bmr = bmrResult ?? 0;
-              const tdee = Math.round(bmr * config.activityMult);
-              const targetDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
-              const foodDeficit = Math.round(targetDeficit * config.deficitPct);
-              const recommendedCalories = tdee - foodDeficit;
-              const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
-              const proteinTarget = Math.round(weightKg * 1.8);
+              // === CONSTANTS ===
+              const CAL_PER_STEP = 0.04;
+              const CAL_PER_STRENGTH_SESSION = 250;
+              const PROTEIN_TEF_RATE = 0.25;
+              const MIN_STEPS = 6000;
               
-              // Calorie burn estimates (informational)
-              const stepsCaloriesBurned = Math.round(config.steps * 0.04); // ~0.04 cal per step
-              const strengthCaloriesPerSession = 250; // avg calories per strength session
-              // Thermic effect of protein: ~25% of protein calories
+              // Activity willingness caps
+              const activityCaps = {
+                minimal: { maxSteps: 8000, maxStrength: 2 },
+                moderate: { maxSteps: 12000, maxStrength: 4 },
+                very_active: { maxSteps: 20000, maxStrength: 6 },
+                sedentary: { maxSteps: 6000, maxStrength: 1 },
+                lightly_active: { maxSteps: 10000, maxStrength: 3 },
+                moderately_active: { maxSteps: 14000, maxStrength: 5 },
+              };
+              
+              // Strategy bias distribution (activity vs food)
+              const strategyDistribution = {
+                diet: { activityPct: 0.30, foodPct: 0.70 },
+                balanced: { activityPct: 0.50, foodPct: 0.50 },
+                activity: { activityPct: 0.65, foodPct: 0.35 },
+              };
+              
+              // === INPUTS ===
+              const bmr = bmrResult ?? 0;
+              const requiredDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
+              const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
+              const gender = bmrData.gender || "male";
+              const caps = activityCaps[activityLevel] || activityCaps.moderate;
+              const distribution = strategyDistribution[strategyBias];
+              
+              // === SAFETY FLOORS ===
+              const genderFloor = gender === "female" ? 1200 : 1500;
+              const minCalories = Math.max(Math.round(bmr * 0.75), genderFloor);
+              
+              // === PROTEIN CALCULATION ===
+              const proteinTarget = Math.round(weightKg * 1.8);
               const proteinCalories = proteinTarget * 4;
-              const proteinThermicEffect = Math.round(proteinCalories * 0.25);
+              const proteinTEF = Math.round(proteinCalories * PROTEIN_TEF_RATE);
+              
+              // === INITIAL DISTRIBUTION ===
+              let targetActivityDeficit = Math.round(requiredDeficit * distribution.activityPct);
+              let targetFoodDeficit = Math.round(requiredDeficit * distribution.foodPct);
+              
+              // === CALCULATE ACTIVITY BURN CAPACITY ===
+              // Steps burn
+              const maxStepsBurn = Math.round(caps.maxSteps * CAL_PER_STEP);
+              // Weekly strength burn averaged daily
+              const maxStrengthBurnDaily = Math.round((caps.maxStrength * CAL_PER_STRENGTH_SESSION) / 7);
+              // Total activity capacity
+              const maxActivityBurn = maxStepsBurn + maxStrengthBurnDaily + proteinTEF;
+              
+              // === MOVEMENT-FIRST RULE ===
+              // For aggressive deficits, maximize activity before cutting calories further
+              let finalSteps = MIN_STEPS;
+              let finalStrength = Math.min(2, caps.maxStrength);
+              let activityDeficit = 0;
+              let foodDeficit = 0;
+              
+              // Calculate how much activity we need based on target
+              let neededFromActivity = targetActivityDeficit;
+              
+              // Step 1: Increase steps (prioritize this first)
+              const stepsNeeded = Math.min(
+                Math.ceil(neededFromActivity / CAL_PER_STEP),
+                caps.maxSteps
+              );
+              finalSteps = Math.max(MIN_STEPS, stepsNeeded);
+              const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
+              neededFromActivity -= stepsBurn;
+              
+              // Step 2: Increase strength training
+              if (neededFromActivity > 0) {
+                const strengthSessionsNeeded = Math.ceil((neededFromActivity * 7) / CAL_PER_STRENGTH_SESSION);
+                finalStrength = Math.min(strengthSessionsNeeded, caps.maxStrength);
+              }
+              const strengthBurnDaily = Math.round((finalStrength * CAL_PER_STRENGTH_SESSION) / 7);
+              
+              // Step 3: Total activity deficit (including protein TEF)
+              activityDeficit = stepsBurn + strengthBurnDaily + proteinTEF;
+              
+              // Step 4: Remaining deficit must come from food
+              foodDeficit = requiredDeficit - activityDeficit;
+              
+              // === SAFETY CHECK: If food deficit too aggressive, reallocate to activity ===
+              const dailyCaloriesBeforeSafety = bmr + activityDeficit - requiredDeficit;
+              
+              if (dailyCaloriesBeforeSafety < minCalories && activityDeficit < maxActivityBurn) {
+                // Need to shift more to activity
+                const additionalActivityNeeded = minCalories - dailyCaloriesBeforeSafety;
+                
+                // Try to add more steps first
+                const additionalSteps = Math.min(
+                  Math.ceil(additionalActivityNeeded / CAL_PER_STEP),
+                  caps.maxSteps - finalSteps
+                );
+                finalSteps += additionalSteps;
+                const additionalStepsBurn = Math.round(additionalSteps * CAL_PER_STEP);
+                activityDeficit += additionalStepsBurn;
+                
+                // If still not enough, add more strength
+                const remainingNeeded = additionalActivityNeeded - additionalStepsBurn;
+                if (remainingNeeded > 0) {
+                  const additionalStrength = Math.min(
+                    Math.ceil((remainingNeeded * 7) / CAL_PER_STRENGTH_SESSION),
+                    caps.maxStrength - finalStrength
+                  );
+                  finalStrength += additionalStrength;
+                  activityDeficit += Math.round((additionalStrength * CAL_PER_STRENGTH_SESSION) / 7);
+                }
+                
+                // Recalculate food deficit
+                foodDeficit = requiredDeficit - activityDeficit;
+              }
+              
+              // === FINAL CALORIE TARGET ===
+              // Daily calories = BMR + activity burn - required deficit
+              // Which simplifies to: BMR - food deficit
+              const dailyCalories = Math.max(minCalories, Math.round(bmr - foodDeficit + activityDeficit));
+              
+              // === VALIDATION: Ensure numbers add up ===
+              const totalDeficit = foodDeficit + activityDeficit;
+              const isBalanced = Math.abs(totalDeficit - requiredDeficit) <= 5; // Allow 5 cal rounding error
+              
+              // Recalculate actual food deficit to ensure balance
+              const actualFoodDeficit = requiredDeficit - activityDeficit;
+              const finalDailyCalories = Math.max(minCalories, Math.round(bmr - actualFoodDeficit + activityDeficit));
+              
+              // Format strength for display
+              const strengthDisplay = finalStrength === 1 ? "1x/week" : 
+                                      finalStrength === 2 ? "2x/week" :
+                                      `${finalStrength}x/week`;
               
               return (
                 <div className="mt-4 space-y-3">
-                  <div className="text-sm font-medium">Recommendations</div>
+                  <div className="text-sm font-medium">Your Plan</div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground">Daily Calories</div>
+                      <div className="text-xl font-bold">{finalDailyCalories.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">Min: {minCalories}</div>
+                    </div>
+                    <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Daily Steps</div>
-                      <div className="font-bold">{config.steps.toLocaleString()}</div>
-                      <div className="text-xs text-green-500">~{stepsCaloriesBurned} cal burned</div>
+                      <div className="text-xl font-bold">{finalSteps.toLocaleString()}</div>
+                      <div className="text-xs text-green-500">~{stepsBurn} cal</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Strength Training</div>
-                      <div className="font-bold">{config.strength}</div>
-                      <div className="text-xs text-green-500">~{strengthCaloriesPerSession} cal/session</div>
+                      <div className="text-xl font-bold">{strengthDisplay}</div>
+                      <div className="text-xs text-green-500">~{Math.round(finalStrength * CAL_PER_STRENGTH_SESSION)} cal/week</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
-                      <div className="text-xs text-muted-foreground">Protein</div>
-                      <div className="font-bold">{proteinTarget}g</div>
-                      <div className="text-xs text-green-500">~{proteinThermicEffect} cal TEF</div>
-                    </div>
-                    <div className="p-2 bg-background rounded-md border">
-                      <div className="text-xs text-muted-foreground">Daily Calories</div>
-                      <div className="font-bold">{recommendedCalories}</div>
+                      <div className="text-xs text-muted-foreground">Protein Target</div>
+                      <div className="text-xl font-bold">{proteinTarget}g</div>
+                      <div className="text-xs text-green-500">~{proteinTEF} cal TEF/day</div>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    ~{Math.round((1 - config.deficitPct) * 100)}% deficit from activity, ~{Math.round(config.deficitPct * 100)}% from food
+                  
+                  {/* Deficit breakdown */}
+                  <div className="p-2 bg-background rounded-md border">
+                    <div className="text-xs text-muted-foreground mb-1">Deficit Breakdown</div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">{Math.round(activityDeficit)} cal</span>
+                      <span className="text-muted-foreground">from activity</span>
+                      <span className="text-muted-foreground">+</span>
+                      <span className="font-medium">{Math.round(actualFoodDeficit)} cal</span>
+                      <span className="text-muted-foreground">from food</span>
+                      <span className="text-muted-foreground">=</span>
+                      <span className="font-bold text-green-500">{requiredDeficit} cal</span>
+                    </div>
                   </div>
                 </div>
               );

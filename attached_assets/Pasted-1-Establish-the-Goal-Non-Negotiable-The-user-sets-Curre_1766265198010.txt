@@ -1,0 +1,124 @@
+1. Establish the Goal (Non-Negotiable)
+
+The user sets:
+
+Current weight
+
+Goal weight
+
+Timeframe (weeks)
+
+From this, the system calculates one fixed daily calorie deficit required to hit that goal.
+
+This deficit does not change unless the goal or timeframe changes.
+
+The goal defines the direction. The system’s job is to decide how to reach it.
+
+2. Use BMR as the Baseline
+
+BMR represents calories burned at rest.
+
+BMR is the starting point for all calculations.
+
+All movement (steps, workouts, cardio) adds calories on top of BMR.
+
+Food intake is measured against BMR + activity, not against TDEE estimates.
+
+BMR is the floor. Movement adds flexibility.
+
+3. Apply Safety Limits
+
+Daily calories should not drop below safe levels unless activity capacity has already been maximized.
+
+Minimum daily intake:
+
+Men: ~1500 calories
+
+Women: ~1200 calories
+
+Or ~75% of BMR (whichever is higher)
+
+The system should always attempt to increase movement before pushing calories lower.
+
+4. Choose Strategy Bias (Lifestyle Preference, Not Math)
+
+The user chooses how they prefer to achieve the deficit:
+
+Diet-focused → more deficit from food, less from activity
+
+Balanced → even split between food and activity
+
+Activity-focused → more deficit from movement, less from food
+
+Strategy bias affects distribution, not the size of the deficit.
+
+5. Determine Willingness to Move
+
+The user selects how active they are willing to be (minimal, moderate, very active).
+
+This sets expectations and upper bounds for:
+
+Daily steps (up to 20,000/day)
+
+Strength training (up to 6 sessions/week)
+
+These are maximum limits, not defaults.
+
+6. Movement-First Rule for Aggressive Goals
+
+If the required daily deficit is large (e.g. aggressive fat loss):
+
+The system must follow this order:
+
+Increase daily steps (up to 20k)
+
+Increase strength training frequency (up to 6×/week)
+
+Account for protein’s thermic effect
+
+Only then reduce daily calories further
+
+Calories should not be pushed very low if movement capacity is still unused.
+
+7. Build the Deficit From Two Sources
+
+The total daily deficit must always equal the goal’s required deficit and come from:
+
+Activity burn (steps + workouts)
+
+Food reduction (eating below BMR + activity)
+
+The system allocates the deficit according to:
+
+Strategy bias
+
+Activity willingness
+
+Safety constraints
+
+8. Ensure the Numbers Always Add Up
+
+Before saving or displaying results:
+
+Calories burned from activity plus
+
+Calories reduced from food
+must equal the required daily deficit exactly.
+
+If they don’t:
+
+Automatically rebalance activity and food until they do.
+
+9. Generate Clear, Actionable Outputs
+
+Once everything balances, the system outputs:
+
+Daily calorie target
+
+Step goal (within 20k max)
+
+Strength training frequency (within 6×/week)
+
+Protein target (to protect lean mass and support metabolism)
+
+These outputs should feel achievable, aligned, and internally consistent.
