@@ -87,6 +87,8 @@ const mockNutritionSettings: NutritionSettings = {
   goalWeight: 175,
   goalTimeframe: 12,
   bmr: 1850,
+  goalPace: "moderate",
+  strategyBias: "balanced",
 };
 
 type ActiveTab = "overview" | "nutrition" | "sports" | "gym" | "body-comp";
@@ -4680,6 +4682,10 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   const [goalWeight, setGoalWeight] = useState("");
   const [goalTimeframe, setGoalTimeframe] = useState("12");
   
+  // Goal direction and willingness state
+  const [goalDirection, setGoalDirection] = useState<"lose" | "maintain" | "gain">("lose");
+  const [workoutWillingness, setWorkoutWillingness] = useState<"minimal" | "moderate" | "high">("moderate");
+  
   // Pace and strategy state
   const [goalPace, setGoalPace] = useState<"conservative" | "moderate" | "aggressive">("moderate");
   const [strategyBias, setStrategyBias] = useState<"diet" | "balanced" | "activity">("balanced");
@@ -4987,7 +4993,40 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             </p>
           </div>
 
-          {/* Goal Weight & Timeframe Section */}
+          {/* Goal Direction Section - show after BMR is calculated */}
+          {bmrResult && (
+            <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4" />
+                <Label className="font-medium">What's your goal?</Label>
+              </div>
+              <div className="flex gap-2">
+                {(["lose", "maintain", "gain"] as const).map((direction) => (
+                  <Button
+                    key={direction}
+                    type="button"
+                    variant={goalDirection === direction ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setGoalDirection(direction)}
+                    data-testid={`button-goal-${direction}`}
+                  >
+                    {direction === "lose" && "Lose Weight"}
+                    {direction === "maintain" && "Maintain"}
+                    {direction === "gain" && "Gain Weight"}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {goalDirection === "lose" && "Create a calorie deficit through diet and activity to lose weight."}
+                {goalDirection === "maintain" && "Balance calories in vs out to maintain your current weight."}
+                {goalDirection === "gain" && "Create a calorie surplus to build muscle and gain weight."}
+              </p>
+            </div>
+          )}
+
+          {/* Goal Weight & Timeframe Section - only show if lose or gain */}
+          {bmrResult && goalDirection !== "maintain" && (
           <div className="space-y-3 p-4 bg-muted/30 rounded-md">
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4" />
@@ -5047,50 +5086,42 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               </div>
             )}
           </div>
+          )}
 
-          {/* Pace Control Section */}
+          {/* Workout Willingness Section */}
+          {bmrResult && (
           <div className="space-y-3 p-4 bg-muted/30 rounded-md">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="h-4 w-4" />
-              <Label className="font-medium">Pace Control</Label>
+              <Label className="font-medium">How much are you willing to workout?</Label>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Conservative</span>
-                <span>Moderate</span>
-                <span>Aggressive</span>
-              </div>
-              <div className="flex gap-2">
-                {(["conservative", "moderate", "aggressive"] as const).map((pace) => (
-                  <Button
-                    key={pace}
-                    type="button"
-                    variant={goalPace === pace ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setGoalPace(pace)}
-                    data-testid={`button-pace-${pace}`}
-                  >
-                    {pace === "conservative" && "~0.5 lb/wk"}
-                    {pace === "moderate" && "~1 lb/wk"}
-                    {pace === "aggressive" && "~1.5 lb/wk"}
-                  </Button>
-                ))}
-              </div>
-              {isPaceTooAggressive && impliedWeeklyRate > 0 && (
-                <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-md text-xs text-amber-600 dark:text-amber-400">
-                  <strong>Note:</strong> Your implied rate of {impliedWeeklyRate.toFixed(2)} lb/week exceeds the {goalPace} pace limit of {paceLimits[goalPace]} lb/week. Consider a longer timeframe or higher activity.
-                </div>
-              )}
-              {isVeryAggressive && (
-                <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-md text-xs text-red-600 dark:text-red-400">
-                  <strong>Warning:</strong> Losing more than 2 lbs/week is not recommended for most people. This may impact muscle retention and energy levels.
-                </div>
-              )}
+            <div className="flex gap-2">
+              {(["minimal", "moderate", "high"] as const).map((level) => (
+                <Button
+                  key={level}
+                  type="button"
+                  variant={workoutWillingness === level ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setWorkoutWillingness(level)}
+                  data-testid={`button-workout-${level}`}
+                >
+                  {level === "minimal" && "Minimal"}
+                  {level === "moderate" && "Moderate"}
+                  {level === "high" && "Very Active"}
+                </Button>
+              ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {workoutWillingness === "minimal" && "1-2 light sessions per week, mostly walking or light activity."}
+              {workoutWillingness === "moderate" && "3-4 workouts per week with a mix of cardio and strength."}
+              {workoutWillingness === "high" && "5+ intense sessions per week, structured training program."}
+            </p>
           </div>
+          )}
 
           {/* Strategy Bias Section */}
+          {bmrResult && (
           <div className="space-y-3 p-4 bg-muted/30 rounded-md">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-4 w-4" />
@@ -5122,6 +5153,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               {strategyBias === "activity" && "Higher daily calorie target, expects consistent logged movement. Best for active lifestyles."}
             </div>
           </div>
+          )}
 
           {/* Safety Warnings */}
           {(isBelowBMR || isExcessiveDeficit || isExcessiveSurplus) && (
@@ -5151,134 +5183,106 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             </p>
           </div>
 
-          {/* Goal Mode Section */}
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>Goal Mode (optional preset)</Label>
-              <Select value={goalMode} onValueChange={(v) => { setGoalMode(v); setIsCustomMode(v === 'custom'); }}>
-                <SelectTrigger data-testid="select-goal-mode">
-                  <SelectValue placeholder="Select goal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {goalOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center gap-2">
-                        <span>{option.label}</span>
-                        <span className="text-xs text-muted-foreground">({option.description})</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isCustomMode && (
-              <div className="space-y-2">
-                <Label>Custom Goal Name</Label>
-                <Input
-                  value={customGoalLabel}
-                  onChange={(e) => setCustomGoalLabel(e.target.value)}
-                  placeholder="e.g., Summer Shred, Athletic Recomp"
-                  data-testid="input-custom-goal-name"
-                />
+          {/* System Suggestions Section */}
+          {bmrResult && (
+            <div className="space-y-4 p-4 bg-muted/30 rounded-md">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4" />
+                <Label className="font-medium">System Suggestions</Label>
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Daily Calorie Target</Label>
-              <Input
-                type="number"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="2000"
-                data-testid="input-calorie-target"
-              />
-              {bmrResult && (
-                <p className="text-xs text-muted-foreground">
-                  {parseInt(target) < bmrResult
-                    ? `${bmrResult - parseInt(target)} cal below BMR (aggressive)`
-                    : parseInt(target) === bmrResult
-                      ? 'Eating at BMR level'
-                      : `${parseInt(target) - bmrResult} cal above BMR`}
-                </p>
-              )}
+              
+              {(() => {
+                // Calculate recommendations based on inputs
+                const activityMultiplier = workoutWillingness === "minimal" ? 1.2 : workoutWillingness === "moderate" ? 1.5 : 1.75;
+                const tdee = Math.round(bmrResult * activityMultiplier);
+                const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
+                
+                // Calorie adjustment based on goal
+                let calorieAdjustment = 0;
+                if (goalDirection === "lose") {
+                  calorieAdjustment = strategyBias === "diet" ? -600 : strategyBias === "balanced" ? -400 : -250;
+                } else if (goalDirection === "gain") {
+                  calorieAdjustment = strategyBias === "diet" ? 250 : strategyBias === "balanced" ? 400 : 500;
+                }
+                const recommendedCalories = tdee + calorieAdjustment;
+                
+                // Activity burn target
+                const activityBurn = workoutWillingness === "minimal" ? 150 : workoutWillingness === "moderate" ? 300 : 450;
+                
+                // Protein recommendation
+                const proteinTarget = Math.round(weightKg * (goalDirection === "gain" ? 2.0 : 1.8));
+                
+                // Example goals
+                const stepGoal = workoutWillingness === "minimal" ? 6000 : workoutWillingness === "moderate" ? 8000 : 10000;
+                const strengthDays = workoutWillingness === "minimal" ? 2 : workoutWillingness === "moderate" ? 3 : 4;
+                
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-background rounded-md border">
+                        <div className="text-xs text-muted-foreground mb-1">Daily Calories</div>
+                        <div className="text-lg font-bold">{recommendedCalories}</div>
+                        <div className="text-xs text-muted-foreground">
+                          TDEE ({tdee}) {calorieAdjustment > 0 ? '+' : ''}{calorieAdjustment}
+                        </div>
+                      </div>
+                      <div className="p-3 bg-background rounded-md border">
+                        <div className="text-xs text-muted-foreground mb-1">Activity Burn</div>
+                        <div className="text-lg font-bold">{activityBurn} cal</div>
+                        <div className="text-xs text-muted-foreground">daily target</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Example Daily Goals</div>
+                      <div className="grid gap-2 text-sm">
+                        <div className="flex justify-between items-center p-2 bg-background rounded border">
+                          <span>Daily Steps</span>
+                          <Badge variant="secondary">{stepGoal.toLocaleString()}</Badge>
+                        </div>
+                        <div className="flex justify-between items-center p-2 bg-background rounded border">
+                          <span>Strength Training</span>
+                          <Badge variant="secondary">{strengthDays}x/week</Badge>
+                        </div>
+                        <div className="flex justify-between items-center p-2 bg-background rounded border">
+                          <span>Protein Target</span>
+                          <Badge variant="secondary">{proteinTarget}g</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      onClick={() => setTarget(recommendedCalories.toString())}
+                      variant="outline" 
+                      className="w-full"
+                      data-testid="button-apply-suggestion"
+                    >
+                      Apply Suggested Calories
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
-            
-            {/* Ask AI Button */}
-            {!showAIChat ? (
-              <Button 
-                onClick={() => { setShowAIChat(true); startAIChat(); }} 
-                variant="outline" 
-                className="w-full"
-                disabled={isLoading}
-                data-testid="button-ask-ai"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Ask AI to Help Choose Goal
-              </Button>
-            ) : (
-              <div className="space-y-3 p-4 bg-muted/30 rounded-md">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    <Label className="font-medium">AI Goal Advisor</Label>
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowAIChat(false); setChatMessages([]); setAiRecommendation(null); }}>
-                    Close
-                  </Button>
-                </div>
-                
-                <div className="max-h-[200px] overflow-y-auto space-y-2">
-                  {chatMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] rounded-md px-3 py-2 text-sm ${
-                        msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background border'
-                      }`}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-background border rounded-md px-3 py-2 text-sm text-muted-foreground">
-                        Thinking...
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-                
-                {aiRecommendation ? (
-                  <div className="bg-background border rounded-md p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-sm">{aiRecommendation.goalLabel}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>Target: <span className="font-medium">{aiRecommendation.calorieTarget} cal</span></div>
-                      <div>Protein: <span className="font-medium">{aiRecommendation.proteinTarget}g</span></div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
-                    <Button onClick={applyAIRecommendation} size="sm" className="w-full" data-testid="button-apply-ai">
-                      Apply Recommendation
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type your response..."
-                      value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                      disabled={isLoading}
-                      data-testid="input-ai-chat"
-                    />
-                    <Button size="icon" onClick={sendMessage} disabled={isLoading || !userInput.trim()} data-testid="button-send-ai">
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
+          )}
+          
+          {/* Manual Calorie Override */}
+          <div className="space-y-2">
+            <Label>Daily Calorie Target</Label>
+            <Input
+              type="number"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="2000"
+              data-testid="input-calorie-target"
+            />
+            {bmrResult && (
+              <p className="text-xs text-muted-foreground">
+                {parseInt(target) < bmrResult
+                  ? `${bmrResult - parseInt(target)} cal below BMR (aggressive)`
+                  : parseInt(target) === bmrResult
+                    ? 'Eating at BMR level'
+                    : `${parseInt(target) - bmrResult} cal above BMR`}
+              </p>
             )}
           </div>
         </div>
