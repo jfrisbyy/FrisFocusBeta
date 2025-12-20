@@ -39,10 +39,10 @@ const mockNutrition: NutritionLog[] = [
 ];
 
 const mockBodyComp: BodyComposition[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], weight: 185, bodyFat: 15, goalWeight: 180, nextMilestone: 183, photoUrl: null },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 7).toISOString().split("T")[0], weight: 187, bodyFat: 16, goalWeight: 180, nextMilestone: 185, photoUrl: null },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 14).toISOString().split("T")[0], weight: 189, bodyFat: 17, goalWeight: 180, nextMilestone: 187, photoUrl: null },
-  { id: "demo-4", userId: "demo", date: subDays(new Date(), 21).toISOString().split("T")[0], weight: 191, bodyFat: 18, goalWeight: 180, nextMilestone: 189, photoUrl: null },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], weight: 185, bodyFat: 15, goalWeight: 180, nextMilestone: 183, photoUrl: null, notes: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 7).toISOString().split("T")[0], weight: 187, bodyFat: 16, goalWeight: 180, nextMilestone: 185, photoUrl: null, notes: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 14).toISOString().split("T")[0], weight: 189, bodyFat: 17, goalWeight: 180, nextMilestone: 187, photoUrl: null, notes: null },
+  { id: "demo-4", userId: "demo", date: subDays(new Date(), 21).toISOString().split("T")[0], weight: 191, bodyFat: 18, goalWeight: 180, nextMilestone: 189, photoUrl: null, notes: null },
 ];
 
 const mockStrength: StrengthWorkout[] = [
@@ -84,12 +84,87 @@ const mockNutritionSettings: NutritionSettings = {
   gender: "male",
   activityLevel: "moderate",
   customToggles: null,
+  goalWeight: 175,
+  goalTimeframe: 12,
+  bmr: 1850,
 };
 
 type ActiveTab = "overview" | "nutrition" | "sports" | "gym" | "body-comp";
 type SportsSubTab = "runs" | "drills";
 type GymSubTab = "strength" | "cardio";
 type ChartPeriod = "weekly" | "monthly";
+
+// Activity Calorie Calculation Helpers
+// These calculate calories burned from logged activities to determine dynamic daily calorie target
+
+/**
+ * Calculate calories burned from steps
+ * Approx 0.04 calories per step for a 180lb person, adjusted by weight
+ */
+function calculateStepCalories(steps: number, weightLbs: number = 180): number {
+  const baseCalPerStep = 0.04;
+  const weightFactor = weightLbs / 180;
+  return Math.round(steps * baseCalPerStep * weightFactor);
+}
+
+/**
+ * Calculate calories burned from strength workout
+ * Approx 5 calories per minute at moderate intensity
+ */
+function calculateStrengthCalories(durationMinutes: number, intensity: 'light' | 'moderate' | 'intense' = 'moderate'): number {
+  const multipliers = { light: 4, moderate: 5, intense: 7 };
+  return Math.round(durationMinutes * multipliers[intensity]);
+}
+
+/**
+ * Calculate calories burned from cardio run
+ * Uses logged caloriesBurned if available, otherwise estimates from duration
+ */
+function calculateCardioCalories(run: { caloriesBurned?: number | null; duration?: number | null }): number {
+  if (run.caloriesBurned) return run.caloriesBurned;
+  if (run.duration) return Math.round(run.duration * 10); // ~10 cal/min running
+  return 0;
+}
+
+/**
+ * Calculate calories burned from basketball/sports sessions
+ * Approx 8 calories per minute for basketball
+ */
+function calculateSportsCalories(durationMinutes: number, intensity: 'casual' | 'competitive' | 'intense' = 'competitive'): number {
+  const multipliers = { casual: 6, competitive: 8, intense: 10 };
+  return Math.round(durationMinutes * multipliers[intensity]);
+}
+
+/**
+ * Calculate calories burned from skill drills
+ * Lower intensity than competitive sports
+ */
+function calculateDrillCalories(durationMinutes: number): number {
+  return Math.round(durationMinutes * 4);
+}
+
+/**
+ * Calculate BMR using Mifflin-St Jeor equation
+ */
+function calculateBMR(weightLbs: number, heightIn: number, age: number, gender: 'male' | 'female'): number {
+  const weightKg = weightLbs * 0.453592;
+  const heightCm = heightIn * 2.54;
+  if (gender === "male") {
+    return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age + 5);
+  }
+  return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age - 161);
+}
+
+/**
+ * Calculate required daily deficit/surplus to reach goal weight in timeframe
+ * Returns negative number for cut, positive for bulk
+ */
+function calculateDailyDeficit(currentWeight: number, goalWeight: number, timeframeWeeks: number): number {
+  const weightDiff = goalWeight - currentWeight; // negative for cut
+  const totalCaloriesNeeded = weightDiff * 3500; // 3500 cal = 1 lb
+  const totalDays = timeframeWeeks * 7;
+  return Math.round(totalCaloriesNeeded / totalDays);
+}
 
 // RoutineForm component for creating/editing workout routines
 function RoutineForm({ initialData, onSave, onGenerate, isGenerating, isSaving }: {
@@ -1412,7 +1487,7 @@ export default function FitnessPage() {
                 </div>
               </div>
             </Button>
-            <Button onClick={() => { setActiveTab("strength"); setStrengthDialogOpen(true); }} variant="outline" className="h-auto py-4" data-testid="button-quick-workout">
+            <Button onClick={() => { setActiveTab("gym"); setStrengthDialogOpen(true); }} variant="outline" className="h-auto py-4" data-testid="button-quick-workout">
               <div className="flex items-center gap-2">
                 <Dumbbell className="h-5 w-5" />
                 <div className="text-left">
@@ -1554,6 +1629,111 @@ export default function FitnessPage() {
               }
             }}
           />
+
+          {/* Dynamic Daily Target - BMR + Activity Calories */}
+          {(() => {
+            const dateStr = format(selectedNutritionDate, "yyyy-MM-dd");
+            const userWeight = nutritionSettings.weight || 180;
+            
+            // Calculate activity calories for selected date
+            const selectedDateSteps = steps.find(s => s.date === dateStr);
+            const stepCalories = selectedDateSteps ? calculateStepCalories(selectedDateSteps.steps, userWeight) : 0;
+            
+            const selectedDateStrength = strength.filter(s => s.date === dateStr);
+            const strengthCalories = selectedDateStrength.reduce((sum, w) => {
+              const intensity = (w.effort && w.effort >= 8) ? 'intense' : (w.effort && w.effort <= 4) ? 'light' : 'moderate';
+              return sum + calculateStrengthCalories(w.duration || 0, intensity);
+            }, 0);
+            
+            const selectedDateCardio = cardioRuns.filter(c => c.date === dateStr);
+            const cardioCalories = selectedDateCardio.reduce((sum, c) => sum + calculateCardioCalories(c), 0);
+            
+            const selectedDateBasketball = runs.filter(r => r.date === dateStr);
+            const basketballCalories = selectedDateBasketball.reduce((sum, r) => {
+              // Estimate 45 min per game, intensity based on competition level
+              const gamesPlayed = r.gamesPlayed || 1;
+              const duration = gamesPlayed * 45;
+              const intensity = r.competitionLevel === 'intense' ? 'intense' : r.competitionLevel === 'casual' ? 'casual' : 'competitive';
+              return sum + calculateSportsCalories(duration, intensity);
+            }, 0);
+            
+            const selectedDateSkills = skills.filter(s => s.date === dateStr);
+            const drillCalories = selectedDateSkills.reduce((sum, s) => sum + calculateDrillCalories(30), 0); // Estimate 30 min per drill session
+            
+            const totalActivityCalories = stepCalories + strengthCalories + cardioCalories + basketballCalories + drillCalories;
+            
+            // BMR from settings or calculate from body stats
+            const bmr = nutritionSettings.bmr || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age 
+              ? calculateBMR(nutritionSettings.weight, nutritionSettings.height, nutritionSettings.age, (nutritionSettings.gender as 'male' | 'female') || 'male')
+              : 1800);
+            
+            // Total daily burn = BMR + Activity
+            const totalBurn = bmr + totalActivityCalories;
+            
+            // Calculate deficit/surplus adjustment
+            const goalWeight = nutritionSettings.goalWeight || nutritionSettings.weight || 175;
+            const currentWeight = nutritionSettings.weight || 180;
+            const timeframe = nutritionSettings.goalTimeframe || 12;
+            const dailyAdjustment = calculateDailyDeficit(currentWeight, goalWeight, timeframe);
+            
+            // Eating target = Total Burn + Adjustment (negative for deficit, positive for surplus)
+            const eatTarget = totalBurn + dailyAdjustment;
+            
+            const isDeficit = dailyAdjustment < 0;
+            const isSurplus = dailyAdjustment > 0;
+            
+            return (
+              <Card className="border-dashed">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-orange-500" />
+                    {isToday(selectedNutritionDate) ? "Today's Energy Balance" : format(selectedNutritionDate, "MMM d") + " Energy Balance"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-muted/30 rounded-md">
+                      <div className="text-lg font-bold font-mono">{bmr.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">Your BMR</div>
+                    </div>
+                    <div className="text-center p-3 bg-muted/30 rounded-md">
+                      <div className="text-lg font-bold font-mono text-orange-500">+{totalActivityCalories.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">Activity</div>
+                      {totalActivityCalories > 0 && (
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          {stepCalories > 0 && <span className="mr-1">Steps: {stepCalories}</span>}
+                          {strengthCalories > 0 && <span className="mr-1">Gym: {strengthCalories}</span>}
+                          {cardioCalories > 0 && <span className="mr-1">Cardio: {cardioCalories}</span>}
+                          {basketballCalories > 0 && <span className="mr-1">Runs: {basketballCalories}</span>}
+                          {drillCalories > 0 && <span>Drills: {drillCalories}</span>}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-center p-3 bg-muted/30 rounded-md">
+                      <div className="text-lg font-bold font-mono">{totalBurn.toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">Total Burn</div>
+                    </div>
+                    <div className={`text-center p-3 rounded-md ${isDeficit ? 'bg-green-500/10' : isSurplus ? 'bg-blue-500/10' : 'bg-muted/30'}`}>
+                      <div className={`text-lg font-bold font-mono ${isDeficit ? 'text-green-500' : isSurplus ? 'text-blue-500' : ''}`}>
+                        {eatTarget.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Eat Target</div>
+                      {dailyAdjustment !== 0 && (
+                        <div className={`text-[10px] mt-1 ${isDeficit ? 'text-green-500' : 'text-blue-500'}`}>
+                          {isDeficit ? `${Math.abs(dailyAdjustment)} cal deficit` : `${dailyAdjustment} cal surplus`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!nutritionSettings.bmr && (
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Set your stats in <button type="button" className="text-xs underline text-foreground hover:text-foreground/80" onClick={() => setGoalDialogOpen(true)}>Goal Settings</button> for accurate calculations
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Today's Breakdown - Main Card */}
           <Card>
@@ -2511,7 +2691,6 @@ export default function FitnessPage() {
                           goals: lastGenerationContext.goals,
                           answers: lastGenerationContext.answers,
                           feedback: feedbackText,
-                          isRegeneration: true,
                         });
                       }}
                       disabled={!feedbackText.trim() || isRegenerating}
@@ -3111,7 +3290,12 @@ export default function FitnessPage() {
                     {(() => {
                       const runsWithPace = cardioRuns.filter(r => r.pace);
                       if (runsWithPace.length === 0) return <div className="text-2xl font-bold">--</div>;
-                      const avgPace = runsWithPace.reduce((sum, r) => sum + (r.pace || 0), 0) / runsWithPace.length;
+                      // Parse pace strings like "8:30" to decimal minutes (8.5)
+                      const parsePace = (p: string): number => {
+                        const [mins, secs] = p.split(':').map(Number);
+                        return mins + (secs || 0) / 60;
+                      };
+                      const avgPace = runsWithPace.reduce((sum, r) => sum + parsePace(r.pace!), 0) / runsWithPace.length;
                       const mins = Math.floor(avgPace);
                       const secs = Math.round((avgPace - mins) * 60);
                       return <div className="text-2xl font-bold">{mins}:{secs.toString().padStart(2, '0')}</div>;
@@ -3144,7 +3328,7 @@ export default function FitnessPage() {
                         <div key={run.id} className="border rounded-md p-4" data-testid={`card-cardio-${run.id}`}>
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="font-medium">{run.runType || "Run"}</h4>
+                              <h4 className="font-medium">{run.terrain || "Run"}</h4>
                               <p className="text-sm text-muted-foreground">{formatDate(run.date)}</p>
                             </div>
                             <div className="flex items-center gap-4">
@@ -3152,7 +3336,7 @@ export default function FitnessPage() {
                               {run.duration && <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />{run.duration}min</Badge>}
                               {run.pace && (
                                 <Badge variant="outline">
-                                  {Math.floor(run.pace)}:{Math.round((run.pace - Math.floor(run.pace)) * 60).toString().padStart(2, '0')}/mi
+                                  {run.pace}/mi
                                 </Badge>
                               )}
                               {!isDemo && (
@@ -4475,25 +4659,26 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   onOpenChange: (open: boolean) => void;
   isDemo: boolean;
   nutritionSettings: NutritionSettings;
-  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; activityLevel?: string }) => void;
+  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number }) => void;
 }) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("settings");
   const [goalMode, setGoalMode] = useState(nutritionSettings.goalType || 'moderate_cut');
   const [customGoalLabel, setCustomGoalLabel] = useState("");
-  const [maintenance, setMaintenance] = useState(nutritionSettings.maintenanceCalories?.toString() || '2500');
   const [target, setTarget] = useState(nutritionSettings.calorieTarget?.toString() || '2000');
   const [isCustomMode, setIsCustomMode] = useState(false);
   
-  // TDEE Calculator state
-  const [tdeeData, setTdeeData] = useState({
+  // BMR Calculator state
+  const [bmrData, setBmrData] = useState({
     weight: "",
     height: "",
     age: "",
     gender: "male",
-    activityLevel: "moderate",
   });
-  const [tdeeResult, setTdeeResult] = useState<{ bmr: number; tdee: number } | null>(null);
+  const [bmrResult, setBmrResult] = useState<number | null>(null);
+  
+  // Goal weight and timeframe state
+  const [goalWeight, setGoalWeight] = useState("");
+  const [goalTimeframe, setGoalTimeframe] = useState("12");
   
   // AI Chat state
   const [showAIChat, setShowAIChat] = useState(false);
@@ -4522,91 +4707,51 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       setIsCustomMode(!presetModes.includes(currentGoal));
       setGoalMode(presetModes.includes(currentGoal) ? currentGoal : 'custom');
       setCustomGoalLabel(!presetModes.includes(currentGoal) ? currentGoal : "");
-      setMaintenance(nutritionSettings.maintenanceCalories?.toString() || '2500');
       setTarget(nutritionSettings.calorieTarget?.toString() || '2000');
       
-      // Pre-populate TDEE data from saved settings
-      setTdeeData({
+      // Pre-populate BMR data from saved settings
+      setBmrData({
         weight: nutritionSettings.weight?.toString() || "",
         height: nutritionSettings.height?.toString() || "",
         age: nutritionSettings.age?.toString() || "",
         gender: nutritionSettings.gender || "male",
-        activityLevel: nutritionSettings.activityLevel || "moderate",
       });
       
-      // If we have saved TDEE data, recalculate the result
+      // Pre-populate goal weight and timeframe
+      setGoalWeight(nutritionSettings.goalWeight?.toString() || "");
+      setGoalTimeframe(nutritionSettings.goalTimeframe?.toString() || "12");
+      
+      // If we have saved BMR data, recalculate the result
       if (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age) {
-        const weightKg = nutritionSettings.weight * 0.453592;
-        const heightCm = nutritionSettings.height * 2.54;
         const gender = nutritionSettings.gender || "male";
-        const bmr = gender === "male"
-          ? Math.round(10 * weightKg + 6.25 * heightCm - 5 * nutritionSettings.age + 5)
-          : Math.round(10 * weightKg + 6.25 * heightCm - 5 * nutritionSettings.age - 161);
-        const multipliers: Record<string, number> = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
-        const multiplier = multipliers[nutritionSettings.activityLevel || "moderate"] || 1.55;
-        const tdee = Math.round(bmr * multiplier);
-        setTdeeResult({ bmr, tdee });
+        const calculatedBmr = calculateBMR(nutritionSettings.weight, nutritionSettings.height, nutritionSettings.age, gender as 'male' | 'female');
+        setBmrResult(calculatedBmr);
+      } else if (nutritionSettings.bmr) {
+        setBmrResult(nutritionSettings.bmr);
       } else {
-        setTdeeResult(null);
+        setBmrResult(null);
       }
     }
   }, [open, nutritionSettings]);
 
-  useEffect(() => {
-    if (goalMode !== 'custom') {
-      const maintenanceCal = parseInt(maintenance) || 2500;
-      let newTarget = maintenanceCal;
-      
-      switch (goalMode) {
-        case 'aggressive_cut': newTarget = maintenanceCal - 750; break;
-        case 'moderate_cut': newTarget = maintenanceCal - 500; break;
-        case 'light_cut': newTarget = maintenanceCal - 250; break;
-        case 'maintenance': newTarget = maintenanceCal; break;
-        case 'lean_bulk': newTarget = maintenanceCal + 250; break;
-        case 'bulk': newTarget = maintenanceCal + 500; break;
-      }
-      setTarget(newTarget.toString());
-    }
-  }, [goalMode, maintenance]);
+  // Calculate recommended daily deficit based on goal weight and timeframe
+  const calculatedDeficit = bmrData.weight && goalWeight && goalTimeframe
+    ? calculateDailyDeficit(parseFloat(bmrData.weight), parseFloat(goalWeight), parseInt(goalTimeframe))
+    : 0;
 
-  const calculateBMR = (weight: number, height: number, age: number, gender: string) => {
-    const weightKg = weight * 0.453592;
-    const heightCm = height * 2.54;
-    if (gender === "male") {
-      return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age + 5);
-    }
-    return Math.round(10 * weightKg + 6.25 * heightCm - 5 * age - 161);
-  };
-
-  const activityMultipliers: Record<string, number> = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    active: 1.725,
-    very_active: 1.9,
-  };
-
-  const calculateTDEE = () => {
-    const weight = parseFloat(tdeeData.weight);
-    const height = parseFloat(tdeeData.height);
-    const age = parseInt(tdeeData.age);
+  const computeBMR = () => {
+    const weight = parseFloat(bmrData.weight);
+    const height = parseFloat(bmrData.height);
+    const age = parseInt(bmrData.age);
     
     if (!weight || !height || !age) {
-      toast({ title: "Please fill in all fields", variant: "destructive" });
+      toast({ title: "Please fill in weight, height, and age", variant: "destructive" });
       return;
     }
     
-    const bmr = calculateBMR(weight, height, age, tdeeData.gender);
-    const tdee = Math.round(bmr * (activityMultipliers[tdeeData.activityLevel] || 1.55));
-    setTdeeResult({ bmr, tdee });
-  };
-
-  const applyTDEE = () => {
-    if (tdeeResult) {
-      setMaintenance(tdeeResult.tdee.toString());
-      setActiveTab("settings");
-      toast({ title: "TDEE applied as maintenance calories" });
-    }
+    const bmr = calculateBMR(weight, height, age, bmrData.gender as 'male' | 'female');
+    setBmrResult(bmr);
+    toast({ title: `BMR calculated: ${bmr} cal/day` });
   };
 
   const startAIChat = async () => {
@@ -4614,15 +4759,16 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     setChatMessages([]);
     setAiRecommendation(null);
     
-    // Use TDEE result if available, otherwise use saved nutrition settings
-    const hasStats = tdeeResult || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age);
+    // Use BMR data if available
+    const hasStats = bmrResult || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age);
     const currentStats = hasStats ? {
-      weight: tdeeData.weight || nutritionSettings.weight?.toString() || "",
-      height: tdeeData.height || nutritionSettings.height?.toString() || "",
-      age: tdeeData.age || nutritionSettings.age?.toString() || "",
-      gender: tdeeData.gender || nutritionSettings.gender || "male",
-      activityLevel: tdeeData.activityLevel || nutritionSettings.activityLevel || "moderate",
-      tdee: tdeeResult?.tdee || nutritionSettings.maintenanceCalories || null,
+      weight: bmrData.weight || nutritionSettings.weight?.toString() || "",
+      height: bmrData.height || nutritionSettings.height?.toString() || "",
+      age: bmrData.age || nutritionSettings.age?.toString() || "",
+      gender: bmrData.gender || nutritionSettings.gender || "male",
+      bmr: bmrResult || nutritionSettings.bmr || null,
+      goalWeight: goalWeight || nutritionSettings.goalWeight?.toString() || "",
+      goalTimeframe: goalTimeframe || nutritionSettings.goalTimeframe?.toString() || "12",
     } : null;
     
     try {
@@ -4656,15 +4802,16 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     setUserInput("");
     setIsLoading(true);
     
-    // Use TDEE result if available, otherwise use saved nutrition settings
-    const hasStats = tdeeResult || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age);
+    // Use BMR data if available
+    const hasStats = bmrResult || (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age);
     const currentStats = hasStats ? {
-      weight: tdeeData.weight || nutritionSettings.weight?.toString() || "",
-      height: tdeeData.height || nutritionSettings.height?.toString() || "",
-      age: tdeeData.age || nutritionSettings.age?.toString() || "",
-      gender: tdeeData.gender || nutritionSettings.gender || "male",
-      activityLevel: tdeeData.activityLevel || nutritionSettings.activityLevel || "moderate",
-      tdee: tdeeResult?.tdee || nutritionSettings.maintenanceCalories || null,
+      weight: bmrData.weight || nutritionSettings.weight?.toString() || "",
+      height: bmrData.height || nutritionSettings.height?.toString() || "",
+      age: bmrData.age || nutritionSettings.age?.toString() || "",
+      gender: bmrData.gender || nutritionSettings.gender || "male",
+      bmr: bmrResult || nutritionSettings.bmr || null,
+      goalWeight: goalWeight || nutritionSettings.goalWeight?.toString() || "",
+      goalTimeframe: goalTimeframe || nutritionSettings.goalTimeframe?.toString() || "12",
     } : null;
     
     try {
@@ -4694,9 +4841,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       setGoalMode('custom');
       setIsCustomMode(true);
       setCustomGoalLabel(aiRecommendation.goalLabel);
-      setMaintenance(aiRecommendation.maintenanceCalories.toString());
       setTarget(aiRecommendation.calorieTarget.toString());
-      setActiveTab("settings");
       toast({ title: "AI recommendation applied" });
     }
   };
@@ -4712,13 +4857,15 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     onSave({
       goalType: finalGoalType,
       calorieTarget: parseInt(target) || 2000,
-      maintenanceCalories: parseInt(maintenance) || 2500,
-      // Include TDEE data if available
-      weight: tdeeData.weight ? parseInt(tdeeData.weight) : undefined,
-      height: tdeeData.height ? parseInt(tdeeData.height) : undefined,
-      age: tdeeData.age ? parseInt(tdeeData.age) : undefined,
-      gender: tdeeData.gender || undefined,
-      activityLevel: tdeeData.activityLevel || undefined,
+      maintenanceCalories: bmrResult || nutritionSettings.maintenanceCalories || 2000,
+      // Include BMR data if available
+      weight: bmrData.weight ? parseInt(bmrData.weight) : undefined,
+      height: bmrData.height ? parseInt(bmrData.height) : undefined,
+      age: bmrData.age ? parseInt(bmrData.age) : undefined,
+      gender: bmrData.gender || undefined,
+      goalWeight: goalWeight ? parseInt(goalWeight) : undefined,
+      goalTimeframe: goalTimeframe ? parseInt(goalTimeframe) : undefined,
+      bmr: bmrResult || undefined,
     });
   };
 
@@ -4736,54 +4883,54 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adjust Your Goal</DialogTitle>
+          <DialogTitle>Set Your Goal</DialogTitle>
           <DialogDescription>
-            Calculate your TDEE, set your goal, or get AI recommendations
+            Calculate your BMR, set your goal weight, and define your timeline
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-5">
-          {/* TDEE Calculator Section */}
+          {/* BMR Calculator Section */}
           <div className="space-y-3 p-4 bg-muted/30 rounded-md">
             <div className="flex items-center gap-2 mb-2">
               <Calculator className="h-4 w-4" />
-              <Label className="font-medium">TDEE Calculator</Label>
+              <Label className="font-medium">BMR Calculator</Label>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Weight (lbs)</Label>
+                <Label className="text-xs">Current Weight (lbs)</Label>
                 <Input
                   type="number"
-                  value={tdeeData.weight}
-                  onChange={(e) => setTdeeData({ ...tdeeData, weight: e.target.value })}
+                  value={bmrData.weight}
+                  onChange={(e) => setBmrData({ ...bmrData, weight: e.target.value })}
                   placeholder="180"
-                  data-testid="input-tdee-weight"
+                  data-testid="input-bmr-weight"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Height (in)</Label>
                 <Input
                   type="number"
-                  value={tdeeData.height}
-                  onChange={(e) => setTdeeData({ ...tdeeData, height: e.target.value })}
+                  value={bmrData.height}
+                  onChange={(e) => setBmrData({ ...bmrData, height: e.target.value })}
                   placeholder="70"
-                  data-testid="input-tdee-height"
+                  data-testid="input-bmr-height"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Age</Label>
                 <Input
                   type="number"
-                  value={tdeeData.age}
-                  onChange={(e) => setTdeeData({ ...tdeeData, age: e.target.value })}
+                  value={bmrData.age}
+                  onChange={(e) => setBmrData({ ...bmrData, age: e.target.value })}
                   placeholder="30"
-                  data-testid="input-tdee-age"
+                  data-testid="input-bmr-age"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Gender</Label>
-                <Select value={tdeeData.gender} onValueChange={(v) => setTdeeData({ ...tdeeData, gender: v })}>
-                  <SelectTrigger data-testid="select-tdee-gender">
+                <Select value={bmrData.gender} onValueChange={(v) => setBmrData({ ...bmrData, gender: v })}>
+                  <SelectTrigger data-testid="select-bmr-gender">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -4793,51 +4940,86 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 </Select>
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Activity Level</Label>
-              <Select value={tdeeData.activityLevel} onValueChange={(v) => setTdeeData({ ...tdeeData, activityLevel: v })}>
-                <SelectTrigger data-testid="select-activity-level">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sedentary">Sedentary (desk job)</SelectItem>
-                  <SelectItem value="light">Light (1-3 days/week)</SelectItem>
-                  <SelectItem value="moderate">Moderate (3-5 days/week)</SelectItem>
-                  <SelectItem value="active">Active (6-7 days/week)</SelectItem>
-                  <SelectItem value="very_active">Very Active (athlete)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             <div className="flex items-center gap-2">
-              <Button onClick={calculateTDEE} size="sm" variant="secondary" data-testid="button-calculate-tdee">
-                Calculate
+              <Button onClick={computeBMR} size="sm" variant="secondary" data-testid="button-calculate-bmr">
+                Calculate BMR
               </Button>
-              {tdeeResult && (
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-muted-foreground">TDEE: <span className="font-bold text-foreground">{tdeeResult.tdee} cal</span></span>
-                  <Button onClick={applyTDEE} size="sm" variant="outline" data-testid="button-apply-tdee">
-                    Apply
-                  </Button>
-                </div>
+              {bmrResult && (
+                <span className="text-sm text-muted-foreground">
+                  BMR: <span className="font-bold text-foreground">{bmrResult} cal/day</span>
+                </span>
               )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              BMR is calories burned at rest. Activity calories are added dynamically from your logged workouts.
+            </p>
+          </div>
+
+          {/* Goal Weight & Timeframe Section */}
+          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-4 w-4" />
+              <Label className="font-medium">Weight Goal</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Goal Weight (lbs)</Label>
+                <Input
+                  type="number"
+                  value={goalWeight}
+                  onChange={(e) => setGoalWeight(e.target.value)}
+                  placeholder="170"
+                  data-testid="input-goal-weight"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Timeframe (weeks)</Label>
+                <Select value={goalTimeframe} onValueChange={(v) => setGoalTimeframe(v)}>
+                  <SelectTrigger data-testid="select-goal-timeframe">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="4">4 weeks</SelectItem>
+                    <SelectItem value="8">8 weeks</SelectItem>
+                    <SelectItem value="12">12 weeks</SelectItem>
+                    <SelectItem value="16">16 weeks</SelectItem>
+                    <SelectItem value="24">24 weeks</SelectItem>
+                    <SelectItem value="36">36 weeks</SelectItem>
+                    <SelectItem value="52">52 weeks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {bmrData.weight && goalWeight && (
+              <div className="p-3 bg-background rounded-md border">
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Weight change:</span>
+                    <span className={`font-medium ${parseFloat(goalWeight) < parseFloat(bmrData.weight) ? 'text-green-500' : parseFloat(goalWeight) > parseFloat(bmrData.weight) ? 'text-blue-500' : ''}`}>
+                      {parseFloat(goalWeight) - parseFloat(bmrData.weight) > 0 ? '+' : ''}{(parseFloat(goalWeight) - parseFloat(bmrData.weight)).toFixed(1)} lbs
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Required daily change:</span>
+                    <span className={`font-medium ${calculatedDeficit < 0 ? 'text-green-500' : calculatedDeficit > 0 ? 'text-blue-500' : ''}`}>
+                      {calculatedDeficit > 0 ? '+' : ''}{calculatedDeficit} cal/day
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Weekly rate:</span>
+                    <span className="font-medium">
+                      {Math.abs((parseFloat(goalWeight) - parseFloat(bmrData.weight)) / parseInt(goalTimeframe)).toFixed(2)} lbs/week
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Goal Mode Section */}
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Maintenance Calories (TDEE)</Label>
-              <Input
-                type="number"
-                value={maintenance}
-                onChange={(e) => setMaintenance(e.target.value)}
-                placeholder="2500"
-                data-testid="input-maintenance-calories"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Goal Mode</Label>
+              <Label>Goal Mode (optional preset)</Label>
               <Select value={goalMode} onValueChange={(v) => { setGoalMode(v); setIsCustomMode(v === 'custom'); }}>
                 <SelectTrigger data-testid="select-goal-mode">
                   <SelectValue placeholder="Select goal" />
@@ -4876,13 +5058,15 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 placeholder="2000"
                 data-testid="input-calorie-target"
               />
-              <p className="text-xs text-muted-foreground">
-                {parseInt(maintenance) === parseInt(target)
-                  ? 'Eating at maintenance level'
-                  : parseInt(target) < parseInt(maintenance)
-                    ? `${parseInt(maintenance) - parseInt(target)} cal deficit per day`
-                    : `${parseInt(target) - parseInt(maintenance)} cal surplus per day`}
-              </p>
+              {bmrResult && (
+                <p className="text-xs text-muted-foreground">
+                  {parseInt(target) < bmrResult
+                    ? `${bmrResult - parseInt(target)} cal below BMR (aggressive)`
+                    : parseInt(target) === bmrResult
+                      ? 'Eating at BMR level'
+                      : `${parseInt(target) - bmrResult} cal above BMR`}
+                </p>
+              )}
             </div>
             
             {/* Ask AI Button */}

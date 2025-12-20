@@ -492,6 +492,10 @@ export const nutritionSettings = pgTable("nutrition_settings", {
   gender: text("gender"),
   activityLevel: text("activity_level"),
   customToggles: jsonb("custom_toggles"),
+  // New BMR-based goal system fields
+  goalWeight: integer("goal_weight"), // target weight in lbs
+  goalTimeframe: integer("goal_timeframe"), // weeks to reach goal
+  bmr: integer("bmr"), // calculated BMR (basal metabolic rate)
 });
 
 export const insertNutritionSettingsSchema = createInsertSchema(nutritionSettings).omit({ id: true });
