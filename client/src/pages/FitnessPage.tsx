@@ -4689,6 +4689,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   // Pace and strategy state
   const [goalPace, setGoalPace] = useState<"conservative" | "moderate" | "aggressive">("moderate");
   const [strategyBias, setStrategyBias] = useState<"diet" | "balanced" | "activity">("balanced");
+  const [activityLevel, setActivityLevel] = useState<"sedentary" | "lightly_active" | "moderately_active" | "very_active">("lightly_active");
   
   // AI Chat state
   const [showAIChat, setShowAIChat] = useState(false);
@@ -5088,203 +5089,354 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
           </div>
           )}
 
-          {/* Workout Willingness Section */}
-          {bmrResult && (
-          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+          {/* MAINTAIN FLOW */}
+          {bmrResult && goalDirection === "maintain" && (
+          <div className="space-y-4 p-4 bg-muted/30 rounded-md">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="h-4 w-4" />
-              <Label className="font-medium">How much are you willing to workout?</Label>
+              <Label className="font-medium">How active are you?</Label>
             </div>
-            <div className="flex gap-2">
-              {(["minimal", "moderate", "high"] as const).map((level) => (
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: "sedentary", label: "Sedentary", desc: "Desk job, little exercise" },
+                { key: "lightly_active", label: "Lightly Active", desc: "Light exercise 1-3 days/week" },
+                { key: "moderately_active", label: "Moderately Active", desc: "Moderate exercise 3-5 days/week" },
+                { key: "very_active", label: "Very Active", desc: "Hard exercise 6-7 days/week" },
+              ] as const).map((level) => (
                 <Button
-                  key={level}
+                  key={level.key}
                   type="button"
-                  variant={workoutWillingness === level ? "default" : "outline"}
+                  variant={activityLevel === level.key ? "default" : "outline"}
                   size="sm"
-                  className="flex-1"
-                  onClick={() => setWorkoutWillingness(level)}
-                  data-testid={`button-workout-${level}`}
+                  className="flex flex-col h-auto py-2"
+                  onClick={() => setActivityLevel(level.key)}
+                  data-testid={`button-activity-${level.key}`}
                 >
-                  {level === "minimal" && "Minimal"}
-                  {level === "moderate" && "Moderate"}
-                  {level === "high" && "Very Active"}
+                  <span>{level.label}</span>
+                  <span className="text-xs opacity-70 font-normal">{level.desc}</span>
                 </Button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {workoutWillingness === "minimal" && "1-2 light sessions per week, mostly walking or light activity."}
-              {workoutWillingness === "moderate" && "3-4 workouts per week with a mix of cardio and strength."}
-              {workoutWillingness === "high" && "5+ intense sessions per week, structured training program."}
-            </p>
+            
+            {(() => {
+              const multipliers = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725 };
+              const tdee = Math.round(bmrResult * multipliers[activityLevel]);
+              return (
+                <div className="mt-4 p-3 bg-background rounded-md border">
+                  <div className="text-xs text-muted-foreground mb-1">Suggested Daily Calories</div>
+                  <div className="text-2xl font-bold">{tdee}</div>
+                  <div className="text-xs text-muted-foreground">TDEE = BMR ({bmrResult}) x {multipliers[activityLevel]}</div>
+                  <Button 
+                    onClick={() => setTarget(tdee.toString())}
+                    variant="outline" 
+                    className="w-full mt-3"
+                    data-testid="button-apply-maintain-calories"
+                  >
+                    Apply This Target
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
           )}
 
-          {/* Strategy Bias Section */}
-          {bmrResult && (
-          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+          {/* GAIN WEIGHT FLOW */}
+          {bmrResult && goalDirection === "gain" && (
+          <div className="space-y-4 p-4 bg-muted/30 rounded-md">
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-4 w-4" />
-              <Label className="font-medium">Strategy Bias</Label>
+              <Activity className="h-4 w-4" />
+              <Label className="font-medium">How active are you?</Label>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">
-              This affects expectations and messaging, not the math. Choose what fits your lifestyle.
-            </p>
-            <div className="flex gap-2">
-              {(["diet", "balanced", "activity"] as const).map((strategy) => (
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: "sedentary", label: "Sedentary", desc: "Desk job, little exercise" },
+                { key: "lightly_active", label: "Lightly Active", desc: "Light exercise 1-3 days/week" },
+                { key: "moderately_active", label: "Moderately Active", desc: "Moderate exercise 3-5 days/week" },
+                { key: "very_active", label: "Very Active", desc: "Hard exercise 6-7 days/week" },
+              ] as const).map((level) => (
                 <Button
-                  key={strategy}
+                  key={level.key}
                   type="button"
-                  variant={strategyBias === strategy ? "default" : "outline"}
+                  variant={activityLevel === level.key ? "default" : "outline"}
                   size="sm"
-                  className="flex-1"
-                  onClick={() => setStrategyBias(strategy)}
-                  data-testid={`button-strategy-${strategy}`}
+                  className="flex flex-col h-auto py-2"
+                  onClick={() => setActivityLevel(level.key)}
+                  data-testid={`button-gain-activity-${level.key}`}
                 >
-                  {strategy === "diet" && "Diet Focus"}
-                  {strategy === "balanced" && "Balanced"}
-                  {strategy === "activity" && "Activity Focus"}
+                  <span>{level.label}</span>
+                  <span className="text-xs opacity-70 font-normal">{level.desc}</span>
                 </Button>
               ))}
             </div>
-            <div className="text-xs text-muted-foreground mt-2">
-              {strategyBias === "diet" && "Larger food deficit, lower assumed activity. Best if you have limited time for exercise."}
-              {strategyBias === "balanced" && "Moderate food adjustment with moderate expected activity. A sustainable approach."}
-              {strategyBias === "activity" && "Higher daily calorie target, expects consistent logged movement. Best for active lifestyles."}
+
+            <div className="space-y-3 mt-4">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                <Label className="font-medium">How much are you willing to workout?</Label>
+              </div>
+              <div className="flex gap-2">
+                {(["minimal", "moderate", "high"] as const).map((level) => (
+                  <Button
+                    key={level}
+                    type="button"
+                    variant={workoutWillingness === level ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setWorkoutWillingness(level)}
+                    data-testid={`button-gain-workout-${level}`}
+                  >
+                    {level === "minimal" && "Minimal"}
+                    {level === "moderate" && "Moderate"}
+                    {level === "high" && "Intensive"}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {workoutWillingness === "minimal" && "1-2 light sessions per week."}
+                {workoutWillingness === "moderate" && "3-4 sessions per week with strength focus."}
+                {workoutWillingness === "high" && "5+ structured strength sessions per week."}
+              </p>
             </div>
+            
+            {(() => {
+              const multipliers = { sedentary: 1.2, lightly_active: 1.375, moderately_active: 1.55, very_active: 1.725 };
+              const tdee = Math.round(bmrResult * multipliers[activityLevel]);
+              const surplus = workoutWillingness === "minimal" ? 250 : workoutWillingness === "moderate" ? 350 : 500;
+              const recommendedCalories = tdee + surplus;
+              const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
+              const proteinTarget = Math.round(weightKg * 2.0);
+              
+              return (
+                <div className="mt-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground mb-1">Daily Calories</div>
+                      <div className="text-xl font-bold">{recommendedCalories}</div>
+                      <div className="text-xs text-muted-foreground">TDEE + {surplus} surplus</div>
+                    </div>
+                    <div className="p-3 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground mb-1">Protein Target</div>
+                      <div className="text-xl font-bold">{proteinTarget}g</div>
+                      <div className="text-xs text-muted-foreground">2g per kg bodyweight</div>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => setTarget(recommendedCalories.toString())}
+                    variant="outline" 
+                    className="w-full"
+                    data-testid="button-apply-gain-calories"
+                  >
+                    Apply Suggested Calories
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
           )}
 
-          {/* Safety Warnings */}
-          {(isBelowBMR || isExcessiveDeficit || isExcessiveSurplus) && (
-            <div className="space-y-2">
-              {isBelowBMR && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm text-amber-600 dark:text-amber-400">
-                  <strong>Heads up:</strong> Your target is below your BMR ({bmrResult} cal). This is aggressive and may affect energy levels. Consider increasing activity to create a deficit instead.
+          {/* LOSE WEIGHT FLOW */}
+          {bmrResult && goalDirection === "lose" && (
+          <div className="space-y-4 p-4 bg-muted/30 rounded-md">
+            {/* Show deficit needed */}
+            {calculatedDeficit !== 0 && (
+              <div className="p-3 bg-background rounded-md border">
+                <div className="text-sm">
+                  You need a <span className="font-bold text-green-500">{Math.abs(calculatedDeficit)} cal/day</span> deficit to reach your goal.
                 </div>
-              )}
-              {isExcessiveDeficit && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm text-amber-600 dark:text-amber-400">
-                  <strong>Large deficit:</strong> A deficit over 1,000 cal/day may not be sustainable long-term. Consider a longer timeline or adding activity.
+                <div className="text-xs text-muted-foreground mt-1">
+                  This can come from eating less, moving more, or both.
                 </div>
-              )}
-              {isExcessiveSurplus && (
-                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-md text-sm text-blue-600 dark:text-blue-400">
-                  <strong>Large surplus:</strong> A surplus over 800 cal/day may lead to faster fat gain. Consider a more moderate approach for lean gains.
-                </div>
-              )}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4" />
+                <Label className="font-medium">Strategy Bias</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Choose how you want to create your deficit:
+              </p>
+              <div className="space-y-2">
+                {([
+                  { 
+                    key: "diet", 
+                    label: "Diet Focus", 
+                    desc: "2-3 strength sessions, 8k steps, bigger food deficit",
+                    steps: 8000,
+                    strength: "2-3x/week",
+                    deficitPct: 0.85
+                  },
+                  { 
+                    key: "balanced", 
+                    label: "Balanced", 
+                    desc: "3-4 strength sessions, 10k steps, moderate deficit",
+                    steps: 10000,
+                    strength: "3-4x/week",
+                    deficitPct: 0.65
+                  },
+                  { 
+                    key: "activity", 
+                    label: "Activity Focus", 
+                    desc: "4-5 strength sessions, 12-15k steps, smaller food deficit",
+                    steps: 12000,
+                    strength: "4-5x/week",
+                    deficitPct: 0.45
+                  },
+                ] as const).map((strategy) => (
+                  <Button
+                    key={strategy.key}
+                    type="button"
+                    variant={strategyBias === strategy.key ? "default" : "outline"}
+                    className="w-full flex flex-col h-auto py-3 items-start"
+                    onClick={() => setStrategyBias(strategy.key)}
+                    data-testid={`button-lose-strategy-${strategy.key}`}
+                  >
+                    <span className="font-medium">{strategy.label}</span>
+                    <span className="text-xs opacity-70 font-normal">{strategy.desc}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
+            
+            {(() => {
+              const strategies = {
+                diet: { steps: 8000, strength: "2-3x/week", deficitPct: 0.85, activityMult: 1.3 },
+                balanced: { steps: 10000, strength: "3-4x/week", deficitPct: 0.65, activityMult: 1.45 },
+                activity: { steps: 12000, strength: "4-5x/week", deficitPct: 0.45, activityMult: 1.6 },
+              };
+              const config = strategies[strategyBias];
+              const tdee = Math.round(bmrResult * config.activityMult);
+              const targetDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
+              const foodDeficit = Math.round(targetDeficit * config.deficitPct);
+              const recommendedCalories = tdee - foodDeficit;
+              const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
+              const proteinTarget = Math.round(weightKg * 1.8);
+              
+              return (
+                <div className="mt-4 space-y-3">
+                  <div className="text-sm font-medium">Recommendations</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground">Daily Steps</div>
+                      <div className="font-bold">{config.steps.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground">Strength Training</div>
+                      <div className="font-bold">{config.strength}</div>
+                    </div>
+                    <div className="p-2 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground">Protein</div>
+                      <div className="font-bold">{proteinTarget}g</div>
+                    </div>
+                    <div className="p-2 bg-background rounded-md border">
+                      <div className="text-xs text-muted-foreground">Daily Calories</div>
+                      <div className="font-bold">{recommendedCalories}</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ~{Math.round((1 - config.deficitPct) * 100)}% deficit from activity, ~{Math.round(config.deficitPct * 100)}% from food
+                  </div>
+                  <Button 
+                    onClick={() => setTarget(recommendedCalories.toString())}
+                    variant="outline" 
+                    className="w-full"
+                    data-testid="button-apply-lose-calories"
+                  >
+                    Apply Suggested Calories
+                  </Button>
+                </div>
+              );
+            })()}
+          </div>
           )}
 
-          {/* Philosophy Message */}
-          <div className="p-3 bg-muted/20 rounded-md border-l-2 border-muted-foreground/30">
-            <p className="text-xs text-muted-foreground italic">
-              Your body burns calories at rest (BMR). Movement adds more. Your goal sets the direction. Your habits determine the speed.
-            </p>
-          </div>
+          {/* Ask AI Button */}
+          {bmrResult && !showAIChat && (
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowAIChat(true)}
+              data-testid="button-ask-ai-goal"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Ask AI to Help Choose Goal
+            </Button>
+          )}
 
-          {/* System Suggestions Section */}
-          {bmrResult && (
-            <div className="space-y-4 p-4 bg-muted/30 rounded-md">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4" />
-                <Label className="font-medium">System Suggestions</Label>
+          {/* AI Chat UI */}
+          {showAIChat && (
+            <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  <Label className="font-medium">AI Goal Assistant</Label>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowAIChat(false)}
+                  data-testid="button-close-ai-chat"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
               
-              {(() => {
-                // Calculate recommendations based on inputs
-                const activityMultiplier = workoutWillingness === "minimal" ? 1.2 : workoutWillingness === "moderate" ? 1.5 : 1.75;
-                const tdee = Math.round(bmrResult * activityMultiplier);
-                const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
-                
-                // Calorie adjustment based on goal
-                let calorieAdjustment = 0;
-                if (goalDirection === "lose") {
-                  calorieAdjustment = strategyBias === "diet" ? -600 : strategyBias === "balanced" ? -400 : -250;
-                } else if (goalDirection === "gain") {
-                  calorieAdjustment = strategyBias === "diet" ? 250 : strategyBias === "balanced" ? 400 : 500;
-                }
-                const recommendedCalories = tdee + calorieAdjustment;
-                
-                // Activity burn target
-                const activityBurn = workoutWillingness === "minimal" ? 150 : workoutWillingness === "moderate" ? 300 : 450;
-                
-                // Protein recommendation
-                const proteinTarget = Math.round(weightKg * (goalDirection === "gain" ? 2.0 : 1.8));
-                
-                // Example goals
-                const stepGoal = workoutWillingness === "minimal" ? 6000 : workoutWillingness === "moderate" ? 8000 : 10000;
-                const strengthDays = workoutWillingness === "minimal" ? 2 : workoutWillingness === "moderate" ? 3 : 4;
-                
-                return (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-background rounded-md border">
-                        <div className="text-xs text-muted-foreground mb-1">Daily Calories</div>
-                        <div className="text-lg font-bold">{recommendedCalories}</div>
-                        <div className="text-xs text-muted-foreground">
-                          TDEE ({tdee}) {calorieAdjustment > 0 ? '+' : ''}{calorieAdjustment}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-background rounded-md border">
-                        <div className="text-xs text-muted-foreground mb-1">Activity Burn</div>
-                        <div className="text-lg font-bold">{activityBurn} cal</div>
-                        <div className="text-xs text-muted-foreground">daily target</div>
-                      </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {chatMessages.map((msg, i) => (
+                  <div key={i} className={`p-2 rounded-md text-sm ${msg.role === 'user' ? 'bg-primary/10 ml-8' : 'bg-background mr-8'}`}>
+                    {msg.content}
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              
+              {aiRecommendation && (
+                <div className="p-3 bg-background rounded-md border space-y-2">
+                  <div className="text-sm font-medium">AI Recommendation</div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <div className="text-xs text-muted-foreground">Calories</div>
+                      <div className="font-bold">{aiRecommendation.calorieTarget}</div>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium">Example Daily Goals</div>
-                      <div className="grid gap-2 text-sm">
-                        <div className="flex justify-between items-center p-2 bg-background rounded border">
-                          <span>Daily Steps</span>
-                          <Badge variant="secondary">{stepGoal.toLocaleString()}</Badge>
-                        </div>
-                        <div className="flex justify-between items-center p-2 bg-background rounded border">
-                          <span>Strength Training</span>
-                          <Badge variant="secondary">{strengthDays}x/week</Badge>
-                        </div>
-                        <div className="flex justify-between items-center p-2 bg-background rounded border">
-                          <span>Protein Target</span>
-                          <Badge variant="secondary">{proteinTarget}g</Badge>
-                        </div>
-                      </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Protein</div>
+                      <div className="font-bold">{aiRecommendation.proteinTarget}g</div>
                     </div>
-                    
-                    <Button 
-                      onClick={() => setTarget(recommendedCalories.toString())}
-                      variant="outline" 
-                      className="w-full"
-                      data-testid="button-apply-suggestion"
-                    >
-                      Apply Suggested Calories
-                    </Button>
-                  </>
-                );
-              })()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
+                  <Button 
+                    onClick={() => {
+                      setTarget(aiRecommendation.calorieTarget.toString());
+                      setShowAIChat(false);
+                    }}
+                    variant="default"
+                    className="w-full"
+                    data-testid="button-apply-ai-recommendation"
+                  >
+                    Apply AI Recommendation
+                  </Button>
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                <Input
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  placeholder="Tell the AI about your goals..."
+                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
+                  data-testid="input-ai-chat"
+                />
+                <Button 
+                  onClick={sendMessage} 
+                  disabled={isLoading || !userInput.trim()}
+                  data-testid="button-send-ai-chat"
+                >
+                  {isLoading ? "..." : "Send"}
+                </Button>
+              </div>
             </div>
           )}
-          
-          {/* Manual Calorie Override */}
-          <div className="space-y-2">
-            <Label>Daily Calorie Target</Label>
-            <Input
-              type="number"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="2000"
-              data-testid="input-calorie-target"
-            />
-            {bmrResult && (
-              <p className="text-xs text-muted-foreground">
-                {parseInt(target) < bmrResult
-                  ? `${bmrResult - parseInt(target)} cal below BMR (aggressive)`
-                  : parseInt(target) === bmrResult
-                    ? 'Eating at BMR level'
-                    : `${parseInt(target) - bmrResult} cal above BMR`}
-              </p>
-            )}
-          </div>
         </div>
         
         <DialogFooter className="pt-4">
