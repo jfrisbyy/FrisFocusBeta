@@ -496,6 +496,9 @@ export const nutritionSettings = pgTable("nutrition_settings", {
   goalWeight: integer("goal_weight"), // target weight in lbs
   goalTimeframe: integer("goal_timeframe"), // weeks to reach goal
   bmr: integer("bmr"), // calculated BMR (basal metabolic rate)
+  // Pace and strategy preferences
+  goalPace: text("goal_pace").default("moderate"), // conservative, moderate, aggressive
+  strategyBias: text("strategy_bias").default("balanced"), // diet, balanced, activity
 });
 
 export const insertNutritionSettingsSchema = createInsertSchema(nutritionSettings).omit({ id: true });

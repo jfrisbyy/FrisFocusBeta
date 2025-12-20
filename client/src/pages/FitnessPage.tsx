@@ -4659,7 +4659,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   onOpenChange: (open: boolean) => void;
   isDemo: boolean;
   nutritionSettings: NutritionSettings;
-  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number }) => void;
+  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number; goalPace?: string; strategyBias?: string }) => void;
 }) {
   const { toast } = useToast();
   const [goalMode, setGoalMode] = useState(nutritionSettings.goalType || 'moderate_cut');
@@ -4679,6 +4679,10 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   // Goal weight and timeframe state
   const [goalWeight, setGoalWeight] = useState("");
   const [goalTimeframe, setGoalTimeframe] = useState("12");
+  
+  // Pace and strategy state
+  const [goalPace, setGoalPace] = useState<"conservative" | "moderate" | "aggressive">("moderate");
+  const [strategyBias, setStrategyBias] = useState<"diet" | "balanced" | "activity">("balanced");
   
   // AI Chat state
   const [showAIChat, setShowAIChat] = useState(false);
@@ -4720,6 +4724,10 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       // Pre-populate goal weight and timeframe
       setGoalWeight(nutritionSettings.goalWeight?.toString() || "");
       setGoalTimeframe(nutritionSettings.goalTimeframe?.toString() || "12");
+      
+      // Pre-populate pace and strategy
+      setGoalPace((nutritionSettings.goalPace as "conservative" | "moderate" | "aggressive") || "moderate");
+      setStrategyBias((nutritionSettings.strategyBias as "diet" | "balanced" | "activity") || "balanced");
       
       // If we have saved BMR data, recalculate the result
       if (nutritionSettings.weight && nutritionSettings.height && nutritionSettings.age) {
@@ -4866,8 +4874,32 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       goalWeight: goalWeight ? parseInt(goalWeight) : undefined,
       goalTimeframe: goalTimeframe ? parseInt(goalTimeframe) : undefined,
       bmr: bmrResult || undefined,
+      goalPace,
+      strategyBias,
     });
   };
+
+  // Calculate implied weekly rate for pace warnings
+  const impliedWeeklyRate = bmrData.weight && goalWeight && goalTimeframe
+    ? Math.abs((parseFloat(goalWeight) - parseFloat(bmrData.weight)) / parseInt(goalTimeframe))
+    : 0;
+  
+  // Get pace limits (lbs/week)
+  const paceLimits = {
+    conservative: 0.5,
+    moderate: 1.0,
+    aggressive: 1.5,
+  };
+  
+  // Check if pace exceeds safe limits
+  const isPaceTooAggressive = impliedWeeklyRate > paceLimits[goalPace];
+  const isVeryAggressive = impliedWeeklyRate > 2.0;
+  
+  // Calculate deficit for safety warnings
+  const dailyDeficitMagnitude = Math.abs(calculatedDeficit);
+  const isBelowBMR = bmrResult && parseInt(target) < bmrResult;
+  const isExcessiveDeficit = dailyDeficitMagnitude > 1000;
+  const isExcessiveSurplus = calculatedDeficit > 800;
 
   const goalOptions = [
     { value: 'aggressive_cut', label: 'Aggressive Cut', description: '-750 cal/day' },
@@ -5014,6 +5046,109 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Pace Control Section */}
+          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-4 w-4" />
+              <Label className="font-medium">Pace Control</Label>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Conservative</span>
+                <span>Moderate</span>
+                <span>Aggressive</span>
+              </div>
+              <div className="flex gap-2">
+                {(["conservative", "moderate", "aggressive"] as const).map((pace) => (
+                  <Button
+                    key={pace}
+                    type="button"
+                    variant={goalPace === pace ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setGoalPace(pace)}
+                    data-testid={`button-pace-${pace}`}
+                  >
+                    {pace === "conservative" && "~0.5 lb/wk"}
+                    {pace === "moderate" && "~1 lb/wk"}
+                    {pace === "aggressive" && "~1.5 lb/wk"}
+                  </Button>
+                ))}
+              </div>
+              {isPaceTooAggressive && impliedWeeklyRate > 0 && (
+                <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-md text-xs text-amber-600 dark:text-amber-400">
+                  <strong>Note:</strong> Your implied rate of {impliedWeeklyRate.toFixed(2)} lb/week exceeds the {goalPace} pace limit of {paceLimits[goalPace]} lb/week. Consider a longer timeframe or higher activity.
+                </div>
+              )}
+              {isVeryAggressive && (
+                <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-md text-xs text-red-600 dark:text-red-400">
+                  <strong>Warning:</strong> Losing more than 2 lbs/week is not recommended for most people. This may impact muscle retention and energy levels.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Strategy Bias Section */}
+          <div className="space-y-3 p-4 bg-muted/30 rounded-md">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-4 w-4" />
+              <Label className="font-medium">Strategy Bias</Label>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">
+              This affects expectations and messaging, not the math. Choose what fits your lifestyle.
+            </p>
+            <div className="flex gap-2">
+              {(["diet", "balanced", "activity"] as const).map((strategy) => (
+                <Button
+                  key={strategy}
+                  type="button"
+                  variant={strategyBias === strategy ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setStrategyBias(strategy)}
+                  data-testid={`button-strategy-${strategy}`}
+                >
+                  {strategy === "diet" && "Diet Focus"}
+                  {strategy === "balanced" && "Balanced"}
+                  {strategy === "activity" && "Activity Focus"}
+                </Button>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              {strategyBias === "diet" && "Larger food deficit, lower assumed activity. Best if you have limited time for exercise."}
+              {strategyBias === "balanced" && "Moderate food adjustment with moderate expected activity. A sustainable approach."}
+              {strategyBias === "activity" && "Higher daily calorie target, expects consistent logged movement. Best for active lifestyles."}
+            </div>
+          </div>
+
+          {/* Safety Warnings */}
+          {(isBelowBMR || isExcessiveDeficit || isExcessiveSurplus) && (
+            <div className="space-y-2">
+              {isBelowBMR && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm text-amber-600 dark:text-amber-400">
+                  <strong>Heads up:</strong> Your target is below your BMR ({bmrResult} cal). This is aggressive and may affect energy levels. Consider increasing activity to create a deficit instead.
+                </div>
+              )}
+              {isExcessiveDeficit && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-sm text-amber-600 dark:text-amber-400">
+                  <strong>Large deficit:</strong> A deficit over 1,000 cal/day may not be sustainable long-term. Consider a longer timeline or adding activity.
+                </div>
+              )}
+              {isExcessiveSurplus && (
+                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-md text-sm text-blue-600 dark:text-blue-400">
+                  <strong>Large surplus:</strong> A surplus over 800 cal/day may lead to faster fat gain. Consider a more moderate approach for lean gains.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Philosophy Message */}
+          <div className="p-3 bg-muted/20 rounded-md border-l-2 border-muted-foreground/30">
+            <p className="text-xs text-muted-foreground italic">
+              Your body burns calories at rest (BMR). Movement adds more. Your goal sets the direction. Your habits determine the speed.
+            </p>
           </div>
 
           {/* Goal Mode Section */}
