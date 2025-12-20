@@ -7,6 +7,7 @@ import {
   userMilestones,
   userDueDates,
   aiConversations,
+  workoutRoutines,
   type User,
   type UpsertUser,
   type Notification,
@@ -26,6 +27,8 @@ import {
   type AIConversation,
   type InsertAIConversation,
   type AIMessage,
+  type WorkoutRoutine,
+  type InsertWorkoutRoutine,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -68,6 +71,13 @@ export interface IStorage {
   createAIConversation(data: InsertAIConversation): Promise<AIConversation>;
   updateAIConversation(id: string, userId: string, data: { title?: string; messages?: AIMessage[] }): Promise<AIConversation | undefined>;
   deleteAIConversation(id: string, userId: string): Promise<boolean>;
+
+  // Workout Routines
+  getWorkoutRoutines(userId: string): Promise<WorkoutRoutine[]>;
+  getWorkoutRoutine(id: string, userId: string): Promise<WorkoutRoutine | undefined>;
+  createWorkoutRoutine(data: InsertWorkoutRoutine): Promise<WorkoutRoutine>;
+  updateWorkoutRoutine(id: string, userId: string, data: Partial<InsertWorkoutRoutine>): Promise<WorkoutRoutine | undefined>;
+  deleteWorkoutRoutine(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -542,6 +552,51 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(aiConversations)
       .where(and(eq(aiConversations.id, id), eq(aiConversations.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== WORKOUT ROUTINES ====================
+
+  async getWorkoutRoutines(userId: string): Promise<WorkoutRoutine[]> {
+    return db
+      .select()
+      .from(workoutRoutines)
+      .where(eq(workoutRoutines.userId, userId))
+      .orderBy(desc(workoutRoutines.createdAt));
+  }
+
+  async getWorkoutRoutine(id: string, userId: string): Promise<WorkoutRoutine | undefined> {
+    const [routine] = await db
+      .select()
+      .from(workoutRoutines)
+      .where(and(eq(workoutRoutines.id, id), eq(workoutRoutines.userId, userId)));
+    return routine;
+  }
+
+  async createWorkoutRoutine(data: InsertWorkoutRoutine): Promise<WorkoutRoutine> {
+    const [routine] = await db.insert(workoutRoutines).values(data).returning();
+    return routine;
+  }
+
+  async updateWorkoutRoutine(id: string, userId: string, data: Partial<InsertWorkoutRoutine>): Promise<WorkoutRoutine | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.exercises !== undefined) updateData.exercises = data.exercises;
+    
+    const [routine] = await db
+      .update(workoutRoutines)
+      .set(updateData)
+      .where(and(eq(workoutRoutines.id, id), eq(workoutRoutines.userId, userId)))
+      .returning();
+    return routine;
+  }
+
+  async deleteWorkoutRoutine(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(workoutRoutines)
+      .where(and(eq(workoutRoutines.id, id), eq(workoutRoutines.userId, userId)))
       .returning();
     return result.length > 0;
   }

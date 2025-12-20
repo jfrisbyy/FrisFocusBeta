@@ -432,6 +432,31 @@ export const insertDailyStepsSchema = createInsertSchema(dailySteps).omit({ id: 
 export type InsertDailySteps = z.infer<typeof insertDailyStepsSchema>;
 export type DailySteps = typeof dailySteps.$inferSelect;
 
+// Routine exercise schema (for workout routines)
+export const routineExerciseSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  sets: z.number().int().min(1),
+  reps: z.number().int().min(1),
+  notes: z.string().optional(),
+});
+export type RoutineExercise = z.infer<typeof routineExerciseSchema>;
+
+// Workout routine (saved workout templates like Push Day, Pull Day, etc.)
+export const workoutRoutines = pgTable("workout_routines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  exercises: jsonb("exercises").notNull(), // Array of RoutineExercise
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWorkoutRoutineSchema = createInsertSchema(workoutRoutines).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkoutRoutine = z.infer<typeof insertWorkoutRoutineSchema>;
+export type WorkoutRoutine = typeof workoutRoutines.$inferSelect;
+
 // Meal schema for nutrition logging
 export const mealSchema = z.object({
   id: z.string(),

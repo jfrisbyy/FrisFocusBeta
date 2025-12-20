@@ -13,17 +13,18 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Dumbbell, Utensils, Scale, Target, Trophy, Plus, Flame, Droplets, 
   TrendingUp, TrendingDown, Calendar, Clock, Activity, Camera, 
   Trash2, Edit, ChevronRight, ChevronLeft, Zap, Star, Award, Calculator, CheckCircle2, Footprints,
-  MessageCircle, MessageSquare, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle
+  MessageCircle, MessageSquare, Send, Sparkles, Check, Loader2, X, Pencil, HelpCircle, ChevronDown, ChevronUp
 } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { useDemo } from "@/contexts/DemoContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences, WorkoutRoutine, RoutineExercise } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
@@ -89,6 +90,154 @@ type ActiveTab = "overview" | "nutrition" | "sports" | "strength" | "body-comp";
 type SportsSubTab = "runs" | "drills" | "cardio";
 type ChartPeriod = "weekly" | "monthly";
 
+// RoutineForm component for creating/editing workout routines
+function RoutineForm({ initialData, onSave, onGenerate, isGenerating, isSaving }: {
+  initialData: WorkoutRoutine | null;
+  onSave: (data: { name: string; description?: string; exercises: RoutineExercise[] }) => void;
+  onGenerate: (goals: string) => void;
+  isGenerating: boolean;
+  isSaving: boolean;
+}) {
+  const [name, setName] = useState(initialData?.name || "");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [exercises, setExercises] = useState<RoutineExercise[]>(
+    (initialData?.exercises as RoutineExercise[]) || []
+  );
+  const [aiGoals, setAiGoals] = useState("");
+
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name || "");
+      setDescription(initialData.description || "");
+      setExercises((initialData.exercises as RoutineExercise[]) || []);
+    }
+  }, [initialData]);
+
+  const addExercise = () => {
+    setExercises([...exercises, { id: crypto.randomUUID(), name: "", sets: 3, reps: 10 }]);
+  };
+
+  const updateExercise = (index: number, field: keyof RoutineExercise, value: string | number) => {
+    const updated = [...exercises];
+    updated[index] = { ...updated[index], [field]: value };
+    setExercises(updated);
+  };
+
+  const removeExercise = (index: number) => {
+    setExercises(exercises.filter((_, i) => i !== index));
+  };
+
+  const handleSave = () => {
+    if (!name.trim()) return;
+    const validExercises = exercises.filter(ex => ex.name.trim());
+    onSave({ name: name.trim(), description: description.trim() || undefined, exercises: validExercises });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Routine Name</Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g., Push Day, Pull Day, Leg Day"
+          data-testid="input-routine-name"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Description (optional)</Label>
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Brief description of the routine"
+          className="resize-none"
+          rows={2}
+          data-testid="input-routine-description"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Exercises</Label>
+          <Button size="sm" variant="outline" onClick={addExercise} data-testid="button-add-exercise">
+            <Plus className="h-3 w-3 mr-1" /> Add
+          </Button>
+        </div>
+        {exercises.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">No exercises yet</p>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {exercises.map((ex, idx) => (
+              <div key={ex.id} className="flex items-center gap-2 p-2 rounded-md border bg-background/50">
+                <Input
+                  value={ex.name}
+                  onChange={(e) => updateExercise(idx, "name", e.target.value)}
+                  placeholder="Exercise name"
+                  className="flex-1"
+                  data-testid={`input-exercise-name-${idx}`}
+                />
+                <Input
+                  type="number"
+                  value={ex.sets}
+                  onChange={(e) => updateExercise(idx, "sets", parseInt(e.target.value) || 0)}
+                  placeholder="Sets"
+                  className="w-16"
+                  data-testid={`input-exercise-sets-${idx}`}
+                />
+                <span className="text-muted-foreground">x</span>
+                <Input
+                  type="number"
+                  value={ex.reps}
+                  onChange={(e) => updateExercise(idx, "reps", parseInt(e.target.value) || 0)}
+                  placeholder="Reps"
+                  className="w-16"
+                  data-testid={`input-exercise-reps-${idx}`}
+                />
+                <Button size="icon" variant="ghost" onClick={() => removeExercise(idx)} data-testid={`button-remove-exercise-${idx}`}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t pt-4 space-y-2">
+        <Label className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4" />
+          Generate with AI
+        </Label>
+        <div className="flex gap-2">
+          <Textarea
+            value={aiGoals}
+            onChange={(e) => setAiGoals(e.target.value)}
+            placeholder="Describe your goals: e.g., 'Build upper body strength, focus on chest and shoulders'"
+            className="resize-none flex-1"
+            rows={2}
+            data-testid="input-ai-routine-goals"
+          />
+          <Button
+            variant="secondary"
+            onClick={() => onGenerate(aiGoals)}
+            disabled={!aiGoals.trim() || isGenerating}
+            data-testid="button-generate-routine"
+          >
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button onClick={handleSave} disabled={!name.trim() || isSaving} data-testid="button-save-routine">
+          {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+          Save Routine
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function FitnessPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
@@ -128,6 +277,13 @@ export default function FitnessPage() {
   const [editingBodyComp, setEditingBodyComp] = useState<BodyComposition | null>(null);
   const [editingSteps, setEditingSteps] = useState<DailySteps | null>(null);
 
+  // Workout routines state
+  const [routinesExpanded, setRoutinesExpanded] = useState(true);
+  const [routineDialogOpen, setRoutineDialogOpen] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState<WorkoutRoutine | null>(null);
+  const [aiRoutineGenerating, setAiRoutineGenerating] = useState(false);
+  const [aiRoutineGoals, setAiRoutineGoals] = useState("");
+
   const { data: nutritionData = [], isLoading: loadingNutrition } = useQuery<NutritionLog[]>({
     queryKey: ["/api/fitness/nutrition"],
     enabled: !isDemo,
@@ -160,6 +316,11 @@ export default function FitnessPage() {
 
   const { data: stepsData = [], isLoading: loadingSteps } = useQuery<DailySteps[]>({
     queryKey: ["/api/fitness/steps"],
+    enabled: !isDemo,
+  });
+
+  const { data: routinesData = [], isLoading: loadingRoutines } = useQuery<WorkoutRoutine[]>({
+    queryKey: ["/api/fitness/routines"],
     enabled: !isDemo,
   });
 
@@ -232,6 +393,14 @@ export default function FitnessPage() {
   const runs = isDemo ? mockRuns : runsData;
   const cardioRuns = isDemo ? mockCardioRuns : cardioData;
   const steps = isDemo ? [] : stepsData;
+  
+  // Demo workout routines
+  const mockRoutines: WorkoutRoutine[] = [
+    { id: "demo-1", userId: "demo", name: "Push Day", description: "Chest, shoulders, triceps", exercises: [{ id: "1", name: "Bench Press", sets: 4, reps: 8 }, { id: "2", name: "Shoulder Press", sets: 3, reps: 10 }, { id: "3", name: "Tricep Pushdowns", sets: 3, reps: 12 }], createdAt: new Date(), updatedAt: new Date() },
+    { id: "demo-2", userId: "demo", name: "Pull Day", description: "Back and biceps", exercises: [{ id: "1", name: "Deadlift", sets: 4, reps: 6 }, { id: "2", name: "Pull-ups", sets: 4, reps: 10 }, { id: "3", name: "Barbell Rows", sets: 3, reps: 10 }], createdAt: new Date(), updatedAt: new Date() },
+    { id: "demo-3", userId: "demo", name: "Leg Day", description: "Quads, hamstrings, glutes", exercises: [{ id: "1", name: "Squat", sets: 5, reps: 5 }, { id: "2", name: "Romanian Deadlift", sets: 4, reps: 8 }, { id: "3", name: "Leg Press", sets: 3, reps: 12 }], createdAt: new Date(), updatedAt: new Date() },
+  ];
+  const routines = isDemo ? mockRoutines : routinesData;
 
   const isLoading = !isDemo && (loadingNutrition || loadingBody || loadingStrength || loadingSkills || loadingRuns || loadingCardio || loadingSteps);
 
@@ -409,6 +578,75 @@ export default function FitnessPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/body-comp"] });
       toast({ title: "Record deleted" });
+    },
+  });
+
+  // Workout routine mutations
+  const createRoutineMutation = useMutation({
+    mutationFn: async (data: { name: string; description?: string; exercises: RoutineExercise[] }) => {
+      const res = await apiRequest("POST", "/api/fitness/routines", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/routines"] });
+      toast({ title: "Routine created" });
+      setRoutineDialogOpen(false);
+      setEditingRoutine(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to create routine", variant: "destructive" });
+    },
+  });
+
+  const updateRoutineMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name: string; description?: string; exercises: RoutineExercise[] } }) => {
+      const res = await apiRequest("PUT", `/api/fitness/routines/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/routines"] });
+      toast({ title: "Routine updated" });
+      setRoutineDialogOpen(false);
+      setEditingRoutine(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to update routine", variant: "destructive" });
+    },
+  });
+
+  const deleteRoutineMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/fitness/routines/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/routines"] });
+      toast({ title: "Routine deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete routine", variant: "destructive" });
+    },
+  });
+
+  const generateRoutineMutation = useMutation({
+    mutationFn: async (goals: string) => {
+      const res = await apiRequest("POST", "/api/fitness/routines/generate", { goals });
+      return res.json();
+    },
+    onSuccess: (data: { name: string; description: string; exercises: RoutineExercise[] }) => {
+      setEditingRoutine({
+        id: "",
+        userId: "",
+        name: data.name,
+        description: data.description,
+        exercises: data.exercises,
+        createdAt: null,
+        updatedAt: null,
+      });
+      setAiRoutineGoals("");
+      toast({ title: "Routine generated! Review and save." });
+    },
+    onError: () => {
+      toast({ title: "Failed to generate routine", variant: "destructive" });
     },
   });
 
@@ -1768,7 +2006,7 @@ export default function FitnessPage() {
         {/* SPORTS TAB */}
         <TabsContent value="sports" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Basketball Training</h2>
+            <h2 className="text-xl font-semibold">Sports Session</h2>
           </div>
 
           <Tabs value={sportsSubTab} onValueChange={(v) => setSportsSubTab(v as SportsSubTab)}>
@@ -2092,6 +2330,148 @@ export default function FitnessPage() {
               Log Workout
             </Button>
           </div>
+
+          {/* My Routines Collapsible Section */}
+          <Collapsible open={routinesExpanded} onOpenChange={setRoutinesExpanded}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="pb-3 cursor-pointer hover-elevate">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4" />
+                      My Workout Routines
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{routines.length}</Badge>
+                      {routinesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </div>
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-4">
+                  {routines.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No routines saved yet. Create your first workout routine!
+                    </p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {routines.map((routine) => (
+                        <div
+                          key={routine.id}
+                          className="p-3 rounded-md border bg-background/50 hover-elevate"
+                          data-testid={`routine-card-${routine.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <h4 className="font-medium text-sm">{routine.name}</h4>
+                              {routine.description && (
+                                <p className="text-xs text-muted-foreground">{routine.description}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingRoutine(routine);
+                                  setRoutineDialogOpen(true);
+                                }}
+                                data-testid={`button-edit-routine-${routine.id}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-destructive"
+                                onClick={() => {
+                                  if (!isDemo) deleteRoutineMutation.mutate(routine.id);
+                                  else toast({ title: "Demo mode - cannot delete" });
+                                }}
+                                data-testid={`button-delete-routine-${routine.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            {(routine.exercises as RoutineExercise[]).slice(0, 3).map((ex, idx) => (
+                              <div key={ex.id || idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                                <span className="font-medium">{ex.name}</span>
+                                <span>{ex.sets}x{ex.reps}</span>
+                              </div>
+                            ))}
+                            {(routine.exercises as RoutineExercise[]).length > 3 && (
+                              <p className="text-xs text-muted-foreground">
+                                +{(routine.exercises as RoutineExercise[]).length - 3} more
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingRoutine(null);
+                        setRoutineDialogOpen(true);
+                      }}
+                      data-testid="button-add-routine"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Routine
+                    </Button>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* Routine Dialog */}
+          <Dialog open={routineDialogOpen} onOpenChange={(open) => {
+            setRoutineDialogOpen(open);
+            if (!open) {
+              setEditingRoutine(null);
+              setAiRoutineGoals("");
+            }
+          }}>
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingRoutine?.id ? "Edit Routine" : "Create Routine"}</DialogTitle>
+                <DialogDescription>
+                  Build a workout routine with exercises, sets, and reps.
+                </DialogDescription>
+              </DialogHeader>
+              <RoutineForm
+                initialData={editingRoutine}
+                onSave={(data) => {
+                  if (isDemo) {
+                    toast({ title: "Demo mode - cannot save" });
+                    return;
+                  }
+                  if (editingRoutine?.id) {
+                    updateRoutineMutation.mutate({ id: editingRoutine.id, data });
+                  } else {
+                    createRoutineMutation.mutate(data);
+                  }
+                }}
+                onGenerate={(goals) => {
+                  if (isDemo) {
+                    toast({ title: "Demo mode - AI not available" });
+                    return;
+                  }
+                  generateRoutineMutation.mutate(goals);
+                }}
+                isGenerating={generateRoutineMutation.isPending}
+                isSaving={createRoutineMutation.isPending || updateRoutineMutation.isPending}
+              />
+            </DialogContent>
+          </Dialog>
 
           <div className="grid gap-4 md:grid-cols-3">
             <Card>

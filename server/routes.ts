@@ -1615,6 +1615,106 @@ Be encouraging and realistic. Help them understand what's achievable.`;
     }
   });
 
+  // ==================== WORKOUT ROUTINES (Protected) ====================
+
+  app.get("/api/fitness/routines", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const routines = await storage.getWorkoutRoutines(userId);
+      res.json(routines);
+    } catch (error) {
+      console.error("Error fetching workout routines:", error);
+      res.status(500).json({ error: "Failed to fetch workout routines" });
+    }
+  });
+
+  app.post("/api/fitness/routines", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description, exercises } = req.body;
+      const routine = await storage.createWorkoutRoutine({
+        userId,
+        name,
+        description,
+        exercises,
+      });
+      res.json(routine);
+    } catch (error) {
+      console.error("Error creating workout routine:", error);
+      res.status(400).json({ error: "Failed to create workout routine" });
+    }
+  });
+
+  app.put("/api/fitness/routines/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { name, description, exercises } = req.body;
+      const updated = await storage.updateWorkoutRoutine(id, userId, { name, description, exercises });
+      if (!updated) return res.status(404).json({ error: "Routine not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating workout routine:", error);
+      res.status(400).json({ error: "Failed to update workout routine" });
+    }
+  });
+
+  app.delete("/api/fitness/routines/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteWorkoutRoutine(id, userId);
+      if (!deleted) return res.status(404).json({ error: "Routine not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting workout routine:", error);
+      res.status(400).json({ error: "Failed to delete workout routine" });
+    }
+  });
+
+  // AI Routine Generation
+  app.post("/api/fitness/routines/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { goals } = req.body;
+      
+      if (!goals || typeof goals !== "string") {
+        return res.status(400).json({ error: "Goals description is required" });
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional fitness coach creating workout routines. Generate personalized workout splits based on user goals. Return a JSON array of routines, where each routine has:
+- name: string (e.g., "Push Day", "Pull Day", "Leg Day")
+- description: string (brief description of the routine's focus)
+- exercises: array of { id: string (unique), name: string, sets: number, reps: number, notes?: string }
+
+Create 3-5 balanced routines that form a complete workout split. Be specific with exercise names and provide appropriate sets/reps for the goal.`
+          },
+          {
+            role: "user",
+            content: `Create a personalized workout split for these goals: ${goals}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+      });
+
+      const content = completion.choices[0].message.content;
+      if (!content) {
+        return res.status(500).json({ error: "Failed to generate routines" });
+      }
+
+      const parsed = JSON.parse(content);
+      res.json(parsed.routines || parsed);
+    } catch (error) {
+      console.error("Error generating workout routines:", error);
+      res.status(500).json({ error: "Failed to generate workout routines" });
+    }
+  });
+
   // ==================== AI ROUTES (Protected) ====================
 
   app.post("/api/ai/insights", isAuthenticated, async (req: any, res) => {
