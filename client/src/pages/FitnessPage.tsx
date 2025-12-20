@@ -5310,9 +5310,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             
             {(() => {
               const strategies = {
-                diet: { steps: 8000, strength: "2-3x/week", deficitPct: 0.85, activityMult: 1.3 },
-                balanced: { steps: 10000, strength: "3-4x/week", deficitPct: 0.65, activityMult: 1.45 },
-                activity: { steps: 12000, strength: "4-5x/week", deficitPct: 0.45, activityMult: 1.6 },
+                diet: { steps: 8000, strengthSessions: 2.5, strength: "2-3x/week", deficitPct: 0.85, activityMult: 1.3 },
+                balanced: { steps: 10000, strengthSessions: 3.5, strength: "3-4x/week", deficitPct: 0.65, activityMult: 1.45 },
+                activity: { steps: 12000, strengthSessions: 4.5, strength: "4-5x/week", deficitPct: 0.45, activityMult: 1.6 },
               };
               const config = strategies[strategyBias];
               const tdee = Math.round(bmrResult * config.activityMult);
@@ -5322,6 +5322,13 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
               const proteinTarget = Math.round(weightKg * 1.8);
               
+              // Calorie burn estimates (informational)
+              const stepsCaloriesBurned = Math.round(config.steps * 0.04); // ~0.04 cal per step
+              const strengthCaloriesPerSession = 250; // avg calories per strength session
+              // Thermic effect of protein: ~25% of protein calories
+              const proteinCalories = proteinTarget * 4;
+              const proteinThermicEffect = Math.round(proteinCalories * 0.25);
+              
               return (
                 <div className="mt-4 space-y-3">
                   <div className="text-sm font-medium">Recommendations</div>
@@ -5329,14 +5336,17 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Daily Steps</div>
                       <div className="font-bold">{config.steps.toLocaleString()}</div>
+                      <div className="text-xs text-green-500">~{stepsCaloriesBurned} cal burned</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Strength Training</div>
                       <div className="font-bold">{config.strength}</div>
+                      <div className="text-xs text-green-500">~{strengthCaloriesPerSession} cal/session</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Protein</div>
                       <div className="font-bold">{proteinTarget}g</div>
+                      <div className="text-xs text-green-500">~{proteinThermicEffect} cal TEF</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Daily Calories</div>
