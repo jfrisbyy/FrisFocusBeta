@@ -333,6 +333,7 @@ export const bodyComposition = pgTable("body_composition", {
   goalWeight: integer("goal_weight"),
   nextMilestone: integer("next_milestone"),
   photoUrl: text("photo_url"),
+  notes: text("notes"),
 });
 
 export const insertBodyCompositionSchema = createInsertSchema(bodyComposition).omit({ id: true });
