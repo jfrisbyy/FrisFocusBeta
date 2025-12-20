@@ -517,6 +517,7 @@ export interface StoredCircle {
   weeklyPointGoal?: number;
   isPrivate?: boolean;
   inviteCode?: string;
+  userRole?: "owner" | "admin" | "member" | null;
 }
 
 export interface StoredCircleMember {
