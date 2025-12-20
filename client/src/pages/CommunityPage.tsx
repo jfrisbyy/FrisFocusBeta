@@ -2758,6 +2758,11 @@ export default function CommunityPage() {
         
         const data = await res.json();
         
+        // Update selectedCircle with userRole from API response
+        if (data.userRole !== undefined) {
+          setSelectedCircle(prev => prev ? { ...prev, userRole: data.userRole } : prev);
+        }
+        
         // Update circle members from API response
         if (data.members && Array.isArray(data.members)) {
           const membersForState: StoredCircleMember[] = data.members.map((m: any) => ({
