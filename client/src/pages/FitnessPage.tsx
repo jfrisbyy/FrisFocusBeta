@@ -4690,6 +4690,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   const [goalPace, setGoalPace] = useState<"conservative" | "moderate" | "aggressive">("moderate");
   const [strategyBias, setStrategyBias] = useState<"diet" | "balanced" | "activity">("balanced");
   const [activityLevel, setActivityLevel] = useState<"sedentary" | "lightly_active" | "moderately_active" | "very_active">("lightly_active");
+  const [activityWillingness, setActivityWillingness] = useState<"minimal" | "moderate" | "very_active">("moderate");
   
   // AI Chat state
   const [showAIChat, setShowAIChat] = useState(false);
@@ -5274,10 +5275,10 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   <Button
                     key={level}
                     type="button"
-                    variant={activityLevel === level ? "default" : "outline"}
+                    variant={activityWillingness === level ? "default" : "outline"}
                     size="sm"
                     className="flex-1"
-                    onClick={() => setActivityLevel(level)}
+                    onClick={() => setActivityWillingness(level)}
                     data-testid={`button-lose-activity-${level}`}
                   >
                     {level === "minimal" && "Minimal"}
@@ -5287,9 +5288,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                {activityLevel === "minimal" && "Up to 8k steps, 2x strength/week"}
-                {activityLevel === "moderate" && "Up to 12k steps, 4x strength/week"}
-                {activityLevel === "very_active" && "Up to 20k steps, 6x strength/week"}
+                {activityWillingness === "minimal" && "Up to 8k steps, 2x strength/week"}
+                {activityWillingness === "moderate" && "Up to 12k steps, 4x strength/week"}
+                {activityWillingness === "very_active" && "Up to 20k steps, 6x strength/week"}
               </p>
             </div>
 
@@ -5353,7 +5354,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const requiredDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
               const gender = bmrData.gender || "male";
-              const caps = activityCaps[activityLevel] || activityCaps.moderate;
+              const caps = activityCaps[activityWillingness] || activityCaps.moderate;
               const distribution = strategyDistribution[strategyBias];
               
               // === SAFETY FLOORS ===
