@@ -1138,19 +1138,17 @@ export default function FitnessPage() {
                     Weekly
                   </Button>
                   <Button 
-                    type="button"
                     size="icon" 
                     variant="ghost"
-                    onClick={(e) => { e.stopPropagation(); setStepsDialogOpen(true); }}
+                    onClick={() => setStepsDialogOpen(true)}
                     data-testid="button-add-steps"
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                   <Button 
-                    type="button"
                     size="icon" 
                     variant="ghost"
-                    onClick={(e) => { e.stopPropagation(); setStepGoalSettingsOpen(true); }}
+                    onClick={() => setStepGoalSettingsOpen(true)}
                     data-testid="button-step-goal-settings"
                   >
                     <Settings className="h-4 w-4" />
