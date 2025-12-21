@@ -4634,7 +4634,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   onOpenChange: (open: boolean) => void;
   isDemo: boolean;
   nutritionSettings: NutritionSettings;
-  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number; goalPace?: string; strategyBias?: string; stepGoal?: number }) => void;
+  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number; goalPace?: string; strategyBias?: string; stepGoal?: number; proteinTarget?: number; strengthSessionsPerWeek?: number }) => void;
 }) {
   const { toast } = useToast();
   const [goalMode, setGoalMode] = useState(nutritionSettings.goalType || 'moderate_cut');
@@ -4944,6 +4944,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       goalPace,
       strategyBias,
       stepGoal: computedPlan?.steps || undefined,
+      proteinTarget: computedPlan?.proteinTarget || undefined,
+      strengthSessionsPerWeek: strategyBias === 'activity' ? 5 : strategyBias === 'balanced' ? 4 : 3,
     });
   };
 
