@@ -5375,20 +5375,24 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const maxStrengthBurnDaily = Math.round((caps.maxStrength * CAL_PER_STRENGTH_SESSION) / 7);
               const maxActivityBurn = maxStepsBurn + maxStrengthBurnDaily;
               
-              // === STEP 2: APPLY STRATEGY BIAS ===
-              // Strategy determines what percentage of deficit comes from food vs activity
-              // Diet Focus (70% food): prioritize eating less, minimal activity increase
+              // === STEP 2: DETERMINE ACHIEVABLE DEFICIT AND APPLY STRATEGY ===
+              // First, check if the goal is achievable within safety constraints
+              const maxAchievableDeficit = maxFoodDeficit + maxActivityBurn;
+              const effectiveDeficit = Math.min(requiredDeficit, maxAchievableDeficit);
+              
+              // Now apply strategy bias to the EFFECTIVE (achievable) deficit
+              // Diet Focus (70% food): prioritize eating less, minimal activity
               // Activity Focus (35% food): eat more, burn more through movement
               // Balanced (50% food): split evenly
               
-              // Target food deficit based on strategy
-              const targetFoodDeficit = Math.round(requiredDeficit * foodPct);
+              // Calculate food deficit based on strategy
+              let targetFoodDeficit = Math.round(effectiveDeficit * foodPct);
               
-              // Cap at safety maximum (can't go below minCalories)
+              // Cap at safety maximum
               const actualFoodDeficit = Math.min(targetFoodDeficit, maxFoodDeficit);
               
-              // Activity must cover the rest
-              const neededActivityDeficit = requiredDeficit - actualFoodDeficit;
+              // Activity covers the rest of the effective deficit
+              const neededActivityDeficit = effectiveDeficit - actualFoodDeficit;
               
               // === STEP 3: ALLOCATE ACTIVITY TO STEPS AND STRENGTH ===
               // Allocate based on what's actually needed, not forcing minimums
