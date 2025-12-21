@@ -1508,14 +1508,6 @@ export default function FitnessPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-xl font-semibold">Nutrition Tracking</h2>
             <div className="flex items-center gap-2">
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                onClick={() => setCalculatorDialogOpen(true)}
-                data-testid="button-tdee-calculator"
-              >
-                <Calculator className="h-4 w-4" />
-              </Button>
               <NutritionDialog 
                 open={nutritionDialogOpen} 
                 onOpenChange={(open) => {
@@ -1681,6 +1673,7 @@ export default function FitnessPage() {
             const targetCalories = nutritionSettings.calorieTarget || eatTarget;
             const strategyLabel = nutritionSettings.strategyBias === 'diet' ? 'diet-focused' : nutritionSettings.strategyBias === 'activity' ? 'activity-focused' : 'balanced';
             const stepGoal = nutritionSettings.stepGoal || 10000;
+            const strengthSessions = nutritionSettings.strengthSessionsPerWeek || 3;
             
             return (
               <Card className="border-dashed">
@@ -1704,7 +1697,7 @@ export default function FitnessPage() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground text-center mt-3">
-                    With your <span className="font-medium text-foreground">{strategyLabel}</span> approach, hit your activity goal ({stepGoal.toLocaleString()} steps/day) to eat these calories.
+                    With your <span className="font-medium text-foreground">{strategyLabel}</span> approach, hit your activity target ({stepGoal.toLocaleString()} steps/day, {strengthSessions} strength sessions/week) to eat these calories and hit your weight goal on time.
                   </p>
                   {!nutritionSettings.calorieTarget && (
                     <p className="text-xs text-muted-foreground text-center mt-2">
