@@ -1701,7 +1701,7 @@ export default function FitnessPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className={`text-center p-3 rounded-md ${isDeficit ? 'bg-green-500/10' : isSurplus ? 'bg-blue-500/10' : 'bg-muted/30'}`}>
                       <div className={`text-xl font-bold font-mono ${isDeficit ? 'text-green-500' : isSurplus ? 'text-blue-500' : ''}`}>
                         {targetCalories.toLocaleString()}
@@ -1709,25 +1709,12 @@ export default function FitnessPage() {
                       <div className="text-xs text-muted-foreground">Target Calories</div>
                     </div>
                     <div className="text-center p-3 bg-muted/30 rounded-md">
-                      <div className="text-lg font-bold font-mono text-orange-500">+{totalActivityCalories.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Activity Burned</div>
-                      {totalActivityCalories > 0 && (
-                        <div className="text-[10px] text-muted-foreground mt-1">
-                          {stepCalories > 0 && <span className="mr-1">Steps: {stepCalories}</span>}
-                          {strengthCalories > 0 && <span className="mr-1">Gym: {strengthCalories}</span>}
-                          {cardioCalories > 0 && <span className="mr-1">Cardio: {cardioCalories}</span>}
-                          {basketballCalories > 0 && <span className="mr-1">Runs: {basketballCalories}</span>}
-                          {drillCalories > 0 && <span>Drills: {drillCalories}</span>}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-center p-3 bg-muted/30 rounded-md">
-                      <div className="text-lg font-bold font-mono">{totalBurn.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Total Burn</div>
+                      <div className="text-xl font-bold font-mono">{nutritionSettings.proteinTarget || 150}g</div>
+                      <div className="text-xs text-muted-foreground">Target Protein</div>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground text-center mt-3">
-                    With your <span className="font-medium text-foreground">{strategyLabel}</span> focus, as long as you meet your activity goal ({stepGoal.toLocaleString()} steps), you can eat this amount of calories.
+                    With your <span className="font-medium text-foreground">{strategyLabel}</span> approach, hit your activity goal ({stepGoal.toLocaleString()} steps/day) to eat these calories.
                   </p>
                   {!nutritionSettings.calorieTarget && (
                     <p className="text-xs text-muted-foreground text-center mt-2">
@@ -3439,11 +3426,11 @@ export default function FitnessPage() {
                 <CardTitle className="text-sm">Goal Progress</CardTitle>
               </CardHeader>
               <CardContent>
-                {latestWeight?.goalWeight && latestWeight?.weight ? (() => {
+                {nutritionSettings.goalWeight && latestWeight?.weight ? (() => {
                   const sortedByDate = [...bodyComp].sort((a, b) => a.date.localeCompare(b.date));
                   const startWeight = sortedByDate[0]?.weight || latestWeight.weight;
                   const currentWeight = latestWeight.weight;
-                  const goalWeight = latestWeight.goalWeight;
+                  const goalWeight = nutritionSettings.goalWeight;
                   const totalToLose = Math.abs(startWeight - goalWeight);
                   const lost = Math.abs(startWeight - currentWeight);
                   const remaining = Math.abs(currentWeight - goalWeight);
@@ -3470,7 +3457,7 @@ export default function FitnessPage() {
                     </>
                   );
                 })() : (
-                  <p className="text-muted-foreground text-sm">Set a goal weight to track</p>
+                  <p className="text-muted-foreground text-sm">Set a goal weight in Goal Settings</p>
                 )}
               </CardContent>
             </Card>
@@ -7492,7 +7479,6 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     date: format(new Date(), "yyyy-MM-dd"),
     weight: "",
     bodyFat: "",
-    goalWeight: "",
     notes: "",
   });
 
@@ -7504,11 +7490,10 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
         date: editData.date,
         weight: editData.weight?.toString() || "",
         bodyFat: editData.bodyFat?.toString() || "",
-        goalWeight: editData.goalWeight?.toString() || "",
         notes: editData.notes || "",
       });
     } else {
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "", notes: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", notes: "" });
     }
   }, [editData]);
 
@@ -7521,7 +7506,7 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/body-comp"] });
       toast({ title: "Body composition logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", goalWeight: "", notes: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), weight: "", bodyFat: "", notes: "" });
     },
     onError: () => {
       toast({ title: "Failed to log body composition", variant: "destructive" });
@@ -7538,7 +7523,6 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       date: formData.date,
       weight: formData.weight ? parseInt(formData.weight) : undefined,
       bodyFat: formData.bodyFat ? parseInt(formData.bodyFat) : undefined,
-      goalWeight: formData.goalWeight ? parseInt(formData.goalWeight) : undefined,
       notes: formData.notes || undefined,
     };
     if (isEditing && editData && onEdit) {
@@ -7569,10 +7553,6 @@ function BodyCompDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
               <Label>Body Fat (%)</Label>
               <Input type="number" placeholder="15" value={formData.bodyFat} onChange={(e) => setFormData({ ...formData, bodyFat: e.target.value })} data-testid="input-body-fat" />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Goal Weight (lbs)</Label>
-            <Input type="number" placeholder="180" value={formData.goalWeight} onChange={(e) => setFormData({ ...formData, goalWeight: e.target.value })} data-testid="input-body-goal" />
           </div>
           <div className="space-y-2">
             <Label>Notes (optional)</Label>
