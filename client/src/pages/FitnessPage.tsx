@@ -5296,22 +5296,22 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               // === CONSTANTS ===
               const CAL_PER_STEP = 0.04;
               const CAL_PER_STRENGTH_SESSION = 250;
-              const MAX_STRENGTH = 6; // Hard cap at 6x/week
               const PROTEIN_TEF_RATE = 0.25;
               
-              // Strategy bias: what percentage of deficit comes from food
-              const strategyFoodPct = {
-                diet: 0.70,      // Diet Focus: 70% from food, 30% from activity
-                balanced: 0.50, // Balanced: 50/50 split
-                activity: 0.35, // Activity Focus: 35% from food, 65% from activity
+              // Strategy presets (fixed activity levels, food makes up the remainder)
+              const strategyPresets = {
+                diet: { steps: 5500, strength: 2, stepsRange: "3k-8k", strengthRange: "1-2" },
+                balanced: { steps: 10500, strength: 3, stepsRange: "8k-13k", strengthRange: "2-4" },
+                activity: { steps: 15000, strength: 5, stepsRange: "13k+", strengthRange: "3-6" },
               };
               
               // === INPUTS ===
               const bmr = bmrResult ?? 0;
-              const requiredDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
+              const requiredDailyDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
+              const requiredWeeklyDeficit = requiredDailyDeficit * 7;
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
               const gender = bmrData.gender || "male";
-              const foodPct = strategyFoodPct[strategyBias];
+              const preset = strategyPresets[strategyBias];
               
               // === SAFETY FLOOR (never go below) ===
               const minCalories = gender === "female" ? 1200 : 1500;
@@ -5321,42 +5321,24 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const proteinCalories = proteinTarget * 4;
               const proteinTEF = Math.round(proteinCalories * PROTEIN_TEF_RATE);
               
-              // === STEP 1: Calculate max food deficit allowed by safety ===
-              const maxFoodDeficit = Math.max(0, bmr - minCalories);
+              // === WEEKLY ACTIVITY BURN (fixed by strategy) ===
+              const stepsBurnWeekly = Math.round(preset.steps * 7 * CAL_PER_STEP);
+              const strengthBurnWeekly = preset.strength * CAL_PER_STRENGTH_SESSION;
+              const activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
               
-              // === STEP 2: Apply strategy bias to determine food deficit ===
-              const targetFoodDeficit = Math.round(requiredDeficit * foodPct);
-              const actualFoodDeficit = Math.min(targetFoodDeficit, maxFoodDeficit);
+              // === FOOD DEFICIT (remainder after activity) ===
+              const foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+              const foodDeficitDaily = Math.round(foodDeficitWeekly / 7);
               
-              // === STEP 3: Activity must cover the rest ===
-              const activityDeficit = requiredDeficit - actualFoodDeficit;
+              // === FINAL DAILY CALORIES ===
+              const rawDailyCalories = bmr - foodDeficitDaily;
+              const finalDailyCalories = Math.max(minCalories, Math.round(rawDailyCalories));
+              const hitSafetyFloor = rawDailyCalories < minCalories;
               
-              // === STEP 4: Allocate activity - strength first (max 6), then unlimited steps ===
-              let finalStrength = 0;
-              let strengthBurnDaily = 0;
-              
-              if (activityDeficit > 0) {
-                // Use strength training first (up to 6x/week)
-                const maxStrengthBurnDaily = (MAX_STRENGTH * CAL_PER_STRENGTH_SESSION) / 7;
-                const strengthNeeded = Math.min(activityDeficit, maxStrengthBurnDaily);
-                finalStrength = Math.min(MAX_STRENGTH, Math.ceil((strengthNeeded * 7) / CAL_PER_STRENGTH_SESSION));
-                strengthBurnDaily = Math.round((finalStrength * CAL_PER_STRENGTH_SESSION) / 7);
-              }
-              
-              // Remaining activity deficit comes from steps (unlimited)
-              const remainingActivityDeficit = Math.max(0, activityDeficit - strengthBurnDaily);
-              const finalSteps = Math.ceil(remainingActivityDeficit / CAL_PER_STEP);
-              const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
-              
-              // === FINAL VALUES ===
-              const finalActivityDeficit = stepsBurn + strengthBurnDaily;
-              const finalFoodDeficit = requiredDeficit - finalActivityDeficit;
-              const finalDailyCalories = Math.max(minCalories, Math.round(bmr - finalFoodDeficit));
-              
-              // Format strength for display
-              const strengthDisplay = finalStrength === 0 ? "0x/week" :
-                                      finalStrength === 1 ? "1x/week" : 
-                                      `${finalStrength}x/week`;
+              // === DISPLAY VALUES ===
+              const finalSteps = preset.steps;
+              const finalStrength = preset.strength;
+              const strengthDisplay = `${finalStrength}x/week`;
               
               return (
                 <div className="mt-4 space-y-3">
@@ -5370,12 +5352,12 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Daily Steps</div>
                       <div className="text-xl font-bold">{finalSteps.toLocaleString()}</div>
-                      <div className="text-xs text-green-500">~{stepsBurn} cal</div>
+                      <div className="text-xs text-muted-foreground">{preset.stepsRange} range</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Strength Training</div>
                       <div className="text-xl font-bold">{strengthDisplay}</div>
-                      <div className="text-xs text-green-500">~{Math.round(finalStrength * CAL_PER_STRENGTH_SESSION)} cal/week</div>
+                      <div className="text-xs text-muted-foreground">{preset.strengthRange} days</div>
                     </div>
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Protein Target</div>
@@ -5384,19 +5366,30 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     </div>
                   </div>
                   
-                  {/* Deficit breakdown */}
+                  {/* Weekly Deficit breakdown */}
                   <div className="p-2 bg-background rounded-md border">
-                    <div className="text-xs text-muted-foreground mb-1">Deficit Breakdown</div>
+                    <div className="text-xs text-muted-foreground mb-1">Weekly Deficit Breakdown</div>
                     <div className="flex items-center gap-2 text-sm flex-wrap">
-                      <span className="font-medium">{finalActivityDeficit} cal</span>
+                      <span className="font-medium">{activityBurnWeekly.toLocaleString()} cal</span>
                       <span className="text-muted-foreground">activity</span>
                       <span className="text-muted-foreground">+</span>
-                      <span className="font-medium">{finalFoodDeficit} cal</span>
+                      <span className="font-medium">{Math.max(0, foodDeficitWeekly).toLocaleString()} cal</span>
                       <span className="text-muted-foreground">food</span>
                       <span className="text-muted-foreground">=</span>
-                      <span className="font-bold text-green-500">{requiredDeficit} cal</span>
+                      <span className="font-bold text-green-500">{requiredWeeklyDeficit.toLocaleString()} cal/week</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Steps: {stepsBurnWeekly.toLocaleString()} cal + Strength: {strengthBurnWeekly.toLocaleString()} cal
                     </div>
                   </div>
+                  
+                  {hitSafetyFloor && (
+                    <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-md">
+                      <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                        Your goal requires eating below the safety minimum. Consider extending your timeframe or choosing a more active strategy.
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
