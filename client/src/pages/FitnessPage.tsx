@@ -4679,6 +4679,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     calorieTarget: number;
     maintenanceCalories: number;
     proteinTarget: number;
+    stepGoal?: number;
+    strengthSessionsPerWeek?: number;
+    strategyBias?: "diet" | "balanced" | "activity";
     explanation: string;
     weeklyChangeEstimate: string;
   } | null>(null);
@@ -5494,21 +5497,41 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               
               {aiRecommendation && (
                 <div className="p-3 bg-background rounded-md border space-y-2">
-                  <div className="text-sm font-medium">AI Recommendation</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">AI Recommendation</div>
+                    {aiRecommendation.strategyBias && (
+                      <Badge variant="secondary" className="text-xs">
+                        {aiRecommendation.strategyBias === 'activity' ? 'Activity-Focused' : 
+                         aiRecommendation.strategyBias === 'diet' ? 'Diet-Focused' : 'Balanced'}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <div className="text-xs text-muted-foreground">Calories</div>
-                      <div className="font-bold">{aiRecommendation.calorieTarget}</div>
+                      <div className="text-xs text-muted-foreground">Daily Calories</div>
+                      <div className="font-bold">{aiRecommendation.calorieTarget?.toLocaleString()}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Protein</div>
+                      <div className="text-xs text-muted-foreground">Protein Target</div>
                       <div className="font-bold">{aiRecommendation.proteinTarget}g</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Daily Steps</div>
+                      <div className="font-bold">{aiRecommendation.stepGoal?.toLocaleString() || '--'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Strength Training</div>
+                      <div className="font-bold">{aiRecommendation.strengthSessionsPerWeek || '--'}x/week</div>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
+                  <p className="text-xs font-medium">{aiRecommendation.weeklyChangeEstimate}</p>
                   <Button 
                     onClick={() => {
                       setTarget(aiRecommendation.calorieTarget.toString());
+                      if (aiRecommendation.strategyBias) {
+                        setStrategyBias(aiRecommendation.strategyBias);
+                      }
                       setShowAIChat(false);
                     }}
                     variant="default"
