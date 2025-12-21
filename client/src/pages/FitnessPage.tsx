@@ -5298,11 +5298,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const CAL_PER_STRENGTH_SESSION = 250;
               const PROTEIN_TEF_RATE = 0.25;
               
-              // Strategy presets (fixed activity levels, food makes up the remainder)
+              // Strategy presets (strength is fixed, steps can increase if needed)
               const strategyPresets = {
-                diet: { steps: 5500, strength: 2, stepsRange: "3k-8k", strengthRange: "1-2" },
-                balanced: { steps: 10500, strength: 3, stepsRange: "8k-13k", strengthRange: "2-4" },
-                activity: { steps: 15000, strength: 5, stepsRange: "13k+", strengthRange: "3-6" },
+                diet: { baseSteps: 5500, strength: 2, stepsRange: "3k-8k", strengthRange: "1-2" },
+                balanced: { baseSteps: 10500, strength: 3, stepsRange: "8k-13k", strengthRange: "2-4" },
+                activity: { baseSteps: 15000, strength: 5, stepsRange: "13k+", strengthRange: "3-6" },
               };
               
               // === INPUTS ===
@@ -5315,28 +5315,46 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               
               // === SAFETY FLOOR (never go below) ===
               const minCalories = gender === "female" ? 1200 : 1500;
+              const maxFoodDeficitDaily = bmr - minCalories;
               
               // === PROTEIN CALCULATION ===
               const proteinTarget = Math.round(weightKg * 1.8);
               const proteinCalories = proteinTarget * 4;
               const proteinTEF = Math.round(proteinCalories * PROTEIN_TEF_RATE);
               
-              // === WEEKLY ACTIVITY BURN (fixed by strategy) ===
-              const stepsBurnWeekly = Math.round(preset.steps * 7 * CAL_PER_STEP);
+              // === STRENGTH BURN (fixed by strategy) ===
               const strengthBurnWeekly = preset.strength * CAL_PER_STRENGTH_SESSION;
-              const activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
               
-              // === FOOD DEFICIT (remainder after activity) ===
+              // === CALCULATE STEPS DYNAMICALLY ===
+              // Start with base steps, increase if needed to avoid going below safety floor
+              const baseStepsBurnWeekly = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
+              const baseActivityBurnWeekly = baseStepsBurnWeekly + strengthBurnWeekly;
+              const baseFoodDeficitWeekly = requiredWeeklyDeficit - baseActivityBurnWeekly;
+              const baseFoodDeficitDaily = baseFoodDeficitWeekly / 7;
+              
+              let finalSteps = preset.baseSteps;
+              let hitSafetyFloor = false;
+              
+              // If base food deficit would exceed safety, increase steps
+              if (baseFoodDeficitDaily > maxFoodDeficitDaily) {
+                // Calculate how much extra activity we need (weekly)
+                const extraDeficitNeeded = (baseFoodDeficitDaily - maxFoodDeficitDaily) * 7;
+                const extraStepsNeeded = Math.ceil(extraDeficitNeeded / (CAL_PER_STEP * 7));
+                finalSteps = preset.baseSteps + extraStepsNeeded;
+              }
+              
+              // Recalculate with final steps
+              const stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
+              const activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
               const foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
               const foodDeficitDaily = Math.round(foodDeficitWeekly / 7);
               
-              // === FINAL DAILY CALORIES ===
+              // Check if we still hit safety floor (shouldn't happen with unlimited steps)
               const rawDailyCalories = bmr - foodDeficitDaily;
               const finalDailyCalories = Math.max(minCalories, Math.round(rawDailyCalories));
-              const hitSafetyFloor = rawDailyCalories < minCalories;
+              hitSafetyFloor = rawDailyCalories < minCalories;
               
               // === DISPLAY VALUES ===
-              const finalSteps = preset.steps;
               const finalStrength = preset.strength;
               const strengthDisplay = `${finalStrength}x/week`;
               
