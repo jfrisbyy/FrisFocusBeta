@@ -1130,11 +1130,9 @@ export default function FitnessPage() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance'
-                        ? 'Maintaining current weight'
-                        : nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk')
-                        ? `+${(nutritionSettings.calorieTarget || 2500) - (nutritionSettings.maintenanceCalories || 2500)} cal above maintenance`
-                        : `-${(nutritionSettings.maintenanceCalories || 2500) - (nutritionSettings.calorieTarget || 2000)} cal below maintenance`}
+                      {nutritionSettings.strategyBias === 'activity' ? 'Activity-focused approach' :
+                       nutritionSettings.strategyBias === 'diet' ? 'Diet-focused approach' :
+                       'Balanced approach'}
                     </p>
                   </div>
                 </div>
@@ -1170,7 +1168,7 @@ export default function FitnessPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{latestWeight?.weight || "--"} <span className="text-sm font-normal text-muted-foreground">lbs</span></div>
-                {latestWeight?.goalWeight && <p className="text-xs text-muted-foreground">Goal: {latestWeight.goalWeight} lbs</p>}
+                {nutritionSettings.goalWeight && <p className="text-xs text-muted-foreground">Goal: {nutritionSettings.goalWeight} lbs</p>}
               </CardContent>
             </Card>
 
@@ -1517,14 +1515,6 @@ export default function FitnessPage() {
                 data-testid="button-tdee-calculator"
               >
                 <Calculator className="h-4 w-4" />
-              </Button>
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                onClick={() => setSettingsDialogOpen(true)}
-                data-testid="button-nutrition-settings"
-              >
-                <Settings className="h-4 w-4" />
               </Button>
               <NutritionDialog 
                 open={nutritionDialogOpen} 

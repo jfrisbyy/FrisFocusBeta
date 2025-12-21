@@ -499,6 +499,7 @@ export const nutritionSettings = pgTable("nutrition_settings", {
   // Pace and strategy preferences
   goalPace: text("goal_pace").default("moderate"), // conservative, moderate, aggressive
   strategyBias: text("strategy_bias").default("balanced"), // diet, balanced, activity
+  stepGoal: integer("step_goal").default(10000), // daily step target
 });
 
 export const insertNutritionSettingsSchema = createInsertSchema(nutritionSettings).omit({ id: true });
