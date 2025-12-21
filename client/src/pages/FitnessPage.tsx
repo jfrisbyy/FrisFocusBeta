@@ -492,12 +492,12 @@ export default function FitnessPage() {
     DEFAULT_PRACTICE_FIELDS.map(f => f.id);
 
   // Dashboard preferences for step goal
-  const { data: dashboardPreferencesData } = useQuery<{ preferences: DashboardPreferences }>({
+  const { data: dashboardPreferencesData } = useQuery<DashboardPreferences>({
     queryKey: ["/api/dashboard/preferences"],
     enabled: !isDemo,
   });
 
-  const defaultStepGoal = dashboardPreferencesData?.preferences?.defaultStepGoal || 10000;
+  const defaultStepGoal = dashboardPreferencesData?.defaultStepGoal || 10000;
 
   const nutrition = isDemo ? demoNutritionData : nutritionData;
   const nutritionSettings = isDemo ? demoNutritionSettings : (nutritionSettingsData || mockNutritionSettings);
@@ -661,7 +661,7 @@ export default function FitnessPage() {
 
   const updateStepGoalMutation = useMutation({
     mutationFn: async (newGoal: number) => {
-      const currentPrefs = dashboardPreferencesData?.preferences || {};
+      const currentPrefs = dashboardPreferencesData || {};
       const res = await apiRequest("PUT", "/api/dashboard/preferences", {
         ...currentPrefs,
         defaultStepGoal: newGoal,
