@@ -89,6 +89,8 @@ const mockNutritionSettings: NutritionSettings = {
   bmr: 1850,
   goalPace: "moderate",
   strategyBias: "balanced",
+  stepGoal: 10000,
+  strengthSessionsPerWeek: 4,
 };
 
 type ActiveTab = "overview" | "nutrition" | "sports" | "gym" | "body-comp";
@@ -2434,6 +2436,43 @@ export default function FitnessPage() {
                   Log Workout
                 </Button>
               </div>
+
+              {/* Strength Training Goal Banner */}
+              <Card className={`border-2 ${
+                nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'border-blue-500/50 bg-blue-500/5' :
+                nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'border-green-500/50 bg-green-500/5' :
+                'border-orange-500/50 bg-orange-500/5'
+              }`}>
+                <CardContent className="py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-full ${
+                        nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'bg-blue-500/20' :
+                        nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'bg-green-500/20' :
+                        'bg-orange-500/20'
+                      }`}>
+                        <Dumbbell className={`h-5 w-5 ${
+                          nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'text-blue-500' :
+                          nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'text-green-500' :
+                          'text-orange-500'
+                        }`} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold">
+                            {nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'Maintenance Mode' :
+                             nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'Surplus Mode' :
+                             'Deficit Mode'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Your current plan suggests you complete {nutritionSettings.strengthSessionsPerWeek || (nutritionSettings.strategyBias === 'activity' ? 5 : nutritionSettings.strategyBias === 'diet' ? 3 : 4)} strength sessions per week
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
           {/* My Routines Collapsible Section */}
           <Collapsible open={routinesExpanded} onOpenChange={setRoutinesExpanded}>
