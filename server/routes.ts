@@ -1087,31 +1087,37 @@ ${hasExistingGoal ? `CURRENT GOAL:
 - Mode: ${goalMode} (${goalMode === 'deficit' ? 'losing weight' : goalMode === 'surplus' ? 'gaining weight' : 'maintaining'})
 - Calorie Target: ${currentGoal.calorieTarget} cal/day` : ''}
 
+MANDATORY: USE THE USER'S GOAL WEIGHT AND TIMEFRAME
+The user's goal weight and timeframe are REQUIRED targets. You MUST calculate the plan to achieve EXACTLY their requested rate.
+
+CALCULATION (do this math):
+1. Weight to lose = Current Weight - Goal Weight
+2. Weekly rate = Weight to lose / Timeframe weeks
+3. Daily deficit needed = Weekly rate * 3500 / 7 (or ~500 cal per lb/week)
+4. This is the deficit your plan MUST achieve
+
 YOUR APPROACH:
-1. Ask about their goals - do they want to lose weight, maintain, or gain?
-2. Ask about their lifestyle preferences - do they prefer eating less or moving more?
-   - If they say "I hate cardio" or "I like eating" → suggest activity-focused (burn more, eat more)
-   - If they say "I'm busy/sedentary" or "I can eat less" → suggest diet-focused (eat less, move less)
-   - If unsure → suggest balanced
-3. Confirm their goal weight and timeframe
-4. Calculate and present a COMPLETE plan with all four elements
+1. If stats are provided, IMMEDIATELY calculate the required deficit from their goal
+2. Ask about their strategy preference (eating less vs moving more)
+3. Create a plan that achieves EXACTLY their required deficit using their preferred strategy
+4. If the rate exceeds 2 lbs/week, include a safety warning but STILL provide the plan they requested
 
 IMPORTANT: Keep ALL responses SHORT and CONCISE. Never ramble or repeat yourself.
 
-When you have enough information, respond with ONLY this JSON structure (no extra text):
+When you have the stats, respond with ONLY this JSON structure (no extra text):
 {
   "isFinal": true,
   "recommendation": {
-    "goalType": "moderate_cut",
-    "goalLabel": "Gradual Fat Loss",
-    "calorieTarget": 1800,
-    "maintenanceCalories": 2200,
+    "goalType": "aggressive_cut",
+    "goalLabel": "Rapid Fat Loss",
+    "calorieTarget": 1500,
+    "maintenanceCalories": 2000,
     "proteinTarget": 180,
-    "stepGoal": 10500,
-    "strengthSessionsPerWeek": 3,
-    "strategyBias": "balanced",
-    "explanation": "Short 1-2 sentence explanation only.",
-    "weeklyChangeEstimate": "-1 lb/week"
+    "stepGoal": 15000,
+    "strengthSessionsPerWeek": 5,
+    "strategyBias": "activity",
+    "explanation": "This achieves your 2.5 lb/week goal through high activity.",
+    "weeklyChangeEstimate": "-2.5 lbs/week"
   }
 }
 
