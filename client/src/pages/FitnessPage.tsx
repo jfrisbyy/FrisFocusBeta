@@ -5375,50 +5375,47 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const maxStrengthBurnDaily = Math.round((caps.maxStrength * CAL_PER_STRENGTH_SESSION) / 7);
               const maxActivityBurn = maxStepsBurn + maxStrengthBurnDaily;
               
-              // === STEP 2: APPLY STRATEGY BIAS WITHIN CONSTRAINTS ===
-              // Calculate target food deficit based on strategy
-              let targetFoodDeficit = Math.round(requiredDeficit * foodPct);
+              // === STEP 2: APPLY STRATEGY BIAS ===
+              // Strategy determines what percentage of deficit comes from food vs activity
+              // Diet Focus (70% food): prioritize eating less, minimal activity increase
+              // Activity Focus (35% food): eat more, burn more through movement
+              // Balanced (50% food): split evenly
               
-              // Diet Focus: use as much food deficit as safety allows
-              // Activity Focus: use less food deficit, leaving more for activity
-              // Balanced: somewhere in between
+              // Target food deficit based on strategy
+              const targetFoodDeficit = Math.round(requiredDeficit * foodPct);
               
-              // Cap food deficit at safety maximum
-              let actualFoodDeficit = Math.min(targetFoodDeficit, maxFoodDeficit);
+              // Cap at safety maximum (can't go below minCalories)
+              const actualFoodDeficit = Math.min(targetFoodDeficit, maxFoodDeficit);
               
-              // Calculate how much activity is needed
-              let neededActivityDeficit = requiredDeficit - actualFoodDeficit;
-              
-              // Cap activity at maximum capacity
-              let actualActivityDeficit = Math.min(neededActivityDeficit, maxActivityBurn);
-              
-              // If activity can't cover the gap, we may need to accept a smaller total deficit
-              // or show a warning
+              // Activity must cover the rest
+              const neededActivityDeficit = requiredDeficit - actualFoodDeficit;
               
               // === STEP 3: ALLOCATE ACTIVITY TO STEPS AND STRENGTH ===
-              let finalSteps = MIN_STEPS;
+              // Allocate based on what's actually needed, not forcing minimums
+              let finalSteps = 0;
               let finalStrength = 0;
               
-              // Calculate steps needed
-              const stepsForDeficit = Math.ceil(actualActivityDeficit / CAL_PER_STEP);
-              finalSteps = Math.min(stepsForDeficit, caps.maxSteps);
-              finalSteps = Math.max(MIN_STEPS, finalSteps); // Ensure at least minimum steps
-              
-              const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
-              const remainingActivity = Math.max(0, actualActivityDeficit - stepsBurn);
-              
-              // Allocate remaining to strength training
-              if (remainingActivity > 0) {
-                const sessionsNeeded = Math.ceil((remainingActivity * 7) / CAL_PER_STRENGTH_SESSION);
-                finalStrength = Math.min(sessionsNeeded, caps.maxStrength);
+              if (neededActivityDeficit > 0) {
+                // First, allocate to steps (capped at willingness)
+                const stepsForDeficit = Math.ceil(neededActivityDeficit / CAL_PER_STEP);
+                finalSteps = Math.min(stepsForDeficit, caps.maxSteps);
+                
+                const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
+                const remainingAfterSteps = neededActivityDeficit - stepsBurn;
+                
+                // Then allocate remainder to strength (capped at willingness)
+                if (remainingAfterSteps > 0) {
+                  const sessionsNeeded = Math.ceil((remainingAfterSteps * 7) / CAL_PER_STRENGTH_SESSION);
+                  finalStrength = Math.min(sessionsNeeded, caps.maxStrength);
+                }
               }
+              
+              // Calculate actual burns
+              const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
               const strengthBurnDaily = Math.round((finalStrength * CAL_PER_STRENGTH_SESSION) / 7);
               
-              // === STEP 4: RECALCULATE FINAL VALUES ===
-              // Actual activity deficit from allocated steps/strength
+              // === STEP 4: FINAL CALCULATIONS ===
               const finalActivityDeficit = stepsBurn + strengthBurnDaily;
-              
-              // Food deficit is the remainder
               const finalFoodDeficit = requiredDeficit - finalActivityDeficit;
               
               // Daily calories (enforce safety floor)
