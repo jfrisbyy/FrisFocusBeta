@@ -1688,23 +1688,29 @@ export default function FitnessPage() {
             const isDeficit = dailyAdjustment < 0;
             const isSurplus = dailyAdjustment > 0;
             
+            const targetCalories = nutritionSettings.calorieTarget || eatTarget;
+            const strategyLabel = nutritionSettings.strategyBias === 'diet' ? 'diet-focused' : nutritionSettings.strategyBias === 'activity' ? 'activity-focused' : 'balanced';
+            const stepGoal = nutritionSettings.stepGoal || 10000;
+            
             return (
               <Card className="border-dashed">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Flame className="h-4 w-4 text-orange-500" />
-                    {isToday(selectedNutritionDate) ? "Today's Energy Balance" : format(selectedNutritionDate, "MMM d") + " Energy Balance"}
+                    {isToday(selectedNutritionDate) ? "Today's Nutrition Plan" : format(selectedNutritionDate, "MMM d") + " Nutrition Plan"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center p-3 bg-muted/30 rounded-md">
-                      <div className="text-lg font-bold font-mono">{bmr.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Your BMR</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className={`text-center p-3 rounded-md ${isDeficit ? 'bg-green-500/10' : isSurplus ? 'bg-blue-500/10' : 'bg-muted/30'}`}>
+                      <div className={`text-xl font-bold font-mono ${isDeficit ? 'text-green-500' : isSurplus ? 'text-blue-500' : ''}`}>
+                        {targetCalories.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Target Calories</div>
                     </div>
                     <div className="text-center p-3 bg-muted/30 rounded-md">
                       <div className="text-lg font-bold font-mono text-orange-500">+{totalActivityCalories.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">Activity</div>
+                      <div className="text-xs text-muted-foreground">Activity Burned</div>
                       {totalActivityCalories > 0 && (
                         <div className="text-[10px] text-muted-foreground mt-1">
                           {stepCalories > 0 && <span className="mr-1">Steps: {stepCalories}</span>}
@@ -1719,21 +1725,13 @@ export default function FitnessPage() {
                       <div className="text-lg font-bold font-mono">{totalBurn.toLocaleString()}</div>
                       <div className="text-xs text-muted-foreground">Total Burn</div>
                     </div>
-                    <div className={`text-center p-3 rounded-md ${isDeficit ? 'bg-green-500/10' : isSurplus ? 'bg-blue-500/10' : 'bg-muted/30'}`}>
-                      <div className={`text-lg font-bold font-mono ${isDeficit ? 'text-green-500' : isSurplus ? 'text-blue-500' : ''}`}>
-                        {eatTarget.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Eat Target</div>
-                      {dailyAdjustment !== 0 && (
-                        <div className={`text-[10px] mt-1 ${isDeficit ? 'text-green-500' : 'text-blue-500'}`}>
-                          {isDeficit ? `${Math.abs(dailyAdjustment)} cal deficit` : `${dailyAdjustment} cal surplus`}
-                        </div>
-                      )}
-                    </div>
                   </div>
-                  {!nutritionSettings.bmr && (
-                    <p className="text-xs text-muted-foreground text-center mt-3">
-                      Set your stats in <button type="button" className="text-xs underline text-foreground hover:text-foreground/80" onClick={() => setGoalDialogOpen(true)}>Goal Settings</button> for accurate calculations
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    With your <span className="font-medium text-foreground">{strategyLabel}</span> focus, as long as you meet your activity goal ({stepGoal.toLocaleString()} steps), you can eat this amount of calories.
+                  </p>
+                  {!nutritionSettings.calorieTarget && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Set your plan in <button type="button" className="text-xs underline text-foreground hover:text-foreground/80" onClick={() => setGoalDialogOpen(true)}>Goal Settings</button> for personalized targets
                     </p>
                   )}
                 </CardContent>
