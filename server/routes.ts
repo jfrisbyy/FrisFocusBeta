@@ -1096,30 +1096,32 @@ YOUR APPROACH:
 3. Confirm their goal weight and timeframe
 4. Calculate and present a COMPLETE plan with all four elements
 
-When you have enough information, respond with JSON:
+IMPORTANT: Keep ALL responses SHORT and CONCISE. Never ramble or repeat yourself.
+
+When you have enough information, respond with ONLY this JSON structure (no extra text):
 {
   "isFinal": true,
   "recommendation": {
-    "goalType": "<e.g. 'moderate_cut', 'lean_bulk', 'maintenance'>",
-    "goalLabel": "<Human readable label, e.g. 'Summer Shred', 'Athletic Recomp'>",
-    "calorieTarget": <number - daily calories to eat>,
-    "maintenanceCalories": <number - BMR or estimated TDEE>,
-    "proteinTarget": <grams - calculate as weight_lbs * 0.9>,
-    "stepGoal": <number - daily steps based on strategy>,
-    "strengthSessionsPerWeek": <number - 2, 3, or 5 based on strategy>,
-    "strategyBias": "<diet | balanced | activity>",
-    "explanation": "<explain WHY this plan works for them, mention the strategy bias and how the deficit is split>",
-    "weeklyChangeEstimate": "<expected weekly weight change, e.g. '-1 lb/week'>"
+    "goalType": "moderate_cut",
+    "goalLabel": "Gradual Fat Loss",
+    "calorieTarget": 1800,
+    "maintenanceCalories": 2200,
+    "proteinTarget": 180,
+    "stepGoal": 10500,
+    "strengthSessionsPerWeek": 3,
+    "strategyBias": "balanced",
+    "explanation": "Short 1-2 sentence explanation only.",
+    "weeklyChangeEstimate": "-1 lb/week"
   }
 }
 
-While gathering info, respond with:
+While gathering info, respond with ONLY:
 {
   "isFinal": false,
-  "message": "<your friendly message>"
+  "message": "Your short friendly message here"
 }
 
-Be encouraging and realistic. Always explain HOW the plan achieves their goal.`;
+CRITICAL: Keep explanation under 50 words. Return ONLY valid JSON, nothing else.`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
@@ -1140,7 +1142,8 @@ Be encouraging and realistic. Always explain HOW the plan achieves their goal.`;
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         messages,
-        max_tokens: 800,
+        max_tokens: 1200,
+        temperature: 0.7,
         response_format: { type: "json_object" },
       });
 
@@ -1149,12 +1152,31 @@ Be encouraging and realistic. Always explain HOW the plan achieves their goal.`;
         return res.status(500).json({ error: "AI did not return a response" });
       }
 
+      // Check if response was truncated (finish_reason !== 'stop')
+      const finishReason = response.choices[0]?.finish_reason;
+      if (finishReason === 'length') {
+        console.error("AI response was truncated due to token limit");
+        return res.status(500).json({ error: "AI response was incomplete. Please try again." });
+      }
+
       try {
         const parsed = JSON.parse(rawContent);
+        
+        // Validate the response structure
+        if (parsed.isFinal && parsed.recommendation) {
+          const rec = parsed.recommendation;
+          // Ensure all required fields are present and valid
+          if (typeof rec.calorieTarget !== 'number' || typeof rec.stepGoal !== 'number') {
+            console.error("AI recommendation missing required numeric fields:", rec);
+            return res.status(500).json({ error: "AI response was incomplete. Please try again." });
+          }
+        }
+        
         res.json(parsed);
       } catch (parseError) {
         console.error("Failed to parse AI goal response:", parseError);
-        res.status(500).json({ error: "Failed to parse AI response" });
+        console.error("Raw content was:", rawContent?.substring(0, 200));
+        res.status(500).json({ error: "Failed to parse AI response. Please try again." });
       }
     } catch (error) {
       console.error("AI goal chat error:", error);
