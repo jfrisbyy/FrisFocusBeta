@@ -5342,11 +5342,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 moderately_active: { maxSteps: 14000, maxStrength: 5 },
               };
               
-              // Strategy bias distribution (activity vs food)
-              const strategyDistribution = {
-                diet: { activityPct: 0.30, foodPct: 0.70 },
-                balanced: { activityPct: 0.50, foodPct: 0.50 },
-                activity: { activityPct: 0.65, foodPct: 0.35 },
+              // Strategy bias distribution (food percentage of deficit)
+              const strategyFoodPct = {
+                diet: 0.70,      // Diet Focus: 70% from food, 30% from activity
+                balanced: 0.50, // Balanced: 50/50 split
+                activity: 0.35, // Activity Focus: 35% from food, 65% from activity
               };
               
               // === INPUTS ===
@@ -5355,7 +5355,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
               const gender = bmrData.gender || "male";
               const caps = activityCaps[activityWillingness] || activityCaps.moderate;
-              const distribution = strategyDistribution[strategyBias];
+              const foodPct = strategyFoodPct[strategyBias];
               
               // === SAFETY FLOORS ===
               const genderFloor = gender === "female" ? 1200 : 1500;
@@ -5366,39 +5366,46 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const proteinCalories = proteinTarget * 4;
               const proteinTEF = Math.round(proteinCalories * PROTEIN_TEF_RATE);
               
-              // === CALCULATE MAX ACTIVITY CAPACITY ===
+              // === STEP 1: CALCULATE CONSTRAINTS ===
+              // Maximum food deficit allowed by safety floor
+              const maxFoodDeficit = bmr - minCalories;
+              
+              // Maximum activity capacity
               const maxStepsBurn = Math.round(caps.maxSteps * CAL_PER_STEP);
               const maxStrengthBurnDaily = Math.round((caps.maxStrength * CAL_PER_STRENGTH_SESSION) / 7);
               const maxActivityBurn = maxStepsBurn + maxStrengthBurnDaily;
               
-              // === STEP 1: DETERMINE ACTIVITY DEFICIT BASED ON STRATEGY ===
-              // Target activity contribution based on strategy bias
-              let targetActivityDeficit = Math.round(requiredDeficit * distribution.activityPct);
+              // === STEP 2: APPLY STRATEGY BIAS WITHIN CONSTRAINTS ===
+              // Calculate target food deficit based on strategy
+              let targetFoodDeficit = Math.round(requiredDeficit * foodPct);
               
-              // Cap activity deficit at maximum capacity
-              targetActivityDeficit = Math.min(targetActivityDeficit, maxActivityBurn);
+              // Diet Focus: use as much food deficit as safety allows
+              // Activity Focus: use less food deficit, leaving more for activity
+              // Balanced: somewhere in between
               
-              // === STEP 2: ALLOCATE ACTIVITY BASED ON STRATEGY ===
-              // For diet focus: prioritize food deficit, minimal activity
-              // For activity focus: prioritize activity, less food restriction
+              // Cap food deficit at safety maximum
+              let actualFoodDeficit = Math.min(targetFoodDeficit, maxFoodDeficit);
+              
+              // Calculate how much activity is needed
+              let neededActivityDeficit = requiredDeficit - actualFoodDeficit;
+              
+              // Cap activity at maximum capacity
+              let actualActivityDeficit = Math.min(neededActivityDeficit, maxActivityBurn);
+              
+              // If activity can't cover the gap, we may need to accept a smaller total deficit
+              // or show a warning
+              
+              // === STEP 3: ALLOCATE ACTIVITY TO STEPS AND STRENGTH ===
               let finalSteps = MIN_STEPS;
               let finalStrength = 0;
               
-              // Calculate steps needed to achieve target activity deficit
-              const stepsForDeficit = Math.ceil(targetActivityDeficit / CAL_PER_STEP);
-              
-              // Cap at max steps allowed by willingness, but DON'T force minimum
-              // This allows diet-focused strategies to recommend fewer steps
+              // Calculate steps needed
+              const stepsForDeficit = Math.ceil(actualActivityDeficit / CAL_PER_STEP);
               finalSteps = Math.min(stepsForDeficit, caps.maxSteps);
-              
-              // For diet focus, allow steps below health minimum (user prefers food restriction)
-              // For activity focus, ensure at least minimum healthy steps
-              if (strategyBias === "activity") {
-                finalSteps = Math.max(MIN_STEPS, finalSteps);
-              }
+              finalSteps = Math.max(MIN_STEPS, finalSteps); // Ensure at least minimum steps
               
               const stepsBurn = Math.round(finalSteps * CAL_PER_STEP);
-              let remainingActivity = Math.max(0, targetActivityDeficit - stepsBurn);
+              const remainingActivity = Math.max(0, actualActivityDeficit - stepsBurn);
               
               // Allocate remaining to strength training
               if (remainingActivity > 0) {
@@ -5407,63 +5414,14 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               }
               const strengthBurnDaily = Math.round((finalStrength * CAL_PER_STRENGTH_SESSION) / 7);
               
-              // === STEP 3: CALCULATE ACTUAL DEFICITS ===
-              // Activity deficit is ONLY from steps and strength (TEF is part of food processing)
-              let activityDeficit = stepsBurn + strengthBurnDaily;
+              // === STEP 4: RECALCULATE FINAL VALUES ===
+              // Actual activity deficit from allocated steps/strength
+              const finalActivityDeficit = stepsBurn + strengthBurnDaily;
               
-              // Food deficit is everything not covered by activity
-              let foodDeficit = requiredDeficit - activityDeficit;
-              
-              // === STEP 4: CHECK SAFETY FLOOR ===
-              // Daily calories = BMR - foodDeficit (simple formula)
-              let dailyCalories = bmr - foodDeficit;
-              
-              // If below safety floor, we need to increase activity to reduce food deficit
-              if (dailyCalories < minCalories) {
-                // How much more activity do we need?
-                const shortfall = minCalories - dailyCalories;
-                
-                // Try to add more steps
-                const additionalStepsPossible = caps.maxSteps - finalSteps;
-                const additionalStepsNeeded = Math.min(
-                  Math.ceil(shortfall / CAL_PER_STEP),
-                  additionalStepsPossible
-                );
-                finalSteps += additionalStepsNeeded;
-                let additionalBurn = Math.round(additionalStepsNeeded * CAL_PER_STEP);
-                
-                // If still not enough, add more strength
-                if (additionalBurn < shortfall) {
-                  const remainingShortfall = shortfall - additionalBurn;
-                  const additionalStrengthPossible = caps.maxStrength - finalStrength;
-                  const additionalStrengthNeeded = Math.min(
-                    Math.ceil((remainingShortfall * 7) / CAL_PER_STRENGTH_SESSION),
-                    additionalStrengthPossible
-                  );
-                  finalStrength += additionalStrengthNeeded;
-                  additionalBurn += Math.round((additionalStrengthNeeded * CAL_PER_STRENGTH_SESSION) / 7);
-                }
-                
-                // Recalculate with additional activity
-                activityDeficit += additionalBurn;
-                foodDeficit = requiredDeficit - activityDeficit;
-                dailyCalories = bmr - foodDeficit;
-              }
-              
-              // === STEP 5: ENFORCE MINIMUM CALORIES (even if activity maxed out) ===
-              dailyCalories = Math.max(minCalories, dailyCalories);
-              
-              // If we hit the floor, recalculate food deficit to match
-              if (dailyCalories === minCalories && bmr - foodDeficit < minCalories) {
-                foodDeficit = bmr - minCalories;
-                // Note: In this case, activity + food may not equal required deficit
-                // This is a safety constraint violation warning
-              }
-              
-              // === STEP 6: FINAL VALIDATION ===
-              // Ensure the math adds up by making food deficit the remainder
-              const finalActivityDeficit = activityDeficit;
+              // Food deficit is the remainder
               const finalFoodDeficit = requiredDeficit - finalActivityDeficit;
+              
+              // Daily calories (enforce safety floor)
               const finalDailyCalories = Math.max(minCalories, Math.round(bmr - finalFoodDeficit));
               
               // Recalculate step burn for display
