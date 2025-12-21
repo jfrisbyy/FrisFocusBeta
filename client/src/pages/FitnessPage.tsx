@@ -1242,7 +1242,7 @@ export default function FitnessPage() {
                   const today = format(new Date(), "yyyy-MM-dd");
                   const todayEntry = steps.find(s => s.date === today);
                   const todaySteps = todayEntry?.steps || 0;
-                  const todayGoal = todayEntry?.goal || defaultStepGoal;
+                  const todayGoal = defaultStepGoal;
                   
                   const weekStart = startOfWeek(subDays(new Date(), stepsWeekOffset * 7), { weekStartsOn: 1 });
                   const weekDays = eachDayOfInterval({ start: weekStart, end: subDays(weekStart, -6) });
@@ -1253,14 +1253,14 @@ export default function FitnessPage() {
                       day: format(day, "EEE"),
                       date: dateStr,
                       steps: entry?.steps || 0,
-                      goal: entry?.goal || defaultStepGoal,
+                      goal: defaultStepGoal,
                     };
                   });
                   
                   const avgSteps = weekData.length > 0 
                     ? Math.round(weekData.reduce((sum, d) => sum + d.steps, 0) / weekData.filter(d => d.steps > 0).length || 0) 
                     : 0;
-                  const daysOverGoal = weekData.filter(d => d.steps >= d.goal).length;
+                  const daysOverGoal = weekData.filter(d => d.steps >= defaultStepGoal).length;
 
                   if (stepsView === "today") {
                     const progress = Math.min((todaySteps / todayGoal) * 100, 100);
