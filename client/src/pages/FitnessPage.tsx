@@ -4783,7 +4783,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     const minCalories = gender === "female" ? 1200 : 1500;
     const maxFoodDeficitDaily = bmrResult - minCalories;
     
-    const proteinTarget = Math.round(weightKg * 1.8);
+    // Use 0.9g per lb of body weight (consistent with TDEE calculator)
+    const weightLbs = bmrData.weight ? parseFloat(bmrData.weight) : 180;
+    const proteinTarget = Math.round(weightLbs * 0.9);
     const strengthBurnWeekly = preset.strength * CAL_PER_STRENGTH_SESSION;
     
     const baseStepsBurnWeekly = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
@@ -5352,8 +5354,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const minCalories = gender === "female" ? 1200 : 1500;
               const maxFoodDeficitDaily = bmr - minCalories;
               
-              // === PROTEIN CALCULATION ===
-              const proteinTarget = Math.round(weightKg * 1.8);
+              // === PROTEIN CALCULATION (0.9g per lb of body weight) ===
+              const weightLbs = bmrData.weight ? parseFloat(bmrData.weight) : 180;
+              const proteinTarget = Math.round(weightLbs * 0.9);
               const proteinCalories = proteinTarget * 4;
               const proteinTEF = Math.round(proteinCalories * PROTEIN_TEF_RATE);
               
