@@ -4974,7 +4974,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       bmr: bmrResult || undefined,
       goalPace,
       strategyBias,
-      stepGoal: goalDirection === "lose" && computedPlan?.steps ? computedPlan.steps : undefined,
+      stepGoal: computedPlan?.steps || undefined,
     });
   };
 
