@@ -2459,6 +2459,7 @@ export default function FitnessPage() {
                   isDemo={isDemo}
                   editData={editingStrength}
                   onEdit={(id, data) => editStrengthMutation.mutate({ id, data })}
+                  routines={routines}
                 />
                 <Button onClick={() => { setEditingStrength(null); setStrengthDialogOpen(true); }} data-testid="button-add-strength">
                   <Plus className="h-4 w-4 mr-2" />
@@ -5575,14 +5576,20 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   );
 }
 
+// Legacy type for backwards compatibility
 type Exercise = { name: string; sets: number; reps: number; weight: number };
 
-function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+// New type supporting per-set weights
+type ExerciseSet = { reps: number; weight: number };
+type ExerciseWithSets = { name: string; sets: ExerciseSet[] };
+
+function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines = [] }: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void; 
   isDemo: boolean;
   editData?: StrengthWorkout | null;
   onEdit?: (id: string, data: Partial<StrengthWorkout>) => void;
+  routines?: WorkoutRoutine[];
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -5592,10 +5599,27 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
     effort: "",
     notes: "",
   });
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string>("");
+  const [exercisesWithSets, setExercisesWithSets] = useState<ExerciseWithSets[]>([]);
   const [newExercise, setNewExercise] = useState({ name: "", sets: "", reps: "", weight: "" });
 
   const isEditing = !!editData;
+
+  // Convert legacy Exercise to ExerciseWithSets format
+  const convertLegacyExercise = (ex: Exercise): ExerciseWithSets => ({
+    name: ex.name,
+    sets: Array.from({ length: ex.sets }, () => ({ reps: ex.reps, weight: ex.weight }))
+  });
+
+  // Convert ExerciseWithSets to legacy format for storage (flattened)
+  const convertToLegacyFormat = (exs: ExerciseWithSets[]): Exercise[] => {
+    return exs.map(ex => ({
+      name: ex.name,
+      sets: ex.sets.length,
+      reps: ex.sets[0]?.reps || 0,
+      weight: Math.round(ex.sets.reduce((sum, s) => sum + s.weight, 0) / ex.sets.length) || 0
+    }));
+  };
 
   useEffect(() => {
     if (editData) {
@@ -5607,31 +5631,63 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
         notes: editData.notes || "",
       });
       const exs = Array.isArray(editData.exercises) ? editData.exercises as Exercise[] : [];
-      setExercises(exs);
+      setExercisesWithSets(exs.map(convertLegacyExercise));
+      setSelectedRoutineId("");
     } else {
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", effort: "", notes: "" });
-      setExercises([]);
+      setExercisesWithSets([]);
+      setSelectedRoutineId("");
     }
-  }, [editData]);
+  }, [editData, open]);
+
+  // Handle routine selection
+  const handleRoutineSelect = (routineId: string) => {
+    setSelectedRoutineId(routineId);
+    if (routineId === "custom" || !routineId) {
+      setExercisesWithSets([]);
+      return;
+    }
+    const routine = routines.find(r => r.id === routineId);
+    if (routine && Array.isArray(routine.exercises)) {
+      const routineExercises = routine.exercises as Array<{ name: string; sets: number; reps: number }>;
+      const converted: ExerciseWithSets[] = routineExercises.map(ex => ({
+        name: ex.name,
+        sets: Array.from({ length: ex.sets }, () => ({ reps: ex.reps, weight: 0 }))
+      }));
+      setExercisesWithSets(converted);
+    }
+  };
 
   const addExercise = () => {
     if (!newExercise.name || !newExercise.sets || !newExercise.reps) return;
-    const exercise: Exercise = {
+    const numSets = parseInt(newExercise.sets) || 1;
+    const reps = parseInt(newExercise.reps) || 0;
+    const weight = parseInt(newExercise.weight) || 0;
+    const exercise: ExerciseWithSets = {
       name: newExercise.name,
-      sets: parseInt(newExercise.sets) || 0,
-      reps: parseInt(newExercise.reps) || 0,
-      weight: parseInt(newExercise.weight) || 0,
+      sets: Array.from({ length: numSets }, () => ({ reps, weight }))
     };
-    setExercises([...exercises, exercise]);
+    setExercisesWithSets([...exercisesWithSets, exercise]);
     setNewExercise({ name: "", sets: "", reps: "", weight: "" });
   };
 
   const removeExercise = (index: number) => {
-    setExercises(exercises.filter((_, i) => i !== index));
+    setExercisesWithSets(exercisesWithSets.filter((_, i) => i !== index));
+  };
+
+  const updateSetWeight = (exerciseIndex: number, setIndex: number, weight: number) => {
+    setExercisesWithSets(prev => prev.map((ex, i) => {
+      if (i !== exerciseIndex) return ex;
+      return {
+        ...ex,
+        sets: ex.sets.map((s, j) => j === setIndex ? { ...s, weight } : s)
+      };
+    }));
   };
 
   const calculateVolume = () => {
-    return exercises.reduce((total, ex) => total + (ex.sets * ex.reps * ex.weight), 0);
+    return exercisesWithSets.reduce((total, ex) => 
+      total + ex.sets.reduce((setTotal, s) => setTotal + (s.reps * s.weight), 0), 0);
   };
 
   const createMutation = useMutation({
@@ -5644,7 +5700,8 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       toast({ title: "Workout logged" });
       onOpenChange(false);
       setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", effort: "", notes: "" });
-      setExercises([]);
+      setExercisesWithSets([]);
+      setSelectedRoutineId("");
     },
     onError: () => {
       toast({ title: "Failed to log workout", variant: "destructive" });
@@ -5657,15 +5714,16 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       onOpenChange(false);
       return;
     }
+    const legacyExercises = convertToLegacyFormat(exercisesWithSets);
     const payload = {
       date: formData.date,
       type: "Strength",
       primaryFocus: formData.primaryFocus,
       duration: formData.duration ? parseInt(formData.duration) : undefined,
-      volume: exercises.length > 0 ? calculateVolume() : undefined,
+      volume: exercisesWithSets.length > 0 ? calculateVolume() : undefined,
       effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
-      exercises: exercises.length > 0 ? exercises : undefined,
+      exercises: exercisesWithSets.length > 0 ? legacyExercises : undefined,
     };
     if (isEditing && editData && onEdit) {
       onEdit(editData.id, payload);
@@ -5682,6 +5740,24 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
           <DialogDescription>{isEditing ? "Update your workout" : "Record your exercises and training session"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {/* Routine Selection - only show when not editing and routines exist */}
+          {!isEditing && routines.length > 0 && (
+            <div className="space-y-2">
+              <Label>Select Routine</Label>
+              <Select value={selectedRoutineId} onValueChange={handleRoutineSelect}>
+                <SelectTrigger data-testid="select-routine">
+                  <SelectValue placeholder="Choose a routine or create custom workout" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="custom">Custom Workout</SelectItem>
+                  {routines.map(routine => (
+                    <SelectItem key={routine.id} value={routine.id}>{routine.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Date</Label>
@@ -5705,7 +5781,43 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
             </div>
           </div>
 
-          {/* Add Exercise */}
+          {/* Exercises with Per-Set Weights */}
+          {exercisesWithSets.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium">Exercises</div>
+                <div className="text-sm text-muted-foreground">Total Volume: {calculateVolume().toLocaleString()} lbs</div>
+              </div>
+              {exercisesWithSets.map((exercise, exIndex) => (
+                <div key={exIndex} className="p-3 border rounded-md space-y-2" data-testid={`exercise-card-${exIndex}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">{exercise.name}</span>
+                    <Button size="icon" variant="ghost" onClick={() => removeExercise(exIndex)} data-testid={`button-remove-exercise-${exIndex}`}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {exercise.sets.map((set, setIndex) => (
+                      <div key={setIndex} className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground w-8">Set {setIndex + 1}</span>
+                        <Input
+                          type="number"
+                          placeholder="lbs"
+                          className="h-8 text-sm"
+                          value={set.weight || ""}
+                          onChange={(e) => updateSetWeight(exIndex, setIndex, parseInt(e.target.value) || 0)}
+                          data-testid={`input-weight-${exIndex}-${setIndex}`}
+                        />
+                        <span className="text-xs text-muted-foreground">x{set.reps}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add Exercise - for custom workouts */}
           <div className="space-y-3 p-3 border rounded-md">
             <div className="text-sm font-medium">Add Exercise</div>
             <div className="grid grid-cols-2 gap-2">
@@ -5741,27 +5853,6 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
               <Plus className="h-4 w-4 mr-1" /> Add Exercise
             </Button>
           </div>
-
-          {/* Exercises List */}
-          {exercises.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Exercises</div>
-                <div className="text-sm text-muted-foreground">Total Volume: {calculateVolume().toLocaleString()} lbs</div>
-              </div>
-              {exercises.map((exercise, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm">
-                  <span className="font-medium">{exercise.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{exercise.sets}x{exercise.reps} @ {exercise.weight}lbs</span>
-                    <Button size="icon" variant="ghost" onClick={() => removeExercise(index)} data-testid={`button-remove-exercise-${index}`}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
