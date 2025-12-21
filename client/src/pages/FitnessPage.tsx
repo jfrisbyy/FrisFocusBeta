@@ -4919,6 +4919,21 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       setIsCustomMode(true);
       setCustomGoalLabel(aiRecommendation.goalLabel);
       setTarget(aiRecommendation.calorieTarget.toString());
+      
+      // Set strategy bias if provided
+      if (aiRecommendation.strategyBias) {
+        setStrategyBias(aiRecommendation.strategyBias);
+      }
+      
+      // Set computed plan with AI values for display and saving
+      setComputedPlan({
+        dailyCalories: aiRecommendation.calorieTarget,
+        steps: aiRecommendation.stepGoal || 10000,
+        proteinTarget: aiRecommendation.proteinTarget,
+      });
+      
+      // Close AI chat and show the plan
+      setShowAIChat(false);
       toast({ title: "AI recommendation applied" });
     }
   };
@@ -5527,13 +5542,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
                   <p className="text-xs font-medium">{aiRecommendation.weeklyChangeEstimate}</p>
                   <Button 
-                    onClick={() => {
-                      setTarget(aiRecommendation.calorieTarget.toString());
-                      if (aiRecommendation.strategyBias) {
-                        setStrategyBias(aiRecommendation.strategyBias);
-                      }
-                      setShowAIChat(false);
-                    }}
+                    onClick={applyAIRecommendation}
                     variant="default"
                     className="w-full"
                     data-testid="button-apply-ai-recommendation"
@@ -5559,6 +5568,72 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   {isLoading ? "..." : "Send"}
                 </Button>
               </div>
+            </div>
+          )}
+          
+          {/* Applied AI Plan Display - shows after applying recommendation */}
+          {!showAIChat && aiRecommendation && computedPlan && (
+            <div className="p-4 bg-muted/30 rounded-md space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{aiRecommendation.goalLabel || 'AI Plan'}</span>
+                </div>
+                {aiRecommendation.strategyBias && (
+                  <Badge variant="secondary" className="text-xs">
+                    {aiRecommendation.strategyBias === 'activity' ? 'Activity-Focused' : 
+                     aiRecommendation.strategyBias === 'diet' ? 'Diet-Focused' : 'Balanced'}
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-background rounded-md border">
+                  <div className="text-xs text-muted-foreground">Daily Calories</div>
+                  <div className="text-xl font-bold">{computedPlan.dailyCalories.toLocaleString()}</div>
+                </div>
+                <div className="p-2 bg-background rounded-md border">
+                  <div className="text-xs text-muted-foreground">Daily Steps</div>
+                  <div className="text-xl font-bold">{computedPlan.steps.toLocaleString()}</div>
+                </div>
+                <div className="p-2 bg-background rounded-md border">
+                  <div className="text-xs text-muted-foreground">Strength Training</div>
+                  <div className="text-xl font-bold">{aiRecommendation.strengthSessionsPerWeek || 3}x/week</div>
+                </div>
+                <div className="p-2 bg-background rounded-md border">
+                  <div className="text-xs text-muted-foreground">Protein Target</div>
+                  <div className="text-xl font-bold">{computedPlan.proteinTarget}g</div>
+                </div>
+              </div>
+              
+              {/* Calorie Burn Breakdown */}
+              <div className="p-2 bg-background rounded-md border">
+                <div className="text-xs text-muted-foreground mb-1">Weekly Calorie Burn Breakdown</div>
+                <div className="flex items-center gap-2 text-sm flex-wrap">
+                  <span className="text-blue-500">{Math.round(computedPlan.steps * 0.04 * 7).toLocaleString()} cal from steps</span>
+                  <span className="text-muted-foreground">+</span>
+                  <span className="text-orange-500">{((aiRecommendation.strengthSessionsPerWeek || 3) * 250).toLocaleString()} cal from lifting</span>
+                  <span className="text-muted-foreground">=</span>
+                  <span className="font-bold">
+                    {(Math.round(computedPlan.steps * 0.04 * 7) + (aiRecommendation.strengthSessionsPerWeek || 3) * 250).toLocaleString()} cal/week
+                  </span>
+                </div>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
+              <p className="text-sm font-medium text-green-600">{aiRecommendation.weeklyChangeEstimate}</p>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setAiRecommendation(null);
+                  setComputedPlan(null);
+                  setShowAIChat(true);
+                }}
+              >
+                Get New AI Recommendation
+              </Button>
             </div>
           )}
         </div>
