@@ -990,12 +990,16 @@ export default function FitnessPage() {
   };
 
   const updateGoalMutation = useMutation({
-    mutationFn: async (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; activityLevel?: string }) => {
+    mutationFn: async (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; activityLevel?: string; stepGoal?: number }) => {
       const res = await apiRequest("PUT", "/api/fitness/nutrition-settings", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+      // If step goal was provided, also update the step goal setting
+      if (variables.stepGoal) {
+        updateStepGoalMutation.mutate(variables.stepGoal);
+      }
       toast({ title: "Goal updated" });
       setGoalDialogOpen(false);
     },
@@ -1096,29 +1100,29 @@ export default function FitnessPage() {
         <TabsContent value="overview" className="space-y-6">
           {/* Goal Banner */}
           <Card className={`border-2 ${
-            (nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'border-blue-500/50 bg-blue-500/5' :
-            (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'border-green-500/50 bg-green-500/5' :
+            nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'border-blue-500/50 bg-blue-500/5' :
+            nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'border-green-500/50 bg-green-500/5' :
             'border-orange-500/50 bg-orange-500/5'
           }`}>
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className={`p-2 rounded-full ${
-                    (nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'bg-blue-500/20' :
-                    (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'bg-green-500/20' :
+                    nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'bg-blue-500/20' :
+                    nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'bg-green-500/20' :
                     'bg-orange-500/20'
                   }`}>
                     <Target className={`h-5 w-5 ${
-                      (nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'text-blue-500' :
-                      (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'text-green-500' :
+                      nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'text-blue-500' :
+                      nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'text-green-500' :
                       'text-orange-500'
                     }`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold">
-                        {(nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500) ? 'Maintenance Mode' :
-                         (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500) ? 'Surplus Mode' :
+                        {nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance' ? 'Maintenance Mode' :
+                         nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk') ? 'Surplus Mode' :
                          'Deficit Mode'}
                       </span>
                       <Badge variant="secondary" className="text-xs">
@@ -1126,9 +1130,9 @@ export default function FitnessPage() {
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {(nutritionSettings.calorieTarget || 2000) === (nutritionSettings.maintenanceCalories || 2500)
+                      {nutritionSettings.goalType === 'maintain' || nutritionSettings.goalType === 'maintenance'
                         ? 'Maintaining current weight'
-                        : (nutritionSettings.calorieTarget || 2000) > (nutritionSettings.maintenanceCalories || 2500)
+                        : nutritionSettings.goalType === 'gain' || nutritionSettings.goalType?.includes('bulk')
                         ? `+${(nutritionSettings.calorieTarget || 2500) - (nutritionSettings.maintenanceCalories || 2500)} cal above maintenance`
                         : `-${(nutritionSettings.maintenanceCalories || 2500) - (nutritionSettings.calorieTarget || 2000)} cal below maintenance`}
                     </p>
@@ -4661,7 +4665,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   onOpenChange: (open: boolean) => void;
   isDemo: boolean;
   nutritionSettings: NutritionSettings;
-  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number; goalPace?: string; strategyBias?: string }) => void;
+  onSave: (data: { goalType: string; calorieTarget: number; maintenanceCalories: number; weight?: number; height?: number; age?: number; gender?: string; goalWeight?: number; goalTimeframe?: number; bmr?: number; goalPace?: string; strategyBias?: string; stepGoal?: number }) => void;
 }) {
   const { toast } = useToast();
   const [goalMode, setGoalMode] = useState(nutritionSettings.goalType || 'moderate_cut');
@@ -4691,6 +4695,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   const [strategyBias, setStrategyBias] = useState<"diet" | "balanced" | "activity">("balanced");
   const [activityLevel, setActivityLevel] = useState<"sedentary" | "lightly_active" | "moderately_active" | "very_active">("lightly_active");
   const [activityWillingness, setActivityWillingness] = useState<"minimal" | "moderate" | "very_active">("moderate");
+  
+  // Computed plan values (auto-sync target and save step goal)
+  const [computedPlan, setComputedPlan] = useState<{ dailyCalories: number; steps: number; proteinTarget: number } | null>(null);
   
   // AI Chat state
   const [showAIChat, setShowAIChat] = useState(false);
@@ -4781,6 +4788,59 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       setTarget((tdee - foodDeficit).toString());
     }
   }, [bmrResult, goalDirection, activityLevel, workoutWillingness, strategyBias, calculatedDeficit]);
+
+  // Compute full plan for "lose" flow to get step goal and sync target
+  useEffect(() => {
+    if (!bmrResult || goalDirection !== "lose") {
+      setComputedPlan(null);
+      return;
+    }
+    
+    const CAL_PER_STEP = 0.04;
+    const CAL_PER_STRENGTH_SESSION = 250;
+    
+    const strategyPresets = {
+      diet: { baseSteps: 5500, strength: 2 },
+      balanced: { baseSteps: 10500, strength: 3 },
+      activity: { baseSteps: 15000, strength: 5 },
+    };
+    
+    const requiredDailyDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
+    const requiredWeeklyDeficit = requiredDailyDeficit * 7;
+    const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
+    const gender = bmrData.gender || "male";
+    const preset = strategyPresets[strategyBias];
+    
+    const minCalories = gender === "female" ? 1200 : 1500;
+    const maxFoodDeficitDaily = bmrResult - minCalories;
+    
+    const proteinTarget = Math.round(weightKg * 1.8);
+    const strengthBurnWeekly = preset.strength * CAL_PER_STRENGTH_SESSION;
+    
+    const baseStepsBurnWeekly = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
+    const baseActivityBurnWeekly = baseStepsBurnWeekly + strengthBurnWeekly;
+    const baseFoodDeficitWeekly = requiredWeeklyDeficit - baseActivityBurnWeekly;
+    const baseFoodDeficitDaily = baseFoodDeficitWeekly / 7;
+    
+    let finalSteps = preset.baseSteps;
+    
+    if (baseFoodDeficitDaily > maxFoodDeficitDaily) {
+      const extraDeficitNeeded = (baseFoodDeficitDaily - maxFoodDeficitDaily) * 7;
+      const extraStepsNeeded = Math.ceil(extraDeficitNeeded / (CAL_PER_STEP * 7));
+      finalSteps = preset.baseSteps + extraStepsNeeded;
+    }
+    
+    const stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
+    const activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
+    const foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+    const foodDeficitDaily = Math.round(foodDeficitWeekly / 7);
+    
+    const rawDailyCalories = bmrResult - foodDeficitDaily;
+    const finalDailyCalories = Math.max(minCalories, Math.round(rawDailyCalories));
+    
+    setComputedPlan({ dailyCalories: finalDailyCalories, steps: finalSteps, proteinTarget });
+    setTarget(finalDailyCalories.toString());
+  }, [bmrResult, goalDirection, strategyBias, calculatedDeficit, bmrData.weight, bmrData.gender]);
 
   const computeBMR = () => {
     const weight = parseFloat(bmrData.weight);
@@ -4896,12 +4956,15 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       return;
     }
     
-    const finalGoalType = goalMode === 'custom' ? (customGoalLabel || 'custom') : goalMode;
+    // Use goalDirection as the primary goalType if in guided flow, otherwise use preset/custom mode
+    const finalGoalType = goalDirection === "lose" ? "lose" : 
+                          goalDirection === "gain" ? "gain" : 
+                          goalDirection === "maintain" ? "maintain" :
+                          goalMode === 'custom' ? (customGoalLabel || 'custom') : goalMode;
     onSave({
       goalType: finalGoalType,
       calorieTarget: parseInt(target) || 2000,
       maintenanceCalories: bmrResult || nutritionSettings.maintenanceCalories || 2000,
-      // Include BMR data if available
       weight: bmrData.weight ? parseInt(bmrData.weight) : undefined,
       height: bmrData.height ? parseInt(bmrData.height) : undefined,
       age: bmrData.age ? parseInt(bmrData.age) : undefined,
@@ -4911,6 +4974,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       bmr: bmrResult || undefined,
       goalPace,
       strategyBias,
+      stepGoal: goalDirection === "lose" && computedPlan?.steps ? computedPlan.steps : undefined,
     });
   };
 
@@ -5413,47 +5477,6 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
             })()}
           </div>
           )}
-
-          {/* Manual Override */}
-          <div className={`flex items-center gap-3 p-3 bg-muted/30 rounded-md ${!bmrResult ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="text-sm text-muted-foreground flex-shrink-0">Daily Target:</div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => {
-                    const current = parseInt(target) || 2000;
-                    setTarget(Math.max(1000, current - 50).toString());
-                  }}
-                  data-testid="button-decrease-target"
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Input
-                  type="number"
-                  value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                  className="w-20 text-center h-8"
-                  data-testid="input-calorie-target"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => {
-                    const current = parseInt(target) || 2000;
-                    setTarget((current + 50).toString());
-                  }}
-                  data-testid="button-increase-target"
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-              <div className="text-sm text-muted-foreground">cal/day</div>
-          </div>
 
           {/* Ask AI Button */}
           {!showAIChat && (
