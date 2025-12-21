@@ -5596,7 +5596,6 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
     date: format(new Date(), "yyyy-MM-dd"),
     primaryFocus: "Push",
     duration: "",
-    effort: "",
     notes: "",
   });
   const [selectedRoutineId, setSelectedRoutineId] = useState<string>("");
@@ -5627,14 +5626,13 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
         date: editData.date,
         primaryFocus: editData.primaryFocus || "Push",
         duration: editData.duration?.toString() || "",
-        effort: editData.effort?.toString() || "",
         notes: editData.notes || "",
       });
       const exs = Array.isArray(editData.exercises) ? editData.exercises as Exercise[] : [];
       setExercisesWithSets(exs.map(convertLegacyExercise));
       setSelectedRoutineId("");
     } else {
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", effort: "", notes: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", notes: "" });
       setExercisesWithSets([]);
       setSelectedRoutineId("");
     }
@@ -5675,12 +5673,33 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
     setExercisesWithSets(exercisesWithSets.filter((_, i) => i !== index));
   };
 
-  const updateSetWeight = (exerciseIndex: number, setIndex: number, weight: number) => {
+  const updateSetField = (exerciseIndex: number, setIndex: number, field: 'weight' | 'reps', value: number) => {
     setExercisesWithSets(prev => prev.map((ex, i) => {
       if (i !== exerciseIndex) return ex;
       return {
         ...ex,
-        sets: ex.sets.map((s, j) => j === setIndex ? { ...s, weight } : s)
+        sets: ex.sets.map((s, j) => j === setIndex ? { ...s, [field]: value } : s)
+      };
+    }));
+  };
+
+  const addSet = (exerciseIndex: number) => {
+    setExercisesWithSets(prev => prev.map((ex, i) => {
+      if (i !== exerciseIndex) return ex;
+      const lastSet = ex.sets[ex.sets.length - 1] || { reps: 10, weight: 0 };
+      return {
+        ...ex,
+        sets: [...ex.sets, { reps: lastSet.reps, weight: lastSet.weight }]
+      };
+    }));
+  };
+
+  const removeSet = (exerciseIndex: number, setIndex: number) => {
+    setExercisesWithSets(prev => prev.map((ex, i) => {
+      if (i !== exerciseIndex || ex.sets.length <= 1) return ex;
+      return {
+        ...ex,
+        sets: ex.sets.filter((_, j) => j !== setIndex)
       };
     }));
   };
@@ -5699,7 +5718,7 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/strength"] });
       toast({ title: "Workout logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", effort: "", notes: "" });
+      setFormData({ date: format(new Date(), "yyyy-MM-dd"), primaryFocus: "Push", duration: "", notes: "" });
       setExercisesWithSets([]);
       setSelectedRoutineId("");
     },
@@ -5721,7 +5740,6 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
       primaryFocus: formData.primaryFocus,
       duration: formData.duration ? parseInt(formData.duration) : undefined,
       volume: exercisesWithSets.length > 0 ? calculateVolume() : undefined,
-      effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
       exercises: exercisesWithSets.length > 0 ? legacyExercises : undefined,
     };
@@ -5734,7 +5752,7 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Strength Workout" : "Log Strength Workout"}</DialogTitle>
           <DialogDescription>{isEditing ? "Update your workout" : "Record your exercises and training session"}</DialogDescription>
@@ -5784,34 +5802,59 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
           {/* Exercises with Per-Set Weights */}
           {exercisesWithSets.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-medium">Exercises</div>
                 <div className="text-sm text-muted-foreground">Total Volume: {calculateVolume().toLocaleString()} lbs</div>
               </div>
               {exercisesWithSets.map((exercise, exIndex) => (
-                <div key={exIndex} className="p-3 border rounded-md space-y-2" data-testid={`exercise-card-${exIndex}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">{exercise.name}</span>
+                <div key={exIndex} className="p-4 border rounded-md space-y-3" data-testid={`exercise-card-${exIndex}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{exercise.name}</span>
                     <Button size="icon" variant="ghost" onClick={() => removeExercise(exIndex)} data-testid={`button-remove-exercise-${exIndex}`}>
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-2">
                     {exercise.sets.map((set, setIndex) => (
-                      <div key={setIndex} className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground w-8">Set {setIndex + 1}</span>
-                        <Input
-                          type="number"
-                          placeholder="lbs"
-                          className="h-8 text-sm"
-                          value={set.weight || ""}
-                          onChange={(e) => updateSetWeight(exIndex, setIndex, parseInt(e.target.value) || 0)}
-                          data-testid={`input-weight-${exIndex}-${setIndex}`}
-                        />
-                        <span className="text-xs text-muted-foreground">x{set.reps}</span>
+                      <div key={setIndex} className="flex items-center gap-3" data-testid={`set-row-${exIndex}-${setIndex}`}>
+                        <span className="text-sm text-muted-foreground w-12 shrink-0">Set {setIndex + 1}</span>
+                        <div className="flex items-center gap-2 flex-1">
+                          <Input
+                            type="number"
+                            placeholder="Weight"
+                            className="w-24"
+                            value={set.weight === 0 ? "" : set.weight}
+                            onChange={(e) => updateSetField(exIndex, setIndex, 'weight', parseInt(e.target.value) || 0)}
+                            data-testid={`input-weight-${exIndex}-${setIndex}`}
+                          />
+                          <span className="text-sm text-muted-foreground">lbs</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Reps"
+                            className="w-20"
+                            value={set.reps}
+                            onChange={(e) => updateSetField(exIndex, setIndex, 'reps', parseInt(e.target.value) || 0)}
+                            data-testid={`input-reps-${exIndex}-${setIndex}`}
+                          />
+                          <span className="text-sm text-muted-foreground">reps</span>
+                        </div>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => removeSet(exIndex, setIndex)}
+                          disabled={exercise.sets.length <= 1}
+                          data-testid={`button-remove-set-${exIndex}-${setIndex}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
+                  <Button size="sm" variant="outline" onClick={() => addSet(exIndex)} data-testid={`button-add-set-${exIndex}`}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Set
+                  </Button>
                 </div>
               ))}
             </div>
@@ -5854,15 +5897,9 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Duration (min)</Label>
-              <Input type="number" placeholder="60" value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: e.target.value })} data-testid="input-strength-duration" />
-            </div>
-            <div className="space-y-2">
-              <Label>Effort (1-10)</Label>
-              <Input type="number" min="1" max="10" placeholder="8" value={formData.effort} onChange={(e) => setFormData({ ...formData, effort: e.target.value })} data-testid="input-strength-effort" />
-            </div>
+          <div className="space-y-2">
+            <Label>Duration (min)</Label>
+            <Input type="number" placeholder="60" value={formData.duration} onChange={(e) => setFormData({ ...formData, duration: e.target.value })} data-testid="input-strength-duration" />
           </div>
           <div className="space-y-2">
             <Label>Notes</Label>
