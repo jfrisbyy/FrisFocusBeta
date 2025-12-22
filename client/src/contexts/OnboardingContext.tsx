@@ -20,6 +20,7 @@ interface OnboardingProgress {
   onboardingComplete: boolean;
   waitingForTrigger: OnboardingTrigger | null;
   isMinimized: boolean;
+  dismissedByUser: boolean;
 }
 
 const defaultProgress: OnboardingProgress = {
@@ -29,6 +30,7 @@ const defaultProgress: OnboardingProgress = {
   onboardingComplete: false,
   waitingForTrigger: null,
   isMinimized: false,
+  dismissedByUser: false,
 };
 
 interface OnboardingContextType {
@@ -41,6 +43,7 @@ interface OnboardingContextType {
   completedCardIds: number[];
   exploringMode: boolean;
   onboardingComplete: boolean;
+  dismissedByUser: boolean;
   waitingForTrigger: OnboardingTrigger | null;
   isMinimized: boolean;
   showOnboarding: () => void;
@@ -97,11 +100,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, [progress]);
 
   // Auto-start tutorial cards when user has profile but hasn't completed tutorial
+  // Don't auto-start if user has manually dismissed the tutorial
   useEffect(() => {
-    if (shouldShowTutorial && progress.currentCardId === null) {
+    if (shouldShowTutorial && progress.currentCardId === null && !progress.dismissedByUser) {
       setProgress(prev => ({ ...prev, currentCardId: 1 }));
     }
-  }, [shouldShowTutorial, progress.currentCardId]);
+  }, [shouldShowTutorial, progress.currentCardId, progress.dismissedByUser]);
 
   const currentCard = progress.currentCardId ? getCardById(progress.currentCardId) ?? null : null;
 
@@ -110,11 +114,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, [progress.exploringMode]);
 
   const showOnboarding = useCallback(() => {
-    if (progress.onboardingComplete) {
+    if (progress.onboardingComplete || progress.dismissedByUser) {
       setProgress(prev => ({ 
         ...prev, 
         currentCardId: 1, 
         onboardingComplete: false,
+        dismissedByUser: false,
         completedCardIds: [],
         waitingForTrigger: null,
         exploringMode: true,
@@ -123,12 +128,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     } else if (progress.isMinimized) {
       setProgress(prev => ({ ...prev, isMinimized: false }));
     } else if (progress.currentCardId === null) {
-      setProgress(prev => ({ ...prev, currentCardId: 1, isMinimized: false }));
+      setProgress(prev => ({ ...prev, currentCardId: 1, isMinimized: false, dismissedByUser: false }));
     }
-  }, [progress.onboardingComplete, progress.currentCardId, progress.isMinimized]);
+  }, [progress.onboardingComplete, progress.currentCardId, progress.isMinimized, progress.dismissedByUser]);
 
   const hideOnboarding = useCallback(() => {
-    setProgress(prev => ({ ...prev, currentCardId: null, isMinimized: false, waitingForTrigger: null }));
+    setProgress(prev => ({ ...prev, currentCardId: null, isMinimized: false, waitingForTrigger: null, dismissedByUser: true }));
   }, []);
 
   const minimizeForAction = useCallback(() => {
@@ -303,6 +308,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       completedCardIds: progress.completedCardIds,
       exploringMode: progress.exploringMode,
       onboardingComplete: progress.onboardingComplete,
+      dismissedByUser: progress.dismissedByUser,
       waitingForTrigger: progress.waitingForTrigger,
       isMinimized: progress.isMinimized,
       showOnboarding,

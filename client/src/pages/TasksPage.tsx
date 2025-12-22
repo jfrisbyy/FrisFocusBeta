@@ -141,7 +141,7 @@ interface ApiSettings {
 
 export default function TasksPage() {
   const { toast } = useToast();
-  const { isOnboarding, triggerAction, triggerPenaltyCreated } = useOnboarding();
+  const { isOnboarding, triggerAction, triggerPenaltyCreated, onboardingComplete, dismissedByUser } = useOnboarding();
   const { isDemo } = useDemo();
   const useMockData = isDemo || isOnboarding;
   
@@ -217,12 +217,12 @@ export default function TasksPage() {
   const nonArchivedSeasons = seasons.filter((s) => !s.isArchived);
   const archivedSeasons = seasons.filter((s) => s.isArchived);
 
-  // Show welcome season dialog for new users with no seasons
+  // Show welcome season dialog for new users with no seasons (only after tutorial is complete or dismissed)
   useEffect(() => {
-    if (!useMockData && !seasonsLoading && seasons.length === 0) {
+    if (!useMockData && !seasonsLoading && seasons.length === 0 && (onboardingComplete || dismissedByUser)) {
       setWelcomeSeasonDialogOpen(true);
     }
-  }, [useMockData, seasonsLoading, seasons.length]);
+  }, [useMockData, seasonsLoading, seasons.length, onboardingComplete, dismissedByUser]);
 
   // Create first season mutation (with auto-activate)
   const createFirstSeasonMutation = useMutation({

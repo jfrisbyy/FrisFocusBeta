@@ -632,7 +632,7 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
                   data-testid="button-help-simplified-replay"
                 >
                   <PlayCircle className="h-4 w-4 mr-2" />
-                  Begin getting started walkthrough
+                  Begin Getting Started Walkthrough
                 </Button>
                 <Button
                   variant="outline"
@@ -761,7 +761,7 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
               data-testid="button-help-replay-tutorial"
             >
               <PlayCircle className="h-4 w-4 mr-2" />
-              Begin getting started walkthrough
+              Begin Getting Started Walkthrough
             </Button>
           )}
         </div>
