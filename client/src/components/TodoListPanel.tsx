@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Gift, Settings, StickyNote, Pencil, AlertTriangle, Download } from "lucide-react";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -61,6 +62,7 @@ export default function TodoListPanel({
   onExpandToggle,
   noCard = false,
 }: TodoListPanelProps) {
+  const { triggerAction } = useOnboarding();
   const [newTitle, setNewTitle] = useState("");
   const [newPoints, setNewPoints] = useState("0");
   const [newPenaltyEnabled, setNewPenaltyEnabled] = useState(false);
@@ -102,6 +104,7 @@ export default function TodoListPanel({
     setNewPoints("0");
     setNewPenaltyEnabled(false);
     setNewPenaltyValue("2");
+    triggerAction("todoCreated");
   };
 
   const handleToggleItem = (id: string) => {

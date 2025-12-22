@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { format, parseISO, isPast, isToday } from "date-fns";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,7 @@ export default function MilestonesPanel({
   onExpandToggle,
 }: MilestonesPanelProps) {
   const { toast } = useToast();
+  const { triggerAction } = useOnboarding();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -158,6 +160,7 @@ export default function MilestonesPanel({
         note: formNote || undefined,
       });
       toast({ title: "Milestone added", description: `"${formName}" has been added` });
+      triggerAction("milestoneCreated");
     }
 
     setDialogOpen(false);

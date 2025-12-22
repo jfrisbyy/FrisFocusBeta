@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles, Rocket } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles, Rocket, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
   Dialog,
   DialogContent,
@@ -363,12 +364,19 @@ interface HelpDialogProps {
   onOpenChange: (open: boolean) => void;
   filterCards?: HelpCardId[];
   startCard?: HelpCardId;
+  showReplayTutorial?: boolean;
 }
 
-export function HelpDialog({ open, onOpenChange, filterCards, startCard }: HelpDialogProps) {
+export function HelpDialog({ open, onOpenChange, filterCards, startCard, showReplayTutorial = true }: HelpDialogProps) {
+  const { showOnboarding, onboardingComplete, completedCardIds } = useOnboarding();
   const displayCards = filterCards 
     ? helpCards.filter(card => filterCards.includes(card.id))
     : helpCards;
+  
+  const handleReplayTutorial = () => {
+    onOpenChange(false);
+    showOnboarding();
+  };
   
   const initialIndex = startCard 
     ? displayCards.findIndex(card => card.id === startCard)
@@ -444,49 +452,64 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard }: HelpD
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-border flex-shrink-0 gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setCurrentIndex(i => i - 1)}
-            disabled={!hasPrev}
-            data-testid="button-help-prev"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Previous
-          </Button>
-
-          <div className="flex gap-1">
-            {displayCards.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-2 w-2 rounded-full transition-colors ${
-                  idx === currentIndex ? "bg-primary" : "bg-muted-foreground/30"
-                }`}
-                data-testid={`button-help-dot-${idx}`}
-              />
-            ))}
-          </div>
-
-          {hasNext ? (
+        <div className="flex flex-col gap-3 pt-4 border-t border-border flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setCurrentIndex(i => i + 1)}
-              data-testid="button-help-next"
+              onClick={() => setCurrentIndex(i => i - 1)}
+              disabled={!hasPrev}
+              data-testid="button-help-prev"
             >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
             </Button>
-          ) : (
+
+            <div className="flex gap-1">
+              {displayCards.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`h-2 w-2 rounded-full transition-colors ${
+                    idx === currentIndex ? "bg-primary" : "bg-muted-foreground/30"
+                  }`}
+                  data-testid={`button-help-dot-${idx}`}
+                />
+              ))}
+            </div>
+
+            {hasNext ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentIndex(i => i + 1)}
+                data-testid="button-help-next"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-help-done"
+              >
+                Got it
+              </Button>
+            )}
+          </div>
+
+          {showReplayTutorial && (onboardingComplete || completedCardIds.length > 0) && (
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
-              onClick={() => onOpenChange(false)}
-              data-testid="button-help-done"
+              onClick={handleReplayTutorial}
+              className="w-full"
+              data-testid="button-help-replay-tutorial"
             >
-              Got it
+              <PlayCircle className="h-4 w-4 mr-2" />
+              Replay Getting Started Tutorial
             </Button>
           )}
         </div>

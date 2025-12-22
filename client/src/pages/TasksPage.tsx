@@ -141,7 +141,7 @@ interface ApiSettings {
 
 export default function TasksPage() {
   const { toast } = useToast();
-  const { isOnboarding } = useOnboarding();
+  const { isOnboarding, triggerAction } = useOnboarding();
   const { isDemo } = useDemo();
   const useMockData = isDemo || isOnboarding;
   
@@ -265,6 +265,7 @@ export default function TasksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
       toast({ title: "Season created", description: `"${seasonName}" has been created` });
+      triggerAction("seasonCreated");
       setSeasonDialogOpen(false);
       setSeasonName("");
       setSeasonDescription("");
@@ -649,6 +650,7 @@ export default function TasksPage() {
       
       queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
       toast({ title: "Season created", description: `"${seasonName}" has been created` });
+      triggerAction("seasonCreated");
       setSeasonDialogOpen(false);
       setSeasonName("");
       setSeasonDescription("");
@@ -1035,6 +1037,7 @@ export default function TasksPage() {
       title: "Task added",
       description: `"${task.name}" has been added as ${task.priority.replace(/([A-Z])/g, " $1").toLowerCase()}`,
     });
+    triggerAction("taskCreated");
   };
 
   const handleEdit = (id: string, task: Omit<Task, "id">) => {
@@ -1274,6 +1277,7 @@ export default function TasksPage() {
         setCategories([...categories, newCategory]);
       }
       toast({ title: "Category added", description: `"${categoryName}" has been added` });
+      triggerAction("categoryCreated");
     }
 
     setCategoryDialogOpen(false);
