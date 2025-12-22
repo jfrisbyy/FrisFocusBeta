@@ -34,6 +34,7 @@ const defaultProgress: OnboardingProgress = {
 interface OnboardingContextType {
   isOnboarding: boolean;
   hasStartedJourney: boolean;
+  shouldShowTutorial: boolean;
   startJourney: () => void;
   currentCard: OnboardingCard | null;
   currentCardId: number | null;
@@ -83,19 +84,24 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, refetchUser } = useAuth();
   
   const hasStartedJourney = user?.hasStartedJourney ?? false;
+  // isOnboarding = user hasn't set up profile yet (for StartJourneyDialog)
   const isOnboarding = isAuthenticated && !hasStartedJourney;
 
   const [progress, setProgress] = useState<OnboardingProgress>(loadProgress);
+
+  // shouldShowTutorial = user is authenticated, has profile, but hasn't completed/skipped tutorial
+  const shouldShowTutorial = isAuthenticated && hasStartedJourney && !progress.onboardingComplete;
 
   useEffect(() => {
     saveProgress(progress);
   }, [progress]);
 
+  // Auto-start tutorial cards when user has profile but hasn't completed tutorial
   useEffect(() => {
-    if (isOnboarding && progress.currentCardId === null && !progress.onboardingComplete) {
+    if (shouldShowTutorial && progress.currentCardId === null) {
       setProgress(prev => ({ ...prev, currentCardId: 1 }));
     }
-  }, [isOnboarding, progress.currentCardId, progress.onboardingComplete]);
+  }, [shouldShowTutorial, progress.currentCardId]);
 
   const currentCard = progress.currentCardId ? getCardById(progress.currentCardId) ?? null : null;
 
@@ -290,6 +296,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     <OnboardingContext.Provider value={{ 
       isOnboarding, 
       hasStartedJourney, 
+      shouldShowTutorial,
       startJourney,
       currentCard,
       currentCardId: progress.currentCardId,
