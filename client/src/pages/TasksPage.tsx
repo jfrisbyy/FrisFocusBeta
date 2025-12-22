@@ -141,7 +141,7 @@ interface ApiSettings {
 
 export default function TasksPage() {
   const { toast } = useToast();
-  const { isOnboarding, triggerAction } = useOnboarding();
+  const { isOnboarding, triggerAction, triggerPenaltyCreated } = useOnboarding();
   const { isDemo } = useDemo();
   const useMockData = isDemo || isOnboarding;
   
@@ -1194,6 +1194,7 @@ export default function TasksPage() {
         setPenalties([...penalties, newPenalty]);
       }
       toast({ title: "Penalty added", description: `"${penaltyName}" has been added` });
+      triggerPenaltyCreated();
     }
 
     setPenaltyDialogOpen(false);

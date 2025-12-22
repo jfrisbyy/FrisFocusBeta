@@ -49,6 +49,8 @@ interface OnboardingContextType {
   resetOnboarding: () => void;
   getCardsForCurrentPage: (page: OnboardingPage) => OnboardingCard[];
   isCardCompleted: (cardId: number) => boolean;
+  triggerPenaltyCreated: () => void;
+  triggerDaySaved: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -219,6 +221,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     return progress.completedCardIds.includes(cardId);
   }, [progress.completedCardIds]);
 
+  const triggerPenaltyCreated = useCallback(() => {
+    triggerAction("penaltyCreated");
+  }, [triggerAction]);
+
+  const triggerDaySaved = useCallback(() => {
+    triggerAction("daySaved");
+  }, [triggerAction]);
+
   const startJourney = async () => {
     if (!user?.id) return;
     clearAllFrisFocusData();
@@ -246,6 +256,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       resetOnboarding,
       getCardsForCurrentPage,
       isCardCompleted,
+      triggerPenaltyCreated,
+      triggerDaySaved,
     }}>
       {children}
     </OnboardingContext.Provider>

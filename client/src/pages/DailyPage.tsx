@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpDialog } from "@/components/HelpDialog";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   loadTasksFromStorage,
@@ -95,6 +96,7 @@ interface SeasonWithData {
 export default function DailyPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
+  const { triggerDaySaved } = useOnboarding();
   const [date, setDate] = useState(new Date());
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
@@ -710,6 +712,7 @@ export default function DailyPage() {
           ? `Logged ${completedIds.size} tasks and added journal entry`
           : `Logged ${completedIds.size} tasks for ${format(date, "MMM d, yyyy")}`,
       });
+      triggerDaySaved();
     } catch (error) {
       // Fallback to localStorage only (include todoPoints and penaltyPoints)
       saveDailyLogToStorage({
@@ -726,6 +729,7 @@ export default function DailyPage() {
         title: "Saved locally",
         description: "Data saved to this device. Sign in to sync across devices.",
       });
+      triggerDaySaved();
     } finally {
       setIsSaving(false);
     }

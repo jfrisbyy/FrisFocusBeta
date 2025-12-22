@@ -1,11 +1,13 @@
-export type OnboardingPage = "dashboard" | "tasks" | "daily";
+export type OnboardingPage = "dashboard" | "tasks" | "daily" | "health";
 
 export type OnboardingTrigger = 
   | "immediate"
   | "seasonCreated"
   | "categoryCreated"
   | "taskCreated"
+  | "penaltyCreated"
   | "todoCreated"
+  | "daySaved"
   | "milestoneCreated"
   | "manual";
 
@@ -16,8 +18,8 @@ export interface OnboardingCard {
   content: string[];
   trigger?: OnboardingTrigger;
   showButtons?: {
-    primary?: { text: string; action: "next" | "explore" | "navigate"; navigateTo?: string };
-    secondary?: { text: string; action: "next" | "skip" };
+    primary?: { text: string; action: "next" | "explore" | "navigate" | "complete"; navigateTo?: string };
+    secondary?: { text: string; action: "next" | "skip" | "complete" };
   };
   highlightElement?: string;
 }
@@ -41,7 +43,7 @@ export const onboardingCards: OnboardingCard[] = [
     content: [
       "This platform has a lot to offer and it might be intimidating to start out. Let's get you comfortable around here so you can use this to its full potential!",
       "You can either flip through the rest of these cards, or start exploring now and learn as you go.",
-      "Don't worry, if you start exploring now you'll still be guided until you get the hang of things, and you can always find these cards by clicking the question mark under the settings gear."
+      "Don't worry, if you start exploring now you'll still be guided until you get the hang of things, and you can always find these cards by **clicking the question mark** under the settings gear."
     ],
     showButtons: {
       primary: { text: "Start Exploring", action: "explore" },
@@ -77,7 +79,7 @@ export const onboardingCards: OnboardingCard[] = [
       "Life doesn't stay static — your goals, responsibilities, and energy change over time. FrisFocus is built to move with you.",
       "A Season represents a phase of your life. You define what matters right now — without locking yourself into a single path.",
       "For example, your priorities and habits as a student will look much different than after you graduate. Both matter!",
-      "Click the + sign in the Seasons card at the top of this page to create a season. Name it whatever you'd like and describe what this phase of your life represents."
+      "**Click the + sign** in the Seasons card at the top of this page to create a season. Name it whatever you'd like and describe what this phase of your life represents."
     ],
     trigger: "seasonCreated",
     highlightElement: "button-add-season"
@@ -120,7 +122,7 @@ export const onboardingCards: OnboardingCard[] = [
       "We all have different responsibilities that we need to focus on at any given moment.",
       "Tasks are divided into categories to help you organize those items. Categories are fully customizable by you!",
       "Some common examples include: Health, Career, Spiritual, Social — but feel free to tailor them to anything that makes sense to you!",
-      "Go ahead and make at least 2 different categories by clicking on the + sign within the category card."
+      "Go ahead and make at least 2 different categories by **clicking on the + sign** within the category card."
     ],
     trigger: "categoryCreated",
     highlightElement: "button-add-category"
@@ -132,9 +134,9 @@ export const onboardingCards: OnboardingCard[] = [
     content: [
       "Great! Stay with me — you've almost got the hang of this!",
       "Before we start building tasks, you should understand that tasks are also categorized into different priority systems:",
-      "mustDo: Core actions that directly support your goals. Our system will alert you if you haven't done these tasks after 3 days.",
-      "shouldDo: Helpful actions that strengthen progress. You'll be alerted if you go 10 days without logging these tasks.",
-      "couldDo: Tasks that keep you balanced, but won't derail your goals if you skip them. Think of a fun activity or side project!"
+      "**mustDo**: Core actions that directly support your goals. Our system will alert you if you haven't done these tasks after 3 days.",
+      "**shouldDo**: Helpful actions that strengthen progress. You'll be alerted if you go 10 days without logging these tasks.",
+      "**couldDo**: Tasks that keep you balanced, but won't derail your goals if you skip them. Think of a fun activity or side project!"
     ],
     trigger: "immediate"
   },
@@ -175,7 +177,7 @@ export const onboardingCards: OnboardingCard[] = [
     page: "tasks",
     title: "Create Your First Task",
     content: [
-      "Now that you know all about tasks, go ahead and create your first task by clicking on the green Add Task button on this page!"
+      "Now that you know all about tasks, go ahead and create your first task by **clicking on the green Add Task button** on this page!"
     ],
     trigger: "taskCreated",
     highlightElement: "button-add-task"
@@ -187,7 +189,7 @@ export const onboardingCards: OnboardingCard[] = [
     content: [
       "Great job!",
       "Don't worry — it can be hard sometimes to figure out exactly what tasks you need to properly position yourself.",
-      "If you're feeling stuck, feel free to click the Generate With AI button. Our system will help you figure out exactly what you need to be focusing on to reach your goals!"
+      "If you're feeling stuck, feel free to **click the Generate With AI button**. Our system will help you figure out exactly what you need to be focusing on to reach your goals!"
     ],
     trigger: "immediate"
   },
@@ -198,8 +200,9 @@ export const onboardingCards: OnboardingCard[] = [
     content: [
       "Got any bad habits you need to break? Or maybe distractions that you need to eliminate?",
       "Penalties allow you to hold yourself accountable — losing points for giving in and earning points for time spent without!",
-      "Go ahead and think of one bad habit or distraction and click the Create a Penalty button underneath the task section."
+      "Go ahead and think of one bad habit or distraction and **click the Create a Penalty button** underneath the task section."
     ],
+    trigger: "penaltyCreated",
     highlightElement: "button-add-penalty"
   },
   {
@@ -210,6 +213,7 @@ export const onboardingCards: OnboardingCard[] = [
       "You're almost a pro at this point!",
       "Now let's head over to the Daily page on the top banner, right next to this Tasks page."
     ],
+    trigger: "immediate",
     showButtons: {
       primary: { text: "Go to Daily", action: "navigate", navigateTo: "/daily" }
     }
@@ -232,7 +236,7 @@ export const onboardingCards: OnboardingCard[] = [
       "To-do list items can be used however you'd like.",
       "Some people use it to organize which task items they'll be completing that day, while others use it to add one-off items that might not be part of your routine but still need to get done.",
       "Think \"Dentist appointment\" or \"Grocery shopping\".",
-      "Go ahead and create one to-do item for today — whatever you'd like!"
+      "Go ahead and create one to-do item for today — whatever you'd like! **Click the + button** in the To-Do section."
     ],
     trigger: "todoCreated",
     highlightElement: "button-add-todo"
@@ -243,7 +247,7 @@ export const onboardingCards: OnboardingCard[] = [
     title: "To-Do Created!",
     content: [
       "Oh, you're getting the hang of this now!",
-      "So now that you've got a task and a to-do list item, once you complete them, you would come to this page, click on them, and save your day to lock your points in!"
+      "So now that you've got a task and a to-do list item, once you complete them, you would come to this page, click on them, and **save your day** to lock your points in!"
     ],
     trigger: "immediate"
   },
@@ -253,8 +257,9 @@ export const onboardingCards: OnboardingCard[] = [
     title: "Journal Notes",
     content: [
       "On this page you can also add a journal note that will show up directly on the journal page!",
-      "Go ahead — write how you're feeling right now and click Save Day. Don't forget to check off your first task or to-do list item if you've completed it!"
+      "Go ahead — write how you're feeling right now and **click Save Day**. Don't forget to check off your first task or to-do list item if you've completed it!"
     ],
+    trigger: "daySaved",
   },
   {
     id: 22,
@@ -264,6 +269,7 @@ export const onboardingCards: OnboardingCard[] = [
       "Wow, I'm impressed — you're picking this up fast!",
       "Now that you've got this system figured out, let's navigate back to the dashboard."
     ],
+    trigger: "immediate",
     showButtons: {
       primary: { text: "Go to Dashboard", action: "navigate", navigateTo: "/" }
     }
@@ -283,7 +289,8 @@ export const onboardingCards: OnboardingCard[] = [
     title: "Milestones & More",
     content: [
       "This page also allows you to add more items to organize your life, such as due dates, weekly to-do list items, and milestones.",
-      "Go ahead — think about one major thing that you'd like to accomplish during this season of life and add it as a milestone. Don't forget to assign points to reward yourself once you complete it!"
+      "Go ahead — think about one major thing that you'd like to accomplish during this season of life and add it as a milestone. Don't forget to assign points to reward yourself once you complete it!",
+      "**Click the + button** in the Milestones section to add your first milestone."
     ],
     trigger: "milestoneCreated",
     highlightElement: "button-add-milestone"
@@ -295,8 +302,9 @@ export const onboardingCards: OnboardingCard[] = [
     content: [
       "You're on your way to success!",
       "FrisFocus is designed to tailor to you and your needs, and this dashboard is no different!",
-      "Click on the settings gear at the top of this page to explore some options. In there you can change colors, adjust your welcome message, decide what cards you'd like to see, and even adjust the order in which you view them!"
+      "**Click on the settings gear** at the top of this page to explore some options. In there you can change colors, adjust your welcome message, decide what cards you'd like to see, and even adjust the order in which you view them!"
     ],
+    trigger: "immediate",
     highlightElement: "button-dashboard-settings"
   },
   {
@@ -305,13 +313,46 @@ export const onboardingCards: OnboardingCard[] = [
     title: "You're All Set!",
     content: [
       "Now you've got all of the basics down, but we've got more!",
-      "With FrisFocus you can keep track of your health and fitness, earn Focus Points and Badges, chat with your own personal AI assistant tailored to you and your goals, compete with friends and motivate each other, and even post updates to the rest of this community!",
-      "Hop around on some of the other pages to keep exploring!"
+      "With FrisFocus you can keep track of your health and fitness, earn Focus Points and Badges, chat with your own personal AI assistant tailored to you and your own goals, compete with friends and motivate each other to achieve your goals, and even post updates on your thoughts or progress to the rest of this community!",
+      "Finish your onboarding journey to explore these other features, or go ahead and get started on your journey now!"
+    ],
+    showButtons: {
+      primary: { text: "Finish Onboarding", action: "navigate", navigateTo: "/health" },
+      secondary: { text: "Start My Journey", action: "complete" }
+    }
+  },
+  {
+    id: 27,
+    page: "health",
+    title: "Your Health Hub",
+    content: [
+      "This is your all inclusive Health hub!",
+      "Whether you are trying to lose weight, gain weight, or just maintain, our comprehensive system is designed to figure out the best plan for you.",
+      "FrisFocus meets you where you are and grows with you as your fitness goals evolve."
+    ],
+  },
+  {
+    id: 28,
+    page: "health",
+    title: "Track Your Nutrition",
+    content: [
+      "Keep track of your nutrition by **logging meals**, **manually entering macros**, by asking our AI system to estimate by giving a detailed description of your meal, or get an estimate by just **snapping a photo**!"
+    ],
+  },
+  {
+    id: 29,
+    page: "health",
+    title: "Workouts & Progress",
+    content: [
+      "Build custom workout routines aligned to your goals and track every gym session.",
+      "Athletes can log practice sessions and games to watch progress over time.",
+      "Runners can track all their runs — whether on the track, trail, or treadmill!",
+      "Consistently **log your weight** to make sure that you are on pace to hit your goals."
     ],
   },
 ];
 
-export const keepLearningCards = [1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18, 19, 21, 23, 24, 25, 26];
+export const keepLearningCards = [1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29];
 export const exploringCards = onboardingCards.map(c => c.id);
 
 export function getCardById(id: number): OnboardingCard | undefined {

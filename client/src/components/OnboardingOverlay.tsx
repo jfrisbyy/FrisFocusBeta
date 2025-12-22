@@ -6,16 +6,32 @@ import { useOnboarding } from "@/contexts/OnboardingContext";
 import { OnboardingPage } from "@/lib/onboardingCards";
 import { cn } from "@/lib/utils";
 
+function renderTextWithBold(text: string): JSX.Element {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, idx) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={idx}>{part.slice(2, -2)}</strong>;
+        }
+        return <span key={idx}>{part}</span>;
+      })}
+    </>
+  );
+}
+
 const pageColors: Record<OnboardingPage, string> = {
   dashboard: "border-l-primary",
   tasks: "border-l-green-500",
   daily: "border-l-blue-500",
+  health: "border-l-rose-500",
 };
 
 const pageBgColors: Record<OnboardingPage, string> = {
   dashboard: "bg-primary/5",
   tasks: "bg-green-500/5",
   daily: "bg-blue-500/5",
+  health: "bg-rose-500/5",
 };
 
 interface OnboardingOverlayProps {
@@ -48,6 +64,8 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
     } else if (action === "navigate" && currentCard.showButtons?.primary?.navigateTo) {
       setLocation(currentCard.showButtons.primary.navigateTo);
       goToNextCard();
+    } else if (action === "complete") {
+      completeOnboarding();
     } else {
       goToNextCard();
     }
@@ -56,7 +74,7 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
   const handleSecondaryAction = () => {
     const action = currentCard.showButtons?.secondary?.action;
     
-    if (action === "skip") {
+    if (action === "skip" || action === "complete") {
       completeOnboarding();
     } else if (action === "next") {
       if (currentCardId === 2) {
@@ -108,7 +126,7 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Card {currentCardId} of 26
+            Card {currentCardId} of 29
           </p>
         </CardHeader>
 
@@ -118,7 +136,7 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
               key={idx} 
               className="text-sm text-foreground leading-relaxed"
             >
-              {paragraph}
+              {renderTextWithBold(paragraph)}
             </p>
           ))}
         </CardContent>
