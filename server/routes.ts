@@ -8608,6 +8608,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
         "first_due_date", 
         "first_weekly_todo",
         "first_badge",
+        "completed_onboarding_tutorial",
       ];
       
       if (!allowedEvents.includes(eventType)) {

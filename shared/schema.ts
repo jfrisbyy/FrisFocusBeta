@@ -1584,7 +1584,8 @@ export const fpEventTypeEnum = z.enum([
   "first_circle_joined",
   "first_circle_created",
   "task_master",
-  "over_achiever"
+  "over_achiever",
+  "completed_onboarding_tutorial"
 ]);
 export type FpEventType = z.infer<typeof fpEventTypeEnum>;
 

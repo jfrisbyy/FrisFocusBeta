@@ -89,6 +89,7 @@ const oneTimeEvents: FpEventType[] = [
   "first_cheerline_sent",
   "first_circle_joined",
   "first_circle_created",
+  "completed_onboarding_tutorial",
 ];
 
 async function checkDuplicateAward(

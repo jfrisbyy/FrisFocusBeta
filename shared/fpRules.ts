@@ -347,6 +347,11 @@ export const fpRules: Record<FpEventType, FpRule> = {
     fpAmount: 10,
     description: "Over Achiever: Exceeded weekly goal by 15%",
   },
+  completed_onboarding_tutorial: {
+    eventType: "completed_onboarding_tutorial",
+    fpAmount: 50,
+    description: "Completed the onboarding tutorial",
+  },
 };
 
 export function getFpRule(eventType: FpEventType): FpRule {
