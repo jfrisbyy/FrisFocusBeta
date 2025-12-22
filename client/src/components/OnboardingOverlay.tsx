@@ -26,6 +26,10 @@ const pageColors: Record<OnboardingPage, string> = {
   tasks: "border-l-green-500",
   daily: "border-l-blue-500",
   health: "border-l-rose-500",
+  community: "border-l-violet-500",
+  insights: "border-l-amber-500",
+  journal: "border-l-cyan-500",
+  badges: "border-l-yellow-500",
 };
 
 const pageBgColors: Record<OnboardingPage, string> = {
@@ -33,6 +37,10 @@ const pageBgColors: Record<OnboardingPage, string> = {
   tasks: "bg-green-500/5",
   daily: "bg-blue-500/5",
   health: "bg-rose-500/5",
+  community: "bg-violet-500/5",
+  insights: "bg-amber-500/5",
+  journal: "bg-cyan-500/5",
+  badges: "bg-yellow-500/5",
 };
 
 interface OnboardingOverlayProps {
@@ -129,7 +137,7 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Card {currentCardId} of 29
+            Card {currentCardId} of 41
           </p>
         </CardHeader>
 

@@ -1,4 +1,4 @@
-export type OnboardingPage = "dashboard" | "tasks" | "daily" | "health";
+export type OnboardingPage = "dashboard" | "tasks" | "daily" | "health" | "community" | "insights" | "journal" | "badges";
 
 export type OnboardingTrigger = 
   | "immediate"
@@ -350,9 +350,129 @@ export const onboardingCards: OnboardingCard[] = [
       "Consistently **log your weight** to make sure that you are on pace to hit your goals."
     ],
   },
+  {
+    id: 30,
+    page: "community",
+    title: "Community Page",
+    content: [
+      "FrisFocus works solo — but becomes more powerful with others.",
+      "The community page is your hub for checking in on friends and their progress, and holding each other accountable!"
+    ],
+  },
+  {
+    id: 31,
+    page: "community",
+    title: "Friends: Shared Progress, Personal Support",
+    content: [
+      "FrisFocus lets you add friends to share progress, stay connected, and support each other along the way — without distracting from your personal system.",
+      "Friends don't change your goals. They make consistency easier."
+    ],
+  },
+  {
+    id: 32,
+    page: "community",
+    title: "Sharing Progress",
+    content: [
+      "When you add friends, you can choose to share what you would like, including task completions, streaks and milestones, progress updates, and fitness data.",
+      "Your structure stays personal — visibility is optional and intentional. Not all friends need the same level of visibility."
+    ],
+  },
+  {
+    id: 33,
+    page: "community",
+    title: "Circles",
+    content: [
+      "Circles are shared spaces where progress is visible and accountability is mutual, transforming goals into shared commitments.",
+      "Instead of everyone working alone, members follow a common task list and build consistency together.",
+      "Perfect for teams, friends, or families who want accountability to feel collaborative — not forced."
+    ],
+  },
+  {
+    id: 34,
+    page: "community",
+    title: "Awards & Badges in Circles",
+    content: [
+      "Within a Circle, you can create Awards and Badges to recognize progress and contribution.",
+      "Awards and Badges help turn shared effort into something tangible — without losing the focus on growth.",
+      "You can tie real life rewards to them if it makes sense for your circle!"
+    ],
+  },
+  {
+    id: 35,
+    page: "community",
+    title: "Competition",
+    content: [
+      "Go 1v1 with a friend, or compete Circle vs Circle, where groups follow the same task structure and progress is tracked collectively.",
+      "It's friendly pressure, designed to push everyone forward."
+    ],
+  },
+  {
+    id: 36,
+    page: "community",
+    title: "Feed: Shared Progress, Not Noise",
+    content: [
+      "The Feed is a simple space to share progress, reflections, and wins with the FrisFocus community.",
+      "It's not about likes or performance — it's about visibility, encouragement, and momentum.",
+      "Posts can be quick or thoughtful — whatever fits the moment."
+    ],
+  },
+  {
+    id: 37,
+    page: "insights",
+    title: "Insights: Your Personal AI Assistant",
+    content: [
+      "Insights is your personal AI assistant — built around your data and your goals.",
+      "It analyzes patterns across your tasks, habits, streaks, and seasons to help you understand what's working, what's not, and where small changes can make the biggest difference.",
+      "Think of it as a reflective partner that helps you spot trends, stay aligned, and make smarter decisions — without guessing."
+    ],
+  },
+  {
+    id: 38,
+    page: "insights",
+    title: "Customize Your Insights Assistant",
+    content: [
+      "Your Insights assistant isn't one-size-fits-all — you can shape how it works for you.",
+      "By **clicking the settings gear**, you can give it instructions about: how you like feedback delivered, what you want it to prioritize (discipline, balance, flexibility, performance), how strict or supportive you want it to be, and personal context that helps it understand you better.",
+      "The more you guide it, the better it reflects your values, goals, and preferences."
+    ],
+  },
+  {
+    id: 39,
+    page: "journal",
+    title: "Journal: Reflection That Connects the Dots",
+    content: [
+      "The Journal is a space to capture thoughts, reflections, and check-ins as you move through your days.",
+      "It's designed to help you slow down, make sense of your progress, and notice patterns that aren't always visible in the moment.",
+      "Entries can be quick notes, honest reflections, lessons learned, moments worth remembering — whatever you need it to be!",
+      "Your journal stays personal — but it works alongside your tasks, seasons, and insights to give your growth context."
+    ],
+  },
+  {
+    id: 40,
+    page: "badges",
+    title: "Badges: Proof of Consistency",
+    content: [
+      "Badges represent moments of earned consistency and follow-through. They're not about perfection — they mark effort, commitment, and showing up over time.",
+      "Badges are awarded for: sustained habits, meaningful streaks, milestones reached, and growth across a Season.",
+      "They serve as quiet proof of the work you've put in — and reminders of what you're capable of when you stay consistent."
+    ],
+  },
+  {
+    id: 41,
+    page: "dashboard",
+    title: "You're All Set!",
+    content: [
+      "Congratulations, you've officially completed your onboarding journey!",
+      "You've got the basics down. You've been introduced to the system, but the real value comes from taking time to shape it around your life.",
+      "Explore, adjust, and build it out at your own pace. We'll be here as you make it yours."
+    ],
+    showButtons: {
+      primary: { text: "Start My Journey", action: "complete" }
+    }
+  },
 ];
 
-export const keepLearningCards = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29];
+export const keepLearningCards = [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41];
 export const exploringCards = onboardingCards.map(c => c.id);
 
 export function getCardById(id: number): OnboardingCard | undefined {
