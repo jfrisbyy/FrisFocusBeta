@@ -1,9 +1,10 @@
 import { useLocation } from "wouter";
-import { ChevronRight, MessageCircle, X, Sparkles } from "lucide-react";
+import { ChevronRight, MessageCircle, X, Sparkles, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useOnboarding } from "@/contexts/OnboardingContext";
-import { OnboardingPage } from "@/lib/onboardingCards";
+import { OnboardingPage, getCardById } from "@/lib/onboardingCards";
 import { cn } from "@/lib/utils";
 
 function renderTextWithBold(text: string): JSX.Element {
@@ -44,14 +45,16 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
     currentCard,
     currentCardId,
     exploringMode,
+    isMinimized,
     goToNextCard,
     goToCard,
     setExploringMode,
     hideOnboarding,
+    minimizeForAction,
     completeOnboarding,
   } = useOnboarding();
 
-  if (!currentCard) {
+  if (!currentCard || isMinimized) {
     return null;
   }
 
@@ -168,15 +171,13 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
           ) : currentCard.trigger && currentCard.trigger !== "immediate" && currentCard.trigger !== "manual" ? (
             <div className="flex items-center justify-between w-full gap-2">
               <p className="text-xs text-muted-foreground">
-                Complete the action above to continue
+                Complete the action to continue
               </p>
               <Button 
-                variant="ghost"
-                size="sm"
-                onClick={handleDismiss}
-                data-testid="button-onboarding-later"
+                onClick={minimizeForAction}
+                data-testid="button-onboarding-do-now"
               >
-                I'll do it later
+                I'll do this now
               </Button>
             </div>
           ) : (
@@ -213,6 +214,42 @@ export function OnboardingOverlay({ onAskCoach }: OnboardingOverlayProps) {
           )}
         </CardFooter>
       </Card>
+    </div>
+  );
+}
+
+export function OnboardingMinimizedIndicator() {
+  const { isMinimized, currentCardId, showOnboarding, waitingForTrigger } = useOnboarding();
+
+  if (!isMinimized || !currentCardId) {
+    return null;
+  }
+
+  const card = getCardById(currentCardId);
+  if (!card) return null;
+
+  const triggerLabels: Record<string, string> = {
+    seasonCreated: "Create a season",
+    taskCreated: "Create a task",
+    penaltyCreated: "Create a penalty", 
+    daySaved: "Save your day",
+    aiTasksGenerated: "Generate tasks with AI",
+  };
+
+  const actionLabel = waitingForTrigger ? triggerLabels[waitingForTrigger] || "Complete the action" : "Complete the action";
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={showOnboarding}
+        className="shadow-lg flex items-center gap-2"
+        data-testid="button-onboarding-minimized"
+      >
+        <Clock className="h-4 w-4 text-primary animate-pulse" />
+        <span className="text-xs">Waiting: {actionLabel}</span>
+      </Button>
     </div>
   );
 }

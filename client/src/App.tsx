@@ -11,7 +11,7 @@ import Navigation from "@/components/Navigation";
 import DemoBanner from "@/components/DemoBanner";
 import StartJourneyButton from "@/components/StartJourneyButton";
 import OnboardingBanner from "@/components/OnboardingBanner";
-import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { OnboardingOverlay, OnboardingMinimizedIndicator } from "@/components/OnboardingOverlay";
 import Dashboard from "@/pages/Dashboard";
 import DailyPage from "@/pages/DailyPage";
 import TasksPage from "@/pages/TasksPage";
@@ -81,6 +81,7 @@ function AuthenticatedApp() {
         </main>
         {isAuthenticated && <StartJourneyButton />}
         {isAuthenticated && <OnboardingOverlay onAskCoach={handleAskCoach} />}
+        {isAuthenticated && <OnboardingMinimizedIndicator />}
       </div>
     </JourneyDialogProvider>
   );

@@ -19,6 +19,7 @@ interface OnboardingProgress {
   exploringMode: boolean;
   onboardingComplete: boolean;
   waitingForTrigger: OnboardingTrigger | null;
+  isMinimized: boolean;
 }
 
 const defaultProgress: OnboardingProgress = {
@@ -27,6 +28,7 @@ const defaultProgress: OnboardingProgress = {
   exploringMode: true,
   onboardingComplete: false,
   waitingForTrigger: null,
+  isMinimized: false,
 };
 
 interface OnboardingContextType {
@@ -39,8 +41,10 @@ interface OnboardingContextType {
   exploringMode: boolean;
   onboardingComplete: boolean;
   waitingForTrigger: OnboardingTrigger | null;
+  isMinimized: boolean;
   showOnboarding: () => void;
   hideOnboarding: () => void;
+  minimizeForAction: () => void;
   goToNextCard: () => void;
   goToCard: (cardId: number) => void;
   setExploringMode: (exploring: boolean) => void;
@@ -108,15 +112,29 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         completedCardIds: [],
         waitingForTrigger: null,
         exploringMode: true,
+        isMinimized: false,
       }));
+    } else if (progress.isMinimized) {
+      setProgress(prev => ({ ...prev, isMinimized: false }));
     } else if (progress.currentCardId === null) {
-      setProgress(prev => ({ ...prev, currentCardId: 1 }));
+      setProgress(prev => ({ ...prev, currentCardId: 1, isMinimized: false }));
     }
-  }, [progress.onboardingComplete, progress.currentCardId]);
+  }, [progress.onboardingComplete, progress.currentCardId, progress.isMinimized]);
 
   const hideOnboarding = useCallback(() => {
-    setProgress(prev => ({ ...prev, currentCardId: null }));
+    setProgress(prev => ({ ...prev, currentCardId: null, isMinimized: false, waitingForTrigger: null }));
   }, []);
+
+  const minimizeForAction = useCallback(() => {
+    const card = progress.currentCardId ? getCardById(progress.currentCardId) : null;
+    if (card?.trigger && card.trigger !== "immediate" && card.trigger !== "manual") {
+      setProgress(prev => ({
+        ...prev,
+        isMinimized: true,
+        waitingForTrigger: card.trigger!,
+      }));
+    }
+  }, [progress.currentCardId]);
 
   const goToNextCard = useCallback(() => {
     const sequence = getActiveCardSequence();
@@ -166,6 +184,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         ...prev,
         currentCardId: cardId,
         waitingForTrigger: null,
+        isMinimized: false,
       }));
     }
   }, []);
@@ -198,12 +217,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
             : [...prev.completedCardIds, currentCard.id],
           currentCardId: nextCardId,
           waitingForTrigger: null,
+          isMinimized: false,
         }));
         return;
       }
     }
     
-    // Fallback: check waitingForTrigger (for cards that were skipped/hidden)
+    // Fallback: check waitingForTrigger (for cards that were minimized)
     if (progress.waitingForTrigger === trigger) {
       const waitingCard = sequence
         .map(id => getCardById(id))
@@ -221,6 +241,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
               : [...prev.completedCardIds, waitingCard.id],
             currentCardId: nextCardId,
             waitingForTrigger: null,
+            isMinimized: false,
           }));
         }
       }
@@ -233,6 +254,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       currentCardId: null,
       onboardingComplete: true,
       waitingForTrigger: null,
+      isMinimized: false,
     }));
   }, []);
 
@@ -275,8 +297,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       exploringMode: progress.exploringMode,
       onboardingComplete: progress.onboardingComplete,
       waitingForTrigger: progress.waitingForTrigger,
+      isMinimized: progress.isMinimized,
       showOnboarding,
       hideOnboarding,
+      minimizeForAction,
       goToNextCard,
       goToCard,
       setExploringMode,
