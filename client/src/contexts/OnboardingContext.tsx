@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { clearAllFrisFocusData } from "@/lib/storage";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   onboardingCards, 
   keepLearningCards, 
@@ -12,6 +13,7 @@ import {
 } from "@/lib/onboardingCards";
 
 const ONBOARDING_STORAGE_KEY = "frisfocus_onboarding_progress";
+const ONBOARDING_REWARD_KEY = "frisfocus_onboarding_reward_granted";
 
 interface OnboardingProgress {
   currentCardId: number | null;
@@ -259,7 +261,35 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }
   }, [progress.currentCardId, progress.waitingForTrigger, progress.completedCardIds, getActiveCardSequence]);
 
-  const completeOnboarding = useCallback(() => {
+  const completeOnboarding = useCallback(async () => {
+    // Award 50 FP on FIRST onboarding completion (not on replay)
+    // Use a separate persistent key that survives tutorial replays
+    const rewardAlreadyGranted = localStorage.getItem(ONBOARDING_REWARD_KEY) === "true";
+    
+    if (!rewardAlreadyGranted) {
+      try {
+        const response = await apiRequest("POST", "/api/fp/award-onetime", {
+          activityKey: "completed_onboarding_tutorial",
+          points: 50,
+          message: "Completed onboarding tutorial",
+        });
+        
+        // Mark reward as granted on success (200) or already claimed (409)
+        if (response.ok || response.status === 409) {
+          localStorage.setItem(ONBOARDING_REWARD_KEY, "true");
+        }
+        
+        if (response.ok) {
+          // Invalidate FP-related queries to show the new points
+          queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/fp/history"] });
+        }
+      } catch (error) {
+        // Network or other errors - don't mark as granted so user can retry
+        console.error("Failed to award onboarding FP:", error);
+      }
+    }
+    
     setProgress(prev => ({
       ...prev,
       currentCardId: null,
