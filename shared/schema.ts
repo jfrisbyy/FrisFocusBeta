@@ -25,6 +25,8 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   fpTotal: integer("fp_total").default(0),
   hasStartedJourney: boolean("has_started_journey").default(false),
+  onboardingProgress: jsonb("onboarding_progress"),
+  onboardingRewardGranted: boolean("onboarding_reward_granted").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

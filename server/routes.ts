@@ -276,6 +276,58 @@ export async function registerRoutes(
     }
   });
 
+  // Get onboarding progress
+  app.get('/api/onboarding/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        progress: user.onboardingProgress || null,
+        rewardGranted: user.onboardingRewardGranted || false,
+      });
+    } catch (error) {
+      console.error("Error fetching onboarding progress:", error);
+      res.status(500).json({ message: "Failed to fetch onboarding progress" });
+    }
+  });
+
+  // Update onboarding progress
+  app.put('/api/onboarding/progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { progress, rewardGranted } = req.body;
+
+      const updateData: Record<string, any> = { updatedAt: new Date() };
+      
+      if (progress !== undefined) {
+        updateData.onboardingProgress = progress;
+      }
+      if (rewardGranted !== undefined) {
+        updateData.onboardingRewardGranted = rewardGranted;
+      }
+
+      const [updatedUser] = await db.update(users)
+        .set(updateData)
+        .where(eq(users.id, userId))
+        .returning();
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        progress: updatedUser.onboardingProgress,
+        rewardGranted: updatedUser.onboardingRewardGranted,
+      });
+    } catch (error) {
+      console.error("Error updating onboarding progress:", error);
+      res.status(500).json({ message: "Failed to update onboarding progress" });
+    }
+  });
+
   // Firebase auth endpoint - create/update user from Firebase token
   app.post('/api/auth/firebase', isAuthenticated, async (req: any, res) => {
     try {
