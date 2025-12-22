@@ -288,9 +288,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (!rewardGranted) {
       try {
         const response = await apiRequest("POST", "/api/fp/award-onetime", {
-          activityKey: "completed_onboarding_tutorial",
-          points: 50,
-          message: "Completed onboarding tutorial",
+          eventType: "completed_onboarding_tutorial",
         });
         
         // Mark reward as granted on success (200) or already claimed (409)
