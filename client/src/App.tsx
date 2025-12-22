@@ -56,11 +56,6 @@ function Router() {
 
 function AuthenticatedApp() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
-  
-  const handleAskCoach = () => {
-    setLocation("/insights");
-  };
   
   if (isLoading) {
     return (
@@ -80,7 +75,7 @@ function AuthenticatedApp() {
           <Router />
         </main>
         {isAuthenticated && <StartJourneyButton />}
-        {isAuthenticated && <OnboardingOverlay onAskCoach={handleAskCoach} />}
+        {isAuthenticated && <OnboardingOverlay />}
         {isAuthenticated && <OnboardingMinimizedIndicator />}
       </div>
     </JourneyDialogProvider>

@@ -41,13 +41,13 @@ export const onboardingCards: OnboardingCard[] = [
     page: "dashboard",
     title: "Getting Started",
     content: [
-      "This platform has a lot to offer and it might be intimidating to start out. Let's get you comfortable around here so you can use this to its full potential!",
-      "You can either flip through the rest of these cards, or start exploring now and learn as you go.",
-      "Don't worry, if you start exploring now you'll still be guided until you get the hang of things, and you can always find these cards by **clicking the question mark** under the settings gear."
+      "This platform has a lot to offer and it might seem intimidating to start out, but don't worry! Let's get you comfortable around here so you can use this to its full potential!",
+      "Start exploring now for a full walkthrough!",
+      "If you'd like to come back to these at a later time, you can always find these cards by **clicking the question mark** under the settings gear."
     ],
     showButtons: {
       primary: { text: "Start Exploring", action: "explore" },
-      secondary: { text: "Keep Learning", action: "next" }
+      secondary: { text: "Skip for now", action: "complete" }
     }
   },
   {
@@ -481,4 +481,11 @@ export function getCardById(id: number): OnboardingCard | undefined {
 
 export function getCardsForPage(page: OnboardingPage): OnboardingCard[] {
   return onboardingCards.filter(c => c.page === page);
+}
+
+export function getOnboardingContentForAI(): string {
+  return onboardingCards.map(card => {
+    const content = card.content.join("\n");
+    return `Card ${card.id} (${card.page}): ${card.title}\n${content}`;
+  }).join("\n\n---\n\n");
 }

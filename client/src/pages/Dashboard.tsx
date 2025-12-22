@@ -1873,6 +1873,7 @@ export default function Dashboard() {
       <HelpDialog 
         open={helpDialogOpen} 
         onOpenChange={handleHelpDialogClose}
+        simplified={true}
       />
 
       {(() => {
