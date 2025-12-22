@@ -136,9 +136,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       const nextCard = getCardById(nextCardId);
       
       if (nextCard?.trigger && nextCard.trigger !== "immediate" && nextCard.trigger !== "manual") {
+        // Show the card so user can see instructions, and set waiting for trigger
         setProgress(prev => ({
           ...prev,
-          currentCardId: null,
+          currentCardId: nextCardId,
           waitingForTrigger: nextCard.trigger!,
         }));
       } else {
