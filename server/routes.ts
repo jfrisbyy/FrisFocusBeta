@@ -3446,8 +3446,20 @@ Create motivating badges that will encourage consistency. Return valid JSON only
   app.post("/api/seasons", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // Check if user has any active seasons
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      // Auto-activate the first season if user has no active seasons
+      const shouldAutoActivate = !activeSeason;
+      
       const parsed = insertSeasonSchema.parse({ ...req.body, userId });
-      const [season] = await db.insert(seasons).values(parsed).returning();
+      const [season] = await db.insert(seasons).values({
+        ...parsed,
+        isActive: shouldAutoActivate ? true : (parsed.isActive ?? false),
+      }).returning();
       res.json(season);
     } catch (error) {
       console.error("Error creating season:", error);
@@ -7108,11 +7120,23 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Get all user categories
+  // Get all user categories (from active season)
   app.get("/api/habit/categories", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const categories = await db.select().from(userCategories).where(eq(userCategories.userId, userId));
+      
+      // First, find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        // No active season, return empty array
+        return res.json([]);
+      }
+      
+      // Get categories from the active season
+      const categories = await db.select().from(seasonCategories).where(eq(seasonCategories.seasonId, activeSeason.id));
       res.json(categories);
     } catch (error) {
       console.error("Error fetching user categories:", error);
@@ -7120,12 +7144,25 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Create a new user category
+  // Create a new user category (in active season)
   app.post("/api/habit/categories", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const parsed = insertUserCategorySchema.parse({ ...req.body, userId });
-      const [category] = await db.insert(userCategories).values(parsed).returning();
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season. Please create a season first." });
+      }
+      
+      const { name } = req.body;
+      const [category] = await db.insert(seasonCategories).values({
+        seasonId: activeSeason.id,
+        name,
+      }).returning();
       res.json(category);
     } catch (error) {
       console.error("Error creating user category:", error);
@@ -7133,16 +7170,26 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Update a user category
+  // Update a user category (in active season)
   app.put("/api/habit/categories/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const categoryId = req.params.id;
-      const { name, color } = req.body;
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season" });
+      }
+      
+      const { name } = req.body;
 
-      const [category] = await db.update(userCategories)
-        .set({ name, color })
-        .where(and(eq(userCategories.id, categoryId), eq(userCategories.userId, userId)))
+      const [category] = await db.update(seasonCategories)
+        .set({ name })
+        .where(and(eq(seasonCategories.id, categoryId), eq(seasonCategories.seasonId, activeSeason.id)))
         .returning();
 
       if (!category) {
@@ -7155,14 +7202,23 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Delete a user category
+  // Delete a user category (from active season)
   app.delete("/api/habit/categories/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const categoryId = req.params.id;
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season" });
+      }
 
-      const [deleted] = await db.delete(userCategories)
-        .where(and(eq(userCategories.id, categoryId), eq(userCategories.userId, userId)))
+      const [deleted] = await db.delete(seasonCategories)
+        .where(and(eq(seasonCategories.id, categoryId), eq(seasonCategories.seasonId, activeSeason.id)))
         .returning();
 
       if (!deleted) {
@@ -7175,11 +7231,23 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Get all user penalties
+  // Get all user penalties (from active season)
   app.get("/api/habit/penalties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const penalties = await db.select().from(userPenalties).where(eq(userPenalties.userId, userId));
+      
+      // First, find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        // No active season, return empty array
+        return res.json([]);
+      }
+      
+      // Get penalties from the active season
+      const penalties = await db.select().from(seasonPenalties).where(eq(seasonPenalties.seasonId, activeSeason.id));
       res.json(penalties);
     } catch (error) {
       console.error("Error fetching user penalties:", error);
@@ -7187,12 +7255,30 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Create a new user penalty
+  // Create a new user penalty (in active season)
   app.post("/api/habit/penalties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const parsed = insertUserPenaltySchema.parse({ ...req.body, userId });
-      const [penalty] = await db.insert(userPenalties).values(parsed).returning();
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season. Please create a season first." });
+      }
+      
+      const { name, value, negativeBoostEnabled, timesThreshold, period, boostPenaltyPoints } = req.body;
+      const [penalty] = await db.insert(seasonPenalties).values({
+        seasonId: activeSeason.id,
+        name,
+        value: value || -5,
+        negativeBoostEnabled: negativeBoostEnabled || false,
+        timesThreshold: timesThreshold || null,
+        period: period || null,
+        boostPenaltyPoints: boostPenaltyPoints || null,
+      }).returning();
       res.json(penalty);
     } catch (error) {
       console.error("Error creating user penalty:", error);
@@ -7200,16 +7286,26 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Update a user penalty
+  // Update a user penalty (in active season)
   app.put("/api/habit/penalties/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const penaltyId = req.params.id;
-      const { name, value } = req.body;
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season" });
+      }
+      
+      const { name, value, negativeBoostEnabled, timesThreshold, period, boostPenaltyPoints } = req.body;
 
-      const [penalty] = await db.update(userPenalties)
-        .set({ name, value })
-        .where(and(eq(userPenalties.id, penaltyId), eq(userPenalties.userId, userId)))
+      const [penalty] = await db.update(seasonPenalties)
+        .set({ name, value, negativeBoostEnabled, timesThreshold, period, boostPenaltyPoints })
+        .where(and(eq(seasonPenalties.id, penaltyId), eq(seasonPenalties.seasonId, activeSeason.id)))
         .returning();
 
       if (!penalty) {
@@ -7222,14 +7318,23 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
-  // Delete a user penalty
+  // Delete a user penalty (from active season)
   app.delete("/api/habit/penalties/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const penaltyId = req.params.id;
+      
+      // Find the user's active season
+      const [activeSeason] = await db.select().from(seasons).where(
+        and(eq(seasons.userId, userId), eq(seasons.isActive, true), eq(seasons.isArchived, false))
+      );
+      
+      if (!activeSeason) {
+        return res.status(400).json({ error: "No active season" });
+      }
 
-      const [deleted] = await db.delete(userPenalties)
-        .where(and(eq(userPenalties.id, penaltyId), eq(userPenalties.userId, userId)))
+      const [deleted] = await db.delete(seasonPenalties)
+        .where(and(eq(seasonPenalties.id, penaltyId), eq(seasonPenalties.seasonId, activeSeason.id)))
         .returning();
 
       if (!deleted) {

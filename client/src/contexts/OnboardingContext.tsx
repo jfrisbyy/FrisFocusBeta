@@ -75,7 +75,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load onboarding progress from API
-  const { data: serverData } = useQuery({
+  const { data: serverData } = useQuery<{ progress: OnboardingProgress | null; rewardGranted: boolean }>({
     queryKey: ["/api/onboarding/progress"],
     enabled: isAuthenticated,
   });
@@ -83,7 +83,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   // Initialize progress from server data when it loads
   useEffect(() => {
     if (serverData && !hasLoadedFromServer) {
-      const serverProgress = serverData.progress as OnboardingProgress | null;
+      const serverProgress = serverData.progress;
       if (serverProgress) {
         setProgress({ ...defaultProgress, ...serverProgress });
       }
