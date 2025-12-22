@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { clearAllFrisFocusData } from "@/lib/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { 
   onboardingCards, 
   keepLearningCards, 
@@ -11,9 +12,6 @@ import {
   OnboardingTrigger,
   OnboardingPage
 } from "@/lib/onboardingCards";
-
-const ONBOARDING_STORAGE_KEY = "frisfocus_onboarding_progress";
-const ONBOARDING_REWARD_KEY = "frisfocus_onboarding_reward_granted";
 
 interface OnboardingProgress {
   currentCardId: number | null;
@@ -65,41 +63,64 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-function loadProgress(): OnboardingProgress {
-  try {
-    const saved = localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    if (saved) {
-      return { ...defaultProgress, ...JSON.parse(saved) };
-    }
-  } catch (e) {
-    console.error("Failed to load onboarding progress:", e);
-  }
-  return defaultProgress;
-}
-
-function saveProgress(progress: OnboardingProgress) {
-  try {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(progress));
-  } catch (e) {
-    console.error("Failed to save onboarding progress:", e);
-  }
-}
-
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, refetchUser } = useAuth();
   
   const hasStartedJourney = user?.hasStartedJourney ?? false;
-  // isOnboarding = user hasn't set up profile yet (for StartJourneyDialog)
   const isOnboarding = isAuthenticated && !hasStartedJourney;
 
-  const [progress, setProgress] = useState<OnboardingProgress>(loadProgress);
+  const [progress, setProgress] = useState<OnboardingProgress>(defaultProgress);
+  const [rewardGranted, setRewardGranted] = useState(false);
+  const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load onboarding progress from API
+  const { data: serverData } = useQuery({
+    queryKey: ["/api/onboarding/progress"],
+    enabled: isAuthenticated,
+  });
+
+  // Initialize progress from server data when it loads
+  useEffect(() => {
+    if (serverData && !hasLoadedFromServer) {
+      const serverProgress = serverData.progress as OnboardingProgress | null;
+      if (serverProgress) {
+        setProgress({ ...defaultProgress, ...serverProgress });
+      }
+      setRewardGranted(serverData.rewardGranted || false);
+      setHasLoadedFromServer(true);
+    }
+  }, [serverData, hasLoadedFromServer]);
+
+  // Save progress to API when it changes (debounced)
+  useEffect(() => {
+    if (!isAuthenticated || !hasLoadedFromServer) return;
+    
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce save to avoid too many API calls
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await apiRequest("PUT", "/api/onboarding/progress", {
+          progress,
+        });
+      } catch (error) {
+        console.error("Failed to save onboarding progress:", error);
+      }
+    }, 500);
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [progress, isAuthenticated, hasLoadedFromServer]);
 
   // shouldShowTutorial = user is authenticated, has profile, but hasn't completed/skipped tutorial
   const shouldShowTutorial = isAuthenticated && hasStartedJourney && !progress.onboardingComplete;
-
-  useEffect(() => {
-    saveProgress(progress);
-  }, [progress]);
 
   // Auto-start tutorial cards when user has profile but hasn't completed tutorial
   // Don't auto-start if user has manually dismissed the tutorial
@@ -263,10 +284,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const completeOnboarding = useCallback(async () => {
     // Award 50 FP on FIRST onboarding completion (not on replay)
-    // Use a separate persistent key that survives tutorial replays
-    const rewardAlreadyGranted = localStorage.getItem(ONBOARDING_REWARD_KEY) === "true";
-    
-    if (!rewardAlreadyGranted) {
+    // Use server-side rewardGranted flag that survives tutorial replays
+    if (!rewardGranted) {
       try {
         const response = await apiRequest("POST", "/api/fp/award-onetime", {
           activityKey: "completed_onboarding_tutorial",
@@ -276,13 +295,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         
         // Mark reward as granted on success (200) or already claimed (409)
         if (response.ok || response.status === 409) {
-          localStorage.setItem(ONBOARDING_REWARD_KEY, "true");
+          setRewardGranted(true);
+          // Persist to server
+          await apiRequest("PUT", "/api/onboarding/progress", {
+            rewardGranted: true,
+          });
         }
         
         if (response.ok) {
           // Invalidate FP-related queries to show the new points
           queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
           queryClient.invalidateQueries({ queryKey: ["/api/fp/history"] });
+          // Refresh user to get updated state
+          refetchUser();
         }
       } catch (error) {
         // Network or other errors - don't mark as granted so user can retry
@@ -297,11 +322,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       waitingForTrigger: null,
       isMinimized: false,
     }));
-  }, []);
+    
+    // Refresh user to sync onboarding state
+    refetchUser();
+  }, [rewardGranted, refetchUser]);
 
   const resetOnboarding = useCallback(() => {
     setProgress(defaultProgress);
-    localStorage.removeItem(ONBOARDING_STORAGE_KEY);
   }, []);
 
   const getCardsForCurrentPage = useCallback((page: OnboardingPage): OnboardingCard[] => {

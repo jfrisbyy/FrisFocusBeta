@@ -295,6 +295,16 @@ export async function registerRoutes(
   });
 
   // Update onboarding progress
+  const onboardingProgressSchema = z.object({
+    currentCardId: z.number().nullable(),
+    completedCardIds: z.array(z.number()),
+    exploringMode: z.boolean(),
+    onboardingComplete: z.boolean(),
+    dismissedByUser: z.boolean(),
+    waitingForTrigger: z.string().nullable(),
+    isMinimized: z.boolean(),
+  }).strict();
+
   app.put('/api/onboarding/progress', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -303,9 +313,10 @@ export async function registerRoutes(
       const updateData: Record<string, any> = { updatedAt: new Date() };
       
       if (progress !== undefined) {
-        updateData.onboardingProgress = progress;
+        const validatedProgress = onboardingProgressSchema.parse(progress);
+        updateData.onboardingProgress = validatedProgress;
       }
-      if (rewardGranted !== undefined) {
+      if (typeof rewardGranted === 'boolean') {
         updateData.onboardingRewardGranted = rewardGranted;
       }
 
@@ -323,6 +334,9 @@ export async function registerRoutes(
         rewardGranted: updatedUser.onboardingRewardGranted,
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid onboarding progress data", errors: error.errors });
+      }
       console.error("Error updating onboarding progress:", error);
       res.status(500).json({ message: "Failed to update onboarding progress" });
     }
