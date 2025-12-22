@@ -179,6 +179,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     
     // Check if current card has this trigger - if so, advance to next card
     const currentCard = progress.currentCardId ? getCardById(progress.currentCardId) : null;
+    console.log('[Onboarding] triggerAction called:', {
+      trigger,
+      currentCardId: progress.currentCardId,
+      currentCardTrigger: currentCard?.trigger,
+      sequence,
+      exploringMode: progress.exploringMode,
+    });
     if (currentCard?.trigger === trigger) {
       const cardIndex = sequence.indexOf(currentCard.id);
       if (cardIndex >= 0) {
