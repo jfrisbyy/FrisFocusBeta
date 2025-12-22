@@ -368,7 +368,7 @@ interface HelpDialogProps {
 }
 
 export function HelpDialog({ open, onOpenChange, filterCards, startCard, showReplayTutorial = true }: HelpDialogProps) {
-  const { showOnboarding, onboardingComplete, completedCardIds } = useOnboarding();
+  const { showOnboarding, onboardingComplete, completedCardIds, hasStartedJourney } = useOnboarding();
   const displayCards = filterCards 
     ? helpCards.filter(card => filterCards.includes(card.id))
     : helpCards;
@@ -500,7 +500,7 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
             )}
           </div>
 
-          {showReplayTutorial && (onboardingComplete || completedCardIds.length > 0) && (
+          {showReplayTutorial && (hasStartedJourney || onboardingComplete || completedCardIds.length > 0) && (
             <Button
               variant="outline"
               size="sm"
