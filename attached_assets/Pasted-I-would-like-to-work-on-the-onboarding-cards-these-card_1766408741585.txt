@@ -1,0 +1,109 @@
+I would like to work on the onboarding cards, these cards should show in order and align with the page required and the action that is tied to activating the next card if applicable 
+
+Card 1 - Dashboard 
+
+Welcome to FrisFocus
+FrisFocus helps you organize your life around what actually matters — and follow through with structure, accountability, and visibility.
+This isn’t about doing more.
+It’s about doing what matters, consistently.
+You can start solo, or with others.
+You can keep things simple, or build something competitive.
+You can adjust anytime.
+There’s no “perfect” setup — just one that fits you right now.
+
+Card 2 - Dashboard page
+Getting Started 
+This platform has a lot to offer and it might be intimidating to start out, let’s get you comfortable around here so you can use this to its full potential! 
+You can either flip through the rest of these cards, or start exploring now and learn as you go. Don’t worry, if you start exploring now you’ll still be guided until you get the hang of things, and you can always find these cards here at the top of the dashboard by clicking the question mark right underneath the settings gear. 
+(user presented with two options, start exploring which opens up card 3, or keep learning, which advances to the next slide in the series of 10) 
+
+Card 3 - Dashboard page
+Start Exploring 
+Great, you’re ready to start exploring! Let’s get started by opening up the tasks page, that will help make all of this make sense! 
+Remember, this is a quick setup walkthrough — most people finish in about 5 minutes. You don’t need to get it perfect and you can change anything later.
+
+
+Cad 4 - Tasks page 
+This right here is the engine behind the person that you strive to be! All of the habits and routines that will keep you on track live here. Let’s start by creating a season. 
+Card 5 - Tasks page
+Life doesn’t stay static,  your goals, responsibilities, and energy change over time.
+FrisFocus is built to move with you.
+A Season represents a phase of your life, you define what matters right now — without locking yourself into a single path. 
+For example, your priorities and the habits that build you up as a student will look much different than the priorities that you would need after you graduate. Both matter! 
+Click the + sign in the Seasons card at the top of this page to create a season, name it whatever you’d like and feel free to describe what this phase of your life represents or looks like for you in the description. 
+
+Card 6 - Tasks page (after Season is created)
+Nice, you just created your first season! When you feel your circumstances shifting, you can always create a new one, and don’t worry you’ll still be able to look back on this season to reflect! 
+
+Card 7 - Tasks page 
+Now, lets get some tasks on the board. 
+Tasks represent actions you repeat regularly to support your current Season — like workouts, study sessions, journaling, recovery habits, or daily routines.They form the foundation of your consistency. Think about the type of person that you’d like to be in 6 months, and ask yourself, what actions would I need to take consistently in order to achieve that goal? Those are the things you should be putting here. 
+
+
+
+Card 8 - Tasks page
+You’re not limited to a fixed number of tasks, create as many as make sense for you! Don’t just think big, feel free to add the micro habits that will help you along the way as well that you might not pay too much mind, for example brushing your teeth, or making your bed. 
+
+Card 9 - Tasks page 
+We all have different responsibilities that we need to focus on at any given moment, tasks are divided into categories to help you organize those items. Categories are fully customizable by you, some common examples of different categories could include health, career, spiritual, social, but feel free to tailor them to anything that makes sense to you! Go head and make at least 2 different categories by clicking on the + sign within the category card. 
+
+Card 10 - Tasks page (after 2 categories are created) 
+Great! Stay with me, you’ve almost got the hang of this! Before we start building tasks, you should understand that tasks are also categorized into different priority systems.  
+mustDo: Core actions that directly support your goals, our system will alert you if you haven’t done these tasks after 3 days 
+shouldDo: Helpful actions that strengthen progress, you’ll be alerted if you go 10 days without logging these tasks
+couldDo: These are the tasks that are helpful to keep you balanced, but won’t derail your goals if you go without them. Think of a fun activity you like to do, or a side project you’ve been working on! 
+
+Card 11 - Tasks page 
+Finally, you need to understand scoring. You will set both a daily personal point goal and a weekly personal point goal. Each task will be assigned a certain amount of points that will roll up towards these goals as you complete them. This is your private system — designed to keep you aligned and intentional day to day. The default daily goal is 50, with a weekly goal of 350, but feel free to adjust this to a scale that makes sense for you as you get the hang of things around here! 
+
+
+
+Card 12 - Tasks page 
+When scoring a task, keep in mind the scale of your goal! For example, if your daily goal is 50 points, it wouldn’t make sense for one task to be worth 30 points, this could break your system. Remember to score tasks based on priority, and how difficult it might be for you to complete. For example, if fitness is a main priority and you know that consistency in the gym has been an issue, this should be worth more points than something that is also important but might be less tedious for you, such as eating your recommended serving of fruits and vegetables. 
+
+Card 13 - Tasks page 
+When creating a task you can also add boosters and penalties, rewarding you for consistency! Using the previous example, if showing up in the gym consistently has been an issue, you could add a booster that says once you go to the gym 3 times in one week you earn additional points! On the other hand, you could also say that if you don’t go to the gym at least 1 time in a week, you lose points. 
+Card 14 - Tasks page 
+
+Now that you know all about tasks, go head and create your first task by clicking on the green add task button on this page! 
+
+Card 15 - Tasks page (after task is created)
+Great job! Don’t worry, it can be hard sometimes to figure out exactly what tasks you need in place to properly position yourself. If you’re feeling stuck, feel free to click the Generate With AI button, our system will help you figure out exactly what you need to be focusing on to reach your goals! 
+
+Card 16 - Tasks page 
+Got any bad habits you need to break? Or maybe distractions that you need to eliminate? Penalties allow you to hold yourself accountable, losing points for giving in and earning points for time spent without! Go head and think of one bad habit or distraction and click the create a penalty button underneath the task section
+
+
+
+Card 16 - Tasks page 
+You’re almost a pro at this point! Now lets head over to the daily page on the top banner right next to this tasks page. 
+
+Card 17 - Daily page 
+You’ve created your task library, now this is where you keep track of how you’re living. Everyday you’ll come here and log what tasks you’ve completed to earn your points. On this same page, you can also add your schedule for each day of the week, or schedules, and you can even add a daily to do list. 
+Card 18 - Daily page 
+To do list items can be used however you’d like. Some people like to use it to organize which task items they’ll be completing that day, while others like to use it to add the one off items that might not necessarily be part of your routine, but still need to get done. Think “Dentist appointment” or “Grocery shopping”. 
+Go ahead and create one to do item for today, whatever you’d like! 
+
+Card 19 - Daily page (after to do list item is added)
+Oh you’re getting the hang of this now! So now that you’ve got a task and a to do list item, once you complete them, you would come to this page, click on them, and save your day to lock your points in! 
+Card 20 - Daily page 
+On this page you can also add a journal note that will show up directly on the journal page! Go ahead, write how you’re feeling right now and click save day, and don’t forget to check off your first task or to do list item if you’ve completed it! 
+Card 21 - Daily page
+Wow, I’m impressed, you’re picking this up fast! Now that you’ve got this system figured out, lets navigate back to the dashboard. 
+
+
+
+Card 22 - Dashboard
+You’ve got a lot of knowledge now so this page should make more sense. This is your hub to view your progress easily. Here you can track how close you are to hitting your weekly point goal,the breakdown of what you did each day of the week, your streak, and even the alert system for tasks you need to complete. 
+Card 23 - Dashboard
+This page also allows you to add more items to organize your life, such as due dates, weekly to-do list items, and milestones. Go ahead, think about one major thing that you’d like to accomplish during this season of life and add it as a milestone, don’t forget to assign points to reward yourself once you complete it! 
+
+Card 24 - Dashboard (after milestone is created)
+You’re on your way to success! FrisFocus is designed to tailor to you and your needs, and this dashboard is no different! Click on the settings gear at the top of this page to explore some options, in there you can change colors, adjust your welcome message, decide what cards you’d like to see on this dashboard, and even adjust the order in which you view them! 
+
+Card 25 - Dashboard 
+Now you’ve got all of the basics down, but we’ve got more! With FrisFocus you can keep track of your health and fitness, earn Focus Points and Badges, chat with your own personal AI assistant tailored to you and your own goals, compete with friends and motivate each other to achieve your goals, and even post updates on your thoughts or progress to the rest of this community! Hop around on some of the other pages to keep exploring! 
+
+
+
+
