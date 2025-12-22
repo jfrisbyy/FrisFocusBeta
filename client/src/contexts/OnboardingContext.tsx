@@ -175,8 +175,29 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const triggerAction = useCallback((trigger: OnboardingTrigger) => {
+    const sequence = getActiveCardSequence();
+    
+    // Check if current card has this trigger - if so, advance to next card
+    const currentCard = progress.currentCardId ? getCardById(progress.currentCardId) : null;
+    if (currentCard?.trigger === trigger) {
+      const cardIndex = sequence.indexOf(currentCard.id);
+      if (cardIndex >= 0) {
+        const nextCardId = cardIndex < sequence.length - 1 ? sequence[cardIndex + 1] : null;
+        
+        setProgress(prev => ({
+          ...prev,
+          completedCardIds: prev.completedCardIds.includes(currentCard.id)
+            ? prev.completedCardIds
+            : [...prev.completedCardIds, currentCard.id],
+          currentCardId: nextCardId,
+          waitingForTrigger: null,
+        }));
+        return;
+      }
+    }
+    
+    // Fallback: check waitingForTrigger (for cards that were skipped/hidden)
     if (progress.waitingForTrigger === trigger) {
-      const sequence = getActiveCardSequence();
       const waitingCard = sequence
         .map(id => getCardById(id))
         .find(c => c?.trigger === trigger && !progress.completedCardIds.includes(c.id));
@@ -197,7 +218,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [progress.waitingForTrigger, progress.completedCardIds, getActiveCardSequence]);
+  }, [progress.currentCardId, progress.waitingForTrigger, progress.completedCardIds, getActiveCardSequence]);
 
   const completeOnboarding = useCallback(() => {
     setProgress(prev => ({
