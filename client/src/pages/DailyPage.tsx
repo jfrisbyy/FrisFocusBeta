@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ import {
   type StoredTodoItem,
   type StoredTaskTier,
 } from "@/lib/storage";
+import type { JournalFolder } from "@shared/schema";
 
 interface DisplayTask {
   id: string;
@@ -96,6 +98,7 @@ interface SeasonWithData {
 export default function DailyPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
+  const { user } = useAuth();
   const { triggerDaySaved } = useOnboarding();
   const [date, setDate] = useState(new Date());
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
@@ -111,6 +114,7 @@ export default function DailyPage() {
   const [taskTiers, setTaskTiers] = useState<Record<string, string>>({});
   const [savedCompletedIds, setSavedCompletedIds] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedJournalFolderId, setSelectedJournalFolderId] = useState<string | null>(null);
   
   // Track which date we've already loaded log data for to prevent re-running
   const loadedLogDateRef = useRef<string | null>(null);
@@ -180,6 +184,12 @@ export default function DailyPage() {
     queryKey: ["/api/habit/daily-todos", previousDayStr],
     enabled: !isDemo,
   });
+
+  // Fetch journal folders for folder selection
+  const { data: journalFolders = [] } = useQuery<JournalFolder[]>({
+    queryKey: ["/api/journal/folders"],
+    enabled: !isDemo && !!user,
+  });
   
   // Check if API queries have completed their initial fetch
   // Also wait for historical season data if needed
@@ -226,6 +236,24 @@ export default function DailyPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
+    },
+  });
+
+  // Mutation for creating enhanced journal entry (with folder support)
+  const createEnhancedJournalEntryMutation = useMutation({
+    mutationFn: async (data: { date: string; title: string; content: string; folderId?: string }) => {
+      const response = await apiRequest("POST", "/api/journal/entries", {
+        date: data.date,
+        title: data.title,
+        content: data.content,
+        folderId: data.folderId || null,
+        entryType: "journal",
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/journal/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
     },
   });
@@ -647,12 +675,22 @@ export default function DailyPage() {
       const journalDate = format(now, "yyyy-MM-dd");
       
       try {
-        // Save via API for authenticated users
-        await createJournalEntryMutation.mutateAsync({
-          date: journalDate,
-          title: timeTitle,
-          content: notes.trim(),
-        });
+        // Use enhanced API with folder support if a folder is selected
+        if (selectedJournalFolderId) {
+          await createEnhancedJournalEntryMutation.mutateAsync({
+            date: journalDate,
+            title: timeTitle,
+            content: notes.trim(),
+            folderId: selectedJournalFolderId,
+          });
+        } else {
+          // Save via API for authenticated users (legacy endpoint)
+          await createJournalEntryMutation.mutateAsync({
+            date: journalDate,
+            title: timeTitle,
+            content: notes.trim(),
+          });
+        }
       } catch (error) {
         // Fallback to localStorage if API fails
         const newJournalEntry: StoredJournalEntry = {
@@ -889,6 +927,9 @@ export default function DailyPage() {
             onNotesChange={setNotes}
             onSave={handleSave}
             isSaving={isSaving}
+            folders={journalFolders.map(f => ({ id: f.id, name: f.name, color: f.color || "#6366f1" }))}
+            selectedFolderId={selectedJournalFolderId}
+            onFolderChange={setSelectedJournalFolderId}
           />
         </div>
       </div>

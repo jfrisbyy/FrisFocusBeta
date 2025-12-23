@@ -1,7 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Save, Check, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Save, Check, X, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HelpIndicator, helpContent } from "@/components/HelpIndicator";
 
@@ -9,6 +16,12 @@ interface CompletedTask {
   id: string;
   name: string;
   value: number;
+}
+
+interface JournalFolderOption {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface DailySummaryProps {
@@ -21,6 +34,9 @@ interface DailySummaryProps {
   onNotesChange: (notes: string) => void;
   onSave: () => void;
   isSaving?: boolean;
+  folders?: JournalFolderOption[];
+  selectedFolderId?: string | null;
+  onFolderChange?: (folderId: string | null) => void;
 }
 
 export default function DailySummary({
@@ -33,6 +49,9 @@ export default function DailySummary({
   onNotesChange,
   onSave,
   isSaving,
+  folders = [],
+  selectedFolderId,
+  onFolderChange,
 }: DailySummaryProps) {
   const netTotal = positivePoints + negativePoints + todoPoints + checkInBonus;
   const positiveTasks = completedTasks.filter(t => t.value > 0);
@@ -116,6 +135,29 @@ export default function DailySummary({
             rows={3}
             data-testid="input-notes"
           />
+          {folders.length > 0 && onFolderChange && (
+            <Select
+              value={selectedFolderId || "none"}
+              onValueChange={(v) => onFolderChange(v === "none" ? null : v)}
+            >
+              <SelectTrigger className="text-sm" data-testid="select-journal-folder">
+                <SelectValue placeholder="Save to folder..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" data-testid="select-folder-none">
+                  <span className="text-muted-foreground">No folder</span>
+                </SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id} data-testid={`select-folder-${folder.id}`}>
+                    <div className="flex items-center gap-2">
+                      <Folder className="h-3 w-3" style={{ color: folder.color }} />
+                      {folder.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <Button
           onClick={onSave}
