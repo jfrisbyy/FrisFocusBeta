@@ -176,6 +176,12 @@ export default function TasksPage() {
   const [welcomeSeasonDialogOpen, setWelcomeSeasonDialogOpen] = useState(false);
   const [firstSeasonName, setFirstSeasonName] = useState("");
   
+  // Season time frame editing state
+  const [editTimeFrameDialogOpen, setEditTimeFrameDialogOpen] = useState(false);
+  const [editingSeasonStartDate, setEditingSeasonStartDate] = useState<string>("");
+  const [editingSeasonEndDate, setEditingSeasonEndDate] = useState<string>("");
+  const [countdownNow, setCountdownNow] = useState(new Date());
+  
   // Track loaded season to prevent auto-save on initial load
   const lastLoadedSeasonIdRef = useRef<string | null>(null);
   const hasUserModifiedDataRef = useRef(false);
@@ -335,6 +341,33 @@ export default function TasksPage() {
       toast({ title: "Error", description: "Failed to update season goal", variant: "destructive" });
     },
   });
+
+  // Update season time frame mutation
+  const updateSeasonTimeFrameMutation = useMutation({
+    mutationFn: async (data: { seasonId: string; startDate: string | null; endDate: string | null }) => {
+      const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}`, { 
+        startDate: data.startDate,
+        endDate: data.endDate,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      toast({ title: "Time frame updated", description: "Season dates have been updated" });
+      setEditTimeFrameDialogOpen(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update time frame", variant: "destructive" });
+    },
+  });
+
+  // Update countdown timer every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdownNow(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Import tasks to season mutation
   const importToSeasonMutation = useMutation({
@@ -624,6 +657,46 @@ export default function TasksPage() {
     setImportCategories([]);
     setImportPenalties([]);
     setSeasonDialogOpen(true);
+  };
+
+  const handleOpenEditTimeFrame = () => {
+    if (activeSeason) {
+      setEditingSeasonStartDate(activeSeason.startDate ? new Date(activeSeason.startDate).toISOString().split('T')[0] : "");
+      setEditingSeasonEndDate(activeSeason.endDate ? new Date(activeSeason.endDate).toISOString().split('T')[0] : "");
+      setEditTimeFrameDialogOpen(true);
+    }
+  };
+
+  const handleSaveTimeFrame = () => {
+    if (activeSeason) {
+      updateSeasonTimeFrameMutation.mutate({
+        seasonId: activeSeason.id,
+        startDate: editingSeasonStartDate || null,
+        endDate: editingSeasonEndDate || null,
+      });
+    }
+  };
+
+  // Helper function to format countdown
+  const formatCountdown = (endDate: Date | string | null): string | null => {
+    if (!endDate) return null;
+    const end = new Date(endDate);
+    const now = countdownNow;
+    const diff = end.getTime() - now.getTime();
+    
+    if (diff <= 0) return "Season ended";
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (days > 0) {
+      return `${days}d ${hours}h remaining`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`;
+    } else {
+      return `${minutes}m remaining`;
+    }
   };
 
   const handleSaveSeason = async () => {
@@ -1470,6 +1543,38 @@ export default function TasksPage() {
                 {activeSeason?.description && (
                   <p className="text-xs text-muted-foreground">{activeSeason.description}</p>
                 )}
+                {activeSeason && (activeSeason.startDate || activeSeason.endDate) && (
+                  <div className="p-2 bg-muted rounded-md space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {activeSeason.startDate && (
+                          <>Starts: {new Date(activeSeason.startDate).toLocaleDateString()}</>
+                        )}
+                        {activeSeason.startDate && activeSeason.endDate && " - "}
+                        {activeSeason.endDate && (
+                          <>Ends: {new Date(activeSeason.endDate).toLocaleDateString()}</>
+                        )}
+                      </span>
+                    </div>
+                    {activeSeason.endDate && (
+                      <div className="text-sm font-medium text-primary" data-testid="text-season-countdown">
+                        {formatCountdown(activeSeason.endDate)}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {activeSeason && !isActiveSeasonArchived && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleOpenEditTimeFrame}
+                    data-testid="button-edit-time-frame"
+                  >
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Edit Time Frame
+                  </Button>
+                )}
                 {activeSeason && !isActiveSeasonArchived && (
                   <Button
                     size="sm"
@@ -1943,6 +2048,64 @@ export default function TasksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editTimeFrameDialogOpen} onOpenChange={setEditTimeFrameDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Edit Season Time Frame
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Set start and end dates to track how much time is left in this season.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="season-start-date">Start Date (optional)</Label>
+              <Input
+                id="season-start-date"
+                type="date"
+                value={editingSeasonStartDate}
+                onChange={(e) => setEditingSeasonStartDate(e.target.value)}
+                data-testid="input-season-start-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="season-end-date">End Date</Label>
+              <Input
+                id="season-end-date"
+                type="date"
+                value={editingSeasonEndDate}
+                onChange={(e) => setEditingSeasonEndDate(e.target.value)}
+                data-testid="input-season-end-date"
+              />
+              <p className="text-xs text-muted-foreground">
+                Set an end date to see a countdown of time remaining in this season.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditTimeFrameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveTimeFrame}
+              disabled={updateSeasonTimeFrameMutation.isPending}
+              data-testid="button-save-time-frame"
+            >
+              {updateSeasonTimeFrameMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Time Frame"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={welcomeSeasonDialogOpen} onOpenChange={(open) => {
         // Only allow closing if user has at least one season
