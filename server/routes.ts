@@ -8556,6 +8556,137 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
+  // ==================== SEASONS API ====================
+
+  // Get all seasons for user
+  app.get("/api/seasons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seasons = await storage.getSeasons(userId);
+      res.json(seasons);
+    } catch (error) {
+      console.error("Error fetching seasons:", error);
+      res.status(500).json({ error: "Failed to fetch seasons" });
+    }
+  });
+
+  // Get active season for user
+  app.get("/api/seasons/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const season = await storage.getActiveSeason(userId);
+      res.json(season || null);
+    } catch (error) {
+      console.error("Error fetching active season:", error);
+      res.status(500).json({ error: "Failed to fetch active season" });
+    }
+  });
+
+  // Get single season
+  app.get("/api/seasons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seasonId = req.params.id;
+      const season = await storage.getSeason(seasonId, userId);
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      res.json(season);
+    } catch (error) {
+      console.error("Error fetching season:", error);
+      res.status(500).json({ error: "Failed to fetch season" });
+    }
+  });
+
+  // Create season
+  app.post("/api/seasons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description, startDate, endDate, isActive, weeklyGoal } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Season name is required" });
+      }
+
+      // If setting this season as active, deactivate all others first
+      if (isActive) {
+        const existingSeasons = await storage.getSeasons(userId);
+        for (const s of existingSeasons) {
+          if (s.isActive) {
+            await storage.updateSeason(s.id, userId, { isActive: false });
+          }
+        }
+      }
+
+      const season = await storage.createSeason({
+        userId,
+        name,
+        description: description || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        isActive: isActive || false,
+        weeklyGoal: weeklyGoal || 100,
+      });
+      res.status(201).json(season);
+    } catch (error) {
+      console.error("Error creating season:", error);
+      res.status(400).json({ error: "Failed to create season" });
+    }
+  });
+
+  // Update season
+  app.put("/api/seasons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seasonId = req.params.id;
+      const { name, description, startDate, endDate, isActive, isArchived, weeklyGoal } = req.body;
+
+      // If setting this season as active, deactivate all others first
+      if (isActive) {
+        const existingSeasons = await storage.getSeasons(userId);
+        for (const s of existingSeasons) {
+          if (s.isActive && s.id !== seasonId) {
+            await storage.updateSeason(s.id, userId, { isActive: false });
+          }
+        }
+      }
+
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
+      if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (isArchived !== undefined) updateData.isArchived = isArchived;
+      if (weeklyGoal !== undefined) updateData.weeklyGoal = weeklyGoal;
+
+      const season = await storage.updateSeason(seasonId, userId, updateData);
+      if (!season) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      res.json(season);
+    } catch (error) {
+      console.error("Error updating season:", error);
+      res.status(400).json({ error: "Failed to update season" });
+    }
+  });
+
+  // Delete season
+  app.delete("/api/seasons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const seasonId = req.params.id;
+      const deleted = await storage.deleteSeason(seasonId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Season not found" });
+      }
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting season:", error);
+      res.status(500).json({ error: "Failed to delete season" });
+    }
+  });
+
   // ==================== USER STATS SYNC API ====================
 
   // Schema for validating stats sync payload
