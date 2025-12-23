@@ -8602,7 +8602,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
   app.post("/api/seasons", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { name, description, startDate, endDate, isActive, weeklyGoal } = req.body;
+      const { name, description, startDate, endDate, isActive, weeklyGoal, bannerColor } = req.body;
       
       if (!name) {
         return res.status(400).json({ error: "Season name is required" });
@@ -8626,6 +8626,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
         endDate: endDate ? new Date(endDate) : null,
         isActive: isActive || false,
         weeklyGoal: weeklyGoal || 100,
+        bannerColor: bannerColor || "default",
       });
       res.status(201).json(season);
     } catch (error) {
@@ -8639,7 +8640,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     try {
       const userId = req.user.claims.sub;
       const seasonId = req.params.id;
-      const { name, description, startDate, endDate, isActive, isArchived, weeklyGoal } = req.body;
+      const { name, description, startDate, endDate, isActive, isArchived, weeklyGoal, bannerColor } = req.body;
 
       // If setting this season as active, deactivate all others first
       if (isActive) {
@@ -8659,6 +8660,7 @@ Create motivating badges that will encourage consistency. Return valid JSON only
       if (isActive !== undefined) updateData.isActive = isActive;
       if (isArchived !== undefined) updateData.isArchived = isArchived;
       if (weeklyGoal !== undefined) updateData.weeklyGoal = weeklyGoal;
+      if (bannerColor !== undefined) updateData.bannerColor = bannerColor;
 
       const season = await storage.updateSeason(seasonId, userId, updateData);
       if (!season) {
