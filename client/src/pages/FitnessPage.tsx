@@ -6396,8 +6396,10 @@ function LivePlaySettingsDialog({
       onOpenChange(false);
       return;
     }
+    console.log("Saving visibleFields:", selectedFields);
     updateMutation.mutate({ visibleFields: selectedFields }, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        console.log("Save successful, response:", data);
         toast({ title: "Settings saved" });
         onOpenChange(false);
       }
