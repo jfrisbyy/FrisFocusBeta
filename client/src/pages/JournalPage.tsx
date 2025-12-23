@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -182,6 +183,9 @@ export default function JournalPage() {
   
   // Filter by tracker template
   const [filterTemplateId, setFilterTemplateId] = useState<string | null>(null);
+  
+  // View entry popup state
+  const [viewingEntry, setViewingEntry] = useState<JournalEntry | null>(null);
 
   // Fetch journal folders
   const { data: folders = [] } = useQuery<JournalFolder[]>({
@@ -538,7 +542,17 @@ export default function JournalPage() {
           title: formTitle.trim() || undefined,
           fieldValues: formFieldValues,
         });
+      } else if (user && formFolderId) {
+        // Save journal entry WITH folder using enhanced entries API
+        await createEnhancedEntryMutation.mutateAsync({
+          folderId: formFolderId,
+          entryType: "journal",
+          date: dateStr,
+          title: formTitle.trim(),
+          content: formContent.trim(),
+        });
       } else if (user) {
+        // Save journal entry WITHOUT folder using legacy API
         try {
           await createMutation.mutateAsync({
             date: dateStr,
@@ -1029,8 +1043,9 @@ export default function JournalPage() {
                       {groupedEntries[dateStr].map((entry) => (
                         <div
                           key={entry.id}
-                          className="flex items-start gap-4 p-3 rounded-md bg-muted/30"
+                          className="flex items-start gap-4 p-3 rounded-md bg-muted/30 cursor-pointer hover-elevate"
                           data-testid={`journal-entry-${entry.id}`}
+                          onClick={() => setViewingEntry(entry)}
                         >
                           <div className="flex-1 min-w-0 space-y-1">
                             <div className="flex items-center gap-2">
@@ -1044,7 +1059,7 @@ export default function JournalPage() {
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -1521,6 +1536,49 @@ export default function JournalPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Entry Dialog */}
+      <Dialog open={!!viewingEntry} onOpenChange={(open) => !open && setViewingEntry(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewingEntry?.title}</DialogTitle>
+            <DialogDescription>
+              {viewingEntry && format(parseISO(viewingEntry.date), "EEEE, MMMM d, yyyy")} at {viewingEntry && format(parseISO(viewingEntry.createdAt), "h:mm a")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm whitespace-pre-wrap">{viewingEntry?.content}</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (viewingEntry) {
+                  handleEditEntry(viewingEntry);
+                  setViewingEntry(null);
+                }
+              }}
+              data-testid="button-edit-from-view"
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (viewingEntry) {
+                  setDeleteEntry(viewingEntry);
+                  setViewingEntry(null);
+                }
+              }}
+              data-testid="button-delete-from-view"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
