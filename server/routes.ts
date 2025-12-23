@@ -8234,6 +8234,328 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     }
   });
 
+  // ==================== JOURNAL FOLDERS API ====================
+
+  // Get all journal folders
+  app.get("/api/journal/folders", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const folders = await storage.getJournalFolders(userId);
+      res.json(folders);
+    } catch (error) {
+      console.error("Error fetching journal folders:", error);
+      res.status(500).json({ error: "Failed to fetch journal folders" });
+    }
+  });
+
+  // Create a new journal folder
+  app.post("/api/journal/folders", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, color, icon, sortOrder, isDefault } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Folder name is required" });
+      }
+      
+      const folder = await storage.createJournalFolder({
+        userId,
+        name,
+        color: color || "#6366f1",
+        icon: icon || "folder",
+        sortOrder: sortOrder || 0,
+        isDefault: isDefault || false,
+      });
+      res.status(201).json(folder);
+    } catch (error) {
+      console.error("Error creating journal folder:", error);
+      res.status(400).json({ error: "Failed to create journal folder" });
+    }
+  });
+
+  // Update a journal folder
+  app.put("/api/journal/folders/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const folderId = req.params.id;
+      const { name, color, icon, sortOrder, isDefault } = req.body;
+      
+      const folder = await storage.updateJournalFolder(folderId, userId, {
+        name,
+        color,
+        icon,
+        sortOrder,
+        isDefault,
+      });
+      
+      if (!folder) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+      res.json(folder);
+    } catch (error) {
+      console.error("Error updating journal folder:", error);
+      res.status(400).json({ error: "Failed to update journal folder" });
+    }
+  });
+
+  // Delete a journal folder
+  app.delete("/api/journal/folders/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const folderId = req.params.id;
+      
+      const deleted = await storage.deleteJournalFolder(folderId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting journal folder:", error);
+      res.status(500).json({ error: "Failed to delete journal folder" });
+    }
+  });
+
+  // ==================== JOURNAL TEMPLATES API ====================
+
+  // Get all journal templates
+  app.get("/api/journal/templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templates = await storage.getJournalTemplates(userId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching journal templates:", error);
+      res.status(500).json({ error: "Failed to fetch journal templates" });
+    }
+  });
+
+  // Get a specific journal template
+  app.get("/api/journal/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templateId = req.params.id;
+      
+      const template = await storage.getJournalTemplate(templateId, userId);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching journal template:", error);
+      res.status(500).json({ error: "Failed to fetch journal template" });
+    }
+  });
+
+  // Create a new journal template
+  app.post("/api/journal/templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, description, icon, color, fields, isActive } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Template name is required" });
+      }
+      
+      const template = await storage.createJournalTemplate({
+        userId,
+        name,
+        description,
+        icon: icon || "clipboard-list",
+        color: color || "#8b5cf6",
+        fields: fields || [],
+        isActive: isActive ?? true,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating journal template:", error);
+      res.status(400).json({ error: "Failed to create journal template" });
+    }
+  });
+
+  // Update a journal template
+  app.put("/api/journal/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templateId = req.params.id;
+      const { name, description, icon, color, fields, isActive } = req.body;
+      
+      const template = await storage.updateJournalTemplate(templateId, userId, {
+        name,
+        description,
+        icon,
+        color,
+        fields,
+        isActive,
+      });
+      
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating journal template:", error);
+      res.status(400).json({ error: "Failed to update journal template" });
+    }
+  });
+
+  // Delete a journal template
+  app.delete("/api/journal/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const templateId = req.params.id;
+      
+      const deleted = await storage.deleteJournalTemplate(templateId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting journal template:", error);
+      res.status(500).json({ error: "Failed to delete journal template" });
+    }
+  });
+
+  // ==================== ENHANCED JOURNAL ENTRIES API ====================
+
+  // Get all enhanced journal entries (with optional folder filter)
+  app.get("/api/journal/entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const folderId = req.query.folderId as string | undefined;
+      
+      const entries = await storage.getJournalEntriesNew(userId, folderId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching journal entries:", error);
+      res.status(500).json({ error: "Failed to fetch journal entries" });
+    }
+  });
+
+  // Get a specific enhanced journal entry
+  app.get("/api/journal/entries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entryId = req.params.id;
+      
+      const entry = await storage.getJournalEntryNew(entryId, userId);
+      if (!entry) {
+        return res.status(404).json({ error: "Entry not found" });
+      }
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching journal entry:", error);
+      res.status(500).json({ error: "Failed to fetch journal entry" });
+    }
+  });
+
+  // Create a new enhanced journal entry
+  app.post("/api/journal/entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { folderId, templateId, entryType, date, title, content, fieldValues, mood, tags } = req.body;
+      
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+      
+      const entry = await storage.createJournalEntryNew({
+        userId,
+        folderId: folderId || null,
+        templateId: templateId || null,
+        entryType: entryType || "journal",
+        date,
+        title: title || null,
+        content: content || null,
+        fieldValues: fieldValues || null,
+        mood: mood || null,
+        tags: tags || [],
+      });
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error creating journal entry:", error);
+      res.status(400).json({ error: "Failed to create journal entry" });
+    }
+  });
+
+  // Update an enhanced journal entry
+  app.put("/api/journal/entries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entryId = req.params.id;
+      const { folderId, templateId, entryType, date, title, content, fieldValues, mood, tags } = req.body;
+      
+      const entry = await storage.updateJournalEntryNew(entryId, userId, {
+        folderId,
+        templateId,
+        entryType,
+        date,
+        title,
+        content,
+        fieldValues,
+        mood,
+        tags,
+      });
+      
+      if (!entry) {
+        return res.status(404).json({ error: "Entry not found" });
+      }
+      res.json(entry);
+    } catch (error) {
+      console.error("Error updating journal entry:", error);
+      res.status(400).json({ error: "Failed to update journal entry" });
+    }
+  });
+
+  // Delete an enhanced journal entry
+  app.delete("/api/journal/entries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entryId = req.params.id;
+      
+      const deleted = await storage.deleteJournalEntryNew(entryId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Entry not found" });
+      }
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting journal entry:", error);
+      res.status(500).json({ error: "Failed to delete journal entry" });
+    }
+  });
+
+  // ==================== JOURNAL SETTINGS API ====================
+
+  // Get journal settings
+  app.get("/api/journal/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const settings = await storage.getJournalSettings(userId);
+      res.json(settings || { userId, defaultFolderId: null, autoAssignDailyToFolder: false, showFolderColors: true, defaultEntryType: "journal" });
+    } catch (error) {
+      console.error("Error fetching journal settings:", error);
+      res.status(500).json({ error: "Failed to fetch journal settings" });
+    }
+  });
+
+  // Update journal settings
+  app.put("/api/journal/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { defaultFolderId, autoAssignDailyToFolder, showFolderColors, defaultEntryType } = req.body;
+      
+      const settings = await storage.upsertJournalSettings(userId, {
+        defaultFolderId,
+        autoAssignDailyToFolder,
+        showFolderColors,
+        defaultEntryType,
+      });
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating journal settings:", error);
+      res.status(400).json({ error: "Failed to update journal settings" });
+    }
+  });
+
   // ==================== USER STATS SYNC API ====================
 
   // Schema for validating stats sync payload
