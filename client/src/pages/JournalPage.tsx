@@ -388,7 +388,7 @@ export default function JournalPage() {
       return [];
     }
     
-    // When filtering by folder or template, use enhanced entries
+    // When filtering by folder or template, use enhanced entries only
     if (selectedFolderId || filterTemplateId) {
       let filtered = enhancedEntries;
       
@@ -404,19 +404,37 @@ export default function JournalPage() {
         content: e.content || (e.fieldValues ? JSON.stringify(e.fieldValues) : ""),
         createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
       }));
-    } else if (apiEntries !== undefined && apiEntries.length > 0) {
-      // Show all legacy entries when no folder/template filter
-      return apiEntries.map((e) => ({
-        id: e.id,
-        date: e.date,
-        title: e.title,
-        content: e.content,
-        createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
-      }));
     }
     
-    // Fallback - return empty array (non-logged-in users use entries state separately)
-    return [];
+    // For "All Entries" view - combine legacy entries AND enhanced entries
+    const legacyTransformed: JournalEntry[] = (apiEntries || []).map((e) => ({
+      id: e.id,
+      date: e.date,
+      title: e.title,
+      content: e.content,
+      createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
+    }));
+    
+    const enhancedTransformed: JournalEntry[] = enhancedEntries.map((e) => ({
+      id: e.id,
+      date: e.date,
+      title: e.title || "Untitled",
+      content: e.content || (e.fieldValues ? JSON.stringify(e.fieldValues) : ""),
+      createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
+    }));
+    
+    // Combine both, avoiding duplicates by id
+    const seenIds = new Set<string>();
+    const combined: JournalEntry[] = [];
+    
+    for (const entry of [...enhancedTransformed, ...legacyTransformed]) {
+      if (!seenIds.has(entry.id)) {
+        seenIds.add(entry.id);
+        combined.push(entry);
+      }
+    }
+    
+    return combined;
   }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId]);
   
   // For display, combine displayEntries with local entries for non-logged-in users
@@ -1376,8 +1394,8 @@ export default function JournalPage() {
                       
                       {field.type === "select" && (
                         <Textarea
-                          value={field.options?.join(", ") || ""}
-                          onChange={(e) => updateTemplateField(index, { options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
+                          defaultValue={field.options?.join(", ") || ""}
+                          onBlur={(e) => updateTemplateField(index, { options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
                           placeholder="Options (comma-separated, e.g.: Option 1, Option 2, Option 3)"
                           rows={2}
                           className="text-sm"
