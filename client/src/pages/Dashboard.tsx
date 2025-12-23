@@ -758,7 +758,7 @@ export default function Dashboard() {
   // Check if API queries have completed their initial fetch
   const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched));
 
-  // Mutation for updating settings (weekly goal)
+  // Mutation for updating settings (weekly goal) when no season is active
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: { weeklyGoal: number }) => {
       const response = await apiRequest("PUT", "/api/habit/settings", data);
@@ -766,6 +766,18 @@ export default function Dashboard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/habit/settings"] });
+    },
+  });
+
+  // Mutation for updating season settings (weekly goal) when a season is active
+  const updateSeasonSettingsMutation = useMutation({
+    mutationFn: async (data: { seasonId: string; weeklyGoal: number }) => {
+      const response = await apiRequest("PUT", `/api/seasons/${data.seasonId}/settings`, { weeklyGoal: data.weeklyGoal });
+      return response.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seasons", variables.seasonId, "data"] });
     },
   });
 
@@ -1422,6 +1434,14 @@ export default function Dashboard() {
     setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties]);
   }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId, selectedWeekId]);
 
+  // Load weeklyGoal from active season when one is active
+  useEffect(() => {
+    if (useMockData) return;
+    if (activeSeason && activeSeasonData?.weeklyGoal !== undefined) {
+      setWeeklyGoal(activeSeasonData.weeklyGoal);
+    }
+  }, [useMockData, activeSeason, activeSeasonData]);
+
   const baseWeekStartForRange = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekStartForRange = addDays(baseWeekStartForRange, weekOffset * 7);
   const weekEndForRange = addDays(weekStartForRange, 6);
@@ -1526,12 +1546,21 @@ export default function Dashboard() {
   const handleGoalChange = (newGoal: number) => {
     setWeeklyGoal(newGoal);
     if (!useMockData) {
-      // Save to API, fall back to localStorage on error
-      updateSettingsMutation.mutate({ weeklyGoal: newGoal }, {
-        onError: () => {
-          saveWeeklyGoalToStorage(newGoal);
-        },
-      });
+      if (activeSeason) {
+        // Update season's weeklyGoal when a season is active
+        updateSeasonSettingsMutation.mutate({ seasonId: activeSeason.id, weeklyGoal: newGoal }, {
+          onError: () => {
+            saveWeeklyGoalToStorage(newGoal);
+          },
+        });
+      } else {
+        // Save to global settings when no season is active
+        updateSettingsMutation.mutate({ weeklyGoal: newGoal }, {
+          onError: () => {
+            saveWeeklyGoalToStorage(newGoal);
+          },
+        });
+      }
     }
   };
 
