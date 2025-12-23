@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format, subDays, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -376,17 +376,16 @@ export default function JournalPage() {
     setNewEntryType("journal");
   };
 
-  // Load entries from API or localStorage on mount
-  useEffect(() => {
+  // Compute entries based on current state using useMemo to avoid infinite loops
+  // Note: We don't include 'entries' in the dependency array to avoid circular updates
+  const displayEntries = useMemo((): JournalEntry[] => {
     if (isDemo) {
-      setEntries(getSampleEntries());
-      return;
+      return getSampleEntries();
     }
     
     if (!user) {
-      const storedEntries = loadJournalFromStorage();
-      setEntries(storedEntries);
-      return;
+      // For non-logged-in users, just return empty - they'll use entries state directly
+      return [];
     }
     
     // When filtering by folder or template, use enhanced entries
@@ -398,26 +397,36 @@ export default function JournalPage() {
         filtered = filtered.filter(e => e.templateId === filterTemplateId);
       }
       
-      const transformed: JournalEntry[] = filtered.map((e) => ({
+      return filtered.map((e) => ({
         id: e.id,
         date: e.date,
         title: e.title || "Untitled",
         content: e.content || (e.fieldValues ? JSON.stringify(e.fieldValues) : ""),
         createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
       }));
-      setEntries(transformed);
-    } else if (apiEntries !== undefined) {
+    } else if (apiEntries !== undefined && apiEntries.length > 0) {
       // Show all legacy entries when no folder/template filter
-      const transformed: JournalEntry[] = apiEntries.map((e) => ({
+      return apiEntries.map((e) => ({
         id: e.id,
         date: e.date,
         title: e.title,
         content: e.content,
         createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
       }));
-      setEntries(transformed);
     }
+    
+    // Fallback - return empty array (non-logged-in users use entries state separately)
+    return [];
   }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId]);
+  
+  // For display, combine displayEntries with local entries for non-logged-in users
+  const allEntries = useMemo(() => {
+    // For non-logged-in, non-demo users, use the local entries state
+    if (!user && !isDemo) {
+      return entries;
+    }
+    return displayEntries;
+  }, [user, isDemo, entries, displayEntries]);
 
   const saveEntries = (newEntries: JournalEntry[]) => {
     setEntries(newEntries);
@@ -428,7 +437,7 @@ export default function JournalPage() {
 
   const entriesPerPage = 10;
   
-  const filteredEntries = entries.filter(entry => 
+  const filteredEntries = allEntries.filter(entry => 
     entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     entry.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     format(parseISO(entry.date), "MMMM d, yyyy").toLowerCase().includes(searchQuery.toLowerCase())
@@ -724,8 +733,8 @@ export default function JournalPage() {
     }
   };
 
-  const uniqueDays = new Set(entries.map(e => e.date)).size;
-  const thisWeekEntries = entries.filter(e => {
+  const uniqueDays = new Set(allEntries.map(e => e.date)).size;
+  const thisWeekEntries = allEntries.filter(e => {
     const entryDate = parseISO(e.date);
     const weekAgo = subDays(new Date(), 7);
     return entryDate >= weekAgo;
@@ -900,7 +909,7 @@ export default function JournalPage() {
                 <BookOpen className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Total Entries</p>
-                  <p className="text-2xl font-mono font-bold" data-testid="text-total-entries">{entries.length}</p>
+                  <p className="text-2xl font-mono font-bold" data-testid="text-total-entries">{allEntries.length}</p>
                 </div>
               </div>
             </CardContent>
