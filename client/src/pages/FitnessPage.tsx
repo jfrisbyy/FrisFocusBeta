@@ -6374,13 +6374,19 @@ function LivePlaySettingsDialog({
         customTemplates: settingsData?.customTemplates || [],
         activeTemplateId: settingsData?.activeTemplateId || "basketball",
       };
-      const res = await apiRequest("PUT", "/api/fitness/live-play-settings", { ...currentSettings, ...data });
-      return res.json();
+      const payload = { ...currentSettings, ...data };
+      console.log("Sending to server:", payload);
+      const res = await apiRequest("PUT", "/api/fitness/live-play-settings", payload);
+      const result = await res.json();
+      console.log("Server response:", result);
+      return result;
     },
     onSuccess: () => {
+      console.log("Mutation success, invalidating query");
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/live-play-settings"] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Mutation error:", error);
       toast({ title: "Failed to save settings", variant: "destructive" });
     },
   });
