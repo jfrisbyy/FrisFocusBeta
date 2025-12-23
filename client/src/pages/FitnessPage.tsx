@@ -6069,10 +6069,8 @@ function SkillDialog({
     ? [...activeTemplate.fields, ...customFields]
     : activeTemplate.fields;
   
-  // For custom templates, show all fields; for default template, filter by visible fields
-  const fieldsToShow = activeTemplate.isDefault 
-    ? displayFields.filter(f => visibleFields.includes(f.id))
-    : displayFields;
+  // Filter fields by visibleFields setting for all templates
+  const fieldsToShow = displayFields.filter(f => visibleFields.includes(f.id));
   
   const getInitialFormData = () => {
     const initial: Record<string, any> = {
@@ -6375,18 +6373,13 @@ function LivePlaySettingsDialog({
         activeTemplateId: settingsData?.activeTemplateId || "basketball",
       };
       const payload = { ...currentSettings, ...data };
-      console.log("Sending to server:", payload);
       const res = await apiRequest("PUT", "/api/fitness/live-play-settings", payload);
-      const result = await res.json();
-      console.log("Server response:", result);
-      return result;
+      return res.json();
     },
     onSuccess: () => {
-      console.log("Mutation success, invalidating query");
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/live-play-settings"] });
     },
-    onError: (error) => {
-      console.error("Mutation error:", error);
+    onError: () => {
       toast({ title: "Failed to save settings", variant: "destructive" });
     },
   });
