@@ -195,17 +195,9 @@ export default function JournalPage() {
     enabled: !!user && !isDemo,
   });
 
-  // Fetch enhanced journal entries with folder filter
+  // Fetch enhanced journal entries (without folder filter - always fetch all)
   const { data: enhancedEntries = [] } = useQuery<JournalEntryNew[]>({
-    queryKey: ["/api/journal/entries", selectedFolderId],
-    queryFn: async () => {
-      const url = selectedFolderId 
-        ? `/api/journal/entries?folderId=${selectedFolderId}`
-        : "/api/journal/entries";
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch entries");
-      return res.json();
-    },
+    queryKey: ["/api/journal/entries"],
     enabled: !!user && !isDemo,
   });
 
