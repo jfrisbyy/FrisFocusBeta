@@ -1283,6 +1283,119 @@ export const insertUserJournalEntrySchema = createInsertSchema(userJournalEntrie
 export type InsertUserJournalEntry = z.infer<typeof insertUserJournalEntrySchema>;
 export type UserJournalEntry = typeof userJournalEntries.$inferSelect;
 
+// ==================== JOURNAL FOLDERS ====================
+
+// Journal folders for organizing entries
+export const journalFolders = pgTable("journal_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  color: varchar("color").default("#6366f1"), // Hex color for folder
+  icon: varchar("icon").default("folder"), // Icon name from lucide
+  sortOrder: integer("sort_order").default(0),
+  isDefault: boolean("is_default").default(false), // If true, new entries auto-assign here
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertJournalFolderSchema = createInsertSchema(journalFolders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJournalFolder = z.infer<typeof insertJournalFolderSchema>;
+export type JournalFolder = typeof journalFolders.$inferSelect;
+
+// ==================== JOURNAL TRACKER TEMPLATES ====================
+
+// Template field type enum
+export const journalFieldTypeEnum = z.enum([
+  "text",
+  "textarea",
+  "number",
+  "select",
+  "multiselect",
+  "toggle",
+  "date",
+  "time",
+  "rating",
+  "slider",
+]);
+export type JournalFieldType = z.infer<typeof journalFieldTypeEnum>;
+
+// Template field definition
+export const journalTemplateFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: journalFieldTypeEnum,
+  required: z.boolean().optional().default(false),
+  placeholder: z.string().optional(),
+  options: z.array(z.string()).optional(), // For select/multiselect
+  min: z.number().optional(), // For number/slider/rating
+  max: z.number().optional(),
+  defaultValue: z.any().optional(),
+  sortOrder: z.number().optional(),
+});
+export type JournalTemplateField = z.infer<typeof journalTemplateFieldSchema>;
+
+// Journal tracker templates
+export const journalTemplates = pgTable("journal_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  icon: varchar("icon").default("clipboard-list"), // Icon name from lucide
+  color: varchar("color").default("#8b5cf6"), // Hex color for template
+  fields: jsonb("fields").default([]).notNull(), // Array of JournalTemplateField
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertJournalTemplateSchema = createInsertSchema(journalTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJournalTemplate = z.infer<typeof insertJournalTemplateSchema>;
+export type JournalTemplate = typeof journalTemplates.$inferSelect;
+
+// ==================== ENHANCED JOURNAL ENTRIES ====================
+
+// Entry type enum
+export const journalEntryTypeEnum = z.enum(["journal", "tracker"]);
+export type JournalEntryType = z.infer<typeof journalEntryTypeEnum>;
+
+// Enhanced journal entries (replaces/extends userJournalEntries)
+export const journalEntries = pgTable("journal_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  folderId: varchar("folder_id").references(() => journalFolders.id, { onDelete: "set null" }),
+  templateId: varchar("template_id").references(() => journalTemplates.id, { onDelete: "set null" }),
+  entryType: varchar("entry_type").notNull().default("journal"), // "journal" or "tracker"
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  title: varchar("title"),
+  content: text("content"), // Main text content for journal entries
+  fieldValues: jsonb("field_values"), // Structured data for tracker entries { fieldId: value }
+  mood: varchar("mood"), // Optional mood for journal entries
+  tags: text("tags").array().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertJournalEntrySchemaNew = createInsertSchema(journalEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJournalEntryNew = z.infer<typeof insertJournalEntrySchemaNew>;
+export type JournalEntryNew = typeof journalEntries.$inferSelect;
+
+// ==================== JOURNAL SETTINGS ====================
+
+// User journal settings (default folder, preferences)
+export const userJournalSettings = pgTable("user_journal_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  defaultFolderId: varchar("default_folder_id").references(() => journalFolders.id, { onDelete: "set null" }),
+  autoAssignDailyToFolder: boolean("auto_assign_daily_to_folder").default(false),
+  showFolderColors: boolean("show_folder_colors").default(true),
+  defaultEntryType: varchar("default_entry_type").default("journal"), // "journal" or "tracker"
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserJournalSettingsSchema = createInsertSchema(userJournalSettings).omit({ id: true, updatedAt: true });
+export type InsertUserJournalSettings = z.infer<typeof insertUserJournalSettingsSchema>;
+export type UserJournalSettings = typeof userJournalSettings.$inferSelect;
+
 // ==================== CIRCLE MEMBER STATS (Analytics) ====================
 
 // Circle member stats - aggregated all-time stats per member per circle
