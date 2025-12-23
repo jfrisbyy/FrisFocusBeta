@@ -6359,9 +6359,12 @@ function LivePlaySettingsDialog({
   const allTemplates = [BASKETBALL_DEFAULT, ...customTemplates];
   const activeTemplate = allTemplates.find(t => t.id === activeTemplateId) || BASKETBALL_DEFAULT;
 
+  // Only sync selectedFields when dialog opens, not on every currentVisibleFields change
   useEffect(() => {
-    setSelectedFields(currentVisibleFields);
-  }, [currentVisibleFields]);
+    if (open) {
+      setSelectedFields(currentVisibleFields);
+    }
+  }, [open]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<LivePlaySettings>) => {
@@ -6396,10 +6399,8 @@ function LivePlaySettingsDialog({
       onOpenChange(false);
       return;
     }
-    console.log("Saving visibleFields:", selectedFields);
     updateMutation.mutate({ visibleFields: selectedFields }, {
-      onSuccess: (data) => {
-        console.log("Save successful, response:", data);
+      onSuccess: () => {
         toast({ title: "Settings saved" });
         onOpenChange(false);
       }
@@ -6912,9 +6913,12 @@ function PracticeSettingsDialog({
   const allTemplates = [DEFAULT_TEMPLATE, ...customTemplates];
   const activeTemplate = allTemplates.find(t => t.id === activeTemplateId) || DEFAULT_TEMPLATE;
 
+  // Only sync selectedFields when dialog opens, not on every currentVisibleFields change
   useEffect(() => {
-    setSelectedFields(currentVisibleFields);
-  }, [currentVisibleFields]);
+    if (open) {
+      setSelectedFields(currentVisibleFields);
+    }
+  }, [open]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<PracticeSettings>) => {
