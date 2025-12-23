@@ -2171,7 +2171,8 @@ export default function TasksPage() {
             <p className="text-sm text-muted-foreground">
               Select a season to make active. Your active season determines which tasks, categories, and penalties are shown.
             </p>
-            <div className="space-y-2">
+            <ScrollArea className="max-h-[50vh]">
+            <div className="space-y-2 pr-3">
               {nonArchivedSeasons.map((season) => (
                 <div
                   key={season.id}
@@ -2231,6 +2232,7 @@ export default function TasksPage() {
                 </>
               )}
             </div>
+            </ScrollArea>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSwitchSeasonDialogOpen(false)}>
