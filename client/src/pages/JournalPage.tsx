@@ -368,6 +368,34 @@ export default function JournalPage() {
     setNewEntryType("journal");
   };
 
+  // Helper function to format fieldValues using template field labels
+  const formatFieldValues = (fieldValues: Record<string, any> | null | unknown, templateId: string | null): string => {
+    if (!fieldValues || typeof fieldValues !== 'object') return "";
+    const values = fieldValues as Record<string, any>;
+    if (Object.keys(values).length === 0) return "";
+    
+    // Find the template to get field labels
+    const template = templates.find(t => t.id === templateId);
+    const templateFields = template?.fields as TemplateField[] | undefined;
+    if (!template || !templateFields) {
+      // Fallback: just show values without labels
+      return Object.values(values).filter(v => v).join(", ");
+    }
+    
+    // Map field IDs to their labels and format as "Label: Value"
+    const formatted = Object.entries(values)
+      .map(([fieldId, value]) => {
+        if (!value) return null;
+        const field = templateFields.find((f: TemplateField) => f.id === fieldId);
+        const label = field?.label || fieldId;
+        return `${label}: ${value}`;
+      })
+      .filter(Boolean)
+      .join(", ");
+    
+    return formatted;
+  };
+
   // Compute entries based on current state using useMemo to avoid infinite loops
   // Note: We don't include 'entries' in the dependency array to avoid circular updates
   const displayEntries = useMemo((): JournalEntry[] => {
@@ -384,6 +412,11 @@ export default function JournalPage() {
     if (selectedFolderId || filterTemplateId) {
       let filtered = enhancedEntries;
       
+      // Filter by folder if selected
+      if (selectedFolderId) {
+        filtered = filtered.filter(e => e.folderId === selectedFolderId);
+      }
+      
       // Filter by template if selected
       if (filterTemplateId) {
         filtered = filtered.filter(e => e.templateId === filterTemplateId);
@@ -393,7 +426,7 @@ export default function JournalPage() {
         id: e.id,
         date: e.date,
         title: e.title || "Untitled",
-        content: e.content || (e.fieldValues ? JSON.stringify(e.fieldValues) : ""),
+        content: e.content || formatFieldValues(e.fieldValues, e.templateId),
         createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
       }));
     }
@@ -411,7 +444,7 @@ export default function JournalPage() {
       id: e.id,
       date: e.date,
       title: e.title || "Untitled",
-      content: e.content || (e.fieldValues ? JSON.stringify(e.fieldValues) : ""),
+      content: e.content || formatFieldValues(e.fieldValues, e.templateId),
       createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
     }));
     
@@ -427,7 +460,7 @@ export default function JournalPage() {
     }
     
     return combined;
-  }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId]);
+  }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId, templates]);
   
   // For display, combine displayEntries with local entries for non-logged-in users
   const allEntries = useMemo(() => {
