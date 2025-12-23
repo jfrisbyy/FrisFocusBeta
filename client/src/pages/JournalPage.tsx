@@ -40,6 +40,8 @@ import {
   Star,
   LayoutTemplate,
   FileText,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
@@ -61,7 +63,9 @@ import {
 } from "@/lib/storage";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { UserJournalEntry, JournalFolder, JournalTemplate, JournalEntryNew, TemplateField } from "@shared/schema";
+import type { UserJournalEntry, JournalFolder, JournalTemplate, JournalEntryNew, JournalTemplateField } from "@shared/schema";
+
+type TemplateField = JournalTemplateField;
 
 interface JournalEntry {
   id: string;
@@ -172,6 +176,12 @@ export default function JournalPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [formFolderId, setFormFolderId] = useState<string | null>(null);
   const [formFieldValues, setFormFieldValues] = useState<Record<string, any>>({});
+  
+  // Sidebar state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
+  // Filter by tracker template
+  const [filterTemplateId, setFilterTemplateId] = useState<string | null>(null);
 
   // Fetch journal folders
   const { data: folders = [] } = useQuery<JournalFolder[]>({
@@ -185,9 +195,17 @@ export default function JournalPage() {
     enabled: !!user && !isDemo,
   });
 
-  // Fetch enhanced journal entries
+  // Fetch enhanced journal entries with folder filter
   const { data: enhancedEntries = [] } = useQuery<JournalEntryNew[]>({
     queryKey: ["/api/journal/entries", selectedFolderId],
+    queryFn: async () => {
+      const url = selectedFolderId 
+        ? `/api/journal/entries?folderId=${selectedFolderId}`
+        : "/api/journal/entries";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch entries");
+      return res.json();
+    },
     enabled: !!user && !isDemo,
   });
 
@@ -371,7 +389,25 @@ export default function JournalPage() {
       return;
     }
     
-    if (apiEntries !== undefined) {
+    // When filtering by folder or template, use enhanced entries
+    if (selectedFolderId || filterTemplateId) {
+      let filtered = enhancedEntries;
+      
+      // Filter by template if selected
+      if (filterTemplateId) {
+        filtered = filtered.filter(e => e.templateId === filterTemplateId);
+      }
+      
+      const transformed: JournalEntry[] = filtered.map((e) => ({
+        id: e.id,
+        date: e.date,
+        title: e.title || "Untitled",
+        content: e.content || (e.fieldValues ? JSON.stringify(e.fieldValues) : ""),
+        createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : new Date().toISOString(),
+      }));
+      setEntries(transformed);
+    } else if (apiEntries !== undefined) {
+      // Show all legacy entries when no folder/template filter
       const transformed: JournalEntry[] = apiEntries.map((e) => ({
         id: e.id,
         date: e.date,
@@ -381,7 +417,7 @@ export default function JournalPage() {
       }));
       setEntries(transformed);
     }
-  }, [isDemo, user, apiEntries]);
+  }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId]);
 
   const saveEntries = (newEntries: JournalEntry[]) => {
     setEntries(newEntries);
@@ -581,7 +617,7 @@ export default function JournalPage() {
       ...templateFields,
       {
         id: `field-${Date.now()}`,
-        name: "",
+        label: "",
         type: "text",
         required: false,
       },
@@ -698,117 +734,150 @@ export default function JournalPage() {
   return (
     <div className="flex h-full">
       {user && !isDemo && (
-        <div className="w-64 border-r bg-muted/30 p-4 space-y-4 hidden md:block">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Folders</h3>
+        <div className={`border-r bg-muted/30 hidden md:block transition-all duration-200 ${isSidebarCollapsed ? "w-12" : "w-64"}`}>
+          <div className="p-2 border-b flex justify-end">
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => {
-                setEditingFolder(null);
-                setFolderName("");
-                setFolderColor(FOLDER_COLORS[0]);
-                setIsFolderDialogOpen(true);
-              }}
-              data-testid="button-add-folder"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              data-testid="button-toggle-sidebar"
             >
-              <FolderPlus className="h-4 w-4" />
+              {isSidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
           </div>
           
-          <div className="space-y-1">
-            <Button
-              variant={selectedFolderId === null ? "secondary" : "ghost"}
-              className="w-full justify-start gap-2"
-              onClick={() => setSelectedFolderId(null)}
-              data-testid="button-folder-all"
-            >
-              <BookOpen className="h-4 w-4" />
-              All Entries
-            </Button>
-            
-            {folders.map((folder) => (
-              <div key={folder.id} className="flex items-center group">
-                <Button
-                  variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
-                  className="flex-1 justify-start gap-2"
-                  onClick={() => setSelectedFolderId(folder.id)}
-                  data-testid={`button-folder-${folder.id}`}
-                >
-                  <Folder className="h-4 w-4" style={{ color: folder.color }} />
-                  <span className="truncate">{folder.name}</span>
-                </Button>
+          {!isSidebarCollapsed && (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Folders</h3>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="opacity-0 group-hover:opacity-100"
                   onClick={() => {
-                    setEditingFolder(folder);
-                    setFolderName(folder.name);
-                    setFolderColor(folder.color);
+                    setEditingFolder(null);
+                    setFolderName("");
+                    setFolderColor(FOLDER_COLORS[0]);
                     setIsFolderDialogOpen(true);
                   }}
-                  data-testid={`button-edit-folder-${folder.id}`}
+                  data-testid="button-add-folder"
                 >
-                  <Pencil className="h-3 w-3" />
+                  <FolderPlus className="h-4 w-4" />
                 </Button>
               </div>
-            ))}
-          </div>
-          
-          <div className="border-t pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium">Templates</h3>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  setEditingTemplate(null);
-                  resetTemplateForm();
-                  setIsTemplateDialogOpen(true);
-                }}
-                data-testid="button-add-template"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            <div className="space-y-1">
-              {templates.length === 0 ? (
-                <p className="text-xs text-muted-foreground px-2">No templates yet</p>
-              ) : (
-                templates.map((template) => (
-                  <div key={template.id} className="flex items-center group">
+              
+              <div className="space-y-1">
+                <Button
+                  variant={selectedFolderId === null && filterTemplateId === null ? "secondary" : "ghost"}
+                  className="w-full justify-start gap-2"
+                  onClick={() => {
+                    setSelectedFolderId(null);
+                    setFilterTemplateId(null);
+                  }}
+                  data-testid="button-folder-all"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  All Entries
+                </Button>
+                
+                {folders.map((folder) => (
+                  <div key={folder.id} className="flex items-center group">
                     <Button
-                      variant="ghost"
-                      className="flex-1 justify-start gap-2 text-sm"
+                      variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
+                      className="flex-1 justify-start gap-2"
                       onClick={() => {
-                        setEditingTemplate(template);
-                        setTemplateName(template.name);
-                        setTemplateDescription(template.description || "");
-                        setTemplateColor(template.color);
-                        setTemplateFields(template.fields as TemplateField[] || []);
-                        setIsTemplateDialogOpen(true);
+                        setSelectedFolderId(folder.id);
+                        setFilterTemplateId(null);
                       }}
-                      data-testid={`button-template-${template.id}`}
+                      data-testid={`button-folder-${folder.id}`}
                     >
-                      <LayoutTemplate className="h-4 w-4" style={{ color: template.color }} />
-                      <span className="truncate">{template.name}</span>
+                      <Folder className="h-4 w-4" style={{ color: folder.color || undefined }} />
+                      <span className="truncate">{folder.name}</span>
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
                       className="opacity-0 group-hover:opacity-100"
-                      onClick={() => setDeleteTemplateId(template.id)}
-                      data-testid={`button-delete-template-${template.id}`}
+                      onClick={() => {
+                        setEditingFolder(folder);
+                        setFolderName(folder.name);
+                        setFolderColor(folder.color || FOLDER_COLORS[0]);
+                        setIsFolderDialogOpen(true);
+                      }}
+                      data-testid={`button-edit-folder-${folder.id}`}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Pencil className="h-3 w-3" />
                     </Button>
                   </div>
-                ))
-              )}
+                ))}
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium">Trackers</h3>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingTemplate(null);
+                      resetTemplateForm();
+                      setIsTemplateDialogOpen(true);
+                    }}
+                    data-testid="button-add-template"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="space-y-1">
+                  {templates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-2">No trackers yet</p>
+                  ) : (
+                    templates.map((template) => (
+                      <div key={template.id} className="flex items-center group">
+                        <Button
+                          variant={filterTemplateId === template.id ? "secondary" : "ghost"}
+                          className="flex-1 justify-start gap-2 text-sm"
+                          onClick={() => {
+                            setFilterTemplateId(template.id);
+                            setSelectedFolderId(null);
+                          }}
+                          data-testid={`button-template-${template.id}`}
+                        >
+                          <LayoutTemplate className="h-4 w-4" style={{ color: template.color || undefined }} />
+                          <span className="truncate">{template.name}</span>
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={() => {
+                            setEditingTemplate(template);
+                            setTemplateName(template.name);
+                            setTemplateDescription(template.description || "");
+                            setTemplateColor(template.color || FOLDER_COLORS[4]);
+                            setTemplateFields(template.fields as TemplateField[] || []);
+                            setIsTemplateDialogOpen(true);
+                          }}
+                          data-testid={`button-edit-template-${template.id}`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100"
+                          onClick={() => setDeleteTemplateId(template.id)}
+                          data-testid={`button-delete-template-${template.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
       
@@ -1040,7 +1109,7 @@ export default function JournalPage() {
                         {folders.map((folder) => (
                           <SelectItem key={folder.id} value={folder.id}>
                             <div className="flex items-center gap-2">
-                              <Folder className="h-4 w-4" style={{ color: folder.color }} />
+                              <Folder className="h-4 w-4" style={{ color: folder.color || undefined }} />
                               {folder.name}
                             </div>
                           </SelectItem>
@@ -1067,7 +1136,7 @@ export default function JournalPage() {
                           {templates.map((template) => (
                             <SelectItem key={template.id} value={template.id}>
                               <div className="flex items-center gap-2">
-                                <LayoutTemplate className="h-4 w-4" style={{ color: template.color }} />
+                                <LayoutTemplate className="h-4 w-4" style={{ color: template.color || undefined }} />
                                 {template.name}
                               </div>
                             </SelectItem>
@@ -1122,7 +1191,7 @@ export default function JournalPage() {
                 {(selectedTemplate.fields as TemplateField[] || []).map((field) => (
                   <div key={field.id} className="space-y-2">
                     <Label>
-                      {field.name}
+                      {field.label}
                       {field.required && <span className="text-destructive ml-1">*</span>}
                     </Label>
                     {renderTemplateFieldInput(field)}
@@ -1207,11 +1276,11 @@ export default function JournalPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Template Dialog */}
+      {/* Tracker Dialog */}
       <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingTemplate ? "Edit Template" : "New Template"}</DialogTitle>
+            <DialogTitle>{editingTemplate ? "Edit Tracker" : "New Tracker"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1264,8 +1333,8 @@ export default function JournalPage() {
                     <div key={field.id} className="p-3 border rounded-md space-y-2">
                       <div className="flex items-center gap-2">
                         <Input
-                          value={field.name}
-                          onChange={(e) => updateTemplateField(index, { name: e.target.value })}
+                          value={field.label}
+                          onChange={(e) => updateTemplateField(index, { label: e.target.value })}
                           placeholder="Field name..."
                           className="flex-1"
                         />
@@ -1297,10 +1366,12 @@ export default function JournalPage() {
                       </div>
                       
                       {field.type === "select" && (
-                        <Input
+                        <Textarea
                           value={field.options?.join(", ") || ""}
                           onChange={(e) => updateTemplateField(index, { options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })}
-                          placeholder="Options (comma-separated)..."
+                          placeholder="Options (comma-separated, e.g.: Option 1, Option 2, Option 3)"
+                          rows={2}
+                          className="text-sm"
                         />
                       )}
                       
