@@ -1222,13 +1222,9 @@ export default function TasksPage() {
     const newGoal = parseInt(goalInput, 10);
     if (!isNaN(newGoal) && newGoal > 0) {
       setDailyGoal(newGoal);
-      setWeeklyGoal(newGoal * 7);
-      if (activeSeason && !useMockData) {
-        // Update season's weeklyGoal when a season is active
-        updateSeasonSettingsMutation.mutate({ seasonId: activeSeason.id, weeklyGoal: newGoal * 7 });
-      } else if (!useMockData) {
-        // Update global settings when no season is active
-        updateSettingsMutation.mutate({ dailyGoal: newGoal, weeklyGoal: newGoal * 7 });
+      if (!useMockData) {
+        // Update global settings (daily goal only - weekly goal is independent)
+        updateSettingsMutation.mutate({ dailyGoal: newGoal });
       }
       toast({
         title: "Daily goal updated",
@@ -1252,14 +1248,12 @@ export default function TasksPage() {
     const newWeeklyGoal = parseInt(weeklyGoalInput, 10);
     if (!isNaN(newWeeklyGoal) && newWeeklyGoal > 0) {
       setWeeklyGoal(newWeeklyGoal);
-      const newDailyGoal = Math.round(newWeeklyGoal / 7);
-      setDailyGoal(newDailyGoal);
       if (activeSeason && !useMockData) {
         // Update season's weeklyGoal when a season is active
         updateSeasonSettingsMutation.mutate({ seasonId: activeSeason.id, weeklyGoal: newWeeklyGoal });
       } else if (!useMockData) {
-        // Update global settings when no season is active
-        updateSettingsMutation.mutate({ dailyGoal: newDailyGoal, weeklyGoal: newWeeklyGoal });
+        // Update global settings when no season is active (weekly goal only - daily goal is independent)
+        updateSettingsMutation.mutate({ weeklyGoal: newWeeklyGoal });
       }
       toast({
         title: "Weekly goal updated",
