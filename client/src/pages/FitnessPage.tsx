@@ -52,9 +52,9 @@ const mockStrength: StrengthWorkout[] = [
 ];
 
 const mockSkills: SkillWorkout[] = [
-  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 8, skillFocus: ["3-pointers", "Mid-range"], zoneFocus: ["Corner", "Wing"], drillStats: { makes: 45, attempts: 60 }, notes: null },
-  { id: "demo-2", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], type: "Skill", drillType: "Ball Handling", effort: 7, skillFocus: ["Crossovers", "Behind back"], zoneFocus: [], drillStats: null, notes: null },
-  { id: "demo-3", userId: "demo", date: subDays(new Date(), 6).toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 9, skillFocus: ["Free throws", "Fadeaways"], zoneFocus: ["Paint", "Elbow"], drillStats: { makes: 38, attempts: 50 }, notes: null },
+  { id: "demo-1", userId: "demo", date: new Date().toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 8, skillFocus: ["3-pointers", "Mid-range"], zoneFocus: ["Corner", "Wing"], drillStats: { makes: 45, attempts: 60 }, notes: null, customFields: null },
+  { id: "demo-2", userId: "demo", date: subDays(new Date(), 3).toISOString().split("T")[0], type: "Skill", drillType: "Ball Handling", effort: 7, skillFocus: ["Crossovers", "Behind back"], zoneFocus: [], drillStats: null, notes: null, customFields: null },
+  { id: "demo-3", userId: "demo", date: subDays(new Date(), 6).toISOString().split("T")[0], type: "Skill", drillType: "Shooting", effort: 9, skillFocus: ["Free throws", "Fadeaways"], zoneFocus: ["Paint", "Elbow"], drillStats: { makes: 38, attempts: 50 }, notes: null, customFields: null },
 ];
 
 const mockRuns: BasketballRun[] = [
@@ -2305,6 +2305,9 @@ export default function FitnessPage() {
                   isDemo={isDemo}
                   editData={editingSkill}
                   onEdit={(id, data) => editSkillMutation.mutate({ id, data })}
+                  defaultFields={DEFAULT_PRACTICE_FIELDS}
+                  visibleFields={practiceVisibleFields}
+                  settingsData={practiceSettingsData}
                 />
                 <PracticeSettingsDialog
                   open={practiceSettingsOpen}
@@ -6027,34 +6030,99 @@ function StrengthDialog({ open, onOpenChange, isDemo, editData, onEdit, routines
   );
 }
 
-function SkillDialog({ open, onOpenChange, isDemo, editData, onEdit }: { 
+function SkillDialog({ 
+  open, 
+  onOpenChange, 
+  isDemo, 
+  editData, 
+  onEdit,
+  defaultFields,
+  visibleFields,
+  settingsData
+}: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void; 
   isDemo: boolean;
   editData?: SkillWorkout | null;
   onEdit?: (id: string, data: Partial<SkillWorkout>) => void;
+  defaultFields: PracticeField[];
+  visibleFields: string[];
+  settingsData: PracticeSettings | undefined;
 }) {
   const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    date: format(new Date(), "yyyy-MM-dd"),
-    drillType: "Shooting",
-    effort: "",
-    notes: "",
-  });
+  
+  const customTemplates = (settingsData?.customTemplates as PracticeTemplate[]) || [];
+  const activeTemplateId = (settingsData?.activeTemplateId as string) || "basketball-drills";
+  const customFields = (settingsData?.customFields as PracticeField[]) || [];
+  
+  const DEFAULT_TEMPLATE: PracticeTemplate = {
+    id: "basketball-drills",
+    name: "Basketball Drills",
+    isDefault: true,
+    fields: defaultFields,
+  };
+  
+  const allTemplates = [DEFAULT_TEMPLATE, ...customTemplates];
+  const activeTemplate = allTemplates.find(t => t.id === activeTemplateId) || DEFAULT_TEMPLATE;
+  
+  const displayFields = activeTemplate.isDefault 
+    ? [...activeTemplate.fields, ...customFields]
+    : activeTemplate.fields;
+  
+  // For custom templates, show all fields; for default template, filter by visible fields
+  const fieldsToShow = activeTemplate.isDefault 
+    ? displayFields.filter(f => visibleFields.includes(f.id))
+    : displayFields;
+  
+  const getInitialFormData = () => {
+    const initial: Record<string, any> = {
+      date: format(new Date(), "yyyy-MM-dd"),
+    };
+    fieldsToShow.forEach(field => {
+      if (field.type === "multiselect") {
+        initial[field.id] = [];
+      } else if (field.type === "number") {
+        initial[field.id] = "";
+      } else if (field.type === "toggle") {
+        initial[field.id] = false;
+      } else {
+        initial[field.id] = "";
+      }
+    });
+    return initial;
+  };
+  
+  const [formData, setFormData] = useState<Record<string, any>>(getInitialFormData());
   const isEditing = !!editData;
 
   useEffect(() => {
     if (editData) {
-      setFormData({
+      const data: Record<string, any> = {
         date: editData.date,
-        drillType: editData.drillType || "Shooting",
+        drillType: editData.drillType || "",
         effort: editData.effort?.toString() || "",
         notes: editData.notes || "",
-      });
+        skillFocus: Array.isArray(editData.skillFocus) ? editData.skillFocus : [],
+        zoneFocus: Array.isArray(editData.zoneFocus) ? editData.zoneFocus : [],
+        makes: (editData.drillStats as any)?.makes?.toString() || "",
+        attempts: (editData.drillStats as any)?.attempts?.toString() || "",
+      };
+      if (editData.customFields && typeof editData.customFields === 'object') {
+        Object.entries(editData.customFields as Record<string, any>).forEach(([key, value]) => {
+          // Find the field to determine its type
+          const field = fieldsToShow.find(f => f.id === key);
+          if (field?.type === "number") {
+            data[key] = value?.toString() || "";
+          } else {
+            data[key] = value;
+          }
+        });
+      }
+      setFormData(data);
     } else {
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), drillType: "Shooting", effort: "", notes: "" });
+      setFormData(getInitialFormData());
     }
-  }, [editData]);
+  }, [editData, open, activeTemplateId]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<SkillWorkout>) => {
@@ -6065,7 +6133,7 @@ function SkillDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/skill"] });
       toast({ title: "Skill workout logged" });
       onOpenChange(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), drillType: "Shooting", effort: "", notes: "" });
+      setFormData(getInitialFormData());
     },
     onError: () => {
       toast({ title: "Failed to log skill workout", variant: "destructive" });
@@ -6078,13 +6146,37 @@ function SkillDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       onOpenChange(false);
       return;
     }
-    const data = {
+    
+    const customFieldData: Record<string, any> = {};
+    fieldsToShow.forEach(field => {
+      if (!["date", "drillType", "effort", "notes", "skillFocus", "zoneFocus", "makes", "attempts"].includes(field.id)) {
+        const value = formData[field.id];
+        // Coerce values to proper types based on field type
+        if (field.type === "number") {
+          customFieldData[field.id] = value ? parseFloat(value) : null;
+        } else if (field.type === "toggle") {
+          customFieldData[field.id] = Boolean(value);
+        } else {
+          customFieldData[field.id] = value;
+        }
+      }
+    });
+    
+    const data: Partial<SkillWorkout> = {
       date: formData.date,
       type: "Skill" as const,
-      drillType: formData.drillType,
+      drillType: formData.drillType || undefined,
       effort: formData.effort ? parseInt(formData.effort) : undefined,
       notes: formData.notes || undefined,
+      skillFocus: formData.skillFocus?.length > 0 ? formData.skillFocus : undefined,
+      zoneFocus: formData.zoneFocus?.length > 0 ? formData.zoneFocus : undefined,
+      drillStats: (formData.makes || formData.attempts) ? {
+        makes: formData.makes ? parseInt(formData.makes) : undefined,
+        attempts: formData.attempts ? parseInt(formData.attempts) : undefined,
+      } : undefined,
+      customFields: Object.keys(customFieldData).length > 0 ? customFieldData : undefined,
     };
+    
     if (isEditing && editData && onEdit) {
       onEdit(editData.id, data);
       onOpenChange(false);
@@ -6092,44 +6184,125 @@ function SkillDialog({ open, onOpenChange, isDemo, editData, onEdit }: {
       createMutation.mutate(data);
     }
   };
+  
+  const toggleMultiSelect = (fieldId: string, value: string) => {
+    const current = formData[fieldId] || [];
+    if (current.includes(value)) {
+      setFormData({ ...formData, [fieldId]: current.filter((v: string) => v !== value) });
+    } else {
+      setFormData({ ...formData, [fieldId]: [...current, value] });
+    }
+  };
+  
+  const renderField = (field: PracticeField) => {
+    switch (field.type) {
+      case "text":
+        if (field.id === "date") {
+          return (
+            <Input 
+              type="date" 
+              value={formData.date || ""} 
+              onChange={(e) => setFormData({ ...formData, date: e.target.value })} 
+              data-testid={`input-skill-${field.id}`} 
+            />
+          );
+        }
+        return (
+          <Input 
+            type="text" 
+            placeholder={field.label}
+            value={formData[field.id] || ""} 
+            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })} 
+            data-testid={`input-skill-${field.id}`} 
+          />
+        );
+      case "number":
+        return (
+          <Input 
+            type="number" 
+            placeholder={field.id === "effort" ? "1-10" : "0"}
+            min={field.id === "effort" ? 1 : 0}
+            max={field.id === "effort" ? 10 : undefined}
+            value={formData[field.id] || ""} 
+            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })} 
+            data-testid={`input-skill-${field.id}`} 
+          />
+        );
+      case "textarea":
+        return (
+          <Textarea 
+            placeholder={field.label}
+            value={formData[field.id] || ""} 
+            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })} 
+            data-testid={`input-skill-${field.id}`} 
+          />
+        );
+      case "select":
+        return (
+          <Select value={formData[field.id] || ""} onValueChange={(v) => setFormData({ ...formData, [field.id]: v })}>
+            <SelectTrigger data-testid={`select-skill-${field.id}`}>
+              <SelectValue placeholder={`Select ${field.label}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {(field.options || []).map(opt => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      case "multiselect":
+        return (
+          <div className="flex flex-wrap gap-2">
+            {(field.options || []).map(opt => (
+              <Badge 
+                key={opt}
+                variant={(formData[field.id] || []).includes(opt) ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => toggleMultiSelect(field.id, opt)}
+                data-testid={`badge-skill-${field.id}-${opt}`}
+              >
+                {opt}
+              </Badge>
+            ))}
+          </div>
+        );
+      case "toggle":
+        return (
+          <div className="flex items-center gap-2">
+            <Switch 
+              checked={formData[field.id] || false}
+              onCheckedChange={(checked) => setFormData({ ...formData, [field.id]: checked })}
+              data-testid={`switch-skill-${field.id}`}
+            />
+            <span className="text-sm text-muted-foreground">{formData[field.id] ? "Yes" : "No"}</span>
+          </div>
+        );
+      default:
+        return (
+          <Input 
+            type="text" 
+            value={formData[field.id] || ""} 
+            onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })} 
+            data-testid={`input-skill-${field.id}`} 
+          />
+        );
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Skill Workout" : "Log Skill Workout"}</DialogTitle>
           <DialogDescription>{isEditing ? "Update your drill session details" : "Record your basketball drill session"}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-skill-date" />
+          {fieldsToShow.map(field => (
+            <div key={field.id} className="space-y-2">
+              <Label>{field.label}</Label>
+              {renderField(field)}
             </div>
-            <div className="space-y-2">
-              <Label>Drill Type</Label>
-              <Select value={formData.drillType} onValueChange={(v) => setFormData({ ...formData, drillType: v })}>
-                <SelectTrigger data-testid="select-skill-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Shooting">Shooting</SelectItem>
-                  <SelectItem value="Ball Handling">Ball Handling</SelectItem>
-                  <SelectItem value="Defense">Defense</SelectItem>
-                  <SelectItem value="Conditioning">Conditioning</SelectItem>
-                  <SelectItem value="Mixed">Mixed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Effort (1-10)</Label>
-            <Input type="number" min="1" max="10" placeholder="8" value={formData.effort} onChange={(e) => setFormData({ ...formData, effort: e.target.value })} data-testid="input-skill-effort" />
-          </div>
-          <div className="space-y-2">
-            <Label>Notes</Label>
-            <Textarea placeholder="What did you work on?" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} data-testid="input-skill-notes" />
-          </div>
+          ))}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

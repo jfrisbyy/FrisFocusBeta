@@ -372,6 +372,7 @@ export const skillWorkouts = pgTable("skill_workouts", {
   effort: integer("effort"),
   notes: text("notes"),
   drillStats: jsonb("drill_stats"),
+  customFields: jsonb("custom_fields"),
 });
 
 export const insertSkillWorkoutSchema = createInsertSchema(skillWorkouts).omit({ id: true });
