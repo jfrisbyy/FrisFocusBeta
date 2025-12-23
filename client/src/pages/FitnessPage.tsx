@@ -6122,7 +6122,7 @@ function SkillDialog({
     } else {
       setFormData(getInitialFormData());
     }
-  }, [editData, open, activeTemplateId, visibleFields.join(',')]);
+  }, [editData, open, activeTemplateId]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<SkillWorkout>) => {
