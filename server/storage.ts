@@ -8,6 +8,10 @@ import {
   userDueDates,
   aiConversations,
   workoutRoutines,
+  journalFolders,
+  journalTemplates,
+  journalEntries,
+  userJournalSettings,
   type User,
   type UpsertUser,
   type Notification,
@@ -29,6 +33,14 @@ import {
   type AIMessage,
   type WorkoutRoutine,
   type InsertWorkoutRoutine,
+  type JournalFolder,
+  type InsertJournalFolder,
+  type JournalTemplate,
+  type InsertJournalTemplate,
+  type JournalEntryNew,
+  type InsertJournalEntryNew,
+  type UserJournalSettings,
+  type InsertUserJournalSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -78,6 +90,31 @@ export interface IStorage {
   createWorkoutRoutine(data: InsertWorkoutRoutine): Promise<WorkoutRoutine>;
   updateWorkoutRoutine(id: string, userId: string, data: Partial<InsertWorkoutRoutine>): Promise<WorkoutRoutine | undefined>;
   deleteWorkoutRoutine(id: string, userId: string): Promise<boolean>;
+
+  // Journal Folders
+  getJournalFolders(userId: string): Promise<JournalFolder[]>;
+  getJournalFolder(id: string, userId: string): Promise<JournalFolder | undefined>;
+  createJournalFolder(data: InsertJournalFolder): Promise<JournalFolder>;
+  updateJournalFolder(id: string, userId: string, data: Partial<InsertJournalFolder>): Promise<JournalFolder | undefined>;
+  deleteJournalFolder(id: string, userId: string): Promise<boolean>;
+
+  // Journal Templates
+  getJournalTemplates(userId: string): Promise<JournalTemplate[]>;
+  getJournalTemplate(id: string, userId: string): Promise<JournalTemplate | undefined>;
+  createJournalTemplate(data: InsertJournalTemplate): Promise<JournalTemplate>;
+  updateJournalTemplate(id: string, userId: string, data: Partial<InsertJournalTemplate>): Promise<JournalTemplate | undefined>;
+  deleteJournalTemplate(id: string, userId: string): Promise<boolean>;
+
+  // Journal Entries (new enhanced version)
+  getJournalEntriesNew(userId: string, folderId?: string): Promise<JournalEntryNew[]>;
+  getJournalEntryNew(id: string, userId: string): Promise<JournalEntryNew | undefined>;
+  createJournalEntryNew(data: InsertJournalEntryNew): Promise<JournalEntryNew>;
+  updateJournalEntryNew(id: string, userId: string, data: Partial<InsertJournalEntryNew>): Promise<JournalEntryNew | undefined>;
+  deleteJournalEntryNew(id: string, userId: string): Promise<boolean>;
+
+  // Journal Settings
+  getJournalSettings(userId: string): Promise<UserJournalSettings | undefined>;
+  upsertJournalSettings(userId: string, data: Partial<InsertUserJournalSettings>): Promise<UserJournalSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -599,6 +636,187 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(workoutRoutines.id, id), eq(workoutRoutines.userId, userId)))
       .returning();
     return result.length > 0;
+  }
+
+  // ==================== JOURNAL FOLDERS ====================
+
+  async getJournalFolders(userId: string): Promise<JournalFolder[]> {
+    return db
+      .select()
+      .from(journalFolders)
+      .where(eq(journalFolders.userId, userId))
+      .orderBy(journalFolders.sortOrder);
+  }
+
+  async getJournalFolder(id: string, userId: string): Promise<JournalFolder | undefined> {
+    const [folder] = await db
+      .select()
+      .from(journalFolders)
+      .where(and(eq(journalFolders.id, id), eq(journalFolders.userId, userId)));
+    return folder;
+  }
+
+  async createJournalFolder(data: InsertJournalFolder): Promise<JournalFolder> {
+    const [folder] = await db.insert(journalFolders).values(data).returning();
+    return folder;
+  }
+
+  async updateJournalFolder(id: string, userId: string, data: Partial<InsertJournalFolder>): Promise<JournalFolder | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.color !== undefined) updateData.color = data.color;
+    if (data.icon !== undefined) updateData.icon = data.icon;
+    if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
+    if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
+
+    const [folder] = await db
+      .update(journalFolders)
+      .set(updateData)
+      .where(and(eq(journalFolders.id, id), eq(journalFolders.userId, userId)))
+      .returning();
+    return folder;
+  }
+
+  async deleteJournalFolder(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(journalFolders)
+      .where(and(eq(journalFolders.id, id), eq(journalFolders.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== JOURNAL TEMPLATES ====================
+
+  async getJournalTemplates(userId: string): Promise<JournalTemplate[]> {
+    return db
+      .select()
+      .from(journalTemplates)
+      .where(eq(journalTemplates.userId, userId))
+      .orderBy(desc(journalTemplates.createdAt));
+  }
+
+  async getJournalTemplate(id: string, userId: string): Promise<JournalTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(journalTemplates)
+      .where(and(eq(journalTemplates.id, id), eq(journalTemplates.userId, userId)));
+    return template;
+  }
+
+  async createJournalTemplate(data: InsertJournalTemplate): Promise<JournalTemplate> {
+    const [template] = await db.insert(journalTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateJournalTemplate(id: string, userId: string, data: Partial<InsertJournalTemplate>): Promise<JournalTemplate | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.icon !== undefined) updateData.icon = data.icon;
+    if (data.color !== undefined) updateData.color = data.color;
+    if (data.fields !== undefined) updateData.fields = data.fields;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+    const [template] = await db
+      .update(journalTemplates)
+      .set(updateData)
+      .where(and(eq(journalTemplates.id, id), eq(journalTemplates.userId, userId)))
+      .returning();
+    return template;
+  }
+
+  async deleteJournalTemplate(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(journalTemplates)
+      .where(and(eq(journalTemplates.id, id), eq(journalTemplates.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== JOURNAL ENTRIES (NEW) ====================
+
+  async getJournalEntriesNew(userId: string, folderId?: string): Promise<JournalEntryNew[]> {
+    if (folderId) {
+      return db
+        .select()
+        .from(journalEntries)
+        .where(and(eq(journalEntries.userId, userId), eq(journalEntries.folderId, folderId)))
+        .orderBy(desc(journalEntries.createdAt));
+    }
+    return db
+      .select()
+      .from(journalEntries)
+      .where(eq(journalEntries.userId, userId))
+      .orderBy(desc(journalEntries.createdAt));
+  }
+
+  async getJournalEntryNew(id: string, userId: string): Promise<JournalEntryNew | undefined> {
+    const [entry] = await db
+      .select()
+      .from(journalEntries)
+      .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)));
+    return entry;
+  }
+
+  async createJournalEntryNew(data: InsertJournalEntryNew): Promise<JournalEntryNew> {
+    const [entry] = await db.insert(journalEntries).values(data).returning();
+    return entry;
+  }
+
+  async updateJournalEntryNew(id: string, userId: string, data: Partial<InsertJournalEntryNew>): Promise<JournalEntryNew | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.folderId !== undefined) updateData.folderId = data.folderId;
+    if (data.templateId !== undefined) updateData.templateId = data.templateId;
+    if (data.entryType !== undefined) updateData.entryType = data.entryType;
+    if (data.date !== undefined) updateData.date = data.date;
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.content !== undefined) updateData.content = data.content;
+    if (data.fieldValues !== undefined) updateData.fieldValues = data.fieldValues;
+    if (data.mood !== undefined) updateData.mood = data.mood;
+    if (data.tags !== undefined) updateData.tags = data.tags;
+
+    const [entry] = await db
+      .update(journalEntries)
+      .set(updateData)
+      .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)))
+      .returning();
+    return entry;
+  }
+
+  async deleteJournalEntryNew(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(journalEntries)
+      .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== JOURNAL SETTINGS ====================
+
+  async getJournalSettings(userId: string): Promise<UserJournalSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(userJournalSettings)
+      .where(eq(userJournalSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertJournalSettings(userId: string, data: Partial<InsertUserJournalSettings>): Promise<UserJournalSettings> {
+    const updateData: any = { updatedAt: new Date() };
+    if (data.defaultFolderId !== undefined) updateData.defaultFolderId = data.defaultFolderId;
+    if (data.autoAssignDailyToFolder !== undefined) updateData.autoAssignDailyToFolder = data.autoAssignDailyToFolder;
+    if (data.showFolderColors !== undefined) updateData.showFolderColors = data.showFolderColors;
+    if (data.defaultEntryType !== undefined) updateData.defaultEntryType = data.defaultEntryType;
+
+    const [settings] = await db
+      .insert(userJournalSettings)
+      .values({ userId, ...data })
+      .onConflictDoUpdate({
+        target: userJournalSettings.userId,
+        set: updateData,
+      })
+      .returning();
+    return settings;
   }
 }
 
