@@ -36,7 +36,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle, ChevronDown, Settings, RefreshCw, Clock } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -173,14 +180,24 @@ export default function TasksPage() {
   const [seasonDialogOpen, setSeasonDialogOpen] = useState(false);
   const [seasonName, setSeasonName] = useState("");
   const [seasonDescription, setSeasonDescription] = useState("");
+  const [seasonStartDate, setSeasonStartDate] = useState<string>("");
+  const [seasonEndDate, setSeasonEndDate] = useState<string>("");
   const [welcomeSeasonDialogOpen, setWelcomeSeasonDialogOpen] = useState(false);
   const [firstSeasonName, setFirstSeasonName] = useState("");
+  const [firstSeasonStartDate, setFirstSeasonStartDate] = useState<string>("");
+  const [firstSeasonEndDate, setFirstSeasonEndDate] = useState<string>("");
   
-  // Season time frame editing state
-  const [editTimeFrameDialogOpen, setEditTimeFrameDialogOpen] = useState(false);
+  // Edit season dialog state
+  const [editSeasonDialogOpen, setEditSeasonDialogOpen] = useState(false);
+  const [editingSeasonId, setEditingSeasonId] = useState<string>("");
+  const [editingSeasonName, setEditingSeasonName] = useState<string>("");
+  const [editingSeasonDescription, setEditingSeasonDescription] = useState<string>("");
   const [editingSeasonStartDate, setEditingSeasonStartDate] = useState<string>("");
   const [editingSeasonEndDate, setEditingSeasonEndDate] = useState<string>("");
   const [countdownNow, setCountdownNow] = useState(new Date());
+  
+  // Switch season dialog state
+  const [switchSeasonDialogOpen, setSwitchSeasonDialogOpen] = useState(false);
   
   // Track loaded season to prevent auto-save on initial load
   const lastLoadedSeasonIdRef = useRef<string | null>(null);
@@ -232,7 +249,7 @@ export default function TasksPage() {
 
   // Create first season mutation (with auto-activate)
   const createFirstSeasonMutation = useMutation({
-    mutationFn: async (data: { name: string }) => {
+    mutationFn: async (data: { name: string; startDate?: string | null; endDate?: string | null }) => {
       const res = await apiRequest("POST", "/api/seasons", data);
       const newSeason = await res.json();
       // Auto-activate the first season
@@ -244,6 +261,8 @@ export default function TasksPage() {
       toast({ title: "Season created!", description: "Your first season is ready. Start adding your tasks!" });
       setWelcomeSeasonDialogOpen(false);
       setFirstSeasonName("");
+      setFirstSeasonStartDate("");
+      setFirstSeasonEndDate("");
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create season", variant: "destructive" });
@@ -342,10 +361,12 @@ export default function TasksPage() {
     },
   });
 
-  // Update season time frame mutation
-  const updateSeasonTimeFrameMutation = useMutation({
-    mutationFn: async (data: { seasonId: string; startDate: string | null; endDate: string | null }) => {
+  // Update season mutation (name, description, dates)
+  const updateSeasonMutation = useMutation({
+    mutationFn: async (data: { seasonId: string; name?: string; description?: string; startDate?: string | null; endDate?: string | null }) => {
       const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}`, { 
+        name: data.name,
+        description: data.description,
         startDate: data.startDate,
         endDate: data.endDate,
       });
@@ -353,11 +374,11 @@ export default function TasksPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/seasons"] });
-      toast({ title: "Time frame updated", description: "Season dates have been updated" });
-      setEditTimeFrameDialogOpen(false);
+      toast({ title: "Season updated", description: "Season has been updated" });
+      setEditSeasonDialogOpen(false);
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update time frame", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update season", variant: "destructive" });
     },
   });
 
@@ -651,6 +672,8 @@ export default function TasksPage() {
   const handleOpenCreateSeason = () => {
     setSeasonName("");
     setSeasonDescription("");
+    setSeasonStartDate("");
+    setSeasonEndDate("");
     setSeasonCreationMode("scratch");
     setImportFromSeasonId("");
     setImportTasks([]);
@@ -659,18 +682,23 @@ export default function TasksPage() {
     setSeasonDialogOpen(true);
   };
 
-  const handleOpenEditTimeFrame = () => {
+  const handleOpenEditSeason = () => {
     if (activeSeason) {
+      setEditingSeasonId(activeSeason.id);
+      setEditingSeasonName(activeSeason.name);
+      setEditingSeasonDescription(activeSeason.description || "");
       setEditingSeasonStartDate(activeSeason.startDate ? new Date(activeSeason.startDate).toISOString().split('T')[0] : "");
       setEditingSeasonEndDate(activeSeason.endDate ? new Date(activeSeason.endDate).toISOString().split('T')[0] : "");
-      setEditTimeFrameDialogOpen(true);
+      setEditSeasonDialogOpen(true);
     }
   };
 
-  const handleSaveTimeFrame = () => {
-    if (activeSeason) {
-      updateSeasonTimeFrameMutation.mutate({
-        seasonId: activeSeason.id,
+  const handleSaveEditSeason = () => {
+    if (editingSeasonId && editingSeasonName.trim()) {
+      updateSeasonMutation.mutate({
+        seasonId: editingSeasonId,
+        name: editingSeasonName.trim(),
+        description: editingSeasonDescription.trim() || undefined,
         startDate: editingSeasonStartDate || null,
         endDate: editingSeasonEndDate || null,
       });
@@ -707,6 +735,8 @@ export default function TasksPage() {
       const res = await apiRequest("POST", "/api/seasons", {
         name: seasonName.trim(),
         description: seasonDescription.trim() || undefined,
+        startDate: seasonStartDate || null,
+        endDate: seasonEndDate || null,
       });
       const newSeason = await res.json();
       
@@ -727,6 +757,8 @@ export default function TasksPage() {
       setSeasonDialogOpen(false);
       setSeasonName("");
       setSeasonDescription("");
+      setSeasonStartDate("");
+      setSeasonEndDate("");
       setSeasonCreationMode("scratch");
       setImportFromSeasonId("");
       setImportTasks([]);
@@ -1392,6 +1424,93 @@ export default function TasksPage() {
       </div>
       <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[2, 3]} />
 
+      {!isDemo && (
+        <div className="bg-gradient-to-r from-primary/5 to-chart-4/5 border border-primary/10 rounded-lg p-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-lg" data-testid="text-season-name">
+                  {activeSeason?.name || "No Season Selected"}
+                </span>
+                {isActiveSeasonArchived && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Archive className="h-3 w-3 mr-1" />
+                    Archived
+                  </Badge>
+                )}
+              </div>
+              {activeSeason?.endDate && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-primary font-medium" data-testid="text-season-countdown">
+                    {formatCountdown(activeSeason.endDate)}
+                  </span>
+                </div>
+              )}
+              {activeSeason?.description && (
+                <span className="text-sm text-muted-foreground hidden md:block">
+                  {activeSeason.description}
+                </span>
+              )}
+            </div>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-season-menu">
+                  <Settings className="h-4 w-4 mr-1" />
+                  Options
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {activeSeason && !isActiveSeasonArchived && (
+                  <DropdownMenuItem onClick={handleOpenEditSeason} data-testid="menu-edit-season">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Season
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleOpenCreateSeason} data-testid="menu-create-season">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Season
+                </DropdownMenuItem>
+                {seasons.length > 1 && (
+                  <DropdownMenuItem onClick={() => setSwitchSeasonDialogOpen(true)} data-testid="menu-switch-season">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Switch Season
+                  </DropdownMenuItem>
+                )}
+                {activeSeason && !isActiveSeasonArchived && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => setArchiveSeasonId(activeSeason.id)} 
+                      className="text-destructive"
+                      data-testid="menu-archive-season"
+                    >
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archive Season
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          
+          {activeSeason && (activeSeason.startDate || activeSeason.endDate) && (
+            <div className="mt-2 text-xs text-muted-foreground">
+              {activeSeason.startDate && (
+                <>Started: {new Date(activeSeason.startDate).toLocaleDateString()}</>
+              )}
+              {activeSeason.startDate && activeSeason.endDate && " • "}
+              {activeSeason.endDate && (
+                <>Ends: {new Date(activeSeason.endDate).toLocaleDateString()}</>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
         <Card>
           <CardHeader className="pb-2">
@@ -1483,119 +1602,6 @@ export default function TasksPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                Season
-              </div>
-              {!isDemo && (
-                <Button size="sm" variant="ghost" onClick={handleOpenCreateSeason} data-testid="button-add-season">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isDemo ? (
-              <span className="text-sm text-muted-foreground">Sign in to use seasons</span>
-            ) : seasonsLoading ? (
-              <span className="text-sm text-muted-foreground">Loading...</span>
-            ) : (
-              <div className="space-y-2">
-                <Select
-                  value={activeSeason?.id || "none"}
-                  onValueChange={handleSeasonChange}
-                  disabled={activateSeasonMutation.isPending || deactivateSeasonMutation.isPending}
-                >
-                  <SelectTrigger data-testid="select-season">
-                    <SelectValue placeholder="Select a season" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {nonArchivedSeasons.length > 0 && (
-                      <>
-                        {nonArchivedSeasons.map((season) => (
-                          <SelectItem key={season.id} value={season.id}>
-                            {season.name} {season.isActive ? "(Active)" : ""}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {archivedSeasons.length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Archived</div>
-                        {archivedSeasons.map((season) => (
-                          <SelectItem key={season.id} value={season.id} className="text-muted-foreground">
-                            {season.name} (Archived)
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-                {isActiveSeasonArchived && (
-                  <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                    <Archive className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">This season is archived (read-only)</span>
-                  </div>
-                )}
-                {activeSeason?.description && (
-                  <p className="text-xs text-muted-foreground">{activeSeason.description}</p>
-                )}
-                {activeSeason && (activeSeason.startDate || activeSeason.endDate) && (
-                  <div className="p-2 bg-muted rounded-md space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {activeSeason.startDate && (
-                          <>Starts: {new Date(activeSeason.startDate).toLocaleDateString()}</>
-                        )}
-                        {activeSeason.startDate && activeSeason.endDate && " - "}
-                        {activeSeason.endDate && (
-                          <>Ends: {new Date(activeSeason.endDate).toLocaleDateString()}</>
-                        )}
-                      </span>
-                    </div>
-                    {activeSeason.endDate && (
-                      <div className="text-sm font-medium text-primary" data-testid="text-season-countdown">
-                        {formatCountdown(activeSeason.endDate)}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {activeSeason && !isActiveSeasonArchived && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleOpenEditTimeFrame}
-                    data-testid="button-edit-time-frame"
-                  >
-                    <Calendar className="h-4 w-4 mr-1" />
-                    Edit Time Frame
-                  </Button>
-                )}
-                {activeSeason && !isActiveSeasonArchived && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setArchiveSeasonId(activeSeason.id)}
-                    data-testid="button-archive-season"
-                  >
-                    <Archive className="h-4 w-4 mr-1" />
-                    Archive Season
-                  </Button>
-                )}
-                {seasons.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Create seasons to organize your tasks by time periods
-                  </p>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {activeSeason && !isActiveSeasonArchived && !isDemo && (
@@ -1876,6 +1882,32 @@ export default function TasksPage() {
               />
             </div>
             
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="season-start-date">Start Date (optional)</Label>
+                <Input
+                  id="season-start-date"
+                  type="date"
+                  value={seasonStartDate}
+                  onChange={(e) => setSeasonStartDate(e.target.value)}
+                  data-testid="input-create-season-start-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="season-end-date">End Date (optional)</Label>
+                <Input
+                  id="season-end-date"
+                  type="date"
+                  value={seasonEndDate}
+                  onChange={(e) => setSeasonEndDate(e.target.value)}
+                  data-testid="input-create-season-end-date"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Set an end date to see a countdown of time remaining in this season.
+            </p>
+            
             <div className="space-y-3 border-t pt-4">
               <Label>How would you like to start?</Label>
               <RadioGroup
@@ -2049,59 +2081,160 @@ export default function TasksPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={editTimeFrameDialogOpen} onOpenChange={setEditTimeFrameDialogOpen}>
+      <Dialog open={editSeasonDialogOpen} onOpenChange={setEditSeasonDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Edit Season Time Frame
+              <Pencil className="h-5 w-5 text-primary" />
+              Edit Season
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              Set start and end dates to track how much time is left in this season.
+            <div className="space-y-2">
+              <Label htmlFor="edit-season-name">Name</Label>
+              <Input
+                id="edit-season-name"
+                value={editingSeasonName}
+                onChange={(e) => setEditingSeasonName(e.target.value)}
+                placeholder="Season name"
+                data-testid="input-edit-season-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-season-description">Description (optional)</Label>
+              <Textarea
+                id="edit-season-description"
+                value={editingSeasonDescription}
+                onChange={(e) => setEditingSeasonDescription(e.target.value)}
+                placeholder="What's the focus of this season?"
+                rows={2}
+                data-testid="input-edit-season-description"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-season-start-date">Start Date</Label>
+                <Input
+                  id="edit-season-start-date"
+                  type="date"
+                  value={editingSeasonStartDate}
+                  onChange={(e) => setEditingSeasonStartDate(e.target.value)}
+                  data-testid="input-edit-season-start-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-season-end-date">End Date</Label>
+                <Input
+                  id="edit-season-end-date"
+                  type="date"
+                  value={editingSeasonEndDate}
+                  onChange={(e) => setEditingSeasonEndDate(e.target.value)}
+                  data-testid="input-edit-season-end-date"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Set an end date to see a countdown of time remaining in this season.
             </p>
-            <div className="space-y-2">
-              <Label htmlFor="season-start-date">Start Date (optional)</Label>
-              <Input
-                id="season-start-date"
-                type="date"
-                value={editingSeasonStartDate}
-                onChange={(e) => setEditingSeasonStartDate(e.target.value)}
-                data-testid="input-season-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="season-end-date">End Date</Label>
-              <Input
-                id="season-end-date"
-                type="date"
-                value={editingSeasonEndDate}
-                onChange={(e) => setEditingSeasonEndDate(e.target.value)}
-                data-testid="input-season-end-date"
-              />
-              <p className="text-xs text-muted-foreground">
-                Set an end date to see a countdown of time remaining in this season.
-              </p>
-            </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditTimeFrameDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setEditSeasonDialogOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={handleSaveTimeFrame}
-              disabled={updateSeasonTimeFrameMutation.isPending}
-              data-testid="button-save-time-frame"
+              onClick={handleSaveEditSeason}
+              disabled={!editingSeasonName.trim() || updateSeasonMutation.isPending}
+              data-testid="button-save-edit-season"
             >
-              {updateSeasonTimeFrameMutation.isPending ? (
+              {updateSeasonMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   Saving...
                 </>
               ) : (
-                "Save Time Frame"
+                "Save Changes"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={switchSeasonDialogOpen} onOpenChange={setSwitchSeasonDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Switch Season
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Select a season to make active. Your active season determines which tasks, categories, and penalties are shown.
+            </p>
+            <div className="space-y-2">
+              {nonArchivedSeasons.map((season) => (
+                <div
+                  key={season.id}
+                  className={`flex items-center justify-between p-3 rounded-md border cursor-pointer hover-elevate ${
+                    season.isActive ? "border-primary bg-primary/5" : "border-border"
+                  }`}
+                  onClick={() => {
+                    if (!season.isActive) {
+                      activateSeasonMutation.mutate(season.id);
+                      setSwitchSeasonDialogOpen(false);
+                    }
+                  }}
+                  data-testid={`switch-season-${season.id}`}
+                >
+                  <div>
+                    <div className="font-medium">{season.name}</div>
+                    {season.description && (
+                      <div className="text-xs text-muted-foreground">{season.description}</div>
+                    )}
+                  </div>
+                  {season.isActive && (
+                    <Badge variant="secondary" className="text-xs">Active</Badge>
+                  )}
+                </div>
+              ))}
+              {archivedSeasons.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold text-muted-foreground pt-2">Archived Seasons</div>
+                  {archivedSeasons.map((season) => (
+                    <div
+                      key={season.id}
+                      className={`flex items-center justify-between p-3 rounded-md border cursor-pointer hover-elevate ${
+                        season.isActive ? "border-primary bg-primary/5" : "border-border opacity-60"
+                      }`}
+                      onClick={() => {
+                        if (!season.isActive) {
+                          activateSeasonMutation.mutate(season.id);
+                          setSwitchSeasonDialogOpen(false);
+                        }
+                      }}
+                      data-testid={`switch-season-${season.id}`}
+                    >
+                      <div>
+                        <div className="font-medium flex items-center gap-1">
+                          {season.name}
+                          <Archive className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                        {season.description && (
+                          <div className="text-xs text-muted-foreground">{season.description}</div>
+                        )}
+                      </div>
+                      {season.isActive && (
+                        <Badge variant="secondary" className="text-xs">Active</Badge>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSwitchSeasonDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2147,12 +2280,41 @@ export default function TasksPage() {
                 data-testid="input-first-season-name"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="first-season-start-date">Start Date (optional)</Label>
+                <Input
+                  id="first-season-start-date"
+                  type="date"
+                  value={firstSeasonStartDate}
+                  onChange={(e) => setFirstSeasonStartDate(e.target.value)}
+                  data-testid="input-first-season-start-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="first-season-end-date">End Date (optional)</Label>
+                <Input
+                  id="first-season-end-date"
+                  type="date"
+                  value={firstSeasonEndDate}
+                  onChange={(e) => setFirstSeasonEndDate(e.target.value)}
+                  data-testid="input-first-season-end-date"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Set an end date to see a countdown timer for this season.
+            </p>
           </div>
           <DialogFooter>
             <Button
               onClick={() => {
                 if (firstSeasonName.trim()) {
-                  createFirstSeasonMutation.mutate({ name: firstSeasonName.trim() });
+                  createFirstSeasonMutation.mutate({ 
+                    name: firstSeasonName.trim(),
+                    startDate: firstSeasonStartDate || undefined,
+                    endDate: firstSeasonEndDate || undefined,
+                  });
                 }
               }}
               disabled={!firstSeasonName.trim() || createFirstSeasonMutation.isPending}
