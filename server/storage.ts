@@ -12,6 +12,7 @@ import {
   journalTemplates,
   journalEntries,
   userJournalSettings,
+  seasons,
   type User,
   type UpsertUser,
   type Notification,
@@ -41,6 +42,8 @@ import {
   type InsertJournalEntryNew,
   type UserJournalSettings,
   type InsertUserJournalSettings,
+  type Season,
+  type InsertSeason,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -115,6 +118,14 @@ export interface IStorage {
   // Journal Settings
   getJournalSettings(userId: string): Promise<UserJournalSettings | undefined>;
   upsertJournalSettings(userId: string, data: Partial<InsertUserJournalSettings>): Promise<UserJournalSettings>;
+
+  // Seasons
+  getSeasons(userId: string): Promise<Season[]>;
+  getSeason(id: string, userId: string): Promise<Season | undefined>;
+  getActiveSeason(userId: string): Promise<Season | undefined>;
+  createSeason(data: InsertSeason): Promise<Season>;
+  updateSeason(id: string, userId: string, data: Partial<InsertSeason>): Promise<Season | undefined>;
+  deleteSeason(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -817,6 +828,63 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return settings;
+  }
+
+  // ==================== SEASONS ====================
+
+  async getSeasons(userId: string): Promise<Season[]> {
+    return db
+      .select()
+      .from(seasons)
+      .where(eq(seasons.userId, userId))
+      .orderBy(desc(seasons.createdAt));
+  }
+
+  async getSeason(id: string, userId: string): Promise<Season | undefined> {
+    const [season] = await db
+      .select()
+      .from(seasons)
+      .where(and(eq(seasons.id, id), eq(seasons.userId, userId)));
+    return season;
+  }
+
+  async getActiveSeason(userId: string): Promise<Season | undefined> {
+    const [season] = await db
+      .select()
+      .from(seasons)
+      .where(and(eq(seasons.userId, userId), eq(seasons.isActive, true)));
+    return season;
+  }
+
+  async createSeason(data: InsertSeason): Promise<Season> {
+    const [season] = await db.insert(seasons).values(data).returning();
+    return season;
+  }
+
+  async updateSeason(id: string, userId: string, data: Partial<InsertSeason>): Promise<Season | undefined> {
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.startDate !== undefined) updateData.startDate = data.startDate;
+    if (data.endDate !== undefined) updateData.endDate = data.endDate;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.isArchived !== undefined) updateData.isArchived = data.isArchived;
+    if (data.weeklyGoal !== undefined) updateData.weeklyGoal = data.weeklyGoal;
+
+    const [season] = await db
+      .update(seasons)
+      .set(updateData)
+      .where(and(eq(seasons.id, id), eq(seasons.userId, userId)))
+      .returning();
+    return season;
+  }
+
+  async deleteSeason(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(seasons)
+      .where(and(eq(seasons.id, id), eq(seasons.userId, userId)))
+      .returning();
+    return result.length > 0;
   }
 }
 
