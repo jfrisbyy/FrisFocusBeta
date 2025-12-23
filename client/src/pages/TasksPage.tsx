@@ -43,7 +43,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle, ChevronDown, Settings, RefreshCw, Clock } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, CalendarDays, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle, ChevronDown, Settings, RefreshCw, Clock } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -155,8 +155,11 @@ export default function TasksPage() {
   // Initialize state - will be populated from API or sample data
   const [tasks, setTasks] = useState<Task[]>(() => useMockData ? sampleTasks : []);
   const [dailyGoal, setDailyGoal] = useState(() => useMockData ? 50 : 50);
+  const [weeklyGoal, setWeeklyGoal] = useState(() => useMockData ? 350 : 350);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
+  const [editingWeeklyGoal, setEditingWeeklyGoal] = useState(false);
+  const [weeklyGoalInput, setWeeklyGoalInput] = useState("");
   
   const [penalties, setPenalties] = useState<PenaltyItem[]>(() => useMockData ? samplePenalties : []);
   const [penaltyDialogOpen, setPenaltyDialogOpen] = useState(false);
@@ -1054,6 +1057,7 @@ export default function TasksPage() {
   useEffect(() => {
     if (useMockData || activeSeason || apiSettingsLoading || !apiSettings) return;
     setDailyGoal(apiSettings.dailyGoal || 50);
+    setWeeklyGoal(apiSettings.weeklyGoal || 350);
   }, [apiSettings, apiSettingsLoading, activeSeason, useMockData]);
 
   // Load tasks/categories/penalties from active season when it changes
@@ -1101,6 +1105,7 @@ export default function TasksPage() {
     
     // Load weekly goal from season
     if (activeSeasonData.weeklyGoal) {
+      setWeeklyGoal(activeSeasonData.weeklyGoal);
       setDailyGoal(Math.round(activeSeasonData.weeklyGoal / 7));
     }
   }, [activeSeasonData, useMockData]);
@@ -1217,6 +1222,7 @@ export default function TasksPage() {
     const newGoal = parseInt(goalInput, 10);
     if (!isNaN(newGoal) && newGoal > 0) {
       setDailyGoal(newGoal);
+      setWeeklyGoal(newGoal * 7);
       if (activeSeason && !useMockData) {
         // Update season's weeklyGoal when a season is active
         updateSeasonSettingsMutation.mutate({ seasonId: activeSeason.id, weeklyGoal: newGoal * 7 });
@@ -1235,6 +1241,37 @@ export default function TasksPage() {
   const handleCancelGoal = () => {
     setEditingGoal(false);
     setGoalInput("");
+  };
+
+  const handleEditWeeklyGoal = () => {
+    setWeeklyGoalInput(weeklyGoal.toString());
+    setEditingWeeklyGoal(true);
+  };
+
+  const handleSaveWeeklyGoal = () => {
+    const newWeeklyGoal = parseInt(weeklyGoalInput, 10);
+    if (!isNaN(newWeeklyGoal) && newWeeklyGoal > 0) {
+      setWeeklyGoal(newWeeklyGoal);
+      const newDailyGoal = Math.round(newWeeklyGoal / 7);
+      setDailyGoal(newDailyGoal);
+      if (activeSeason && !useMockData) {
+        // Update season's weeklyGoal when a season is active
+        updateSeasonSettingsMutation.mutate({ seasonId: activeSeason.id, weeklyGoal: newWeeklyGoal });
+      } else if (!useMockData) {
+        // Update global settings when no season is active
+        updateSettingsMutation.mutate({ dailyGoal: newDailyGoal, weeklyGoal: newWeeklyGoal });
+      }
+      toast({
+        title: "Weekly goal updated",
+        description: `Your weekly goal is now ${newWeeklyGoal} points`,
+      });
+    }
+    setEditingWeeklyGoal(false);
+  };
+
+  const handleCancelWeeklyGoal = () => {
+    setEditingWeeklyGoal(false);
+    setWeeklyGoalInput("");
   };
 
   const resetPenaltyForm = () => {
@@ -1539,7 +1576,49 @@ export default function TasksPage() {
         </div>
       )}
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              Weekly Point Goal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {editingWeeklyGoal ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={weeklyGoalInput}
+                  onChange={(e) => setWeeklyGoalInput(e.target.value)}
+                  className="w-24 font-mono"
+                  min={1}
+                  autoFocus
+                  data-testid="input-weekly-goal"
+                />
+                <span className="text-sm text-muted-foreground">points</span>
+                <Button size="icon" variant="ghost" onClick={handleSaveWeeklyGoal} data-testid="button-save-weekly-goal">
+                  <Check className="h-4 w-4 text-chart-1" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={handleCancelWeeklyGoal} data-testid="button-cancel-weekly-goal">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-mono font-bold">{weeklyGoal}</span>
+                <span className="text-sm text-muted-foreground">pts/week</span>
+                <Button size="icon" variant="ghost" onClick={handleEditWeeklyGoal} data-testid="button-edit-weekly-goal">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Hit this goal each week to build your week streak
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1570,7 +1649,7 @@ export default function TasksPage() {
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-mono font-bold">{dailyGoal}</span>
-                <span className="text-sm text-muted-foreground">points per day</span>
+                <span className="text-sm text-muted-foreground">pts/day</span>
                 <Button size="icon" variant="ghost" onClick={handleEditGoal} data-testid="button-edit-daily-goal">
                   <Pencil className="h-4 w-4" />
                 </Button>
