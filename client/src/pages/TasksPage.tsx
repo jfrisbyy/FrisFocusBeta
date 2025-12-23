@@ -1103,10 +1103,9 @@ export default function TasksPage() {
     }));
     setPenalties(seasonPenalties);
     
-    // Load weekly goal from season
+    // Load weekly goal from season (daily goal is independent, not calculated from weekly)
     if (activeSeasonData.weeklyGoal) {
       setWeeklyGoal(activeSeasonData.weeklyGoal);
-      setDailyGoal(Math.round(activeSeasonData.weeklyGoal / 7));
     }
   }, [activeSeasonData, useMockData]);
 

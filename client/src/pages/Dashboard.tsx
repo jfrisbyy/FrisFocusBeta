@@ -892,10 +892,13 @@ export default function Dashboard() {
     setSelectedMessageIndex(profile.selectedMessageIndex ?? -1);
 
     // Load goals - prefer API settings, fall back to localStorage
-    if (apiSettings?.weeklyGoal !== undefined) {
-      setWeeklyGoal(apiSettings.weeklyGoal);
-    } else {
-      setWeeklyGoal(loadWeeklyGoalFromStorage());
+    // Only load from global settings when NO active season (season goal loaded in separate effect)
+    if (!activeSeason) {
+      if (apiSettings?.weeklyGoal !== undefined) {
+        setWeeklyGoal(apiSettings.weeklyGoal);
+      } else {
+        setWeeklyGoal(loadWeeklyGoalFromStorage());
+      }
     }
 
     // Load milestones from API (database persistence only)
