@@ -870,6 +870,7 @@ export class DatabaseStorage implements IStorage {
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.isArchived !== undefined) updateData.isArchived = data.isArchived;
     if (data.weeklyGoal !== undefined) updateData.weeklyGoal = data.weeklyGoal;
+    if (data.bannerColor !== undefined) updateData.bannerColor = data.bannerColor;
 
     const [season] = await db
       .update(seasons)
