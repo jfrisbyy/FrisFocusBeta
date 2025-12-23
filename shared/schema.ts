@@ -680,6 +680,7 @@ export const seasons = pgTable("seasons", {
   isActive: boolean("is_active").default(false),
   isArchived: boolean("is_archived").default(false),
   weeklyGoal: integer("weekly_goal").default(100),
+  bannerColor: varchar("banner_color").default("default"),
   createdAt: timestamp("created_at").defaultNow(),
   archivedAt: timestamp("archived_at"),
 });

@@ -194,6 +194,9 @@ export default function TasksPage() {
   const [editingSeasonDescription, setEditingSeasonDescription] = useState<string>("");
   const [editingSeasonStartDate, setEditingSeasonStartDate] = useState<string>("");
   const [editingSeasonEndDate, setEditingSeasonEndDate] = useState<string>("");
+  const [editingSeasonColor, setEditingSeasonColor] = useState<string>("default");
+  const [seasonColor, setSeasonColor] = useState<string>("default");
+  const [firstSeasonColor, setFirstSeasonColor] = useState<string>("default");
   const [countdownNow, setCountdownNow] = useState(new Date());
   
   // Switch season dialog state
@@ -249,7 +252,7 @@ export default function TasksPage() {
 
   // Create first season mutation (with auto-activate)
   const createFirstSeasonMutation = useMutation({
-    mutationFn: async (data: { name: string; startDate?: string | null; endDate?: string | null }) => {
+    mutationFn: async (data: { name: string; startDate?: string | null; endDate?: string | null; bannerColor?: string }) => {
       const res = await apiRequest("POST", "/api/seasons", data);
       const newSeason = await res.json();
       // Auto-activate the first season
@@ -263,6 +266,7 @@ export default function TasksPage() {
       setFirstSeasonName("");
       setFirstSeasonStartDate("");
       setFirstSeasonEndDate("");
+      setFirstSeasonColor("default");
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create season", variant: "destructive" });
@@ -283,7 +287,7 @@ export default function TasksPage() {
 
   // Create season mutation
   const createSeasonMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
+    mutationFn: async (data: { name: string; description?: string; startDate?: string | null; endDate?: string | null; bannerColor?: string }) => {
       const res = await apiRequest("POST", "/api/seasons", data);
       return res.json();
     },
@@ -294,6 +298,9 @@ export default function TasksPage() {
       setSeasonDialogOpen(false);
       setSeasonName("");
       setSeasonDescription("");
+      setSeasonStartDate("");
+      setSeasonEndDate("");
+      setSeasonColor("default");
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create season", variant: "destructive" });
@@ -363,12 +370,13 @@ export default function TasksPage() {
 
   // Update season mutation (name, description, dates)
   const updateSeasonMutation = useMutation({
-    mutationFn: async (data: { seasonId: string; name?: string; description?: string; startDate?: string | null; endDate?: string | null }) => {
+    mutationFn: async (data: { seasonId: string; name?: string; description?: string; startDate?: string | null; endDate?: string | null; bannerColor?: string }) => {
       const res = await apiRequest("PUT", `/api/seasons/${data.seasonId}`, { 
         name: data.name,
         description: data.description,
         startDate: data.startDate,
         endDate: data.endDate,
+        bannerColor: data.bannerColor,
       });
       return res.json();
     },
@@ -674,6 +682,7 @@ export default function TasksPage() {
     setSeasonDescription("");
     setSeasonStartDate("");
     setSeasonEndDate("");
+    setSeasonColor("default");
     setSeasonCreationMode("scratch");
     setImportFromSeasonId("");
     setImportTasks([]);
@@ -689,6 +698,7 @@ export default function TasksPage() {
       setEditingSeasonDescription(activeSeason.description || "");
       setEditingSeasonStartDate(activeSeason.startDate ? new Date(activeSeason.startDate).toISOString().split('T')[0] : "");
       setEditingSeasonEndDate(activeSeason.endDate ? new Date(activeSeason.endDate).toISOString().split('T')[0] : "");
+      setEditingSeasonColor(activeSeason.bannerColor || "default");
       setEditSeasonDialogOpen(true);
     }
   };
@@ -701,11 +711,28 @@ export default function TasksPage() {
         description: editingSeasonDescription.trim() || undefined,
         startDate: editingSeasonStartDate || null,
         endDate: editingSeasonEndDate || null,
+        bannerColor: editingSeasonColor,
       });
     }
   };
 
   // Helper function to format countdown
+  const bannerColorOptions = [
+    { value: "default", label: "Default", gradient: "from-primary/5 to-chart-4/5", border: "border-primary/10" },
+    { value: "blue", label: "Blue", gradient: "from-blue-500/10 to-blue-600/5", border: "border-blue-500/20" },
+    { value: "green", label: "Green", gradient: "from-green-500/10 to-green-600/5", border: "border-green-500/20" },
+    { value: "purple", label: "Purple", gradient: "from-purple-500/10 to-purple-600/5", border: "border-purple-500/20" },
+    { value: "orange", label: "Orange", gradient: "from-orange-500/10 to-orange-600/5", border: "border-orange-500/20" },
+    { value: "pink", label: "Pink", gradient: "from-pink-500/10 to-pink-600/5", border: "border-pink-500/20" },
+    { value: "teal", label: "Teal", gradient: "from-teal-500/10 to-teal-600/5", border: "border-teal-500/20" },
+    { value: "red", label: "Red", gradient: "from-red-500/10 to-red-600/5", border: "border-red-500/20" },
+  ];
+
+  const getBannerColorClasses = (color: string | null | undefined) => {
+    const option = bannerColorOptions.find(o => o.value === color) || bannerColorOptions[0];
+    return { gradient: option.gradient, border: option.border };
+  };
+
   const formatCountdown = (endDate: Date | string | null): string | null => {
     if (!endDate) return null;
     const end = new Date(endDate);
@@ -737,6 +764,7 @@ export default function TasksPage() {
         description: seasonDescription.trim() || undefined,
         startDate: seasonStartDate || null,
         endDate: seasonEndDate || null,
+        bannerColor: seasonColor,
       });
       const newSeason = await res.json();
       
@@ -1425,7 +1453,7 @@ export default function TasksPage() {
       <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[2, 3]} />
 
       {!isDemo && (
-        <div className="bg-gradient-to-r from-primary/5 to-chart-4/5 border border-primary/10 rounded-lg p-4">
+        <div className={`bg-gradient-to-r ${getBannerColorClasses(activeSeason?.bannerColor).gradient} border ${getBannerColorClasses(activeSeason?.bannerColor).border} rounded-lg p-4`}>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
@@ -1511,7 +1539,7 @@ export default function TasksPage() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1602,25 +1630,31 @@ export default function TasksPage() {
           </CardContent>
         </Card>
 
+        {activeSeason && !isActiveSeasonArchived && !isDemo && (
+          <Card className="bg-gradient-to-br from-primary/5 to-chart-4/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                AI Task Generator
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">
+                Describe your ideal life and let AI create personalized tasks for you
+              </p>
+              <Button
+                className="w-full bg-gradient-to-r from-primary to-chart-4 hover:from-primary/90 hover:to-chart-4/90 text-primary-foreground"
+                onClick={handleOpenAiDialog}
+                disabled={aiConversationMutation.isPending || aiFinalizeMutation.isPending}
+                data-testid="button-generate-ai"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate with AI
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
-
-      {activeSeason && !isActiveSeasonArchived && !isDemo && (
-        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-primary/10 to-chart-4/10 rounded-lg border border-primary/20">
-          <Button
-            size="lg"
-            className="bg-gradient-to-r from-primary to-chart-4 hover:from-primary/90 hover:to-chart-4/90 text-primary-foreground shadow-md"
-            onClick={handleOpenAiDialog}
-            disabled={aiConversationMutation.isPending || aiFinalizeMutation.isPending}
-            data-testid="button-generate-ai"
-          >
-            <Sparkles className="h-5 w-5 mr-2" />
-            Generate with AI
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Describe your ideal life and let AI create personalized tasks for you
-          </span>
-        </div>
-      )}
 
       <TaskList
         tasks={tasks}
@@ -1904,6 +1938,25 @@ export default function TasksPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Banner Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {bannerColorOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSeasonColor(option.value)}
+                    className={`w-8 h-8 rounded-md border-2 transition-all bg-gradient-to-r ${option.gradient} ${
+                      seasonColor === option.value 
+                        ? "border-primary ring-2 ring-primary/30" 
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                    title={option.label}
+                    data-testid={`color-create-${option.value}`}
+                  />
+                ))}
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
               Set an end date to see a countdown of time remaining in this season.
             </p>
@@ -2133,6 +2186,25 @@ export default function TasksPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Banner Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {bannerColorOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setEditingSeasonColor(option.value)}
+                    className={`w-8 h-8 rounded-md border-2 transition-all bg-gradient-to-r ${option.gradient} ${
+                      editingSeasonColor === option.value 
+                        ? "border-primary ring-2 ring-primary/30" 
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                    title={option.label}
+                    data-testid={`color-edit-${option.value}`}
+                  />
+                ))}
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
               Set an end date to see a countdown of time remaining in this season.
             </p>
@@ -2304,6 +2376,25 @@ export default function TasksPage() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Banner Color</Label>
+              <div className="flex flex-wrap gap-2">
+                {bannerColorOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFirstSeasonColor(option.value)}
+                    className={`w-8 h-8 rounded-md border-2 transition-all bg-gradient-to-r ${option.gradient} ${
+                      firstSeasonColor === option.value 
+                        ? "border-primary ring-2 ring-primary/30" 
+                        : "border-transparent hover:border-muted-foreground/30"
+                    }`}
+                    title={option.label}
+                    data-testid={`color-first-${option.value}`}
+                  />
+                ))}
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
               Set an end date to see a countdown timer for this season.
             </p>
@@ -2316,6 +2407,7 @@ export default function TasksPage() {
                     name: firstSeasonName.trim(),
                     startDate: firstSeasonStartDate || undefined,
                     endDate: firstSeasonEndDate || undefined,
+                    bannerColor: firstSeasonColor,
                   });
                 }
               }}
