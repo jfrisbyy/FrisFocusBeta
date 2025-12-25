@@ -5044,10 +5044,16 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       }
       
       // Set computed plan with AI values for display and saving
+      // Include bmr and sedentaryTDEE from the recommendation or calculate from current bmrResult
+      const bmr = aiRecommendation.bmr || bmrResult || 0;
+      const sedentaryTDEE = aiRecommendation.sedentaryTDEE || Math.round(bmr * 1.2);
+      
       setComputedPlan({
         dailyCalories: aiRecommendation.calorieTarget,
         steps: aiRecommendation.stepGoal || 10000,
         proteinTarget: aiRecommendation.proteinTarget,
+        bmr,
+        sedentaryTDEE,
       });
       
       // Close AI chat and show the plan
