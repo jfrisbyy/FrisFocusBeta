@@ -162,12 +162,21 @@ function calculateBMR(weightLbs: number, heightIn: number, age: number, gender: 
 /**
  * Calculate required daily deficit/surplus to reach goal weight in timeframe
  * Returns negative number for cut, positive for bulk
+ * @param timeframeDays - number of days (use this for precise date-based calculations)
  */
-function calculateDailyDeficit(currentWeight: number, goalWeight: number, timeframeWeeks: number): number {
+function calculateDailyDeficitByDays(currentWeight: number, goalWeight: number, timeframeDays: number): number {
   const weightDiff = goalWeight - currentWeight; // negative for cut
   const totalCaloriesNeeded = weightDiff * 3500; // 3500 cal = 1 lb
-  const totalDays = timeframeWeeks * 7;
-  return Math.round(totalCaloriesNeeded / totalDays);
+  return Math.round(totalCaloriesNeeded / Math.max(1, timeframeDays));
+}
+
+/**
+ * Calculate required daily deficit/surplus to reach goal weight in timeframe
+ * Returns negative number for cut, positive for bulk
+ * @param timeframeWeeks - number of weeks (converted to days internally)
+ */
+function calculateDailyDeficit(currentWeight: number, goalWeight: number, timeframeWeeks: number): number {
+  return calculateDailyDeficitByDays(currentWeight, goalWeight, timeframeWeeks * 7);
 }
 
 // RoutineForm component for creating/editing workout routines
@@ -4793,9 +4802,24 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   }, [open, nutritionSettings]);
 
   // Calculate recommended daily deficit based on goal weight and timeframe
-  const calculatedDeficit = bmrData.weight && goalWeight && goalTimeframe
-    ? calculateDailyDeficit(parseFloat(bmrData.weight), parseFloat(goalWeight), parseInt(goalTimeframe))
-    : 0;
+  // Use exact days when target date is selected for precise calculations
+  const calculatedDeficit = (() => {
+    if (!bmrData.weight || !goalWeight) return 0;
+    
+    if (useTargetDate && targetDate) {
+      const daysUntil = Math.max(1, differenceInDays(targetDate, new Date()));
+      return calculateDailyDeficitByDays(parseFloat(bmrData.weight), parseFloat(goalWeight), daysUntil);
+    }
+    
+    return goalTimeframe 
+      ? calculateDailyDeficit(parseFloat(bmrData.weight), parseFloat(goalWeight), parseInt(goalTimeframe))
+      : 0;
+  })();
+  
+  // Calculate actual days for display (either from date or weeks)
+  const timeframeDays = useTargetDate && targetDate 
+    ? Math.max(1, differenceInDays(targetDate, new Date()))
+    : parseInt(goalTimeframe || "12") * 7;
 
   // Auto-update target based on flow selections
   useEffect(() => {
@@ -5293,7 +5317,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 )}
                 {useTargetDate && targetDate && (
                   <div className="text-xs text-muted-foreground">
-                    {Math.ceil(differenceInDays(targetDate, new Date()) / 7)} weeks away
+                    {differenceInDays(targetDate, new Date())} days ({(differenceInDays(targetDate, new Date()) / 7).toFixed(1)} weeks)
                   </div>
                 )}
               </div>
@@ -5314,9 +5338,15 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     </span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-muted-foreground">Timeframe:</span>
+                    <span className="font-medium">
+                      {timeframeDays} days ({(timeframeDays / 7).toFixed(1)} weeks)
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Weekly rate:</span>
                     <span className="font-medium">
-                      {Math.abs((parseFloat(goalWeight) - parseFloat(bmrData.weight)) / parseInt(goalTimeframe)).toFixed(2)} lbs/week
+                      {Math.abs((parseFloat(goalWeight) - parseFloat(bmrData.weight)) / (timeframeDays / 7)).toFixed(2)} lbs/week
                     </span>
                   </div>
                 </div>
@@ -5601,6 +5631,13 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     <div className="text-xs font-medium text-muted-foreground">How This Plan Works</div>
                     <div className="text-sm leading-relaxed space-y-2">
                       <p>
+                        <span className="font-medium">Timeline:</span>{' '}
+                        {timeframeDays} days ({(timeframeDays / 7).toFixed(1)} weeks)
+                        {useTargetDate && targetDate && (
+                          <span className="text-muted-foreground"> — target: {format(targetDate, "MMM d, yyyy")}</span>
+                        )}
+                      </p>
+                      <p>
                         <span className="font-medium">Your BMR is {bmr.toLocaleString()} cal/day.</span>{' '}
                         Sedentary TDEE = {bmr.toLocaleString()} × 1.2 = <span className="font-medium">{sedentaryTDEE.toLocaleString()} cal/day</span>.
                       </p>
@@ -5628,7 +5665,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                       </p>
                       {requiredWeeklyDeficit !== (Math.max(0, foodDeficitWeekly) + activityBurnWeekly) && (
                         <p className="text-xs text-muted-foreground">
-                          (Target was {requiredWeeklyDeficit.toLocaleString()} cal/week)
+                          (Target was {requiredWeeklyDeficit.toLocaleString()} cal/week based on {requiredDailyDeficit.toLocaleString()} cal/day × 7)
                         </p>
                       )}
                     </div>
