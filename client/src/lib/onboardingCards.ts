@@ -11,6 +11,16 @@ export type OnboardingTrigger =
   | "milestoneCreated"
   | "manual";
 
+// Skip check keys - used to determine if an action has already been completed
+export type SkipCheckKey = 
+  | "hasSeasons"
+  | "hasCategories"
+  | "hasTasks"
+  | "hasPenalties"
+  | "hasTodos"
+  | "hasDaySaved"
+  | "hasMilestones";
+
 export interface OnboardingCard {
   id: number;
   page: OnboardingPage;
@@ -22,6 +32,8 @@ export interface OnboardingCard {
     secondary?: { text: string; action: "next" | "skip" | "complete" };
   };
   highlightElement?: string;
+  // If set, users can skip this card during replay if the action is already done
+  skipCheck?: SkipCheckKey;
 }
 
 export const onboardingCards: OnboardingCard[] = [
@@ -82,7 +94,8 @@ export const onboardingCards: OnboardingCard[] = [
       "**Click the + sign** in the Seasons card at the top of this page to create a season. Name it whatever you'd like and describe what this phase of your life represents."
     ],
     trigger: "seasonCreated",
-    highlightElement: "button-add-season"
+    highlightElement: "button-add-season",
+    skipCheck: "hasSeasons"
   },
   {
     id: 6,
@@ -125,7 +138,8 @@ export const onboardingCards: OnboardingCard[] = [
       "Go ahead and make at least 2 different categories by **clicking on the + sign** within the category card."
     ],
     trigger: "categoryCreated",
-    highlightElement: "button-add-category"
+    highlightElement: "button-add-category",
+    skipCheck: "hasCategories"
   },
   {
     id: 10,
@@ -180,7 +194,8 @@ export const onboardingCards: OnboardingCard[] = [
       "Now that you know all about tasks, go ahead and create your first task by **clicking on the green Add Task button** on this page!"
     ],
     trigger: "taskCreated",
-    highlightElement: "button-add-task"
+    highlightElement: "button-add-task",
+    skipCheck: "hasTasks"
   },
   {
     id: 15,
@@ -203,7 +218,8 @@ export const onboardingCards: OnboardingCard[] = [
       "Go ahead and think of one bad habit or distraction and **click the Create a Penalty button** underneath the task section."
     ],
     trigger: "penaltyCreated",
-    highlightElement: "button-add-penalty"
+    highlightElement: "button-add-penalty",
+    skipCheck: "hasPenalties"
   },
   {
     id: 17,
@@ -239,7 +255,8 @@ export const onboardingCards: OnboardingCard[] = [
       "Go ahead and create one to-do item for today — whatever you'd like! **Click the + button** in the To-Do section."
     ],
     trigger: "todoCreated",
-    highlightElement: "button-add-todo"
+    highlightElement: "button-add-todo",
+    skipCheck: "hasTodos"
   },
   {
     id: 20,
@@ -260,6 +277,7 @@ export const onboardingCards: OnboardingCard[] = [
       "Go ahead — write how you're feeling right now and **click Save Day**. Don't forget to check off your first task or to-do list item if you've completed it!"
     ],
     trigger: "daySaved",
+    skipCheck: "hasDaySaved"
   },
   {
     id: 22,
@@ -293,7 +311,8 @@ export const onboardingCards: OnboardingCard[] = [
       "**Click the + button** in the Milestones section to add your first milestone."
     ],
     trigger: "milestoneCreated",
-    highlightElement: "button-add-milestone"
+    highlightElement: "button-add-milestone",
+    skipCheck: "hasMilestones"
   },
   {
     id: 25,

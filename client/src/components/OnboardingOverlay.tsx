@@ -1,17 +1,18 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { ChevronRight, ChevronLeft, MessageCircle, X, Sparkles, Clock, Send, Loader2 } from "lucide-react";
+import { ChevronRight, ChevronLeft, MessageCircle, X, Sparkles, Clock, Send, Loader2, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useOnboarding } from "@/contexts/OnboardingContext";
-import { OnboardingPage, getCardById, getOnboardingContentForAI } from "@/lib/onboardingCards";
+import { OnboardingPage, getCardById, getOnboardingContentForAI, SkipCheckKey } from "@/lib/onboardingCards";
 import { cn } from "@/lib/utils";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { nanoid } from "nanoid";
 import confetti from "canvas-confetti";
+import type { Season, Category, Task, Milestone } from "@shared/schema";
 
 interface ChatMessage {
   id: string;
@@ -68,7 +69,53 @@ export function OnboardingOverlay() {
     hideOnboarding,
     minimizeForAction,
     completeOnboarding,
+    skipCurrentCard,
   } = useOnboarding();
+
+  // Fetch data needed for skip checks - use same endpoints as rest of app
+  const { data: seasons = [] } = useQuery<Season[]>({
+    queryKey: ["/api/habit/seasons"],
+  });
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/habit/categories"],
+  });
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/habit/tasks"],
+  });
+  const { data: penalties = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/habit/penalties"],
+  });
+  const { data: milestones = [] } = useQuery<Milestone[]>({
+    queryKey: ["/api/habit/milestones"],
+  });
+  
+  // For todos and day logs, check ALL historical data (not just today)
+  // This ensures users who completed these steps on a previous day can skip during replay
+  const { data: allTodos = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/habit/all-daily-todos"],
+  });
+  
+  // Check if ANY day log exists (uses existing /api/habit/logs endpoint with no date filter)
+  const { data: allDayLogs = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/habit/logs"],
+  });
+
+  // Check if the current card's skipCheck condition is met
+  const canSkipCurrentCard = useMemo(() => {
+    if (!currentCard?.skipCheck) return false;
+    
+    const skipCheckMap: Record<SkipCheckKey, boolean> = {
+      hasSeasons: seasons.length > 0,
+      hasCategories: categories.length > 0,
+      hasTasks: tasks.length > 0,
+      hasPenalties: penalties.length > 0,
+      hasTodos: allTodos.length > 0,
+      hasDaySaved: allDayLogs.length > 0,
+      hasMilestones: milestones.length > 0,
+    };
+    
+    return skipCheckMap[currentCard.skipCheck] ?? false;
+  }, [currentCard, seasons, categories, tasks, penalties, allTodos, allDayLogs, milestones]);
 
   // Inline chat state
   const [showChat, setShowChat] = useState(false);
@@ -401,16 +448,29 @@ export function OnboardingOverlay() {
               )}
             </div>
           ) : currentCard.trigger && currentCard.trigger !== "immediate" && currentCard.trigger !== "manual" ? (
-            <div className="flex items-center justify-between w-full gap-2">
-              <p className="text-xs text-muted-foreground">
-                Complete the action to continue
-              </p>
-              <Button 
-                onClick={minimizeForAction}
-                data-testid="button-onboarding-do-now"
-              >
-                I'll do this now
-              </Button>
+            <div className="flex flex-col w-full gap-2">
+              <div className="flex items-center justify-between w-full gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {canSkipCurrentCard ? "You've already done this!" : "Complete the action to continue"}
+                </p>
+                <Button 
+                  onClick={minimizeForAction}
+                  data-testid="button-onboarding-do-now"
+                >
+                  I'll do this now
+                </Button>
+              </div>
+              {canSkipCurrentCard && (
+                <Button 
+                  variant="secondary"
+                  onClick={skipCurrentCard}
+                  className="w-full"
+                  data-testid="button-onboarding-skip-done"
+                >
+                  <SkipForward className="h-4 w-4 mr-2" />
+                  Skip - Already Done
+                </Button>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-between w-full gap-2">
@@ -449,27 +509,89 @@ export function OnboardingOverlay() {
 }
 
 export function OnboardingMinimizedIndicator() {
-  const { isMinimized, currentCardId, showOnboarding, waitingForTrigger } = useOnboarding();
+  const { isMinimized, currentCardId, showOnboarding, waitingForTrigger, skipCurrentCard } = useOnboarding();
 
-  if (!isMinimized || !currentCardId) {
+  const card = isMinimized && currentCardId ? getCardById(currentCardId) : null;
+  const hasSkipCheck = !!card?.skipCheck;
+
+  // Only fetch skip check data when minimized AND current card has a skipCheck
+  const { data: seasons = [] } = useQuery<Season[]>({
+    queryKey: ["/api/habit/seasons"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/habit/categories"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/habit/tasks"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+  const { data: penalties = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/habit/penalties"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+  const { data: milestones = [] } = useQuery<Milestone[]>({
+    queryKey: ["/api/habit/milestones"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+  const { data: allTodos = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/habit/all-daily-todos"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+  const { data: allDayLogs = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/habit/logs"],
+    enabled: isMinimized && hasSkipCheck,
+  });
+
+  if (!isMinimized || !currentCardId || !card) {
     return null;
   }
 
-  const card = getCardById(currentCardId);
-  if (!card) return null;
+  // Check if the current card's skipCheck condition is met
+  const canSkipCurrentCard = (() => {
+    if (!card.skipCheck) return false;
+    
+    const skipCheckMap: Record<SkipCheckKey, boolean> = {
+      hasSeasons: seasons.length > 0,
+      hasCategories: categories.length > 0,
+      hasTasks: tasks.length > 0,
+      hasPenalties: penalties.length > 0,
+      hasTodos: allTodos.length > 0,
+      hasDaySaved: allDayLogs.length > 0,
+      hasMilestones: milestones.length > 0,
+    };
+    
+    return skipCheckMap[card.skipCheck] ?? false;
+  })();
 
   const triggerLabels: Record<string, string> = {
     seasonCreated: "Create a season",
+    categoryCreated: "Create a category",
     taskCreated: "Create a task",
     penaltyCreated: "Create a penalty", 
+    todoCreated: "Create a to-do",
     daySaved: "Save your day",
+    milestoneCreated: "Create a milestone",
     aiTasksGenerated: "Generate tasks with AI",
   };
 
   const actionLabel = waitingForTrigger ? triggerLabels[waitingForTrigger] || "Complete the action" : "Complete the action";
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      {canSkipCurrentCard && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={skipCurrentCard}
+          className="shadow-lg flex items-center gap-2"
+          data-testid="button-onboarding-minimized-skip"
+        >
+          <SkipForward className="h-4 w-4" />
+          <span className="text-xs">Skip - Already Done</span>
+        </Button>
+      )}
       <Button
         variant="outline"
         size="sm"
@@ -478,7 +600,7 @@ export function OnboardingMinimizedIndicator() {
         data-testid="button-onboarding-minimized"
       >
         <Clock className="h-4 w-4 text-primary animate-pulse" />
-        <span className="text-xs">Waiting: {actionLabel}</span>
+        <span className="text-xs">{canSkipCurrentCard ? "View Tutorial" : `Waiting: ${actionLabel}`}</span>
       </Button>
     </div>
   );

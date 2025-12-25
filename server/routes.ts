@@ -7997,6 +7997,19 @@ Create motivating badges that will encourage consistency. Return valid JSON only
 
   // ==================== DAILY TO-DO LIST API ====================
 
+  // Get ALL daily to-do lists for user (used for onboarding skip check)
+  app.get("/api/habit/all-daily-todos", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const todos = await db.select().from(userDailyTodos)
+        .where(eq(userDailyTodos.userId, userId));
+      res.json(todos);
+    } catch (error) {
+      console.error("Error fetching all daily to-do lists:", error);
+      res.status(500).json({ error: "Failed to fetch daily to-do lists" });
+    }
+  });
+
   // Get daily to-do list for a specific date
   app.get("/api/habit/daily-todos/:date", isAuthenticated, async (req: any, res) => {
     try {

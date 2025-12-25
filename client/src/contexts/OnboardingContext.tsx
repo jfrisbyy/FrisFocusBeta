@@ -10,7 +10,8 @@ import {
   getCardById,
   OnboardingCard,
   OnboardingTrigger,
-  OnboardingPage
+  OnboardingPage,
+  SkipCheckKey
 } from "@/lib/onboardingCards";
 
 interface OnboardingProgress {
@@ -59,6 +60,7 @@ interface OnboardingContextType {
   isCardCompleted: (cardId: number) => boolean;
   triggerPenaltyCreated: () => void;
   triggerDaySaved: () => void;
+  skipCurrentCard: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -346,6 +348,53 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     triggerAction("daySaved");
   }, [triggerAction]);
 
+  // Skip current card (used when user already has completed the action during replay)
+  // This properly clears waitingForTrigger and marks current card as completed before advancing
+  const skipCurrentCard = useCallback(() => {
+    const sequence = getActiveCardSequence();
+    const currentIndex = sequence.indexOf(progress.currentCardId ?? 0);
+    
+    // Mark current card as completed
+    if (progress.currentCardId !== null) {
+      setProgress(prev => ({
+        ...prev,
+        completedCardIds: prev.completedCardIds.includes(progress.currentCardId!)
+          ? prev.completedCardIds
+          : [...prev.completedCardIds, progress.currentCardId!],
+      }));
+    }
+
+    // Advance to next card
+    if (currentIndex >= 0 && currentIndex < sequence.length - 1) {
+      const nextCardId = sequence[currentIndex + 1];
+      const nextCard = getCardById(nextCardId);
+      
+      if (nextCard?.trigger && nextCard.trigger !== "immediate" && nextCard.trigger !== "manual") {
+        setProgress(prev => ({
+          ...prev,
+          currentCardId: nextCardId,
+          waitingForTrigger: nextCard.trigger!,
+          isMinimized: false,
+        }));
+      } else {
+        setProgress(prev => ({
+          ...prev,
+          currentCardId: nextCardId,
+          waitingForTrigger: null,
+          isMinimized: false,
+        }));
+      }
+    } else {
+      setProgress(prev => ({
+        ...prev,
+        currentCardId: null,
+        onboardingComplete: true,
+        waitingForTrigger: null,
+        isMinimized: false,
+      }));
+    }
+  }, [getActiveCardSequence, progress.currentCardId]);
+
   const startJourney = async () => {
     if (!user?.id) return;
     clearAllFrisFocusData();
@@ -379,6 +428,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       isCardCompleted,
       triggerPenaltyCreated,
       triggerDaySaved,
+      skipCurrentCard,
     }}>
       {children}
     </OnboardingContext.Provider>
