@@ -4708,7 +4708,19 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   const [activityWillingness, setActivityWillingness] = useState<"minimal" | "moderate" | "very_active">("moderate");
   
   // Computed plan values (auto-sync target and save step goal)
-  const [computedPlan, setComputedPlan] = useState<{ dailyCalories: number; steps: number; proteinTarget: number } | null>(null);
+  const [computedPlan, setComputedPlan] = useState<{ 
+    dailyCalories: number; 
+    steps: number; 
+    proteinTarget: number;
+    bmr?: number;
+    sedentaryTDEE?: number;
+    dietaryDeficit?: number;
+    stepCalories?: number;
+    liftingCalories?: number;
+    totalWeeklyDeficit?: number;
+    requiredWeeklyDeficit?: number;
+    strengthSessions?: number;
+  } | null>(null);
   
   // AI Chat state
   const [showAIChat, setShowAIChat] = useState(false);
@@ -4726,6 +4738,13 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     strategyBias?: "diet" | "balanced" | "activity";
     explanation: string;
     weeklyChangeEstimate: string;
+    bmr?: number;
+    sedentaryTDEE?: number;
+    requiredWeeklyDeficit?: number;
+    dietaryDeficit?: number;
+    stepCalories?: number;
+    liftingCalories?: number;
+    totalWeeklyDeficit?: number;
   } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -4804,6 +4823,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   }, [bmrResult, goalDirection, activityLevel, workoutWillingness, strategyBias, calculatedDeficit]);
 
   // Compute full plan for "lose" flow to get step goal and sync target
+  // Uses BMR × 1.2 (sedentary TDEE) as baseline to avoid double-counting steps
   useEffect(() => {
     if (!bmrResult || goalDirection !== "lose") {
       setComputedPlan(null);
@@ -4821,40 +4841,60 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     
     const requiredDailyDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
     const requiredWeeklyDeficit = requiredDailyDeficit * 7;
-    const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
     const gender = bmrData.gender || "male";
     const preset = strategyPresets[strategyBias];
     
-    const minCalories = gender === "female" ? 1200 : 1500;
-    const maxFoodDeficitDaily = bmrResult - minCalories;
+    // Use sedentary TDEE (BMR × 1.2) as baseline - steps are ADDITIONAL activity
+    const sedentaryTDEE = Math.round(bmrResult * 1.2);
     
-    // Use 0.9g per lb of body weight (consistent with TDEE calculator)
+    const minCalories = gender === "female" ? 1200 : 1500;
+    const maxFoodDeficitDaily = sedentaryTDEE - minCalories;
+    
+    // Use 0.9g per lb of body weight
     const weightLbs = bmrData.weight ? parseFloat(bmrData.weight) : 180;
     const proteinTarget = Math.round(weightLbs * 0.9);
-    const strengthBurnWeekly = preset.strength * CAL_PER_STRENGTH_SESSION;
+    const liftingCalories = preset.strength * CAL_PER_STRENGTH_SESSION;
     
-    const baseStepsBurnWeekly = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
-    const baseActivityBurnWeekly = baseStepsBurnWeekly + strengthBurnWeekly;
+    const baseStepCalories = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
+    const baseActivityBurnWeekly = baseStepCalories + liftingCalories;
     const baseFoodDeficitWeekly = requiredWeeklyDeficit - baseActivityBurnWeekly;
     const baseFoodDeficitDaily = baseFoodDeficitWeekly / 7;
     
     let finalSteps = preset.baseSteps;
     
+    // If dietary deficit would go below minimum, increase steps
     if (baseFoodDeficitDaily > maxFoodDeficitDaily) {
       const extraDeficitNeeded = (baseFoodDeficitDaily - maxFoodDeficitDaily) * 7;
       const extraStepsNeeded = Math.ceil(extraDeficitNeeded / (CAL_PER_STEP * 7));
       finalSteps = preset.baseSteps + extraStepsNeeded;
     }
     
-    const stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
-    const activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
+    const stepCalories = Math.round(finalSteps * 7 * CAL_PER_STEP);
+    const activityBurnWeekly = stepCalories + liftingCalories;
     const foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
     const foodDeficitDaily = Math.round(foodDeficitWeekly / 7);
     
-    const rawDailyCalories = bmrResult - foodDeficitDaily;
+    // Calculate from sedentary TDEE (not raw BMR)
+    const rawDailyCalories = sedentaryTDEE - foodDeficitDaily;
     const finalDailyCalories = Math.max(minCalories, Math.round(rawDailyCalories));
     
-    setComputedPlan({ dailyCalories: finalDailyCalories, steps: finalSteps, proteinTarget });
+    // Recalculate actual dietary deficit based on final calories
+    const actualDietaryDeficit = (sedentaryTDEE - finalDailyCalories) * 7;
+    const totalWeeklyDeficit = actualDietaryDeficit + stepCalories + liftingCalories;
+    
+    setComputedPlan({ 
+      dailyCalories: finalDailyCalories, 
+      steps: finalSteps, 
+      proteinTarget,
+      bmr: bmrResult,
+      sedentaryTDEE,
+      dietaryDeficit: actualDietaryDeficit,
+      stepCalories,
+      liftingCalories,
+      totalWeeklyDeficit,
+      requiredWeeklyDeficit,
+      strengthSessions: preset.strength,
+    });
     setTarget(finalDailyCalories.toString());
   }, [bmrResult, goalDirection, strategyBias, calculatedDeficit, bmrData.weight, bmrData.gender]);
 
@@ -5675,21 +5715,72 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 </div>
               </div>
               
-              {/* Calorie Burn Breakdown */}
-              <div className="p-2 bg-background rounded-md border">
-                <div className="text-xs text-muted-foreground mb-1">Weekly Calorie Burn Breakdown</div>
-                <div className="flex items-center gap-2 text-sm flex-wrap">
-                  <span className="text-blue-500">{Math.round(computedPlan.steps * 0.04 * 7).toLocaleString()} cal from steps</span>
-                  <span className="text-muted-foreground">+</span>
-                  <span className="text-orange-500">{((aiRecommendation.strengthSessionsPerWeek || 3) * 250).toLocaleString()} cal from lifting</span>
-                  <span className="text-muted-foreground">=</span>
-                  <span className="font-bold">
-                    {(Math.round(computedPlan.steps * 0.04 * 7) + (aiRecommendation.strengthSessionsPerWeek || 3) * 250).toLocaleString()} cal/week
-                  </span>
+              {/* Detailed Deficit Breakdown */}
+              <div className="p-3 bg-background rounded-md border space-y-2">
+                <div className="text-xs font-medium text-muted-foreground">Weekly Deficit Breakdown</div>
+                
+                {/* Show BMR and Sedentary TDEE calculation */}
+                {(computedPlan.bmr || aiRecommendation.bmr) && (
+                  <div className="text-xs text-muted-foreground">
+                    BMR: {(computedPlan.bmr || aiRecommendation.bmr)?.toLocaleString()} cal/day | 
+                    Sedentary TDEE: {(computedPlan.sedentaryTDEE || aiRecommendation.sedentaryTDEE || Math.round((computedPlan.bmr || aiRecommendation.bmr || 0) * 1.2))?.toLocaleString()} cal/day (BMR × 1.2)
+                  </div>
+                )}
+                
+                {/* Deficit Components */}
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-green-600">Dietary Deficit</span>
+                    <span className="font-medium">
+                      {(computedPlan.dietaryDeficit || aiRecommendation.dietaryDeficit || 
+                        ((computedPlan.sedentaryTDEE || aiRecommendation.maintenanceCalories || 0) - computedPlan.dailyCalories) * 7
+                      ).toLocaleString()} cal/week
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-2">
+                    ({(computedPlan.sedentaryTDEE || aiRecommendation.maintenanceCalories || 0).toLocaleString()} - {computedPlan.dailyCalories.toLocaleString()}) × 7 days
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-blue-500">Steps</span>
+                    <span className="font-medium">
+                      {(computedPlan.stepCalories || Math.round(computedPlan.steps * 0.04 * 7)).toLocaleString()} cal/week
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-2">
+                    {computedPlan.steps.toLocaleString()} steps × 0.04 cal × 7 days
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-orange-500">Lifting</span>
+                    <span className="font-medium">
+                      {(computedPlan.liftingCalories || (aiRecommendation.strengthSessionsPerWeek || 3) * 250).toLocaleString()} cal/week
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-2">
+                    {computedPlan.strengthSessions || aiRecommendation.strengthSessionsPerWeek || 3} sessions × 250 cal
+                  </div>
+                  
+                  <div className="border-t pt-1 mt-1 flex justify-between items-center font-bold">
+                    <span>Total Weekly Deficit</span>
+                    <span className="text-primary">
+                      {(computedPlan.totalWeeklyDeficit || aiRecommendation.totalWeeklyDeficit || 
+                        ((computedPlan.dietaryDeficit || 0) + (computedPlan.stepCalories || 0) + (computedPlan.liftingCalories || 0))
+                      ).toLocaleString()} cal/week
+                    </span>
+                  </div>
+                  
+                  {(computedPlan.requiredWeeklyDeficit || aiRecommendation.requiredWeeklyDeficit) && (
+                    <div className="text-xs text-muted-foreground">
+                      Target: {(computedPlan.requiredWeeklyDeficit || aiRecommendation.requiredWeeklyDeficit)?.toLocaleString()} cal/week needed for goal
+                    </div>
+                  )}
                 </div>
               </div>
               
-              <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
+              {aiRecommendation.explanation && (
+                <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
+              )}
               <p className="text-sm font-medium text-green-600">{aiRecommendation.weeklyChangeEstimate}</p>
               
               <Button 

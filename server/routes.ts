@@ -1117,22 +1117,28 @@ While gathering info, respond with:
 
 Your plan's TOTAL WEEKLY DEFICIT must EXACTLY equal: targetLbsPerWeek × 3,500
 
+=== BASELINE CALCULATION (USE BMR × 1.2) ===
+IMPORTANT: Use SEDENTARY TDEE as baseline, not active maintenance!
+- Sedentary TDEE = BMR × 1.2 (accounts for basic daily movement only)
+- This prevents double-counting steps - your logged steps are ADDITIONAL activity
+- If BMR is provided, calculate: sedentaryTDEE = BMR × 1.2
+
 === DEFICIT COMPONENTS ===
 Total Weekly Deficit = dietaryDeficit + stepCalories + liftingCalories
 
-1. dietaryDeficit = (maintenance - calorieTarget) × 7 days
-2. stepCalories = stepGoal × 0.04 cal/step × 7 days
+1. dietaryDeficit = (sedentaryTDEE - calorieTarget) × 7 days
+2. stepCalories = stepGoal × 0.04 cal/step × 7 days (ADDITIONAL activity)
 3. liftingCalories = strengthSessions × 250 cal each
 
-Example for 2 lb/week (7,000 cal deficit needed):
-- Eat 1,800 vs 2,200 maintenance = 400/day × 7 = 2,800 dietary
+Example for 2 lb/week with BMR of 1,800:
+- Sedentary TDEE = 1,800 × 1.2 = 2,160 cal/day
+- Eat 1,700 cal/day = (2,160 - 1,700) × 7 = 3,220 weekly dietary deficit
 - 12,000 steps × 0.04 × 7 = 3,360 from steps
 - 3 lifting sessions × 250 = 750 from lifting
-- TOTAL: 2,800 + 3,360 + 750 = 6,910 (TOO LOW! Need 7,000)
-- Must adjust: increase steps OR decrease calories
+- TOTAL: 3,220 + 3,360 + 750 = 7,330 cal/week (close to 7,000 target!)
 
 === CONSTANTS ===
-- Steps: 0.04 cal per step
+- Steps: 0.04 cal per step (ADDITIONAL to baseline)
 - Lifting: 250 cal per session
 - Protein: 0.9g per lb bodyweight
 - Min calories: 1,500 (men), 1,200 (women)
@@ -1149,37 +1155,43 @@ BMR: ${currentStats.bmr || '?'}, Goal: ${currentStats.goalWeight || '?'} lbs in 
 ${hasExistingGoal ? `Current plan: ${currentGoal.calorieTarget} cal/day (${goalMode})` : ''}
 
 === YOUR TASK ===
-1. Calculate required weekly deficit from their goal
-2. Build a plan where dietaryDeficit + stepCalories + liftingCalories = required deficit
-3. VERIFY the math adds up before responding
+1. Calculate sedentary TDEE = BMR × 1.2
+2. Calculate required weekly deficit from their goal (lbs/week × 3,500)
+3. Build a plan where dietaryDeficit + stepCalories + liftingCalories = required deficit
+4. VERIFY the math adds up before responding
 
 === JSON RESPONSE FORMAT ===
-When ready with a plan:
+When ready with a plan, include DETAILED explanation showing all math:
 {
   "isFinal": true,
   "recommendation": {
     "goalType": "aggressive_cut",
     "goalLabel": "Rapid Fat Loss",
-    "calorieTarget": 1800,
-    "maintenanceCalories": 2200,
+    "calorieTarget": 1700,
+    "maintenanceCalories": 2160,
     "proteinTarget": 180,
-    "stepGoal": 15000,
-    "strengthSessionsPerWeek": 5,
-    "strategyBias": "activity",
-    "weeklyChangeEstimate": "-2.5 lbs/week",
-    "requiredWeeklyDeficit": 8750,
-    "dietaryDeficit": 2800,
-    "stepCalories": 4200,
-    "liftingCalories": 1250,
-    "totalWeeklyDeficit": 8250,
-    "explanation": "Diet: 2,800 + Steps: 4,200 + Lifting: 1,250 = 8,250 cal/week deficit."
+    "stepGoal": 12000,
+    "strengthSessionsPerWeek": 3,
+    "strategyBias": "balanced",
+    "weeklyChangeEstimate": "-2 lbs/week",
+    "bmr": 1800,
+    "sedentaryTDEE": 2160,
+    "requiredWeeklyDeficit": 7000,
+    "dietaryDeficit": 3220,
+    "stepCalories": 3360,
+    "liftingCalories": 750,
+    "totalWeeklyDeficit": 7330,
+    "explanation": "Your BMR is 1,800. Sedentary TDEE = 1,800 × 1.2 = 2,160 cal/day. Eating 1,700 cal/day creates a 460 cal/day dietary deficit (3,220/week). 12,000 daily steps burn 3,360 cal/week. 3 lifting sessions add 750 cal/week. Total: 3,220 + 3,360 + 750 = 7,330 cal/week deficit, achieving ~2 lbs/week loss."
   }
 }
 
 When gathering info:
 { "isFinal": false, "message": "Short question here" }
 
-CRITICAL: totalWeeklyDeficit MUST be within 250 cal of requiredWeeklyDeficit. If not, adjust the plan until it matches.`;
+CRITICAL: 
+1. totalWeeklyDeficit MUST be within 350 cal of requiredWeeklyDeficit
+2. The explanation MUST show: BMR, sedentary TDEE calculation, dietary deficit math, step calorie math, lifting calorie math, and the total
+3. Be thorough but concise in explanations`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
