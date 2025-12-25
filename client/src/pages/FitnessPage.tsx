@@ -5727,6 +5727,16 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     {msg.content}
                   </div>
                 ))}
+                {isLoading && (
+                  <div className="p-2 rounded-md text-sm bg-background mr-8 flex items-center gap-2">
+                    <div className="animate-pulse flex gap-1">
+                      <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-muted-foreground">AI is calculating your plan...</span>
+                  </div>
+                )}
                 <div ref={chatEndRef} />
               </div>
               

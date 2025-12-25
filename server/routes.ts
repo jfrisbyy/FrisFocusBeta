@@ -1191,7 +1191,9 @@ When gathering info:
 CRITICAL: 
 1. totalWeeklyDeficit MUST be within 350 cal of requiredWeeklyDeficit
 2. The explanation MUST show: BMR, sedentary TDEE calculation, dietary deficit math, step calorie math, lifting calorie math, and the total
-3. Be thorough but concise in explanations`;
+3. Be thorough but concise in explanations
+4. NEVER say "hold on" or "let me calculate" - DO THE CALCULATIONS IMMEDIATELY and provide the final recommendation in ONE response. The user should never have to send another message to get results.
+5. If you have enough info (BMR, goal weight, timeframe, strategy preference), provide the final recommendation immediately with isFinal: true`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
