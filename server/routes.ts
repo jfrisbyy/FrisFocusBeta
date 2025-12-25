@@ -1107,98 +1107,79 @@ While gathering info, respond with:
         (currentGoal.calorieTarget === currentGoal.maintenanceCalories ? 'maintenance' :
          currentGoal.calorieTarget > currentGoal.maintenanceCalories ? 'surplus' : 'deficit') : null;
       
-      const systemPrompt = `You are a supportive fitness coach helping someone set their nutrition and fitness goals. You understand our complete plan calculation system and will generate plans that match it exactly.
+      const systemPrompt = `You are a fitness coach helping set nutrition goals. You MUST do accurate math.
 
-=== PLAN CALCULATION SYSTEM ===
+=== CRITICAL MATH RULES ===
+1 lb of fat = 3,500 calories. This is NON-NEGOTIABLE.
+- To lose 1 lb/week: need 3,500 cal/week deficit (500/day)
+- To lose 2 lb/week: need 7,000 cal/week deficit (1,000/day)
+- To lose 2.5 lb/week: need 8,750 cal/week deficit (1,250/day)
 
-1. STRATEGY BIAS (how to split the deficit between diet and activity):
-   - "diet" (Diet-Focused): Base steps 5,500/day, 2 strength sessions/week. Most deficit from food.
-   - "balanced" (Balanced): Base steps 10,500/day, 3 strength sessions/week. Split between food and activity.
-   - "activity" (Activity-Focused): Base steps 15,000/day, 5 strength sessions/week. Most deficit from activity.
+Your plan's TOTAL WEEKLY DEFICIT must EXACTLY equal: targetLbsPerWeek × 3,500
 
-2. CALORIE CALCULATIONS:
-   - BMR (Basal Metabolic Rate): Calculated using Mifflin-St Jeor formula
-   - Safety Floor: Men never go below 1,500 cal/day, women never go below 1,200 cal/day
-   - Steps burn ~0.04 cal per step
-   - Strength training burns ~250 cal per session
-   - If the food deficit would go below safety floor, INCREASE steps to make up the difference
+=== DEFICIT COMPONENTS ===
+Total Weekly Deficit = dietaryDeficit + stepCalories + liftingCalories
 
-3. DEFICIT CALCULATION (for weight loss):
-   - Weight change per week = (Goal Weight - Current Weight) / Timeframe in weeks
-   - Each pound = 3,500 calories, so weekly deficit = weight change * 3,500
-   - Daily deficit = weekly deficit / 7
-   - Split between food reduction and activity increase based on strategy bias
+1. dietaryDeficit = (maintenance - calorieTarget) × 7 days
+2. stepCalories = stepGoal × 0.04 cal/step × 7 days
+3. liftingCalories = strengthSessions × 250 cal each
 
-4. PROTEIN TARGET:
-   - Always use 0.9g per lb of body weight
-   - Example: 200 lbs person = 180g protein/day
+Example for 2 lb/week (7,000 cal deficit needed):
+- Eat 1,800 vs 2,200 maintenance = 400/day × 7 = 2,800 dietary
+- 12,000 steps × 0.04 × 7 = 3,360 from steps
+- 3 lifting sessions × 250 = 750 from lifting
+- TOTAL: 2,800 + 3,360 + 750 = 6,910 (TOO LOW! Need 7,000)
+- Must adjust: increase steps OR decrease calories
 
-5. HOW THE PLAN WORKS:
-   - Total weekly deficit needed = (food deficit per day * 7) + (step calories burned weekly) + (strength sessions * 250)
-   - Strategy bias determines the RATIO between food and activity
-   - More activity-focused = higher step goal, more strength sessions, eating closer to maintenance
-   - More diet-focused = lower step goal, fewer strength sessions, eating further below maintenance
+=== CONSTANTS ===
+- Steps: 0.04 cal per step
+- Lifting: 250 cal per session
+- Protein: 0.9g per lb bodyweight
+- Min calories: 1,500 (men), 1,200 (women)
 
-CURRENT STATS (if provided):
-${currentStats ? `- Weight: ${currentStats.weight || 'unknown'} lbs
-- Height: ${currentStats.height || 'unknown'} inches
-- Age: ${currentStats.age || 'unknown'}
-- Gender: ${currentStats.gender || 'unknown'}
-- BMR: ${currentStats.bmr || 'unknown'} cal/day
-- Goal Weight: ${currentStats.goalWeight || 'unknown'} lbs
-- Timeframe: ${currentStats.goalTimeframe || 'unknown'} weeks` : 'No stats provided yet'}
+=== STRATEGY BIAS ===
+- "diet": Lower steps (5,500/day), 2 lifts/week, bigger food deficit
+- "balanced": Mid steps (10,500/day), 3 lifts/week, split deficit
+- "activity": High steps (15,000/day), 5 lifts/week, smaller food deficit
 
-${hasExistingGoal ? `CURRENT GOAL:
-- Goal Type: ${currentGoal.goalType || 'custom'}
-- Mode: ${goalMode} (${goalMode === 'deficit' ? 'losing weight' : goalMode === 'surplus' ? 'gaining weight' : 'maintaining'})
-- Calorie Target: ${currentGoal.calorieTarget} cal/day` : ''}
+CURRENT STATS:
+${currentStats ? `Weight: ${currentStats.weight || '?'} lbs, Height: ${currentStats.height || '?'} in, Age: ${currentStats.age || '?'}, Gender: ${currentStats.gender || '?'}
+BMR: ${currentStats.bmr || '?'}, Goal: ${currentStats.goalWeight || '?'} lbs in ${currentStats.goalTimeframe || '?'} weeks` : 'None provided'}
 
-MANDATORY: USE THE USER'S GOAL WEIGHT AND TIMEFRAME
-The user's goal weight and timeframe are REQUIRED targets. You MUST calculate the plan to achieve EXACTLY their requested rate.
+${hasExistingGoal ? `Current plan: ${currentGoal.calorieTarget} cal/day (${goalMode})` : ''}
 
-CALCULATION (do this math):
-1. Weight to lose = Current Weight - Goal Weight
-2. Weekly rate = Weight to lose / Timeframe weeks
-3. Daily deficit needed = Weekly rate * 3500 / 7 (or ~500 cal per lb/week)
-4. This is the deficit your plan MUST achieve
+=== YOUR TASK ===
+1. Calculate required weekly deficit from their goal
+2. Build a plan where dietaryDeficit + stepCalories + liftingCalories = required deficit
+3. VERIFY the math adds up before responding
 
-YOUR APPROACH:
-1. If stats are provided, IMMEDIATELY calculate the required deficit from their goal
-2. Ask about their strategy preference (eating less vs moving more)
-3. Create a plan that achieves EXACTLY their required deficit using their preferred strategy
-4. If the rate exceeds 2 lbs/week, include a safety warning but STILL provide the plan they requested
-
-HANDLING REFINEMENTS:
-- If you already gave a recommendation and the user asks to adjust it (e.g., "lower calories", "more steps", "less aggressive"), provide an UPDATED recommendation with isFinal: true
-- Always acknowledge what they asked to change and explain how the new plan differs
-- Keep the conversation flowing - users can keep refining until they're happy
-
-IMPORTANT: Keep ALL responses SHORT and CONCISE. Never ramble or repeat yourself.
-
-When you have the stats, respond with ONLY this JSON structure (no extra text):
+=== JSON RESPONSE FORMAT ===
+When ready with a plan:
 {
   "isFinal": true,
   "recommendation": {
     "goalType": "aggressive_cut",
     "goalLabel": "Rapid Fat Loss",
-    "calorieTarget": 1500,
-    "maintenanceCalories": 2000,
+    "calorieTarget": 1800,
+    "maintenanceCalories": 2200,
     "proteinTarget": 180,
     "stepGoal": 15000,
     "strengthSessionsPerWeek": 5,
     "strategyBias": "activity",
-    "explanation": "This achieves your 2.5 lb/week goal through high activity.",
-    "weeklyChangeEstimate": "-2.5 lbs/week"
+    "weeklyChangeEstimate": "-2.5 lbs/week",
+    "requiredWeeklyDeficit": 8750,
+    "dietaryDeficit": 2800,
+    "stepCalories": 4200,
+    "liftingCalories": 1250,
+    "totalWeeklyDeficit": 8250,
+    "explanation": "Diet: 2,800 + Steps: 4,200 + Lifting: 1,250 = 8,250 cal/week deficit."
   }
 }
 
-While gathering info, respond with ONLY:
-{
-  "isFinal": false,
-  "message": "Your short friendly message here"
-}
+When gathering info:
+{ "isFinal": false, "message": "Short question here" }
 
-CRITICAL: Keep explanation under 50 words. Return ONLY valid JSON, nothing else.`;
+CRITICAL: totalWeeklyDeficit MUST be within 250 cal of requiredWeeklyDeficit. If not, adjust the plan until it matches.`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
         { role: "system", content: systemPrompt },
@@ -1252,6 +1233,23 @@ CRITICAL: Keep explanation under 50 words. Return ONLY valid JSON, nothing else.
           if (typeof rec.calorieTarget !== 'number' || typeof rec.stepGoal !== 'number') {
             console.error("AI recommendation missing required numeric fields:", rec);
             return res.status(500).json({ error: "AI response was incomplete. Please try again." });
+          }
+          
+          // Validate math if deficit fields are provided
+          if (rec.requiredWeeklyDeficit && rec.totalWeeklyDeficit) {
+            const difference = Math.abs(rec.requiredWeeklyDeficit - rec.totalWeeklyDeficit);
+            if (difference > 500) {
+              console.warn(`AI math mismatch: required=${rec.requiredWeeklyDeficit}, total=${rec.totalWeeklyDeficit}, diff=${difference}`);
+              // Don't reject, but log for monitoring
+            }
+          }
+          
+          // Calculate and verify the breakdown if fields exist
+          if (rec.dietaryDeficit !== undefined && rec.stepCalories !== undefined && rec.liftingCalories !== undefined) {
+            const calculatedTotal = rec.dietaryDeficit + rec.stepCalories + rec.liftingCalories;
+            if (rec.totalWeeklyDeficit && Math.abs(calculatedTotal - rec.totalWeeklyDeficit) > 100) {
+              console.warn(`AI breakdown mismatch: calculated=${calculatedTotal}, reported=${rec.totalWeeklyDeficit}`);
+            }
           }
         }
         
