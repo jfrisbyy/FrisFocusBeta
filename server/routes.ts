@@ -1217,10 +1217,15 @@ CRITICAL: Keep explanation under 50 words. Return ONLY valid JSON, nothing else.
         messages.push({ role: "user", content: "Help me figure out my fitness goals and calorie targets." });
       }
 
+      // Limit history to last 6 messages to reduce token usage
+      const limitedMessages = messages.length > 8 
+        ? [messages[0], ...messages.slice(-6)]  // Keep system prompt + last 6
+        : messages;
+
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
-        messages,
-        max_tokens: 1200,
+        messages: limitedMessages,
+        max_tokens: 2500,
         temperature: 0.7,
         response_format: { type: "json_object" },
       });
