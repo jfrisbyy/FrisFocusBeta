@@ -4901,7 +4901,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
         },
       });
       const data = await res.json();
-      setChatMessages([{ role: 'assistant', content: data.message }]);
+      // Handle both message-only and final recommendation responses
+      const assistantContent = data.message || (data.isFinal && data.recommendation 
+        ? `Here's my recommendation: ${data.recommendation.calorieTarget} calories/day with ${data.recommendation.stepGoal || 10000} daily steps.`
+        : "I'm here to help with your goals.");
+      setChatMessages([{ role: 'assistant', content: assistantContent }]);
       if (data.isFinal && data.recommendation) {
         setAiRecommendation(data.recommendation);
       }
@@ -4916,7 +4920,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     if (!userInput.trim() || isLoading) return;
     
     const newUserMessage = { role: 'user' as const, content: userInput.trim() };
-    const updatedHistory = [...chatMessages, newUserMessage];
+    // Filter out any messages with null/undefined content before adding new message
+    const validHistory = chatMessages.filter(msg => msg.content != null && msg.content !== '');
+    const updatedHistory = [...validHistory, newUserMessage];
     setChatMessages(updatedHistory);
     setUserInput("");
     setIsLoading(true);
@@ -4944,7 +4950,11 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
         },
       });
       const data = await res.json();
-      setChatMessages([...updatedHistory, { role: 'assistant', content: data.message }]);
+      // Handle both message-only and final recommendation responses
+      const assistantContent = data.message || (data.isFinal && data.recommendation 
+        ? `Updated recommendation: ${data.recommendation.calorieTarget} calories/day with ${data.recommendation.stepGoal || 10000} daily steps.`
+        : "Let me know if you'd like any adjustments.");
+      setChatMessages([...updatedHistory, { role: 'assistant', content: assistantContent }]);
       if (data.isFinal && data.recommendation) {
         setAiRecommendation(data.recommendation);
       }

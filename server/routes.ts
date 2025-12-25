@@ -1206,8 +1206,9 @@ CRITICAL: Keep explanation under 50 words. Return ONLY valid JSON, nothing else.
       
       if (Array.isArray(history)) {
         for (const msg of history) {
-          if (msg.role === "user" || msg.role === "assistant") {
-            messages.push({ role: msg.role, content: msg.content });
+          // Only add messages with valid content (not null/undefined/empty)
+          if ((msg.role === "user" || msg.role === "assistant") && msg.content) {
+            messages.push({ role: msg.role, content: String(msg.content) });
           }
         }
       }
