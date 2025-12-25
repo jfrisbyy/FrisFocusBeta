@@ -5583,32 +5583,49 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   </div>
                   <p className="text-xs text-muted-foreground">{aiRecommendation.explanation}</p>
                   <p className="text-xs font-medium">{aiRecommendation.weeklyChangeEstimate}</p>
-                  <Button 
-                    onClick={applyAIRecommendation}
-                    variant="default"
-                    className="w-full"
-                    data-testid="button-apply-ai-recommendation"
-                  >
-                    Apply AI Recommendation
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={applyAIRecommendation}
+                      variant="default"
+                      className="flex-1"
+                      data-testid="button-apply-ai-recommendation"
+                    >
+                      Apply This Plan
+                    </Button>
+                    <Button 
+                      onClick={() => setAiRecommendation(null)}
+                      variant="outline"
+                      className="flex-1"
+                      data-testid="button-refine-recommendation"
+                    >
+                      Refine It
+                    </Button>
+                  </div>
                 </div>
               )}
               
-              <div className="flex gap-2">
-                <Input
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  placeholder="Tell the AI about your goals..."
-                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
-                  data-testid="input-ai-chat"
-                />
-                <Button 
-                  onClick={sendMessage} 
-                  disabled={isLoading || !userInput.trim()}
-                  data-testid="button-send-ai-chat"
-                >
-                  {isLoading ? "..." : "Send"}
-                </Button>
+              <div className="space-y-1">
+                {aiRecommendation && (
+                  <p className="text-xs text-muted-foreground">
+                    Want different targets? Keep chatting below to refine the suggestion.
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder={aiRecommendation ? "Ask for adjustments (e.g., 'Can you lower the calories?')..." : "Tell the AI about your goals..."}
+                    onKeyDown={(e) => e.key === 'Enter' && !isLoading && sendMessage()}
+                    data-testid="input-ai-chat"
+                  />
+                  <Button 
+                    onClick={sendMessage} 
+                    disabled={isLoading || !userInput.trim()}
+                    data-testid="button-send-ai-chat"
+                  >
+                    {isLoading ? "..." : "Send"}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

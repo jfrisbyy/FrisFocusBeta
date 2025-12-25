@@ -1168,6 +1168,11 @@ YOUR APPROACH:
 3. Create a plan that achieves EXACTLY their required deficit using their preferred strategy
 4. If the rate exceeds 2 lbs/week, include a safety warning but STILL provide the plan they requested
 
+HANDLING REFINEMENTS:
+- If you already gave a recommendation and the user asks to adjust it (e.g., "lower calories", "more steps", "less aggressive"), provide an UPDATED recommendation with isFinal: true
+- Always acknowledge what they asked to change and explain how the new plan differs
+- Keep the conversation flowing - users can keep refining until they're happy
+
 IMPORTANT: Keep ALL responses SHORT and CONCISE. Never ramble or repeat yourself.
 
 When you have the stats, respond with ONLY this JSON structure (no extra text):
