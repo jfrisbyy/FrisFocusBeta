@@ -74,7 +74,7 @@ export function OnboardingOverlay() {
 
   // Fetch data needed for skip checks - use same endpoints as rest of app
   const { data: seasons = [] } = useQuery<Season[]>({
-    queryKey: ["/api/habit/seasons"],
+    queryKey: ["/api/seasons"],
   });
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["/api/habit/categories"],
@@ -86,7 +86,7 @@ export function OnboardingOverlay() {
     queryKey: ["/api/habit/penalties"],
   });
   const { data: milestones = [] } = useQuery<Milestone[]>({
-    queryKey: ["/api/habit/milestones"],
+    queryKey: ["/api/milestones"],
   });
   
   // For todos and day logs, check ALL historical data (not just today)
@@ -516,7 +516,7 @@ export function OnboardingMinimizedIndicator() {
 
   // Only fetch skip check data when minimized AND current card has a skipCheck
   const { data: seasons = [] } = useQuery<Season[]>({
-    queryKey: ["/api/habit/seasons"],
+    queryKey: ["/api/seasons"],
     enabled: isMinimized && hasSkipCheck,
   });
   const { data: categories = [] } = useQuery<Category[]>({
@@ -532,7 +532,7 @@ export function OnboardingMinimizedIndicator() {
     enabled: isMinimized && hasSkipCheck,
   });
   const { data: milestones = [] } = useQuery<Milestone[]>({
-    queryKey: ["/api/habit/milestones"],
+    queryKey: ["/api/milestones"],
     enabled: isMinimized && hasSkipCheck,
   });
   const { data: allTodos = [] } = useQuery<{ id: string }[]>({
