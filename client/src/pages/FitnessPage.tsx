@@ -26,7 +26,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences, WorkoutRoutine, RoutineExercise } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Settings } from "lucide-react";
+import { Settings, Calendar as CalendarIcon } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell, Legend, PieChart, Pie, Area, AreaChart } from "recharts";
 
@@ -4696,6 +4696,8 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
   // Goal weight and timeframe state
   const [goalWeight, setGoalWeight] = useState("");
   const [goalTimeframe, setGoalTimeframe] = useState("12");
+  const [useTargetDate, setUseTargetDate] = useState(false);
+  const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
   
   // Goal direction and willingness state
   const [goalDirection, setGoalDirection] = useState<"lose" | "maintain" | "gain">("lose");
@@ -5218,21 +5220,82 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Timeframe (weeks)</Label>
-                <Select value={goalTimeframe} onValueChange={(v) => setGoalTimeframe(v)}>
-                  <SelectTrigger data-testid="select-goal-timeframe">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="4">4 weeks</SelectItem>
-                    <SelectItem value="8">8 weeks</SelectItem>
-                    <SelectItem value="12">12 weeks</SelectItem>
-                    <SelectItem value="16">16 weeks</SelectItem>
-                    <SelectItem value="24">24 weeks</SelectItem>
-                    <SelectItem value="36">36 weeks</SelectItem>
-                    <SelectItem value="52">52 weeks</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Timeframe</Label>
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant={!useTargetDate ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => setUseTargetDate(false)}
+                    data-testid="button-timeframe-weeks"
+                  >
+                    Weeks
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant={useTargetDate ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => setUseTargetDate(true)}
+                    data-testid="button-timeframe-date"
+                  >
+                    Target Date
+                  </Button>
+                </div>
+                {!useTargetDate ? (
+                  <Select value={goalTimeframe} onValueChange={(v) => setGoalTimeframe(v)}>
+                    <SelectTrigger data-testid="select-goal-timeframe">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2 weeks</SelectItem>
+                      <SelectItem value="4">4 weeks</SelectItem>
+                      <SelectItem value="6">6 weeks</SelectItem>
+                      <SelectItem value="8">8 weeks</SelectItem>
+                      <SelectItem value="10">10 weeks</SelectItem>
+                      <SelectItem value="12">12 weeks (3 months)</SelectItem>
+                      <SelectItem value="16">16 weeks (4 months)</SelectItem>
+                      <SelectItem value="20">20 weeks (5 months)</SelectItem>
+                      <SelectItem value="24">24 weeks (6 months)</SelectItem>
+                      <SelectItem value="36">36 weeks (9 months)</SelectItem>
+                      <SelectItem value="52">52 weeks (1 year)</SelectItem>
+                      <SelectItem value="78">78 weeks (1.5 years)</SelectItem>
+                      <SelectItem value="104">104 weeks (2 years)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start text-left font-normal"
+                        data-testid="button-select-target-date"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {targetDate ? format(targetDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker
+                        mode="single"
+                        selected={targetDate}
+                        onSelect={(date) => {
+                          setTargetDate(date);
+                          if (date) {
+                            const weeksUntil = Math.max(1, Math.ceil(differenceInDays(date, new Date()) / 7));
+                            setGoalTimeframe(weeksUntil.toString());
+                          }
+                        }}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+                {useTargetDate && targetDate && (
+                  <div className="text-xs text-muted-foreground">
+                    {Math.ceil(differenceInDays(targetDate, new Date()) / 7)} weeks away
+                  </div>
+                )}
               </div>
             </div>
             {bmrData.weight && goalWeight && (
