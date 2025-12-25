@@ -3446,6 +3446,11 @@ Create motivating badges that will encourage consistency. Return valid JSON only
   app.post("/api/seasons", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { name, description, startDate, endDate, bannerColor, weeklyGoal } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ error: "Season name is required" });
+      }
       
       // Check if user has any active seasons
       const [activeSeason] = await db.select().from(seasons).where(
@@ -3455,10 +3460,15 @@ Create motivating badges that will encourage consistency. Return valid JSON only
       // Auto-activate the first season if user has no active seasons
       const shouldAutoActivate = !activeSeason;
       
-      const parsed = insertSeasonSchema.parse({ ...req.body, userId });
       const [season] = await db.insert(seasons).values({
-        ...parsed,
-        isActive: shouldAutoActivate ? true : (parsed.isActive ?? false),
+        userId,
+        name,
+        description: description || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        isActive: shouldAutoActivate,
+        bannerColor: bannerColor || "default",
+        weeklyGoal: weeklyGoal || 100,
       }).returning();
       res.json(season);
     } catch (error) {
@@ -8595,43 +8605,6 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     } catch (error) {
       console.error("Error fetching season:", error);
       res.status(500).json({ error: "Failed to fetch season" });
-    }
-  });
-
-  // Create season
-  app.post("/api/seasons", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { name, description, startDate, endDate, isActive, weeklyGoal, bannerColor } = req.body;
-      
-      if (!name) {
-        return res.status(400).json({ error: "Season name is required" });
-      }
-
-      // If setting this season as active, deactivate all others first
-      if (isActive) {
-        const existingSeasons = await storage.getSeasons(userId);
-        for (const s of existingSeasons) {
-          if (s.isActive) {
-            await storage.updateSeason(s.id, userId, { isActive: false });
-          }
-        }
-      }
-
-      const season = await storage.createSeason({
-        userId,
-        name,
-        description: description || null,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
-        isActive: isActive || false,
-        weeklyGoal: weeklyGoal || 100,
-        bannerColor: bannerColor || "default",
-      });
-      res.status(201).json(season);
-    } catch (error) {
-      console.error("Error creating season:", error);
-      res.status(400).json({ error: "Failed to create season" });
     }
   });
 
