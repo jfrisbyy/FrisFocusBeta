@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -187,6 +188,7 @@ export default function TasksPage() {
   const [seasonEndDate, setSeasonEndDate] = useState<string>("");
   const [welcomeSeasonDialogOpen, setWelcomeSeasonDialogOpen] = useState(false);
   const [firstSeasonName, setFirstSeasonName] = useState("");
+  const [firstSeasonDescription, setFirstSeasonDescription] = useState("");
   const [firstSeasonStartDate, setFirstSeasonStartDate] = useState<string>("");
   const [firstSeasonEndDate, setFirstSeasonEndDate] = useState<string>("");
   
@@ -255,7 +257,7 @@ export default function TasksPage() {
 
   // Create first season mutation (with auto-activate)
   const createFirstSeasonMutation = useMutation({
-    mutationFn: async (data: { name: string; startDate?: string | null; endDate?: string | null; bannerColor?: string }) => {
+    mutationFn: async (data: { name: string; description?: string; startDate?: string | null; endDate?: string | null; bannerColor?: string }) => {
       const res = await apiRequest("POST", "/api/seasons", data);
       const newSeason = await res.json();
       // Auto-activate the first season
@@ -267,6 +269,7 @@ export default function TasksPage() {
       toast({ title: "Season created!", description: "Your first season is ready. Start adding your tasks!" });
       setWelcomeSeasonDialogOpen(false);
       setFirstSeasonName("");
+      setFirstSeasonDescription("");
       setFirstSeasonStartDate("");
       setFirstSeasonEndDate("");
       setFirstSeasonColor("default");
@@ -2386,23 +2389,16 @@ export default function TasksPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={welcomeSeasonDialogOpen} onOpenChange={(open) => {
-        // Only allow closing if user has at least one season
-        if (!open && seasons.length === 0) return;
-        setWelcomeSeasonDialogOpen(open);
-      }}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => {
-          // Prevent closing by clicking outside when no seasons exist
-          if (seasons.length === 0) e.preventDefault();
-        }} onEscapeKeyDown={(e) => {
-          // Prevent closing with Escape when no seasons exist
-          if (seasons.length === 0) e.preventDefault();
-        }}>
+      <Dialog open={welcomeSeasonDialogOpen} onOpenChange={setWelcomeSeasonDialogOpen}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               Create Your First Season
             </DialogTitle>
+            <DialogDescription>
+              Seasons help you organize your tasks and track progress over time.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-3 text-sm text-muted-foreground">
@@ -2424,6 +2420,16 @@ export default function TasksPage() {
                 onChange={(e) => setFirstSeasonName(e.target.value)}
                 placeholder="e.g., Winter 2025, New Job, Post-Grad Life"
                 data-testid="input-first-season-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="first-season-description">Description (optional)</Label>
+              <Input
+                id="first-season-description"
+                value={firstSeasonDescription}
+                onChange={(e) => setFirstSeasonDescription(e.target.value)}
+                placeholder="What's this season about?"
+                data-testid="input-first-season-description"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -2477,6 +2483,7 @@ export default function TasksPage() {
                 if (firstSeasonName.trim()) {
                   createFirstSeasonMutation.mutate({ 
                     name: firstSeasonName.trim(),
+                    description: firstSeasonDescription.trim() || undefined,
                     startDate: firstSeasonStartDate || undefined,
                     endDate: firstSeasonEndDate || undefined,
                     bannerColor: firstSeasonColor,
