@@ -5454,6 +5454,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               
               // === INPUTS ===
               const bmr = bmrResult ?? 0;
+              const sedentaryTDEE = Math.round(bmr * 1.2);
               const requiredDailyDeficit = calculatedDeficit !== 0 ? Math.abs(calculatedDeficit) : 500;
               const requiredWeeklyDeficit = requiredDailyDeficit * 7;
               const weightKg = bmrData.weight ? parseFloat(bmrData.weight) / 2.2 : 80;
@@ -5532,20 +5533,41 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     </div>
                   </div>
                   
-                  {/* Weekly Deficit breakdown */}
-                  <div className="p-2 bg-background rounded-md border">
-                    <div className="text-xs text-muted-foreground mb-1">Weekly Deficit Breakdown</div>
-                    <div className="flex items-center gap-2 text-sm flex-wrap">
-                      <span className="font-medium">{activityBurnWeekly.toLocaleString()} cal</span>
-                      <span className="text-muted-foreground">activity</span>
-                      <span className="text-muted-foreground">+</span>
-                      <span className="font-medium">{Math.max(0, foodDeficitWeekly).toLocaleString()} cal</span>
-                      <span className="text-muted-foreground">food</span>
-                      <span className="text-muted-foreground">=</span>
-                      <span className="font-bold text-green-500">{requiredWeeklyDeficit.toLocaleString()} cal/week</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Steps: {stepsBurnWeekly.toLocaleString()} cal + Strength: {strengthBurnWeekly.toLocaleString()} cal
+                  {/* Detailed Weekly Deficit Breakdown */}
+                  <div className="p-3 bg-background rounded-md border space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground">How This Plan Works</div>
+                    <div className="text-sm leading-relaxed space-y-2">
+                      <p>
+                        <span className="font-medium">Your BMR is {bmr.toLocaleString()} cal/day.</span>{' '}
+                        Sedentary TDEE = {bmr.toLocaleString()} × 1.2 = <span className="font-medium">{sedentaryTDEE.toLocaleString()} cal/day</span>.
+                      </p>
+                      <p>
+                        <span className="text-green-600 font-medium">Dietary Deficit:</span>{' '}
+                        Eating {finalDailyCalories.toLocaleString()} cal/day vs {sedentaryTDEE.toLocaleString()} creates a{' '}
+                        {Math.round((sedentaryTDEE - finalDailyCalories)).toLocaleString()} cal/day deficit{' '}
+                        (<span className="font-medium">{Math.max(0, foodDeficitWeekly).toLocaleString()} cal/week</span>).
+                      </p>
+                      <p>
+                        <span className="text-blue-500 font-medium">Steps:</span>{' '}
+                        {finalSteps.toLocaleString()} steps × 0.04 cal × 7 days ={' '}
+                        <span className="font-medium">{stepsBurnWeekly.toLocaleString()} cal/week</span>.
+                      </p>
+                      <p>
+                        <span className="text-orange-500 font-medium">Lifting:</span>{' '}
+                        {finalStrength} sessions × 250 cal ={' '}
+                        <span className="font-medium">{strengthBurnWeekly.toLocaleString()} cal/week</span>.
+                      </p>
+                      <p className="pt-1 border-t">
+                        <span className="font-bold">Total:</span>{' '}
+                        {Math.max(0, foodDeficitWeekly).toLocaleString()} + {stepsBurnWeekly.toLocaleString()} + {strengthBurnWeekly.toLocaleString()} ={' '}
+                        <span className="font-bold text-primary">{(Math.max(0, foodDeficitWeekly) + activityBurnWeekly).toLocaleString()} cal/week deficit</span>,{' '}
+                        achieving <span className="text-green-600 font-medium">~{((Math.max(0, foodDeficitWeekly) + activityBurnWeekly) / 3500).toFixed(1)} lbs/week</span> loss.
+                      </p>
+                      {requiredWeeklyDeficit !== (Math.max(0, foodDeficitWeekly) + activityBurnWeekly) && (
+                        <p className="text-xs text-muted-foreground">
+                          (Target was {requiredWeeklyDeficit.toLocaleString()} cal/week)
+                        </p>
+                      )}
                     </div>
                   </div>
                   
