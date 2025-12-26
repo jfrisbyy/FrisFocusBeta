@@ -139,11 +139,13 @@ function TemplateEditor({
   onSave,
   onCancel,
   isSaving,
+  allTemplates = [],
 }: {
   template?: ScheduleTemplate;
   onSave: (data: { name: string; description: string; timeBlocks: TimeBlock[] }) => void;
   onCancel: () => void;
   isSaving: boolean;
+  allTemplates?: ScheduleTemplate[];
 }) {
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateFormSchema),
@@ -155,6 +157,21 @@ function TemplateEditor({
   });
 
   const [newBlock, setNewBlock] = useState({ startTime: "09:00", endTime: "10:00", activity: "", category: "" });
+  const [importFromTemplateId, setImportFromTemplateId] = useState<string>("none");
+  
+  const handleImportFromTemplate = (templateId: string) => {
+    setImportFromTemplateId(templateId);
+    if (templateId && templateId !== "none") {
+      const sourceTemplate = allTemplates.find(t => t.id === templateId);
+      if (sourceTemplate) {
+        const copiedBlocks = sourceTemplate.timeBlocks.map(block => ({
+          ...block,
+          id: `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        }));
+        form.setValue("timeBlocks", copiedBlocks);
+      }
+    }
+  };
 
   useEffect(() => {
     if (template) {
@@ -231,6 +248,28 @@ function TemplateEditor({
             </FormItem>
           )}
         />
+
+        {!template && allTemplates.length > 0 && (
+          <div className="space-y-2">
+            <FormLabel>Import Time Blocks From (Optional)</FormLabel>
+            <Select value={importFromTemplateId} onValueChange={handleImportFromTemplate}>
+              <SelectTrigger data-testid="select-import-schedule-template">
+                <SelectValue placeholder="Start from scratch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Start from scratch</SelectItem>
+                {allTemplates.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} ({t.timeBlocks.length} blocks)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose an existing template to copy its time blocks as a starting point
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <FormLabel>Time Blocks</FormLabel>
@@ -492,6 +531,7 @@ export default function ScheduleCard({ date, isDemo = false }: ScheduleCardProps
                     setEditingTemplate(undefined);
                   }}
                   isSaving={createTemplateMutation.isPending || updateTemplateMutation.isPending}
+                  allTemplates={templates}
                 />
               </DialogContent>
             </Dialog>
