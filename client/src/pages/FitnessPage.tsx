@@ -4875,28 +4875,57 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
     // Use 0.9g per lb of body weight
     const weightLbs = bmrData.weight ? parseFloat(bmrData.weight) : 180;
     const proteinTarget = Math.round(weightLbs * 0.9);
-    const liftingCalories = preset.strength * CAL_PER_STRENGTH_SESSION;
     
-    const baseStepCalories = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
-    const baseActivityBurnWeekly = baseStepCalories + liftingCalories;
-    const baseFoodDeficitWeekly = requiredWeeklyDeficit - baseActivityBurnWeekly;
-    const baseFoodDeficitDaily = baseFoodDeficitWeekly / 7;
-    
+    let finalStrengthSessions = preset.strength;
+    let liftingCalories = finalStrengthSessions * CAL_PER_STRENGTH_SESSION;
     let finalSteps = preset.baseSteps;
     
-    // If dietary deficit would go below minimum, increase steps
-    if (baseFoodDeficitDaily > maxFoodDeficitDaily) {
-      const extraDeficitNeeded = (baseFoodDeficitDaily - maxFoodDeficitDaily) * 7;
+    // Calculate initial activity burn
+    let stepCalories = Math.round(finalSteps * 7 * CAL_PER_STEP);
+    let activityBurnWeekly = stepCalories + liftingCalories;
+    
+    // Calculate what food deficit is needed to hit target
+    let foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+    let foodDeficitDaily = foodDeficitWeekly / 7;
+    
+    // If food deficit exceeds safety, we need MORE activity
+    if (foodDeficitDaily > maxFoodDeficitDaily) {
+      const extraDeficitNeeded = (foodDeficitDaily - maxFoodDeficitDaily) * 7;
       const extraStepsNeeded = Math.ceil(extraDeficitNeeded / (CAL_PER_STEP * 7));
       finalSteps = preset.baseSteps + extraStepsNeeded;
+      stepCalories = Math.round(finalSteps * 7 * CAL_PER_STEP);
+      activityBurnWeekly = stepCalories + liftingCalories;
+      foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+      foodDeficitDaily = foodDeficitWeekly / 7;
     }
     
-    const stepCalories = Math.round(finalSteps * 7 * CAL_PER_STEP);
-    const activityBurnWeekly = stepCalories + liftingCalories;
-    const foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
-    const foodDeficitDaily = Math.round(foodDeficitWeekly / 7);
+    // If food deficit is NEGATIVE (activity alone exceeds target), reduce activity to hit target
+    if (foodDeficitDaily < 0) {
+      const minSteps = 3000;
+      const minStepsBurn = Math.round(minSteps * 7 * CAL_PER_STEP);
+      
+      if (liftingCalories + minStepsBurn <= requiredWeeklyDeficit) {
+        // We can hit target by adjusting steps
+        const targetStepsBurn = requiredWeeklyDeficit - liftingCalories;
+        finalSteps = Math.max(minSteps, Math.round(targetStepsBurn / (7 * CAL_PER_STEP)));
+        stepCalories = Math.round(finalSteps * 7 * CAL_PER_STEP);
+        activityBurnWeekly = stepCalories + liftingCalories;
+        foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+        foodDeficitDaily = foodDeficitWeekly / 7;
+      } else {
+        // Even minimum steps exceed target - reduce strength sessions too
+        finalSteps = minSteps;
+        stepCalories = Math.round(finalSteps * 7 * CAL_PER_STEP);
+        const remainingDeficit = requiredWeeklyDeficit - stepCalories;
+        finalStrengthSessions = Math.max(0, Math.floor(remainingDeficit / CAL_PER_STRENGTH_SESSION));
+        liftingCalories = finalStrengthSessions * CAL_PER_STRENGTH_SESSION;
+        activityBurnWeekly = stepCalories + liftingCalories;
+        foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+        foodDeficitDaily = foodDeficitWeekly / 7;
+      }
+    }
     
-    // Calculate from sedentary TDEE (not raw BMR)
+    // Calculate from sedentary TDEE
     const rawDailyCalories = sedentaryTDEE - foodDeficitDaily;
     const finalDailyCalories = Math.max(minCalories, Math.round(rawDailyCalories));
     
@@ -4915,7 +4944,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       liftingCalories,
       totalWeeklyDeficit,
       requiredWeeklyDeficit,
-      strengthSessions: preset.strength,
+      strengthSessions: finalStrengthSessions,
     });
     setTarget(finalDailyCalories.toString());
   }, [bmrResult, goalDirection, strategyBias, calculatedDeficit, bmrData.weight, bmrData.gender]);
@@ -5558,7 +5587,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               
               // === SAFETY FLOOR (never go below) ===
               const minCalories = gender === "female" ? 1200 : 1500;
-              const maxFoodDeficitDaily = bmr - minCalories;
+              const maxFoodDeficitDaily = sedentaryTDEE - minCalories;
               
               // === PROTEIN CALCULATION (0.9g per lb of body weight) ===
               const weightLbs = bmrData.weight ? parseFloat(bmrData.weight) : 180;
@@ -5567,39 +5596,72 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
               const proteinTEF = Math.round(proteinCalories * PROTEIN_TEF_RATE);
               
               // === STRENGTH BURN (fixed by strategy) ===
-              const strengthBurnWeekly = preset.strength * CAL_PER_STRENGTH_SESSION;
+              let finalStrengthSessions = preset.strength;
+              let strengthBurnWeekly = finalStrengthSessions * CAL_PER_STRENGTH_SESSION;
               
-              // === CALCULATE STEPS DYNAMICALLY ===
-              // Start with base steps, increase if needed to avoid going below safety floor
-              const baseStepsBurnWeekly = Math.round(preset.baseSteps * 7 * CAL_PER_STEP);
-              const baseActivityBurnWeekly = baseStepsBurnWeekly + strengthBurnWeekly;
-              const baseFoodDeficitWeekly = requiredWeeklyDeficit - baseActivityBurnWeekly;
-              const baseFoodDeficitDaily = baseFoodDeficitWeekly / 7;
-              
+              // === CALCULATE TO HIT TARGET DEFICIT ===
+              // Start with base steps, adjust if needed
               let finalSteps = preset.baseSteps;
               let hitSafetyFloor = false;
               
-              // If base food deficit would exceed safety, increase steps
-              if (baseFoodDeficitDaily > maxFoodDeficitDaily) {
-                // Calculate how much extra activity we need (weekly)
-                const extraDeficitNeeded = (baseFoodDeficitDaily - maxFoodDeficitDaily) * 7;
+              // Calculate initial activity burn
+              let stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
+              let activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
+              
+              // Calculate what food deficit is needed to hit target
+              let foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+              let foodDeficitDaily = foodDeficitWeekly / 7;
+              
+              // If food deficit exceeds safety, we need MORE activity
+              if (foodDeficitDaily > maxFoodDeficitDaily) {
+                const extraDeficitNeeded = (foodDeficitDaily - maxFoodDeficitDaily) * 7;
                 const extraStepsNeeded = Math.ceil(extraDeficitNeeded / (CAL_PER_STEP * 7));
                 finalSteps = preset.baseSteps + extraStepsNeeded;
+                stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
+                activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
+                foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+                foodDeficitDaily = foodDeficitWeekly / 7;
               }
               
-              // Recalculate with final steps
-              const stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
-              const activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
-              const foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
-              const foodDeficitDaily = Math.round(foodDeficitWeekly / 7);
+              // If food deficit is NEGATIVE (activity alone exceeds target), reduce activity to hit target
+              if (foodDeficitDaily < 0) {
+                // We have too much activity - need to reduce to hit target exactly
+                // First, try reducing steps
+                const neededFoodDeficit = 0; // Aim for zero food deficit, let activity do the work
+                const neededActivityBurn = requiredWeeklyDeficit - neededFoodDeficit;
+                
+                // Calculate minimum reasonable steps (don't go below 3000 for health)
+                const minSteps = 3000;
+                const minStepsBurn = Math.round(minSteps * 7 * CAL_PER_STEP);
+                
+                if (strengthBurnWeekly + minStepsBurn <= requiredWeeklyDeficit) {
+                  // We can hit target by adjusting steps
+                  const targetStepsBurn = requiredWeeklyDeficit - strengthBurnWeekly;
+                  finalSteps = Math.max(minSteps, Math.round(targetStepsBurn / (7 * CAL_PER_STEP)));
+                  stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
+                  activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
+                  foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+                  foodDeficitDaily = foodDeficitWeekly / 7;
+                } else {
+                  // Even minimum steps exceed target - reduce strength sessions too
+                  finalSteps = minSteps;
+                  stepsBurnWeekly = Math.round(finalSteps * 7 * CAL_PER_STEP);
+                  const remainingDeficit = requiredWeeklyDeficit - stepsBurnWeekly;
+                  finalStrengthSessions = Math.max(0, Math.floor(remainingDeficit / CAL_PER_STRENGTH_SESSION));
+                  strengthBurnWeekly = finalStrengthSessions * CAL_PER_STRENGTH_SESSION;
+                  activityBurnWeekly = stepsBurnWeekly + strengthBurnWeekly;
+                  foodDeficitWeekly = requiredWeeklyDeficit - activityBurnWeekly;
+                  foodDeficitDaily = foodDeficitWeekly / 7;
+                }
+              }
               
-              // Check if we still hit safety floor (shouldn't happen with unlimited steps)
-              const rawDailyCalories = bmr - foodDeficitDaily;
+              // Calculate final calories (use sedentary TDEE as baseline)
+              const rawDailyCalories = sedentaryTDEE - foodDeficitDaily;
               const finalDailyCalories = Math.max(minCalories, Math.round(rawDailyCalories));
               hitSafetyFloor = rawDailyCalories < minCalories;
               
               // === DISPLAY VALUES ===
-              const finalStrength = preset.strength;
+              const finalStrength = finalStrengthSessions;
               const strengthDisplay = `${finalStrength}x/week`;
               
               return (
