@@ -5658,6 +5658,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                         <span className="text-orange-500 font-medium">Lifting:</span>{' '}
                         {finalStrength} sessions × 250 cal ={' '}
                         <span className="font-medium">{strengthBurnWeekly.toLocaleString()} cal/week</span>.
+                        <span className="text-xs text-muted-foreground block mt-0.5">
+                          (Assumes 45-60 min compound lifts like squats, deadlifts, bench, rows with moderate-heavy weight and 60-90s rest)
+                        </span>
                       </p>
                       <p className="pt-1 border-t">
                         <span className="font-bold">Total:</span>{' '}
@@ -5893,6 +5896,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                   </div>
                   <div className="text-xs text-muted-foreground pl-2">
                     {computedPlan.strengthSessions || aiRecommendation.strengthSessionsPerWeek || 3} sessions × 250 cal
+                  </div>
+                  <div className="text-xs text-muted-foreground pl-2 italic">
+                    (45-60 min compound lifts with moderate-heavy weight)
                   </div>
                   
                   <div className="border-t pt-1 mt-1 flex justify-between items-center font-bold">
