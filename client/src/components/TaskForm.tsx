@@ -163,7 +163,17 @@ export default function TaskForm({
       // Add AI message to chat
       setAssistMessages(prev => [...prev, { role: "assistant", content: data.message }]);
       setAssistStep(data.nextStep);
-      setAssistExtractedData(data.extractedData);
+      
+      // Sanitize extractedData - ensure penaltyPoints is always positive
+      const sanitizedData = { ...data.extractedData };
+      if (sanitizedData.penaltyRule?.penaltyPoints) {
+        sanitizedData.penaltyRule = {
+          ...sanitizedData.penaltyRule,
+          penaltyPoints: Math.abs(sanitizedData.penaltyRule.penaltyPoints),
+        };
+      }
+      setAssistExtractedData(sanitizedData);
+      
       setAssistOptions(data.options || null);
       setAssistComplete(data.isComplete);
       

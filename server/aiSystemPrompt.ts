@@ -280,7 +280,7 @@ Return JSON:
     "hasBooster": boolean or null,
     "boosterRule": {"enabled": true, "timesRequired": number, "period": "week", "bonusPoints": number} or null,
     "hasPenalty": boolean or null,
-    "penaltyRule": {"enabled": true, "timesThreshold": number, "penaltyPoints": number, "condition": "lessThan"} or null,
+    "penaltyRule": {"enabled": true, "timesThreshold": number, "penaltyPoints": number (MUST be positive, e.g. 8 not -8), "condition": "lessThan"} or null,
     "suggestedPoints": number or null,
     "pointsReasoning": "string" or null
   },
