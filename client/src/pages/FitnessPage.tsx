@@ -6694,6 +6694,7 @@ function LivePlaySettingsDialog({
   const [selectedFields, setSelectedFields] = useState<string[]>(currentVisibleFields);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
+  const [importFromTemplateId, setImportFromTemplateId] = useState<string>("");
   const [showAddField, setShowAddField] = useState(false);
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState<FieldType>("text");
@@ -6775,15 +6776,24 @@ function LivePlaySettingsDialog({
       toast({ title: "Please enter a template name", variant: "destructive" });
       return;
     }
-    const selectedFieldsFromDisplay = displayFields.filter(f => selectedFields.includes(f.id));
+    
+    // If importing from an existing template, use its fields
+    let templateFields: LivePlayField[];
+    if (importFromTemplateId) {
+      const sourceTemplate = allTemplates.find(t => t.id === importFromTemplateId);
+      templateFields = sourceTemplate ? [...sourceTemplate.fields] : displayFields.filter(f => selectedFields.includes(f.id));
+    } else {
+      templateFields = displayFields.filter(f => selectedFields.includes(f.id));
+    }
+    
     const newTemplate: SportTemplate = {
       id: `custom-${Date.now()}`,
       name: newTemplateName.trim(),
       isDefault: false,
-      fields: selectedFieldsFromDisplay,
+      fields: templateFields,
     };
     const updatedTemplates = [...customTemplates, newTemplate];
-    const newFieldIds = selectedFieldsFromDisplay.map(f => f.id);
+    const newFieldIds = templateFields.map(f => f.id);
     updateMutation.mutate({ 
       customTemplates: updatedTemplates,
       activeTemplateId: newTemplate.id,
@@ -6792,6 +6802,7 @@ function LivePlaySettingsDialog({
       onSuccess: () => {
         toast({ title: `Template "${newTemplate.name}" created` });
         setNewTemplateName("");
+        setImportFromTemplateId("");
         setShowCreateTemplate(false);
         setSelectedFields(newFieldIds);
       }
@@ -7049,16 +7060,37 @@ function LivePlaySettingsDialog({
           </div>
 
           {showCreateTemplate ? (
-            <div className="space-y-2 p-3 border rounded-md">
-              <Label>New Template Name</Label>
-              <Input 
-                placeholder="e.g., Soccer, Tennis, Volleyball"
-                value={newTemplateName}
-                onChange={(e) => setNewTemplateName(e.target.value)}
-                data-testid="input-template-name"
-              />
+            <div className="space-y-3 p-3 border rounded-md">
+              <div className="space-y-2">
+                <Label>New Template Name</Label>
+                <Input 
+                  placeholder="e.g., Soccer, Tennis, Volleyball"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  data-testid="input-template-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Import Fields From (Optional)</Label>
+                <Select value={importFromTemplateId} onValueChange={setImportFromTemplateId}>
+                  <SelectTrigger data-testid="select-import-template">
+                    <SelectValue placeholder="Start from scratch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Start from scratch</SelectItem>
+                    {allTemplates.map(template => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name} ({template.fields.length} fields)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose an existing template to copy its fields as a starting point
+                </p>
+              </div>
               <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="outline" onClick={() => setShowCreateTemplate(false)}>Cancel</Button>
+                <Button size="sm" variant="outline" onClick={() => { setShowCreateTemplate(false); setImportFromTemplateId(""); }}>Cancel</Button>
                 <Button size="sm" onClick={handleCreateTemplate} data-testid="button-confirm-create-template">Create</Button>
               </div>
             </div>
@@ -7249,6 +7281,7 @@ function PracticeSettingsDialog({
   const [selectedFields, setSelectedFields] = useState<string[]>(currentVisibleFields);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
+  const [importFromTemplateId, setImportFromTemplateId] = useState<string>("");
   const [showAddField, setShowAddField] = useState(false);
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState<FieldType>("text");
@@ -7333,15 +7366,24 @@ function PracticeSettingsDialog({
       toast({ title: "Please enter a template name", variant: "destructive" });
       return;
     }
-    const selectedFieldsFromDisplay = displayFields.filter(f => selectedFields.includes(f.id));
+    
+    // If importing from an existing template, use its fields
+    let templateFields: PracticeField[];
+    if (importFromTemplateId) {
+      const sourceTemplate = allTemplates.find(t => t.id === importFromTemplateId);
+      templateFields = sourceTemplate ? [...sourceTemplate.fields] : displayFields.filter(f => selectedFields.includes(f.id));
+    } else {
+      templateFields = displayFields.filter(f => selectedFields.includes(f.id));
+    }
+    
     const newTemplate: PracticeTemplate = {
       id: `custom-${Date.now()}`,
       name: newTemplateName.trim(),
       isDefault: false,
-      fields: selectedFieldsFromDisplay,
+      fields: templateFields,
     };
     const updatedTemplates = [...customTemplates, newTemplate];
-    const newFieldIds = selectedFieldsFromDisplay.map(f => f.id);
+    const newFieldIds = templateFields.map(f => f.id);
     updateMutation.mutate({ 
       customTemplates: updatedTemplates,
       activeTemplateId: newTemplate.id,
@@ -7350,6 +7392,7 @@ function PracticeSettingsDialog({
       onSuccess: () => {
         toast({ title: `Template "${newTemplate.name}" created` });
         setNewTemplateName("");
+        setImportFromTemplateId("");
         setShowCreateTemplate(false);
         setSelectedFields(newFieldIds);
       }
@@ -7603,16 +7646,37 @@ function PracticeSettingsDialog({
           </div>
 
           {showCreateTemplate ? (
-            <div className="space-y-2 p-3 border rounded-md">
-              <Label>New Template Name</Label>
-              <Input 
-                placeholder="e.g., Yoga, Swimming, Tennis Drills"
-                value={newTemplateName}
-                onChange={(e) => setNewTemplateName(e.target.value)}
-                data-testid="input-practice-template-name"
-              />
+            <div className="space-y-3 p-3 border rounded-md">
+              <div className="space-y-2">
+                <Label>New Template Name</Label>
+                <Input 
+                  placeholder="e.g., Yoga, Swimming, Tennis Drills"
+                  value={newTemplateName}
+                  onChange={(e) => setNewTemplateName(e.target.value)}
+                  data-testid="input-practice-template-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Import Fields From (Optional)</Label>
+                <Select value={importFromTemplateId} onValueChange={setImportFromTemplateId}>
+                  <SelectTrigger data-testid="select-import-practice-template">
+                    <SelectValue placeholder="Start from scratch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Start from scratch</SelectItem>
+                    {allTemplates.map(template => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name} ({template.fields.length} fields)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose an existing template to copy its fields as a starting point
+                </p>
+              </div>
               <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="outline" onClick={() => setShowCreateTemplate(false)}>Cancel</Button>
+                <Button size="sm" variant="outline" onClick={() => { setShowCreateTemplate(false); setImportFromTemplateId(""); }}>Cancel</Button>
                 <Button size="sm" onClick={handleCreateTemplate} data-testid="button-confirm-create-practice-template">Create</Button>
               </div>
             </div>
