@@ -44,7 +44,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, CalendarDays, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle, ChevronDown, Settings, RefreshCw, Clock } from "lucide-react";
+import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, CalendarDays, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle, ChevronDown, Settings, RefreshCw, Clock, ListPlus } from "lucide-react";
+import TaskForm, { TaskWithBooster } from "@/components/TaskForm";
 import { HelpDialog } from "@/components/HelpDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -236,6 +237,7 @@ export default function TasksPage() {
   const [aiSelectedCategories, setAiSelectedCategories] = useState<Set<number>>(new Set());
   const aiChatEndRef = useRef<HTMLDivElement>(null);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [quickAddTaskOpen, setQuickAddTaskOpen] = useState(false);
 
   // Fetch seasons from API (available to all authenticated users)
   const { data: seasons = [], isLoading: seasonsLoading } = useQuery<Season[]>({
@@ -1735,6 +1737,30 @@ export default function TasksPage() {
           </CardContent>
         </Card>
 
+        {activeSeason && !isActiveSeasonArchived && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ListPlus className="h-4 w-4 text-muted-foreground" />
+                Add Task
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">
+                Create a new task to track your habits
+              </p>
+              <Button
+                className="w-full"
+                onClick={() => setQuickAddTaskOpen(true)}
+                data-testid="button-quick-add-task"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Task
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {activeSeason && !isActiveSeasonArchived && !isDemo && (
           <Card className="bg-gradient-to-br from-primary/5 to-chart-4/5">
             <CardHeader className="pb-2">
@@ -2812,6 +2838,22 @@ export default function TasksPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Quick Add Task Form */}
+      <TaskForm
+        open={quickAddTaskOpen}
+        onOpenChange={setQuickAddTaskOpen}
+        onSubmit={(values) => {
+          handleAdd(values as Omit<Task, "id">);
+          setQuickAddTaskOpen(false);
+        }}
+        title="Add Task"
+        categories={categoryNames.length > 0 ? categoryNames : undefined}
+        enableAIPoints={!!activeSeason && !isActiveSeasonArchived}
+        dailyGoal={dailyGoal}
+        seasonContext={activeSeason?.name}
+        onCategoryCreate={handleCategoryCreate}
+      />
     </div>
   );
 }
