@@ -2131,3 +2131,54 @@ export const aiConversations = pgTable("ai_conversations", {
 export const insertAIConversationSchema = createInsertSchema(aiConversations).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAIConversation = z.infer<typeof insertAIConversationSchema>;
 export type AIConversation = typeof aiConversations.$inferSelect;
+
+// ==================== AI TASK ASSIST (Conversational Task Creation) ====================
+
+// Message in the task assist conversation
+export const aiTaskAssistMessageSchema = z.object({
+  role: z.enum(["assistant", "user"]),
+  content: z.string(),
+});
+export type AITaskAssistMessage = z.infer<typeof aiTaskAssistMessageSchema>;
+
+// Extracted data from the conversation
+export const aiTaskAssistExtractedDataSchema = z.object({
+  priority: taskPriorityEnum.nullable().optional(),
+  category: z.string().nullable().optional(),
+  isNewCategory: z.boolean().nullable().optional(),
+  hasTiers: z.boolean().nullable().optional(),
+  tiers: z.array(z.object({
+    name: z.string(),
+    bonusPoints: z.number().int(),
+  })).nullable().optional(),
+  hasBooster: z.boolean().nullable().optional(),
+  boosterRule: boosterRuleSchema.nullable().optional(),
+  hasPenalty: z.boolean().nullable().optional(),
+  penaltyRule: penaltyRuleSchema.nullable().optional(),
+  suggestedPoints: z.number().int().nullable().optional(),
+  pointsReasoning: z.string().nullable().optional(),
+});
+export type AITaskAssistExtractedData = z.infer<typeof aiTaskAssistExtractedDataSchema>;
+
+// Request schema for AI task assist
+export const aiTaskAssistRequestSchema = z.object({
+  taskName: z.string().min(1),
+  userMessage: z.string().optional(),
+  currentStep: z.string().default("priority"),
+  conversationHistory: z.array(aiTaskAssistMessageSchema).default([]),
+  extractedData: aiTaskAssistExtractedDataSchema.default({}),
+  categories: z.array(z.string()).default([]),
+  seasonName: z.string().optional(),
+  dailyGoal: z.number().int().min(1).default(50),
+});
+export type AITaskAssistRequest = z.infer<typeof aiTaskAssistRequestSchema>;
+
+// Response schema for AI task assist
+export const aiTaskAssistResponseSchema = z.object({
+  message: z.string(),
+  options: z.array(z.string()).nullable().optional(),
+  extractedData: aiTaskAssistExtractedDataSchema,
+  nextStep: z.string(),
+  isComplete: z.boolean(),
+});
+export type AITaskAssistResponse = z.infer<typeof aiTaskAssistResponseSchema>;

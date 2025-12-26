@@ -2600,6 +2600,100 @@ Based on the task name and context, classify the task and suggest an appropriate
     }
   });
 
+  // AI Task Assist - Conversational task creation
+  app.post("/api/ai/task-assist", isAuthenticated, async (req: any, res) => {
+    try {
+      const { aiTaskAssistRequestSchema, aiTaskAssistResponseSchema } = await import("@shared/schema");
+      const { getAITaskAssistPrompt } = await import("./aiSystemPrompt");
+      
+      const parseResult = aiTaskAssistRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+
+      const { 
+        taskName, 
+        userMessage, 
+        currentStep, 
+        conversationHistory, 
+        extractedData,
+        categories,
+        seasonName,
+        dailyGoal 
+      } = parseResult.data;
+
+      // Build conversation messages for OpenAI
+      const systemPrompt = getAITaskAssistPrompt({
+        currentStep,
+        taskName,
+        categories,
+        seasonName: seasonName || "Current Season",
+        dailyGoal,
+        conversationHistory,
+      });
+
+      // Build messages array with conversation history
+      const messages: Array<{role: "system" | "user" | "assistant"; content: string}> = [
+        { role: "system", content: systemPrompt }
+      ];
+
+      // Add conversation history
+      for (const msg of conversationHistory) {
+        messages.push({ role: msg.role as "user" | "assistant", content: msg.content });
+      }
+
+      // Add user's current message if provided
+      if (userMessage) {
+        messages.push({ role: "user", content: userMessage });
+      }
+
+      // Add context about what we need next
+      const stepContext = `Current step: ${currentStep}. Already extracted: ${JSON.stringify(extractedData)}. ${userMessage ? `User responded: "${userMessage}"` : "Start by asking the first question about priority."} Continue the conversation and extract relevant data. Return valid JSON only.`;
+      messages.push({ role: "user", content: stepContext });
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages,
+        max_tokens: 500,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      let aiResponse: any;
+      try {
+        const parsed = JSON.parse(rawContent);
+        
+        // Merge extracted data with previous data
+        const mergedExtractedData = {
+          ...extractedData,
+          ...parsed.extractedData,
+        };
+
+        // Ensure we have proper defaults
+        const validatedResponse = {
+          message: parsed.message || "I'm having trouble. Let's try again.",
+          options: Array.isArray(parsed.options) ? parsed.options : null,
+          extractedData: mergedExtractedData,
+          nextStep: parsed.nextStep || currentStep,
+          isComplete: parsed.isComplete === true,
+        };
+
+        aiResponse = validatedResponse;
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      res.json(aiResponse);
+    } catch (error) {
+      console.error("AI task assist error:", error);
+      res.status(500).json({ error: "Failed to process task assist request" });
+    }
+  });
+
   // ==================== FRIENDS API ROUTES ====================
 
   // Get all friends (accepted friendships)
