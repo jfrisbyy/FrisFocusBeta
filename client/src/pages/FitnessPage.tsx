@@ -5672,16 +5672,18 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                         </span>
                       </p>
                       {(() => {
-                        const netWeeklyDeficit = foodDeficitWeekly + activityBurnWeekly;
+                        // Calculate actual dietary deficit/surplus from TDEE vs intake
+                        const actualDietaryWeekly = Math.round((sedentaryTDEE - finalDailyCalories) * 7);
+                        const netWeeklyDeficit = actualDietaryWeekly + activityBurnWeekly;
                         const isNetDeficit = netWeeklyDeficit > 0;
-                        const dietaryDisplay = foodDeficitWeekly >= 0 
-                          ? foodDeficitWeekly.toLocaleString()
-                          : `(${Math.abs(foodDeficitWeekly).toLocaleString()})`;
+                        const dietaryDisplay = actualDietaryWeekly >= 0 
+                          ? actualDietaryWeekly.toLocaleString()
+                          : `(${Math.abs(actualDietaryWeekly).toLocaleString()})`;
                         return (
                           <>
                             <p className="pt-1 border-t">
                               <span className="font-bold">Total:</span>{' '}
-                              {dietaryDisplay} {foodDeficitWeekly < 0 ? '-' : '+'} {stepsBurnWeekly.toLocaleString()} + {strengthBurnWeekly.toLocaleString()} ={' '}
+                              {dietaryDisplay} {actualDietaryWeekly < 0 ? '-' : '+'} {stepsBurnWeekly.toLocaleString()} + {strengthBurnWeekly.toLocaleString()} ={' '}
                               {isNetDeficit ? (
                                 <>
                                   <span className="font-bold text-primary">{netWeeklyDeficit.toLocaleString()} cal/week deficit</span>,{' '}
