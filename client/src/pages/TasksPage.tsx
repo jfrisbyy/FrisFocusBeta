@@ -1608,84 +1608,77 @@ export default function TasksPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              Weekly Point Goal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {editingWeeklyGoal ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  value={weeklyGoalInput}
-                  onChange={(e) => setWeeklyGoalInput(e.target.value)}
-                  className="w-24 font-mono"
-                  min={1}
-                  autoFocus
-                  data-testid="input-weekly-goal"
-                />
-                <span className="text-sm text-muted-foreground">points</span>
-                <Button size="icon" variant="ghost" onClick={handleSaveWeeklyGoal} data-testid="button-save-weekly-goal">
-                  <Check className="h-4 w-4 text-chart-1" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={handleCancelWeeklyGoal} data-testid="button-cancel-weekly-goal">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-mono font-bold">{weeklyGoal}</span>
-                <span className="text-sm text-muted-foreground">pts/week</span>
-                <Button size="icon" variant="ghost" onClick={handleEditWeeklyGoal} data-testid="button-edit-weekly-goal">
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-2">
-              Hit this goal each week to build your week streak
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Target className="h-4 w-4 text-muted-foreground" />
-              Daily Point Goal
+              Point Goals
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {editingGoal ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  value={goalInput}
-                  onChange={(e) => setGoalInput(e.target.value)}
-                  className="w-24 font-mono"
-                  min={1}
-                  autoFocus
-                  data-testid="input-daily-goal"
-                />
-                <span className="text-sm text-muted-foreground">points</span>
-                <Button size="icon" variant="ghost" onClick={handleSaveGoal} data-testid="button-save-daily-goal">
-                  <Check className="h-4 w-4 text-chart-1" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={handleCancelGoal} data-testid="button-cancel-daily-goal">
-                  <X className="h-4 w-4" />
-                </Button>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                <CalendarDays className="h-3 w-3" />
+                Weekly
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-mono font-bold">{dailyGoal}</span>
-                <span className="text-sm text-muted-foreground">pts/day</span>
-                <Button size="icon" variant="ghost" onClick={handleEditGoal} data-testid="button-edit-daily-goal">
-                  <Pencil className="h-4 w-4" />
-                </Button>
+              {editingWeeklyGoal ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={weeklyGoalInput}
+                    onChange={(e) => setWeeklyGoalInput(e.target.value)}
+                    className="w-20 font-mono h-8"
+                    min={1}
+                    autoFocus
+                    data-testid="input-weekly-goal"
+                  />
+                  <Button size="icon" variant="ghost" onClick={handleSaveWeeklyGoal} data-testid="button-save-weekly-goal">
+                    <Check className="h-4 w-4 text-chart-1" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={handleCancelWeeklyGoal} data-testid="button-cancel-weekly-goal">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-mono font-bold">{weeklyGoal}</span>
+                  <span className="text-xs text-muted-foreground">pts/week</span>
+                  <Button size="icon" variant="ghost" onClick={handleEditWeeklyGoal} data-testid="button-edit-weekly-goal">
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                <Target className="h-3 w-3" />
+                Daily
               </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-2">
-              Hit this goal each day to build your day streak
-            </p>
+              {editingGoal ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={goalInput}
+                    onChange={(e) => setGoalInput(e.target.value)}
+                    className="w-20 font-mono h-8"
+                    min={1}
+                    autoFocus
+                    data-testid="input-daily-goal"
+                  />
+                  <Button size="icon" variant="ghost" onClick={handleSaveGoal} data-testid="button-save-daily-goal">
+                    <Check className="h-4 w-4 text-chart-1" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={handleCancelGoal} data-testid="button-cancel-daily-goal">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-mono font-bold">{dailyGoal}</span>
+                  <span className="text-xs text-muted-foreground">pts/day</span>
+                  <Button size="icon" variant="ghost" onClick={handleEditGoal} data-testid="button-edit-daily-goal">
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
