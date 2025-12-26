@@ -267,6 +267,154 @@ export const insertBadgeWithLevelsSchema = badgeWithLevelsSchema.omit({ id: true
 });
 export type InsertBadgeWithLevels = z.infer<typeof insertBadgeWithLevelsSchema>;
 
+// ==================== STAMPS (Community Recognition) ====================
+
+// Stamp condition types - fixed, platform-defined criteria
+export const stampConditionTypeEnum = z.enum([
+  "consistentLogger",      // Logged activity X days in Y window
+  "weeklyGoalStreaker",    // Hit weekly goal for X consecutive weeks
+  "dailyGoalStreaker",     // Hit daily goal for X consecutive days
+  "focusedUser",           // Maintained high focus scores
+  "comebackKid",           // Returned after inactivity and logged consistently
+  "earlyAdopter",          // Joined during early period
+  "taskMaster",            // Completed large number of total tasks
+  "perfectWeek",           // Perfect weeks (hit all daily goals in a week)
+]);
+export type StampConditionType = z.infer<typeof stampConditionTypeEnum>;
+
+// Stamp definition - platform-defined, same criteria for all users
+export const stampDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  description: z.string(),
+  icon: z.string(),
+  conditionType: stampConditionTypeEnum,
+  requirement: z.number().int().min(1), // e.g., 30 days for consistentLogger
+  rarity: z.enum(["common", "uncommon", "rare", "epic", "legendary"]),
+});
+export type StampDefinition = z.infer<typeof stampDefinitionSchema>;
+
+// User's earned stamps
+export const userStampSchema = z.object({
+  id: z.string(),
+  stampId: z.string(), // References stampDefinition.id
+  earnedAt: z.string(),
+  progress: z.number().int().min(0),
+});
+export type UserStamp = z.infer<typeof userStampSchema>;
+
+// Pre-defined stamps (platform-wide, fixed criteria)
+export const PLATFORM_STAMPS: StampDefinition[] = [
+  {
+    id: "stamp-consistent-logger-7",
+    name: "Consistent Logger",
+    description: "Logged activity for 7 days in a 10-day window",
+    icon: "calendar-check",
+    conditionType: "consistentLogger",
+    requirement: 7,
+    rarity: "common",
+  },
+  {
+    id: "stamp-consistent-logger-30",
+    name: "Dedicated Logger",
+    description: "Logged activity for 30 days in a 45-day window",
+    icon: "calendar-check",
+    conditionType: "consistentLogger",
+    requirement: 30,
+    rarity: "uncommon",
+  },
+  {
+    id: "stamp-weekly-streaker-4",
+    name: "Focused",
+    description: "Hit weekly focus goal for 4 consecutive weeks",
+    icon: "target",
+    conditionType: "weeklyGoalStreaker",
+    requirement: 4,
+    rarity: "uncommon",
+  },
+  {
+    id: "stamp-weekly-streaker-12",
+    name: "Laser Focused",
+    description: "Hit weekly focus goal for 12 consecutive weeks",
+    icon: "target",
+    conditionType: "weeklyGoalStreaker",
+    requirement: 12,
+    rarity: "rare",
+  },
+  {
+    id: "stamp-daily-streaker-7",
+    name: "Week Warrior",
+    description: "Hit daily focus goal for 7 consecutive days",
+    icon: "flame",
+    conditionType: "dailyGoalStreaker",
+    requirement: 7,
+    rarity: "common",
+  },
+  {
+    id: "stamp-daily-streaker-30",
+    name: "Month Master",
+    description: "Hit daily focus goal for 30 consecutive days",
+    icon: "flame",
+    conditionType: "dailyGoalStreaker",
+    requirement: 30,
+    rarity: "rare",
+  },
+  {
+    id: "stamp-comeback",
+    name: "Comeback",
+    description: "Returned after 14+ day break and logged 7 consecutive days",
+    icon: "rotate-cw",
+    conditionType: "comebackKid",
+    requirement: 7,
+    rarity: "uncommon",
+  },
+  {
+    id: "stamp-task-master-100",
+    name: "Task Crusher",
+    description: "Completed 100 total task completions",
+    icon: "check-circle",
+    conditionType: "taskMaster",
+    requirement: 100,
+    rarity: "common",
+  },
+  {
+    id: "stamp-task-master-500",
+    name: "Task Titan",
+    description: "Completed 500 total task completions",
+    icon: "check-circle",
+    conditionType: "taskMaster",
+    requirement: 500,
+    rarity: "rare",
+  },
+  {
+    id: "stamp-task-master-1000",
+    name: "Task Legend",
+    description: "Completed 1000 total task completions",
+    icon: "crown",
+    conditionType: "taskMaster",
+    requirement: 1000,
+    rarity: "legendary",
+  },
+  {
+    id: "stamp-perfect-week",
+    name: "Perfect Week",
+    description: "Hit daily goal every day for an entire week",
+    icon: "star",
+    conditionType: "perfectWeek",
+    requirement: 1,
+    rarity: "uncommon",
+  },
+  {
+    id: "stamp-perfect-week-4",
+    name: "Flawless Month",
+    description: "Achieved 4 perfect weeks",
+    icon: "sparkles",
+    conditionType: "perfectWeek",
+    requirement: 4,
+    rarity: "epic",
+  },
+];
+
 // Journal entry (multiple per day)
 export const journalEntrySchema = z.object({
   id: z.string(),

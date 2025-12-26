@@ -1,0 +1,117 @@
+Goal:
+ Refactor the current “Badges” system into a clear Recognition framework with two distinct concepts: Badges (personal) and Stamps (community), while preserving the integrity of the Focus Points system.
+
+
+1. Rename & Structure
+Rename the Badges page to Recognition
+
+
+Recognition contains three sections:
+
+
+Focus Points – explanation and stats of current focus points and what led to them 
+Badges – personal, task-bound achievements
+
+
+Stamps – community-wide, platform-verified achievements
+
+
+
+2. Badges (Personal)
+Definition:
+Badges are personal achievements
+
+
+Tied to the user’s own tasks, habits, streaks, or goals
+
+
+Not meant for comparison across users
+
+
+Rules:
+Badge criteria are user-specific, users can create them or use AI to generate them
+
+
+Badges may be private or semi-private by default
+
+
+Badges reinforce identity (e.g., consistency, discipline, habits)
+
+
+Examples:
+“30 Workouts Logged”- 
+
+
+“7-Day Deep Work Streak”
+
+
+“Early Riser”
+
+
+“Meal Prep Master”
+
+
+While all of these badges are tied specifically to the user’s tasks from the task list 
+
+3. Stamps (Community)
+Definition:
+Stamps are standardized, community-wide recognition
+
+
+Same criteria for every user
+
+
+Earned less frequently than badges
+
+
+Meant to be public and comparable
+
+
+Rules:
+Stamp criteria are fixed and platform-defined
+
+
+Stamps represent meaningful milestones or behavior patterns
+
+
+Stamps should not be trivial or easily farmed
+
+
+Stamps may appear on user profiles when they are being viewed 
+
+
+Examples:
+“Consistent Logger” (logged activity X days in Y window)
+
+
+“Fitness Fanatic” (reached declared fitness goal)
+
+
+“Focused” (hit weekly focus goal for multiple weeks)
+
+
+“Comeback” (returned after inactivity and logged consistently)
+
+
+
+4. Language & UX Constraints
+
+
+Badges = personal ownership
+
+
+Stamps = system-verified recognition
+
+
+
+5. Non-Goals (Important)
+Do not merge badges and stamps into one system
+
+
+Do not allow stamps to be user-defined
+
+
+Do not auto-adjust Focus Point values based on recognition
+
+
+Recognition should reflect behavior, not influence point economics

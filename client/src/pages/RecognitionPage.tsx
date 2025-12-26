@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -40,13 +41,19 @@ import {
   Loader2,
   AlertCircle,
   Check,
+  TrendingUp,
+  CalendarCheck,
+  CheckCircle,
+  Crown,
+  RotateCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import type { Task, AIGenerateBadgesResponse, AIGeneratedBadge } from "@shared/schema";
+import type { Task, AIGenerateBadgesResponse, AIGeneratedBadge, StampDefinition } from "@shared/schema";
+import { PLATFORM_STAMPS } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,8 +67,11 @@ import {
 import {
   loadBadgesFromStorage,
   saveBadgesToStorage,
+  loadStampProgressFromStorage,
+  saveStampProgressToStorage,
   type StoredBadge,
   type StoredBadgeLevel,
+  type StoredStampProgress,
 } from "@/lib/storage";
 
 type BadgeConditionType = "taskCompletions" | "perfectDaysStreak" | "negativeFreeStreak" | "weeklyGoalStreak";
@@ -209,7 +219,7 @@ const sampleBadges: BadgeDefinition[] = [
   },
 ];
 
-export default function BadgesPage() {
+export default function RecognitionPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
   const [badges, setBadges] = useState<BadgeDefinition[]>([]);
@@ -453,163 +463,378 @@ export default function BadgesPage() {
     }
   };
 
+  // Stamp progress state
+  const [stampProgress, setStampProgress] = useState<StoredStampProgress[]>([]);
+  
+  // Load stamp progress on mount
+  useEffect(() => {
+    if (!isDemo) {
+      const stored = loadStampProgressFromStorage();
+      setStampProgress(stored);
+    }
+  }, [isDemo]);
+
+  // Helper to get stamp icon component
+  const getStampIcon = (iconName: string) => {
+    const iconMap: Record<string, typeof Award> = {
+      "calendar-check": CalendarCheck,
+      "target": Target,
+      "flame": Flame,
+      "rotate-cw": RotateCw,
+      "check-circle": CheckCircle,
+      "crown": Crown,
+      "star": Star,
+      "sparkles": Sparkles,
+    };
+    return iconMap[iconName] || Award;
+  };
+
+  // Get stamp progress for a specific stamp
+  const getStampProgress = (stampId: string): { progress: number; earned: boolean } => {
+    const found = stampProgress.find(s => s.stampId === stampId);
+    return found || { progress: 0, earned: false };
+  };
+
+  // Rarity colors
+  const rarityColors: Record<string, string> = {
+    common: "text-muted-foreground border-muted-foreground/30",
+    uncommon: "text-chart-2 border-chart-2/30",
+    rare: "text-chart-1 border-chart-1/30",
+    epic: "text-purple-500 border-purple-500/30",
+    legendary: "text-yellow-500 border-yellow-500/30",
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Badges</h2>
-          <p className="text-muted-foreground text-sm">Create and track achievement badges</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Recognition</h2>
+          <p className="text-muted-foreground text-sm">Track your achievements and community recognition</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {!isDemo && (
-            <Button
-              variant="outline"
-              onClick={handleOpenAiDialog}
-              className="bg-gradient-to-r from-primary/10 to-chart-3/10 hover:from-primary/20 hover:to-chart-3/20 border-primary/30"
-              data-testid="button-generate-badges-ai"
-            >
-              <Sparkles className="h-4 w-4 mr-1" />
-              Generate with AI
-            </Button>
+      </div>
+
+      <Tabs defaultValue="focus-points" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="focus-points" data-testid="tab-focus-points">
+            <TrendingUp className="h-4 w-4 mr-1.5" />
+            Focus Points
+          </TabsTrigger>
+          <TabsTrigger value="badges" data-testid="tab-badges">
+            <Award className="h-4 w-4 mr-1.5" />
+            Badges
+          </TabsTrigger>
+          <TabsTrigger value="stamps" data-testid="tab-stamps">
+            <Trophy className="h-4 w-4 mr-1.5" />
+            Stamps
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Focus Points Tab */}
+        <TabsContent value="focus-points" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                What are Focus Points?
+              </CardTitle>
+              <CardDescription>
+                Your Focus Points (FP) represent your commitment to building better habits
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Focus Points are earned by completing tasks, hitting daily and weekly goals, and triggering boosters. 
+                They reflect your dedication to personal growth and habit formation.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Card className="bg-muted/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                      <CheckCircle className="h-4 w-4 text-chart-2" />
+                      Task Completions
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Earn points each time you complete a task. Higher priority tasks earn more points.
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-muted/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                      <Zap className="h-4 w-4 text-chart-1" />
+                      Boosters
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Trigger bonus points by hitting task frequency goals (e.g., workout 3x per week).
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-muted/50">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 text-sm font-medium mb-1">
+                      <Target className="h-4 w-4 text-primary" />
+                      Goal Streaks
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Build momentum by consistently hitting your daily and weekly point goals.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Badges Tab */}
+        <TabsContent value="badges" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="text-lg font-medium">Personal Badges</h3>
+              <p className="text-sm text-muted-foreground">Create and track achievements tied to your tasks</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {!isDemo && (
+                <Button
+                  variant="outline"
+                  onClick={handleOpenAiDialog}
+                  className="bg-gradient-to-r from-primary/10 to-chart-3/10 hover:from-primary/20 hover:to-chart-3/20 border-primary/30"
+                  data-testid="button-generate-badges-ai"
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Generate with AI
+                </Button>
+              )}
+              <Button onClick={handleOpenCreate} data-testid="button-create-badge">
+                <Plus className="h-4 w-4 mr-1" />
+                Create Badge
+              </Button>
+            </div>
+          </div>
+
+          {earnedBadges.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-chart-1" />
+                Earned ({earnedBadges.length})
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {earnedBadges.map((badge) => {
+                  const Icon = getIcon(badge.icon);
+                  const highestLevel = getHighestEarnedLevel(badge);
+                  const nextLevel = getNextLevel(badge);
+                  const percentage = nextLevel 
+                    ? Math.min((badge.progress / nextLevel.required) * 100, 100)
+                    : 100;
+                  return (
+                    <Card key={badge.id} className="border-chart-1/30" data-testid={`badge-${badge.id}`}>
+                      <CardContent className="pt-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-full p-2 bg-chart-1/10">
+                            <Icon className="h-5 w-5 text-chart-1" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm">{badge.name}</span>
+                              <Badge variant="outline" className="text-xs text-chart-1 border-chart-1/30">
+                                Level {highestLevel}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleOpenEdit(badge)}
+                            data-testid={`button-edit-badge-${badge.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {nextLevel && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Next: Level {nextLevel.level}</span>
+                              <span className="font-mono">
+                                {badge.progress}/{nextLevel.required}
+                              </span>
+                            </div>
+                            <Progress value={percentage} className="h-1.5" />
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
           )}
-          <Button onClick={handleOpenCreate} data-testid="button-create-badge">
-            <Plus className="h-4 w-4 mr-1" />
-            Create Badge
-          </Button>
-        </div>
-      </div>
 
-      {earnedBadges.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-chart-1" />
-            Earned ({earnedBadges.length})
-          </h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {earnedBadges.map((badge) => {
-              const Icon = getIcon(badge.icon);
-              const highestLevel = getHighestEarnedLevel(badge);
-              const nextLevel = getNextLevel(badge);
-              const percentage = nextLevel 
-                ? Math.min((badge.progress / nextLevel.required) * 100, 100)
-                : 100;
-              return (
-                <Card key={badge.id} className="border-chart-1/30" data-testid={`badge-${badge.id}`}>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-full p-2 bg-chart-1/10">
-                        <Icon className="h-5 w-5 text-chart-1" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm">{badge.name}</span>
-                          <Badge variant="outline" className="text-xs text-chart-1 border-chart-1/30">
-                            Level {highestLevel}
-                          </Badge>
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              In Progress ({inProgressBadges.length})
+            </h4>
+            {badges.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-no-badges">
+                  No badges yet. Create one to start tracking achievements!
+                </CardContent>
+              </Card>
+            ) : inProgressBadges.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  All badges earned! Create more to continue tracking.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {inProgressBadges.map((badge) => {
+                  const Icon = getIcon(badge.icon);
+                  const nextLevel = getNextLevel(badge);
+                  const percentage = nextLevel 
+                    ? Math.min((badge.progress / nextLevel.required) * 100, 100)
+                    : 0;
+                  return (
+                    <Card key={badge.id} data-testid={`badge-${badge.id}`}>
+                      <CardContent className="pt-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-full p-2 bg-muted">
+                            <Icon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-sm">{badge.name}</span>
+                            <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenEdit(badge)}
+                              data-testid={`button-edit-badge-${badge.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteId(badge.id)}
+                              data-testid={`button-delete-badge-${badge.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-chart-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
+                        {nextLevel && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">Level {nextLevel.level}</span>
+                              <span className="font-mono">
+                                {badge.progress}/{nextLevel.required}
+                              </span>
+                            </div>
+                            <Progress value={percentage} className="h-1.5" />
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Stamps Tab */}
+        <TabsContent value="stamps" className="space-y-4">
+          <div>
+            <h3 className="text-lg font-medium">Community Stamps</h3>
+            <p className="text-sm text-muted-foreground">Platform-verified achievements with fixed criteria for all users</p>
+          </div>
+
+          {/* Earned Stamps */}
+          {stampProgress.filter(s => s.earned).length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-chart-1" />
+                Earned Stamps
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {PLATFORM_STAMPS.filter(stamp => {
+                  const progress = getStampProgress(stamp.id);
+                  return progress.earned;
+                }).map((stamp) => {
+                  const Icon = getStampIcon(stamp.icon);
+                  return (
+                    <Card key={stamp.id} className="border-chart-1/30" data-testid={`stamp-${stamp.id}`}>
+                      <CardContent className="pt-4 space-y-2">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-full p-2 bg-chart-1/10">
+                            <Icon className="h-5 w-5 text-chart-1" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-sm">{stamp.name}</span>
+                              <Badge variant="outline" className={cn("text-xs capitalize", rarityColors[stamp.rarity])}>
+                                {stamp.rarity}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{stamp.description}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Available Stamps */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              Available Stamps
+            </h4>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {PLATFORM_STAMPS.filter(stamp => {
+                const progress = getStampProgress(stamp.id);
+                return !progress.earned;
+              }).map((stamp) => {
+                const Icon = getStampIcon(stamp.icon);
+                const progress = getStampProgress(stamp.id);
+                const percentage = Math.min((progress.progress / stamp.requirement) * 100, 100);
+                return (
+                  <Card key={stamp.id} data-testid={`stamp-${stamp.id}`}>
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-full p-2 bg-muted">
+                          <Icon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{stamp.name}</span>
+                            <Badge variant="outline" className={cn("text-xs capitalize", rarityColors[stamp.rarity])}>
+                              {stamp.rarity}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{stamp.description}</p>
+                        </div>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleOpenEdit(badge)}
-                        data-testid={`button-edit-badge-${badge.id}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {nextLevel && (
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Next: Level {nextLevel.level}</span>
-                          <span className="font-mono">
-                            {badge.progress}/{nextLevel.required}
-                          </span>
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-mono">{progress.progress}/{stamp.requirement}</span>
                         </div>
                         <Progress value={percentage} className="h-1.5" />
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium flex items-center gap-2">
-          <Target className="h-5 w-5 text-muted-foreground" />
-          In Progress ({inProgressBadges.length})
-        </h3>
-        {badges.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-no-badges">
-              No badges yet. Create one to start tracking achievements!
-            </CardContent>
-          </Card>
-        ) : inProgressBadges.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              All badges earned! Create more to continue tracking.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {inProgressBadges.map((badge) => {
-              const Icon = getIcon(badge.icon);
-              const nextLevel = getNextLevel(badge);
-              const percentage = nextLevel 
-                ? Math.min((badge.progress / nextLevel.required) * 100, 100)
-                : 0;
-              return (
-                <Card key={badge.id} data-testid={`badge-${badge.id}`}>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-full p-2 bg-muted">
-                        <Icon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-sm">{badge.name}</span>
-                        <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleOpenEdit(badge)}
-                          data-testid={`button-edit-badge-${badge.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeleteId(badge.id)}
-                          data-testid={`button-delete-badge-${badge.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-chart-3" />
-                        </Button>
-                      </div>
-                    </div>
-                    {nextLevel && (
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Level {nextLevel.level}</span>
-                          <span className="font-mono">
-                            {badge.progress}/{nextLevel.required}
-                          </span>
-                        </div>
-                        <Progress value={percentage} className="h-1.5" />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] p-0">

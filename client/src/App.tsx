@@ -15,7 +15,7 @@ import { OnboardingOverlay, OnboardingMinimizedIndicator } from "@/components/On
 import Dashboard from "@/pages/Dashboard";
 import DailyPage from "@/pages/DailyPage";
 import TasksPage from "@/pages/TasksPage";
-import BadgesPage from "@/pages/BadgesPage";
+import RecognitionPage from "@/pages/RecognitionPage";
 import JournalPage from "@/pages/JournalPage";
 import InsightsPage from "@/pages/InsightsPage";
 import FitnessPage from "@/pages/FitnessPage";
@@ -42,7 +42,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/daily" component={DailyPage} />
         <Route path="/tasks" component={TasksPage} />
-        <Route path="/badges" component={BadgesPage} />
+        <Route path="/recognition" component={RecognitionPage} />
         <Route path="/journal" component={JournalPage} />
         <Route path="/insights" component={InsightsPage} />
         <Route path="/health" component={FitnessPage} />

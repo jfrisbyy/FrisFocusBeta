@@ -16,7 +16,7 @@ const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/daily", label: "Daily", icon: CalendarCheck },
   { path: "/tasks", label: "Tasks", icon: ListTodo },
-  { path: "/badges", label: "Badges", icon: Award },
+  { path: "/recognition", label: "Recognition", icon: Award },
   { path: "/journal", label: "Journal", icon: BookOpen },
   { path: "/insights", label: "Insights", icon: Sparkles },
   { path: "/health", label: "Health", icon: Dumbbell },

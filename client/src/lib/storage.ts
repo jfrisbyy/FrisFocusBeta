@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   WEEKLY_GOAL: "frisfocus_weekly_goal",
   DAILY_LOGS: "frisfocus_daily_logs",
   BADGES: "frisfocus_badges",
+  STAMPS: "frisfocus_stamps",
   JOURNAL: "frisfocus_journal",
   MILESTONES: "frisfocus_milestones",
   USER_PROFILE: "frisfocus_user_profile",
@@ -208,6 +209,22 @@ export function loadBadgesFromStorage(): StoredBadge[] {
 
 export function saveBadgesToStorage(badges: StoredBadge[]): void {
   saveToStorage(STORAGE_KEYS.BADGES, badges);
+}
+
+// ============ STAMPS (Community Recognition) ============
+export interface StoredStampProgress {
+  stampId: string;
+  progress: number;
+  earned: boolean;
+  earnedAt?: string;
+}
+
+export function loadStampProgressFromStorage(): StoredStampProgress[] {
+  return loadFromStorage<StoredStampProgress[]>(STORAGE_KEYS.STAMPS, []);
+}
+
+export function saveStampProgressToStorage(stamps: StoredStampProgress[]): void {
+  saveToStorage(STORAGE_KEYS.STAMPS, stamps);
 }
 
 /**
