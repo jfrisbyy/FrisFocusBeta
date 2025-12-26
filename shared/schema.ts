@@ -2143,6 +2143,7 @@ export type AITaskAssistMessage = z.infer<typeof aiTaskAssistMessageSchema>;
 
 // Extracted data from the conversation
 export const aiTaskAssistExtractedDataSchema = z.object({
+  suggestedTaskName: z.string().nullable().optional(),
   priority: taskPriorityEnum.nullable().optional(),
   category: z.string().nullable().optional(),
   isNewCategory: z.boolean().nullable().optional(),
@@ -2164,7 +2165,7 @@ export type AITaskAssistExtractedData = z.infer<typeof aiTaskAssistExtractedData
 export const aiTaskAssistRequestSchema = z.object({
   taskName: z.string().min(1),
   userMessage: z.string().optional(),
-  currentStep: z.string().default("priority"),
+  currentStep: z.string().default("taskName"),
   conversationHistory: z.array(aiTaskAssistMessageSchema).default([]),
   extractedData: aiTaskAssistExtractedDataSchema.default({}),
   categories: z.array(z.string()).default([]),

@@ -2622,8 +2622,16 @@ Based on the task name and context, classify the task and suggest an appropriate
         dailyGoal 
       } = parseResult.data;
 
+      // Build the context reminder to include in system prompt
+      const contextReminder = `
+CURRENT CONVERSATION STATE:
+- Current step: ${currentStep}
+- Data extracted so far: ${JSON.stringify(extractedData)}
+- If the user asked a question or made a statement that's not an answer, respond helpfully and stay on the current step.
+- If the user provided a clear answer, extract it and advance to the next step.`;
+
       // Build conversation messages for OpenAI
-      const systemPrompt = getAITaskAssistPrompt({
+      const baseSystemPrompt = getAITaskAssistPrompt({
         currentStep,
         taskName,
         categories,
@@ -2632,9 +2640,12 @@ Based on the task name and context, classify the task and suggest an appropriate
         conversationHistory,
       });
 
+      // Combine base prompt with context reminder
+      const fullSystemPrompt = baseSystemPrompt + "\n" + contextReminder;
+
       // Build messages array with conversation history
       const messages: Array<{role: "system" | "user" | "assistant"; content: string}> = [
-        { role: "system", content: systemPrompt }
+        { role: "system", content: fullSystemPrompt }
       ];
 
       // Add conversation history
@@ -2645,11 +2656,10 @@ Based on the task name and context, classify the task and suggest an appropriate
       // Add user's current message if provided
       if (userMessage) {
         messages.push({ role: "user", content: userMessage });
+      } else if (conversationHistory.length === 0) {
+        // Starting a new conversation - add initial user message
+        messages.push({ role: "user", content: `I want to create a task called "${taskName}". Help me set it up.` });
       }
-
-      // Add context about what we need next
-      const stepContext = `Current step: ${currentStep}. Already extracted: ${JSON.stringify(extractedData)}. ${userMessage ? `User responded: "${userMessage}"` : "Start by asking the first question about priority."} Continue the conversation and extract relevant data. Return valid JSON only.`;
-      messages.push({ role: "user", content: stepContext });
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -2672,6 +2682,20 @@ Based on the task name and context, classify the task and suggest an appropriate
           ...extractedData,
           ...parsed.extractedData,
         };
+
+        // Sanitize tiers: remove any tier that represents base task completion
+        // Tiers should only give bonus points for EXTRA effort beyond the base task
+        if (mergedExtractedData.tiers && Array.isArray(mergedExtractedData.tiers)) {
+          // Filter out tiers with 0 or negative bonus points (base task completion)
+          mergedExtractedData.tiers = mergedExtractedData.tiers.filter(
+            (tier: { name: string; bonusPoints: number }) => tier.bonusPoints > 0
+          );
+          // If no valid tiers remain, set hasTiers to false
+          if (mergedExtractedData.tiers.length === 0) {
+            mergedExtractedData.hasTiers = false;
+            mergedExtractedData.tiers = null;
+          }
+        }
 
         // Ensure we have proper defaults
         const validatedResponse = {

@@ -134,7 +134,7 @@ export default function TaskForm({
   const [assistTaskName, setAssistTaskName] = useState("");
   const [assistStarted, setAssistStarted] = useState(false);
   const [assistMessages, setAssistMessages] = useState<AITaskAssistMessage[]>([]);
-  const [assistStep, setAssistStep] = useState("priority");
+  const [assistStep, setAssistStep] = useState("taskName");
   const [assistExtractedData, setAssistExtractedData] = useState<AITaskAssistExtractedData>({});
   const [assistOptions, setAssistOptions] = useState<string[] | null>(null);
   const [assistComplete, setAssistComplete] = useState(false);
@@ -182,7 +182,7 @@ export default function TaskForm({
     if (!assistTaskName.trim()) return;
     setAssistStarted(true);
     setAssistMessages([]);
-    setAssistStep("priority");
+    setAssistStep("taskName");
     setAssistExtractedData({});
     setAssistOptions(null);
     setAssistComplete(false);
@@ -206,7 +206,7 @@ export default function TaskForm({
     setAssistTaskName("");
     setAssistStarted(false);
     setAssistMessages([]);
-    setAssistStep("priority");
+    setAssistStep("taskName");
     setAssistExtractedData({});
     setAssistOptions(null);
     setAssistComplete(false);
@@ -216,7 +216,8 @@ export default function TaskForm({
 
   const applyAssistDataToForm = () => {
     // Apply extracted data to the form with defensive defaults
-    form.setValue("name", assistTaskName);
+    const finalName = assistExtractedData.suggestedTaskName || assistTaskName;
+    form.setValue("name", finalName);
     form.setValue("priority", assistExtractedData.priority || "shouldDo");
     form.setValue("category", assistExtractedData.category || categories[0] || "General");
     form.setValue("value", assistExtractedData.suggestedPoints || 5);
@@ -255,12 +256,13 @@ export default function TaskForm({
 
   const saveAssistTask = () => {
     // Defensive defaults for all extracted data
+    const finalName = assistExtractedData.suggestedTaskName || assistTaskName;
     const finalCategory = assistExtractedData.category || categories[0] || "General";
     const finalPriority = assistExtractedData.priority || "shouldDo";
     const finalPoints = assistExtractedData.suggestedPoints || 5;
 
     const taskData: TaskWithRules = {
-      name: assistTaskName,
+      name: finalName,
       value: finalPoints,
       category: finalCategory,
       priority: finalPriority,
@@ -469,7 +471,14 @@ export default function TaskForm({
                   
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">{assistTaskName}</CardTitle>
+                      <CardTitle className="text-base">
+                        {assistExtractedData.suggestedTaskName || assistTaskName}
+                      </CardTitle>
+                      {assistExtractedData.suggestedTaskName && assistExtractedData.suggestedTaskName !== assistTaskName && (
+                        <p className="text-xs text-muted-foreground">
+                          Originally: "{assistTaskName}"
+                        </p>
+                      )}
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="grid grid-cols-2 gap-3 text-sm">
@@ -567,7 +576,10 @@ export default function TaskForm({
                     {/* Task name header */}
                     <div className="text-center pb-2 border-b">
                       <p className="text-sm text-muted-foreground">Creating task:</p>
-                      <p className="font-medium">{assistTaskName}</p>
+                      <p className="font-medium">{assistExtractedData.suggestedTaskName || assistTaskName}</p>
+                      {assistExtractedData.suggestedTaskName && assistExtractedData.suggestedTaskName !== assistTaskName && (
+                        <p className="text-xs text-muted-foreground">Originally: "{assistTaskName}"</p>
+                      )}
                     </div>
 
                     {/* Messages */}
