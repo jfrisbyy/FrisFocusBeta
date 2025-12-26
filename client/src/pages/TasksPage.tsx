@@ -1614,8 +1614,8 @@ export default function TasksPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <CalendarDays className="h-3 w-3" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                <CalendarDays className="h-4 w-4" />
                 Weekly
               </div>
               {editingWeeklyGoal ? (
@@ -1624,7 +1624,7 @@ export default function TasksPage() {
                     type="number"
                     value={weeklyGoalInput}
                     onChange={(e) => setWeeklyGoalInput(e.target.value)}
-                    className="w-20 font-mono h-8"
+                    className="w-24 font-mono"
                     min={1}
                     autoFocus
                     data-testid="input-weekly-goal"
@@ -1638,17 +1638,17 @@ export default function TasksPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-mono font-bold">{weeklyGoal}</span>
-                  <span className="text-xs text-muted-foreground">pts/week</span>
+                  <span className="text-3xl font-mono font-bold">{weeklyGoal}</span>
+                  <span className="text-sm text-muted-foreground">pts/week</span>
                   <Button size="icon" variant="ghost" onClick={handleEditWeeklyGoal} data-testid="button-edit-weekly-goal">
-                    <Pencil className="h-3 w-3" />
+                    <Pencil className="h-4 w-4" />
                   </Button>
                 </div>
               )}
             </div>
             <div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                <Target className="h-3 w-3" />
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                <Target className="h-4 w-4" />
                 Daily
               </div>
               {editingGoal ? (
@@ -1657,7 +1657,7 @@ export default function TasksPage() {
                     type="number"
                     value={goalInput}
                     onChange={(e) => setGoalInput(e.target.value)}
-                    className="w-20 font-mono h-8"
+                    className="w-24 font-mono"
                     min={1}
                     autoFocus
                     data-testid="input-daily-goal"
@@ -1671,10 +1671,10 @@ export default function TasksPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-xl font-mono font-bold">{dailyGoal}</span>
-                  <span className="text-xs text-muted-foreground">pts/day</span>
+                  <span className="text-3xl font-mono font-bold">{dailyGoal}</span>
+                  <span className="text-sm text-muted-foreground">pts/day</span>
                   <Button size="icon" variant="ghost" onClick={handleEditGoal} data-testid="button-edit-daily-goal">
-                    <Pencil className="h-3 w-3" />
+                    <Pencil className="h-4 w-4" />
                   </Button>
                 </div>
               )}

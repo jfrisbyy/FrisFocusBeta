@@ -129,10 +129,6 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
                 By Category
               </button>
             </div>
-            <Button size="sm" onClick={() => setFormOpen(true)} data-testid="button-add-task">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Task
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
