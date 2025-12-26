@@ -164,15 +164,19 @@ export default function TaskForm({
       setAssistMessages(prev => [...prev, { role: "assistant", content: data.message }]);
       setAssistStep(data.nextStep);
       
-      // Sanitize extractedData - ensure penaltyPoints is always positive
-      const sanitizedData = { ...data.extractedData };
-      if (sanitizedData.penaltyRule?.penaltyPoints) {
-        sanitizedData.penaltyRule = {
-          ...sanitizedData.penaltyRule,
-          penaltyPoints: Math.abs(sanitizedData.penaltyRule.penaltyPoints),
-        };
-      }
-      setAssistExtractedData(sanitizedData);
+      // Merge new extractedData with previous, preserving all collected data
+      // This prevents losing tier/booster/penalty data from earlier steps
+      setAssistExtractedData(prev => {
+        const merged = { ...prev, ...data.extractedData };
+        // Sanitize penaltyPoints to be positive
+        if (merged.penaltyRule?.penaltyPoints) {
+          merged.penaltyRule = {
+            ...merged.penaltyRule,
+            penaltyPoints: Math.abs(merged.penaltyRule.penaltyPoints),
+          };
+        }
+        return merged;
+      });
       
       setAssistOptions(data.options || null);
       setAssistComplete(data.isComplete);
