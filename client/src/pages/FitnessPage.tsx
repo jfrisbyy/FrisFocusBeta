@@ -5648,14 +5648,14 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                           <span className="text-green-600 font-medium">Dietary Deficit:</span>{' '}
                           Eating {finalDailyCalories.toLocaleString()} cal/day vs {sedentaryTDEE.toLocaleString()} creates a{' '}
                           {Math.round((sedentaryTDEE - finalDailyCalories)).toLocaleString()} cal/day deficit{' '}
-                          (<span className="font-medium">{foodDeficitWeekly.toLocaleString()} cal/week</span>).
+                          (<span className="font-medium">{Math.round((sedentaryTDEE - finalDailyCalories) * 7).toLocaleString()} cal/week</span>).
                         </p>
                       ) : (
                         <p>
                           <span className="text-red-500 font-medium">Dietary Surplus:</span>{' '}
                           Eating {finalDailyCalories.toLocaleString()} cal/day vs {sedentaryTDEE.toLocaleString()} creates a{' '}
                           {Math.abs(Math.round((sedentaryTDEE - finalDailyCalories))).toLocaleString()} cal/day surplus{' '}
-                          (<span className="font-medium">+{Math.abs(foodDeficitWeekly).toLocaleString()} cal/week</span>).
+                          (<span className="font-medium">+{Math.abs(Math.round((sedentaryTDEE - finalDailyCalories) * 7)).toLocaleString()} cal/week</span>).
                         </p>
                       )}
                       <p>
