@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, X, Layers, ChevronRight } from "lucide-react";
+import { Plus, X, Layers, ChevronRight, Sparkles, Loader2 } from "lucide-react";
 import BoosterRuleConfig, { defaultBoosterRule } from "./BoosterRuleConfig";
 import PenaltyRuleConfig, { defaultPenaltyRule } from "./PenaltyRuleConfig";
 import type { BoosterRule } from "./BoosterRuleConfig";
@@ -40,6 +41,8 @@ import type { TaskPriority, PenaltyRule } from "@shared/schema";
 import type { StoredTaskTier, StoredTaskTierBoosterRule } from "@/lib/storage";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Zap } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const taskFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -57,6 +60,12 @@ export interface TaskWithRules extends TaskFormValues {
   tiers?: StoredTaskTier[];
 }
 
+interface ExistingTaskForAI {
+  name: string;
+  value: number;
+  priority: string;
+}
+
 interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,6 +73,10 @@ interface TaskFormProps {
   defaultValues?: Partial<TaskWithRules>;
   title?: string;
   categories?: string[];
+  enableAIPoints?: boolean;
+  dailyGoal?: number;
+  existingTasks?: ExistingTaskForAI[];
+  seasonContext?: string;
 }
 
 const defaultCategories = ["Health", "Productivity", "Spiritual", "Social", "Finance"];
@@ -93,6 +106,10 @@ export default function TaskForm({
   defaultValues,
   title = "Add Task",
   categories = defaultCategories,
+  enableAIPoints = false,
+  dailyGoal = 50,
+  existingTasks = [],
+  seasonContext,
 }: TaskFormProps) {
   const [boosterRule, setBoosterRule] = useState<BoosterRule>(
     defaultValues?.boosterRule || defaultBoosterRule
@@ -106,6 +123,27 @@ export default function TaskForm({
   const [tiers, setTiers] = useState<StoredTaskTier[]>(
     defaultValues?.tiers || []
   );
+  const [aiReasoning, setAiReasoning] = useState<string | null>(null);
+
+  const aiPointsMutation = useMutation({
+    mutationFn: async (data: { taskName: string; category?: string; priority?: string }) => {
+      const res = await apiRequest("POST", "/api/ai/assign-points", {
+        taskName: data.taskName,
+        category: data.category,
+        priority: data.priority,
+        dailyGoal,
+        existingTasks: existingTasks.length > 0 ? existingTasks : undefined,
+        seasonContext,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.suggestedPoints) {
+        form.setValue("value", data.suggestedPoints);
+        setAiReasoning(data.reasoning || null);
+      }
+    },
+  });
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -134,6 +172,7 @@ export default function TaskForm({
       setPenaltyRule(defaultValues?.penaltyRule || defaultPenaltyRule);
       setTiersEnabled((defaultValues?.tiers && defaultValues.tiers.length > 0) || false);
       setTiers(defaultValues?.tiers || []);
+      setAiReasoning(null);
     }
   }, [open, defaultValues, form]);
 
@@ -183,6 +222,7 @@ export default function TaskForm({
     setPenaltyRule(defaultPenaltyRule);
     setTiersEnabled(false);
     setTiers([]);
+    setAiReasoning(null);
     onOpenChange(false);
   };
 
@@ -213,7 +253,43 @@ export default function TaskForm({
                 name="value"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Point Value</FormLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>Point Value</FormLabel>
+                      {enableAIPoints && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                              disabled={!taskName.trim() || aiPointsMutation.isPending}
+                              onClick={() => {
+                                const currentCategory = form.getValues("category");
+                                const currentPriority = form.getValues("priority");
+                                setAiReasoning(null);
+                                aiPointsMutation.mutate({
+                                  taskName: taskName.trim(),
+                                  category: currentCategory || undefined,
+                                  priority: currentPriority,
+                                });
+                              }}
+                              data-testid="button-ai-assign-points"
+                            >
+                              {aiPointsMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Sparkles className="h-4 w-4" />
+                              )}
+                              AI Suggest
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>Let AI suggest an appropriate point value based on task type and difficulty</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                     <FormControl>
                       <Input
                         type="number"
@@ -222,6 +298,11 @@ export default function TaskForm({
                         data-testid="input-task-value"
                       />
                     </FormControl>
+                    {aiReasoning && (
+                      <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1 mt-1">
+                        {aiReasoning}
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

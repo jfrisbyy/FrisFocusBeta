@@ -8,7 +8,8 @@ import {
   getConversationFlowPrompt,
   getTaskFinalizationPrompt,
   BADGE_GENERATION_PROMPT,
-  getSimpleTaskGenerationPrompt
+  getSimpleTaskGenerationPrompt,
+  getAIPointAssignmentPrompt
 } from "./aiSystemPrompt";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -2519,6 +2520,83 @@ Create motivating badges that will encourage consistency. Return valid JSON only
     } catch (error) {
       console.error("AI badge generation error:", error);
       res.status(500).json({ error: "Failed to generate badges" });
+    }
+  });
+
+  // AI point assignment endpoint - assigns appropriate point values to individual tasks
+  app.post("/api/ai/assign-points", isAuthenticated, async (req: any, res) => {
+    try {
+      const { aiPointAssignmentRequestSchema, aiPointAssignmentResponseSchema } = await import("@shared/schema");
+      
+      const parseResult = aiPointAssignmentRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid request", details: parseResult.error.issues });
+      }
+      
+      const { taskName, category, priority, dailyGoal, existingTasks, seasonContext } = parseResult.data;
+      
+      // Build context about existing tasks
+      let existingTasksContext = "";
+      if (existingTasks && existingTasks.length > 0) {
+        const avgPoints = Math.round(existingTasks.reduce((sum, t) => sum + t.value, 0) / existingTasks.length);
+        const taskSummary = existingTasks.slice(0, 10).map(t => `${t.name}: ${t.value} pts (${t.priority})`).join(", ");
+        existingTasksContext = `
+Existing tasks (${existingTasks.length} total, avg ${avgPoints} pts): ${taskSummary}${existingTasks.length > 10 ? "..." : ""}`;
+      }
+      
+      const systemPrompt = getAIPointAssignmentPrompt();
+
+      const userPrompt = `Assign a point value to this task:
+
+Task Name: "${taskName}"
+${category ? `Category: ${category}` : ""}
+${priority ? `Priority: ${priority}` : ""}
+Daily Goal: ${dailyGoal} points
+${seasonContext ? `Season Context: ${seasonContext}` : ""}
+${existingTasksContext}
+
+Based on the task name and context, classify the task and suggest an appropriate point value that fits within the user's daily goal economy. Return valid JSON only.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        max_tokens: 300,
+        response_format: { type: "json_object" },
+      });
+
+      const rawContent = response.choices[0]?.message?.content;
+      if (!rawContent) {
+        return res.status(500).json({ error: "AI did not return a response" });
+      }
+
+      let aiResponse: any;
+      try {
+        const parsed = JSON.parse(rawContent);
+        const validated = aiPointAssignmentResponseSchema.safeParse(parsed);
+        if (!validated.success) {
+          console.error("AI point assignment validation failed:", validated.error.issues);
+          // Try to extract at least a suggested point value
+          if (parsed.suggestedPoints && typeof parsed.suggestedPoints === "number") {
+            return res.json({
+              suggestedPoints: Math.round(parsed.suggestedPoints),
+              reasoning: parsed.reasoning || "AI suggested this value based on task analysis.",
+              classification: parsed.classification || { importance: "supportive", effort: "medium", frequencyImpact: "daily" }
+            });
+          }
+          return res.status(500).json({ error: "AI response format was invalid" });
+        }
+        aiResponse = validated.data;
+      } catch {
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      res.json(aiResponse);
+    } catch (error) {
+      console.error("AI point assignment error:", error);
+      res.status(500).json({ error: "Failed to assign points" });
     }
   });
 

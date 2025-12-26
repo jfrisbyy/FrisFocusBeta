@@ -1737,6 +1737,9 @@ export default function TasksPage() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         categories={categoryNames}
+        enableAIPoints={!!activeSeason && !isActiveSeasonArchived}
+        dailyGoal={dailyGoal}
+        seasonContext={activeSeason?.name}
       />
 
       <div className="space-y-4">

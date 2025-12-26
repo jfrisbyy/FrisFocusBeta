@@ -2050,6 +2050,35 @@ export const aiGenerateTasksResponseSchema = z.object({
 });
 export type AIGenerateTasksResponse = z.infer<typeof aiGenerateTasksResponseSchema>;
 
+// ==================== AI POINT ASSIGNMENT ====================
+
+// Request schema for AI point assignment
+export const aiPointAssignmentRequestSchema = z.object({
+  taskName: z.string().min(1),
+  category: z.string().optional(),
+  priority: taskPriorityEnum.optional(),
+  dailyGoal: z.number().int().min(1).default(50),
+  existingTasks: z.array(z.object({
+    name: z.string(),
+    value: z.number().int(),
+    priority: z.string(),
+  })).optional(),
+  seasonContext: z.string().optional(),
+});
+export type AIPointAssignmentRequest = z.infer<typeof aiPointAssignmentRequestSchema>;
+
+// Response schema for AI point assignment
+export const aiPointAssignmentResponseSchema = z.object({
+  suggestedPoints: z.number().int().min(1).max(50),
+  reasoning: z.string(),
+  classification: z.object({
+    importance: z.enum(["critical", "supportive", "maintenance", "optional"]),
+    effort: z.enum(["high", "medium", "low"]),
+    frequencyImpact: z.enum(["daily", "weekly", "occasional"]),
+  }),
+});
+export type AIPointAssignmentResponse = z.infer<typeof aiPointAssignmentResponseSchema>;
+
 // ==================== AI BADGE GENERATION ====================
 
 // AI-generated badge level schema

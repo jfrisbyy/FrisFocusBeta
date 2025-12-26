@@ -1,0 +1,186 @@
+Core Goal
+
+AI assigns points so that completing a reasonable set of meaningful tasks naturally lands you near your daily Focus Goal (e.g., 50), without inflation or punishment.
+
+Not:
+
+“Big tasks always = big points”
+
+“Everything is 5 points”
+
+Or dopamine farming
+
+But:
+
+Points reflect relative importance + effort + frequency
+
+The system self-balances based on the user’s day
+
+Step 1: Establish Hard Constraints (Non-Negotiable)
+
+These are rules the AI must obey.
+
+1️⃣ Daily Focus Point Target (DFPT)
+
+Example:
+
+User’s daily goal = 50 Focus Points
+
+This is the budget.
+
+2️⃣ Expected Completion Band
+
+People don’t complete 100% of tasks.
+
+So we assume:
+
+60–75% completion on a good day
+
+That means:
+
+Total points created should usually land around 65–80 points
+
+Completing most of them → ~50 earned
+
+📌 This is key: points are assigned with expected incompletion baked in
+
+Step 2: Task Classification (AI-Assisted)
+
+When a task is created, the AI classifies it along four axes (0–1 scale internally):
+
+A. Importance (Impact)
+
+How much this task moves the user’s life forward
+
+Critical (health, income, deadlines)
+
+Supportive
+
+Maintenance
+
+Optional
+
+B. Effort / Friction
+
+Mental + physical cost
+
+Low friction (send email)
+
+Medium (gym session)
+
+High (deep work, long workout, studying)
+
+C. Frequency
+
+How often this task appears
+
+Daily
+
+Weekly
+
+Occasional
+
+One-off
+
+📌 High-frequency tasks get fewer points per instance
+(so habits don’t drown the system)
+
+D. User Priority Bias
+
+From:
+
+Seasons
+
+Declared goals
+
+Past behavior
+
+Example:
+
+User says “Fitness is important”
+
+But only completes workouts 3×/week
+→ AI weights fitness moderately, not blindly
+
+Step 3: Point Allocation Logic (Simple but Powerful)
+Base Rule
+
+No single task should be able to “win the day” alone.
+
+Hard caps:
+
+Max task value: 20–25% of daily goal
+→ If daily goal = 50 → max task = 10–12 points
+
+Practical Point Bands
+Task Type	Typical Points
+Tiny admin	1–2
+Normal task	3–4
+Important habit (workout)	5–7
+High-impact deep work	7–10
+Rare, heavy task	10–12
+Step 4: Example (Your Scenario)
+
+Daily Goal: 50
+Tasks Created: 20
+
+AI logic:
+
+Expected completion ≈ 65% → ~13 tasks
+
+13 tasks × avg 4 points ≈ 52 points → perfect
+
+Example Breakdown
+Task	Reasoning	Points
+Workout	High importance, medium effort, frequent	6
+Deep work block	High importance, high effort	8
+Meal prep	Health support, medium effort	4
+Clean room	Maintenance	3
+Respond to emails	Low effort	2
+Stretching	Habit, low friction	2
+Read	Supportive	3
+Optional task	Low priority	1–2
+
+Nothing feels inflated.
+Nothing feels pointless.
+Completing the right tasks wins the day.
+
+Step 5: AI Adjustment Pass (This Is the Magic)
+
+After task creation, AI runs a normalization pass:
+
+“If the user completed the most important tasks today, would they land near their daily goal?”
+
+If:
+
+Too easy → scale down low-importance tasks
+
+Too hard → gently scale up core tasks
+
+This keeps:
+
+Point economy stable
+
+No manual tuning
+
+No min-maxing
+
+Step 6: How You Phrase This to Users (Important)
+
+You do NOT say:
+
+“AI calculates your points”
+
+You say:
+
+“FrisFocus helps balance your day so the things that matter most naturally carry more weight.”
+
+That feels:
+
+Intentional
+
+Calm
+
+Coach-like
+
+Not creepy

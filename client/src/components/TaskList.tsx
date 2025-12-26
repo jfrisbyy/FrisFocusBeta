@@ -37,12 +37,21 @@ interface Task {
   penaltyRule?: PenaltyRule;
 }
 
+interface ExistingTaskForAI {
+  name: string;
+  value: number;
+  priority: string;
+}
+
 interface TaskListProps {
   tasks: Task[];
   onAdd: (task: Omit<Task, "id">) => void;
   onEdit: (id: string, task: Omit<Task, "id">) => void;
   onDelete: (id: string) => void;
   categories?: string[];
+  enableAIPoints?: boolean;
+  dailyGoal?: number;
+  seasonContext?: string;
 }
 
 const priorityConfig: Record<TaskPriority, { label: string; variant: "default" | "secondary" | "outline"; icon: typeof AlertTriangle }> = {
@@ -53,7 +62,7 @@ const priorityConfig: Record<TaskPriority, { label: string; variant: "default" |
 
 const priorityOrder: TaskPriority[] = ["mustDo", "shouldDo", "couldDo"];
 
-export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: propCategories }: TaskListProps) {
+export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: propCategories, enableAIPoints, dailyGoal, seasonContext }: TaskListProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -403,6 +412,10 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
         onSubmit={onAdd as (values: TaskWithBooster) => void}
         title="Add Task"
         categories={categories.length > 0 ? categories : undefined}
+        enableAIPoints={enableAIPoints}
+        dailyGoal={dailyGoal}
+        existingTasks={tasks.map(t => ({ name: t.name, value: t.value, priority: t.priority }))}
+        seasonContext={seasonContext}
       />
 
       <TaskForm
@@ -412,6 +425,10 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
         defaultValues={editingTask || undefined}
         title="Edit Task"
         categories={categories.length > 0 ? categories : undefined}
+        enableAIPoints={enableAIPoints}
+        dailyGoal={dailyGoal}
+        existingTasks={tasks.map(t => ({ name: t.name, value: t.value, priority: t.priority }))}
+        seasonContext={seasonContext}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
