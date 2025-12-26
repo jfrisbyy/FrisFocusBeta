@@ -4617,10 +4617,6 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
                           <span>NEAT bonus:</span>
                           <span>{finalEstimate.breakdown.neatBonus} cal</span>
                         </div>
-                        <div className="flex justify-between gap-2">
-                          <span>Protein TEF:</span>
-                          <span>{finalEstimate.breakdown.proteinTEF} cal</span>
-                        </div>
                         <p className="pt-2 text-xs">{finalEstimate.breakdown.explanation}</p>
                       </div>
                     )}
@@ -5628,7 +5624,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                     <div className="p-2 bg-background rounded-md border">
                       <div className="text-xs text-muted-foreground">Protein Target</div>
                       <div className="text-xl font-bold">{proteinTarget}g</div>
-                      <div className="text-xs text-green-500">~{proteinTEF} cal TEF/day</div>
+                      <div className="text-xs text-muted-foreground">0.9g per lb</div>
                     </div>
                   </div>
                   
