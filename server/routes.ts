@@ -2707,8 +2707,17 @@ CURRENT CONVERSATION STATE:
         };
 
         aiResponse = validatedResponse;
-      } catch {
-        return res.status(500).json({ error: "Failed to parse AI response" });
+      } catch (parseError) {
+        console.error("AI task assist parse error:", parseError);
+        console.error("Raw AI response:", rawContent);
+        // Return a graceful fallback response instead of error
+        return res.json({
+          message: "I'm having trouble processing that. Could you rephrase or try again?",
+          options: null,
+          extractedData: extractedData, // Keep previous extracted data
+          nextStep: currentStep, // Stay on current step
+          isComplete: false,
+        });
       }
 
       res.json(aiResponse);
