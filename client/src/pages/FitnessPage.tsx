@@ -5643,12 +5643,21 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                         <span className="font-medium">Your BMR is {bmr.toLocaleString()} cal/day.</span>{' '}
                         Sedentary TDEE = {bmr.toLocaleString()} × 1.2 = <span className="font-medium">{sedentaryTDEE.toLocaleString()} cal/day</span>.
                       </p>
-                      <p>
-                        <span className="text-green-600 font-medium">Dietary Deficit:</span>{' '}
-                        Eating {finalDailyCalories.toLocaleString()} cal/day vs {sedentaryTDEE.toLocaleString()} creates a{' '}
-                        {Math.round((sedentaryTDEE - finalDailyCalories)).toLocaleString()} cal/day deficit{' '}
-                        (<span className="font-medium">{Math.max(0, foodDeficitWeekly).toLocaleString()} cal/week</span>).
-                      </p>
+                      {sedentaryTDEE >= finalDailyCalories ? (
+                        <p>
+                          <span className="text-green-600 font-medium">Dietary Deficit:</span>{' '}
+                          Eating {finalDailyCalories.toLocaleString()} cal/day vs {sedentaryTDEE.toLocaleString()} creates a{' '}
+                          {Math.round((sedentaryTDEE - finalDailyCalories)).toLocaleString()} cal/day deficit{' '}
+                          (<span className="font-medium">{foodDeficitWeekly.toLocaleString()} cal/week</span>).
+                        </p>
+                      ) : (
+                        <p>
+                          <span className="text-red-500 font-medium">Dietary Surplus:</span>{' '}
+                          Eating {finalDailyCalories.toLocaleString()} cal/day vs {sedentaryTDEE.toLocaleString()} creates a{' '}
+                          {Math.abs(Math.round((sedentaryTDEE - finalDailyCalories))).toLocaleString()} cal/day surplus{' '}
+                          (<span className="font-medium">+{Math.abs(foodDeficitWeekly).toLocaleString()} cal/week</span>).
+                        </p>
+                      )}
                       <p>
                         <span className="text-blue-500 font-medium">Steps:</span>{' '}
                         {finalSteps.toLocaleString()} steps × 0.04 cal × 7 days ={' '}
@@ -5662,17 +5671,34 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                           (Assumes 45-60 min compound lifts like squats, deadlifts, bench, rows with moderate-heavy weight and 60-90s rest)
                         </span>
                       </p>
-                      <p className="pt-1 border-t">
-                        <span className="font-bold">Total:</span>{' '}
-                        {Math.max(0, foodDeficitWeekly).toLocaleString()} + {stepsBurnWeekly.toLocaleString()} + {strengthBurnWeekly.toLocaleString()} ={' '}
-                        <span className="font-bold text-primary">{(Math.max(0, foodDeficitWeekly) + activityBurnWeekly).toLocaleString()} cal/week deficit</span>,{' '}
-                        achieving <span className="text-green-600 font-medium">~{((Math.max(0, foodDeficitWeekly) + activityBurnWeekly) / 3500).toFixed(1)} lbs/week</span> loss.
-                      </p>
-                      {requiredWeeklyDeficit !== (Math.max(0, foodDeficitWeekly) + activityBurnWeekly) && (
-                        <p className="text-xs text-muted-foreground">
-                          (Target was {requiredWeeklyDeficit.toLocaleString()} cal/week based on {requiredDailyDeficit.toLocaleString()} cal/day × 7)
-                        </p>
-                      )}
+                      {(() => {
+                        const netWeeklyDeficit = foodDeficitWeekly + activityBurnWeekly;
+                        const isNetDeficit = netWeeklyDeficit > 0;
+                        const dietaryDisplay = foodDeficitWeekly >= 0 
+                          ? foodDeficitWeekly.toLocaleString()
+                          : `(${Math.abs(foodDeficitWeekly).toLocaleString()})`;
+                        return (
+                          <>
+                            <p className="pt-1 border-t">
+                              <span className="font-bold">Total:</span>{' '}
+                              {dietaryDisplay} {foodDeficitWeekly < 0 ? '-' : '+'} {stepsBurnWeekly.toLocaleString()} + {strengthBurnWeekly.toLocaleString()} ={' '}
+                              {isNetDeficit ? (
+                                <>
+                                  <span className="font-bold text-primary">{netWeeklyDeficit.toLocaleString()} cal/week deficit</span>,{' '}
+                                  achieving <span className="text-green-600 font-medium">~{(netWeeklyDeficit / 3500).toFixed(1)} lbs/week</span> loss.
+                                </>
+                              ) : (
+                                <span className="font-bold text-red-500">{Math.abs(netWeeklyDeficit).toLocaleString()} cal/week surplus</span>
+                              )}
+                            </p>
+                            {isNetDeficit && requiredWeeklyDeficit !== netWeeklyDeficit && (
+                              <p className="text-xs text-muted-foreground">
+                                (Target was {requiredWeeklyDeficit.toLocaleString()} cal/week based on {requiredDailyDeficit.toLocaleString()} cal/day × 7)
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                   
@@ -5865,18 +5891,28 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                 )}
                 
                 {/* Deficit Components */}
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-green-600">Dietary Deficit</span>
-                    <span className="font-medium">
-                      {(computedPlan.dietaryDeficit || aiRecommendation.dietaryDeficit || 
-                        ((computedPlan.sedentaryTDEE || aiRecommendation.maintenanceCalories || 0) - computedPlan.dailyCalories) * 7
-                      ).toLocaleString()} cal/week
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground pl-2">
-                    ({(computedPlan.sedentaryTDEE || aiRecommendation.maintenanceCalories || 0).toLocaleString()} - {computedPlan.dailyCalories.toLocaleString()}) × 7 days
-                  </div>
+                {(() => {
+                  const sedentaryTDEE = computedPlan.sedentaryTDEE || aiRecommendation.maintenanceCalories || 0;
+                  const dietaryDeficitValue = computedPlan.dietaryDeficit ?? aiRecommendation.dietaryDeficit ?? 
+                    ((sedentaryTDEE - computedPlan.dailyCalories) * 7);
+                  const isDietaryDeficit = dietaryDeficitValue >= 0;
+                  
+                  return (
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className={isDietaryDeficit ? "text-green-600" : "text-red-500"}>
+                          {isDietaryDeficit ? "Dietary Deficit" : "Dietary Surplus"}
+                        </span>
+                        <span className="font-medium">
+                          {isDietaryDeficit 
+                            ? `${dietaryDeficitValue.toLocaleString()} cal/week`
+                            : `+${Math.abs(dietaryDeficitValue).toLocaleString()} cal/week`
+                          }
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground pl-2">
+                        ({sedentaryTDEE.toLocaleString()} - {computedPlan.dailyCalories.toLocaleString()}) × 7 days
+                      </div>
                   
                   <div className="flex justify-between items-center">
                     <span className="text-blue-500">Steps</span>
@@ -5915,7 +5951,9 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
                       Target: {(computedPlan.requiredWeeklyDeficit || aiRecommendation.requiredWeeklyDeficit)?.toLocaleString()} cal/week needed for goal
                     </div>
                   )}
-                </div>
+                    </div>
+                  );
+                })()}
               </div>
               
               {aiRecommendation.explanation && (
