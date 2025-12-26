@@ -52,6 +52,7 @@ interface TaskListProps {
   enableAIPoints?: boolean;
   dailyGoal?: number;
   seasonContext?: string;
+  onCategoryCreate?: (categoryName: string) => void;
 }
 
 const priorityConfig: Record<TaskPriority, { label: string; variant: "default" | "secondary" | "outline"; icon: typeof AlertTriangle }> = {
@@ -62,7 +63,7 @@ const priorityConfig: Record<TaskPriority, { label: string; variant: "default" |
 
 const priorityOrder: TaskPriority[] = ["mustDo", "shouldDo", "couldDo"];
 
-export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: propCategories, enableAIPoints, dailyGoal, seasonContext }: TaskListProps) {
+export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: propCategories, enableAIPoints, dailyGoal, seasonContext, onCategoryCreate }: TaskListProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -416,6 +417,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
         dailyGoal={dailyGoal}
         existingTasks={tasks.map(t => ({ name: t.name, value: t.value, priority: t.priority }))}
         seasonContext={seasonContext}
+        onCategoryCreate={onCategoryCreate}
       />
 
       <TaskForm
@@ -429,6 +431,7 @@ export default function TaskList({ tasks, onAdd, onEdit, onDelete, categories: p
         dailyGoal={dailyGoal}
         existingTasks={tasks.map(t => ({ name: t.name, value: t.value, priority: t.priority }))}
         seasonContext={seasonContext}
+        onCategoryCreate={onCategoryCreate}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

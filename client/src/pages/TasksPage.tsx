@@ -1180,6 +1180,36 @@ export default function TasksPage() {
     triggerAction("taskCreated");
   };
 
+  const handleCategoryCreate = (categoryName: string) => {
+    if (isActiveSeasonArchived) return;
+    
+    // Check if category already exists
+    if (categories.some(c => c.name.toLowerCase() === categoryName.toLowerCase())) {
+      return; // Category already exists
+    }
+    
+    if (activeSeason) {
+      hasUserModifiedDataRef.current = true;
+      const newCategory: Category = {
+        id: `c${Date.now()}`,
+        name: categoryName,
+      };
+      setCategories([...categories, newCategory]);
+    } else if (!useMockData) {
+      createCategoryMutation.mutate({ name: categoryName });
+    } else {
+      const newCategory: Category = {
+        id: `c${Date.now()}`,
+        name: categoryName,
+      };
+      setCategories([...categories, newCategory]);
+    }
+    toast({
+      title: "Category added",
+      description: `"${categoryName}" has been created`,
+    });
+  };
+
   const handleEdit = (id: string, task: Omit<Task, "id">) => {
     if (isActiveSeasonArchived) return;
     
@@ -1740,6 +1770,7 @@ export default function TasksPage() {
         enableAIPoints={!!activeSeason && !isActiveSeasonArchived}
         dailyGoal={dailyGoal}
         seasonContext={activeSeason?.name}
+        onCategoryCreate={handleCategoryCreate}
       />
 
       <div className="space-y-4">

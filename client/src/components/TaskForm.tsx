@@ -79,6 +79,7 @@ interface TaskFormProps {
   dailyGoal?: number;
   existingTasks?: ExistingTaskForAI[];
   seasonContext?: string;
+  onCategoryCreate?: (categoryName: string) => void;
 }
 
 const defaultCategories = ["Health", "Productivity", "Spiritual", "Social", "Finance"];
@@ -114,6 +115,7 @@ export default function TaskForm({
   dailyGoal = 50,
   existingTasks = [],
   seasonContext,
+  onCategoryCreate,
 }: TaskFormProps) {
   const [boosterRule, setBoosterRule] = useState<BoosterRule>(
     defaultValues?.boosterRule || defaultBoosterRule
@@ -260,6 +262,14 @@ export default function TaskForm({
     const finalCategory = assistExtractedData.category || categories[0] || "General";
     const finalPriority = assistExtractedData.priority || "shouldDo";
     const finalPoints = assistExtractedData.suggestedPoints || 5;
+
+    // Create new category if needed - verify it doesn't already exist
+    const categoryExists = categories.some(
+      c => c.toLowerCase() === finalCategory.toLowerCase()
+    );
+    if (assistExtractedData.isNewCategory && finalCategory && onCategoryCreate && !categoryExists) {
+      onCategoryCreate(finalCategory);
+    }
 
     const taskData: TaskWithRules = {
       name: finalName,
