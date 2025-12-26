@@ -5114,7 +5114,7 @@ function GoalDialog({ open, onOpenChange, isDemo, nutritionSettings, onSave }: {
       strategyBias,
       stepGoal: computedPlan?.steps || undefined,
       proteinTarget: computedPlan?.proteinTarget || undefined,
-      strengthSessionsPerWeek: strategyBias === 'activity' ? 5 : strategyBias === 'balanced' ? 4 : 3,
+      strengthSessionsPerWeek: computedPlan?.strengthSessions ?? (strategyBias === 'activity' ? 5 : strategyBias === 'balanced' ? 4 : 3),
     });
   };
 
