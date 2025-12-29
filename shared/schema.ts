@@ -1934,6 +1934,7 @@ export type FpActivityDisplay = z.infer<typeof fpActivityDisplaySchema>;
 export const dashboardCardKeys = [
   "weekTotal",
   "weeklyTable",
+  "insightEngine",
   "streaks", 
   "badges",
   "alerts",
@@ -1945,7 +1946,6 @@ export const dashboardCardKeys = [
   "circlesOverview",
   "journal",
   "feed",
-  "insightEngine",
 ] as const;
 export type DashboardCardKey = typeof dashboardCardKeys[number];
 

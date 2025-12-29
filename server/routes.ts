@@ -10036,13 +10036,8 @@ PERIOD DATA:
 - Days logged: ${totalDays}
 ${hasDetailedTaskData ? `- Days with task-level tracking: ${daysWithTaskDetails}` : ""}
 
-${hasDetailedTaskData ? `TASKS - STRONG HABITS (70%+ completion among tracked days):
-${strongTasks.length > 0 ? strongTasks.slice(0, 6).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% of ${daysWithTaskDetails} tracked days, ${t.value} pts each`).join("\n") : "No tasks reached 70%+ completion rate."}
-
-TASKS - WEAKER AREAS (<30% completion):
-${weakTasks.length > 0 ? weakTasks.slice(0, 5).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% of tracked days`).join("\n") : "No weak areas identified among tracked tasks."}
-
-${mustDoMissed.length > 0 ? `MUST-DO TASKS NEVER COMPLETED:\n${mustDoMissed.map(t => `- "${t.name}" [${t.category}]`).join("\n")}` : ""}` : "TASK-LEVEL DATA: Not available. Focus your analysis on aggregate points and penalties."}
+${hasDetailedTaskData ? (taskStats.length > 0 ? `USER'S TASKS (sorted by completion rate):
+${taskStats.slice(0, 12).map(t => `- "${t.name}" [${t.category}] - ${t.completionCount}/${daysWithTaskDetails} days (${t.completionRate}%), ${t.value} pts, priority: ${t.priority}`).join("\n")}` : `Task IDs were logged but task definitions not found. User has ${totalPoints} total points across ${totalDays} days.`) : "TASK-LEVEL DATA: Not available. Focus your analysis on aggregate points and penalties."}
 
 ${hasDetailedTaskData && Object.entries(categoryPoints).length > 0 ? `CATEGORY BREAKDOWN (from task completions):
 ${Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) => `- ${cat}: ${pts} pts`).join("\n")}` : ""}
@@ -10093,12 +10088,14 @@ Respond ONLY with valid JSON:
 {
   "headline": "Concise 5-10 words, descriptive, non-dramatic, grounded in specific task data",
   "status": "aligned" | "drifting" | "needs_attention",
-  "mainInsight": "Explain what happened and why, using task-level evidence. Be specific.",
-  "strengths": ["List specific completed tasks or clear positive patterns"],
-  "concerns": ["List specific missing/skipped tasks ONLY if meaningful - leave empty if none"],
-  "suggestion": "One low-friction, realistic adjustment based on patterns you observed",
+  "mainInsight": "MUST NAME SPECIFIC TASKS with their completion stats. Example: 'You completed \"Morning Workout\" 5/7 days (71%) but \"Bible Reading\" only 2/7 days (28%).' Do not use vague language.",
+  "strengths": ["Name specific task: \"Task Name\" - X/Y days (Z%)"],
+  "concerns": ["Name specific task: \"Task Name\" - only X/Y days (Z%) - keep empty array if no meaningful concerns"],
+  "suggestion": "One specific, actionable suggestion referencing a task by name",
   "momentum": "up" | "steady" | "down"
 }
+
+CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. Do NOT say "No tasks maintained consistent engagement" - instead say which specific tasks had what completion rates.
 
 ===== TONE GUIDELINES =====
 - Address as "you" - never use names or "the user"

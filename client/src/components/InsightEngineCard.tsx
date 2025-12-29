@@ -379,133 +379,102 @@ export default function InsightEngineCard({
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base font-semibold">Insight Engine</CardTitle>
+            <Brain className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-semibold">Insight Engine</CardTitle>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleGenerate}
-            disabled={isLoading}
-            data-testid="button-refresh-insight-header"
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-        <div className="flex gap-1 mt-2">
-          {periodConfig.map((p) => {
-            const Icon = p.icon;
-            const isSelected = selectedPeriod === p.value;
-            return (
-              <button
-                key={p.value}
-                onClick={() => handlePeriodChange(p.value)}
-                disabled={isLoading}
-                className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-md transition-colors ${
-                  isSelected
-                    ? "bg-primary/10 text-primary border border-primary/30"
-                    : "text-muted-foreground hover-elevate border border-transparent"
-                } ${isLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                data-testid={`button-period-${p.value}`}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-xs font-medium">{p.shortLabel}</span>
-              </button>
-            );
-          })}
+          <div className="flex items-center gap-1">
+            <div className="flex gap-0.5">
+              {periodConfig.map((p) => {
+                const isSelected = selectedPeriod === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    onClick={() => handlePeriodChange(p.value)}
+                    disabled={isLoading}
+                    className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                      isSelected
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover-elevate"
+                    } ${isLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    data-testid={`button-period-${p.value}`}
+                  >
+                    {p.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleGenerate}
+              disabled={isLoading}
+              data-testid="button-refresh-insight-header"
+            >
+              <RefreshCw className={`h-3 w-3 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 pt-0">
         {hasError ? (
-          <div className="flex flex-col items-center justify-center py-4 space-y-2 text-center">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <p className="text-sm text-destructive font-medium">Something went wrong</p>
-            <p className="text-xs text-muted-foreground">{errorMessage}</p>
+          <div className="flex items-center gap-2 py-2">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <p className="text-xs text-destructive flex-1">{errorMessage}</p>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={handleGenerate}
               data-testid="button-retry-insight"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Retry
             </Button>
           </div>
         ) : isLoading || !insight ? (
-          <div className="flex flex-col items-center justify-center py-8 space-y-3">
-            <div className="relative">
-              <Brain className="h-12 w-12 text-primary/20" />
-              <RefreshCw className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-spin" />
-            </div>
-            <p className="text-sm text-muted-foreground text-center">
-              Analyzing your patterns...
-            </p>
+          <div className="flex items-center justify-center py-4 gap-2">
+            <RefreshCw className="h-4 w-4 text-primary animate-spin" />
+            <p className="text-xs text-muted-foreground">Analyzing...</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-start justify-between gap-2">
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              {getStatusIcon(insight!.status)}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  {getStatusIcon(insight!.status)}
-                  <h3 className="font-medium text-sm leading-tight">
-                    {insight!.headline}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-medium text-sm leading-tight">{insight!.headline}</h3>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {getStatusBadge(insight!.status)}
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     {getMomentumIcon(insight!.momentum)}
                     <span>
-                      {insight!.momentum === "up"
-                        ? "Trending up"
-                        : insight!.momentum === "down"
-                        ? "Trending down"
-                        : "Steady"}
+                      {insight!.momentum === "up" ? "Up" : insight!.momentum === "down" ? "Down" : "Steady"}
                     </span>
                   </div>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleGenerate}
-                disabled={isLoading}
-                data-testid="button-refresh-insight"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-              </Button>
             </div>
 
-            <p className="text-sm text-muted-foreground">{insight!.mainInsight}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{insight!.mainInsight}</p>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-between"
+            <button
+              className="flex items-center gap-1 text-xs text-muted-foreground hover-elevate py-1"
               onClick={() => setIsExpanded(!isExpanded)}
               data-testid="button-expand-insight"
             >
-              <span className="text-xs">{isExpanded ? "Show less" : "Show details"}</span>
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
+              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              <span>{isExpanded ? "Less" : "Details"}</span>
+            </button>
 
             {isExpanded && (
-              <div className="space-y-4 pt-2 border-t">
+              <div className="space-y-2 pt-2 border-t">
                 {insight.strengths.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3 text-green-500" />
                       Strengths
                     </h4>
-                    <ul className="space-y-1">
+                    <ul className="space-y-0.5">
                       {insight.strengths.map((strength, i) => (
-                        <li key={i} className="text-sm text-muted-foreground pl-4">
-                          {strength}
-                        </li>
+                        <li key={i} className="text-xs text-muted-foreground pl-4">{strength}</li>
                       ))}
                     </ul>
                   </div>
@@ -513,40 +482,38 @@ export default function InsightEngineCard({
 
                 {insight.concerns.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                    <h4 className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3 text-yellow-500" />
-                      Areas to Watch
+                      Watch
                     </h4>
-                    <ul className="space-y-1">
+                    <ul className="space-y-0.5">
                       {insight.concerns.map((concern, i) => (
-                        <li key={i} className="text-sm text-muted-foreground pl-4">
-                          {concern}
-                        </li>
+                        <li key={i} className="text-xs text-muted-foreground pl-4">{concern}</li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                <div className="bg-primary/5 rounded-md p-3">
-                  <h4 className="text-xs font-medium mb-1 flex items-center gap-1">
+                <div className="bg-primary/5 rounded-md p-2">
+                  <h4 className="text-xs font-medium mb-0.5 flex items-center gap-1">
                     <Lightbulb className="h-3 w-3 text-primary" />
                     Suggestion
                   </h4>
-                  <p className="text-sm">{insight.suggestion}</p>
+                  <p className="text-xs">{insight.suggestion}</p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t">
+                <div className="flex justify-between text-center pt-2 border-t text-xs">
                   <div>
-                    <div className="text-lg font-semibold">{insight.daysAnalyzed}</div>
-                    <div className="text-xs text-muted-foreground">Days</div>
+                    <span className="font-semibold">{insight.daysAnalyzed}</span>
+                    <span className="text-muted-foreground ml-1">days</span>
                   </div>
                   <div>
-                    <div className="text-lg font-semibold">{insight.totalPoints}</div>
-                    <div className="text-xs text-muted-foreground">Points</div>
+                    <span className="font-semibold">{insight.totalPoints}</span>
+                    <span className="text-muted-foreground ml-1">pts</span>
                   </div>
                   <div>
-                    <div className="text-lg font-semibold">{insight.avgDailyPoints}</div>
-                    <div className="text-xs text-muted-foreground">Avg/Day</div>
+                    <span className="font-semibold">{insight.avgDailyPoints}</span>
+                    <span className="text-muted-foreground ml-1">avg/day</span>
                   </div>
                 </div>
               </div>
