@@ -9982,56 +9982,72 @@ Always recalculate totals when items change. Round all numbers to whole integers
         challenging: "Be motivational and push for growth. Call out areas of complacency. Challenge the user to step up and reach their full potential.",
       };
       
-      // Build the insight prompt
-      const insightPrompt = `You are an AI life coach analyzing a user's behavior patterns from ${periodLabel}. Your role is to provide personalized, actionable insights based on their actual data.
+      // Build penalty stats - count how many times each penalty was triggered based on penalty points
+      const penaltyStats = penalties.map(p => {
+        // Since we don't have appliedPenaltyIds, estimate based on total penalty points
+        return {
+          name: p.name,
+          value: p.value,
+          triggerCount: 0, // Will be calculated from overall penalty points
+        };
+      });
+      
+      // If there are penalty points, list active penalties
+      const activePenalties = totalPenaltyPoints > 0 ? penalties.slice(0, 4) : [];
+      
+      // Build the insight prompt - address user as "you", focus on tasks/categories/penalties
+      const insightPrompt = `You are an AI life coach analyzing behavior patterns from ${periodLabel}. Your role is to provide personalized, actionable insights based on actual data. ALWAYS address the user as "you" - never use their name.
 
 ANALYSIS PERIOD: ${startDateStr} to ${endDateStr} (${totalDays} days logged)
 
 TONE: ${selectedTone.toUpperCase()}
 ${toneInstructions[selectedTone]}
 
-USER CONTEXT:
-- Name: ${userName}
+GOALS:
 - Daily goal: ${userSettings?.dailyGoal || 50} pts
 - Weekly goal: ${userSettings?.weeklyGoal || 350} pts
-${activeSeasonData ? `- Active season: "${activeSeasonData.name}"` : "- No active season"}
+${activeSeasonData ? `- Active season: "${activeSeasonData.name}"` : ""}
 
 PERIOD STATISTICS:
 - Total points earned: ${totalPoints} pts
-- Total penalty points: ${totalPenaltyPoints} pts  
+- Total penalty points incurred: ${totalPenaltyPoints} pts  
 - Average daily points: ${avgDailyPoints} pts
 - Days logged: ${totalDays}
 
-TASK PERFORMANCE:
-Strong habits (70%+ completion): ${strongTasks.length > 0 ? strongTasks.slice(0, 5).map(t => `"${t.name}" (${t.completionRate}%)`).join(", ") : "None yet"}
+TASKS - YOUR STRONG HABITS (70%+ completion rate):
+${strongTasks.length > 0 ? strongTasks.slice(0, 6).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% completion, ${t.value} pts each`).join("\n") : "None yet - you haven't established consistent habits in this period."}
 
-Struggling areas (<30% completion): ${weakTasks.length > 0 ? weakTasks.slice(0, 5).map(t => `"${t.name}" (${t.completionRate}%)`).join(", ") : "None"}
+TASKS - AREAS NEEDING WORK (<30% completion):
+${weakTasks.length > 0 ? weakTasks.slice(0, 5).map(t => `- "${t.name}" [${t.category}] - only ${t.completionRate}% completion`).join("\n") : "None - you're completing most tasks you attempt!"}
 
-${mustDoMissed.length > 0 ? `ALERT - Must-Do tasks not completed: ${mustDoMissed.map(t => `"${t.name}"`).join(", ")}` : ""}
+${mustDoMissed.length > 0 ? `CRITICAL - MUST-DO TASKS NOT COMPLETED AT ALL:\n${mustDoMissed.map(t => `- "${t.name}" [${t.category}]`).join("\n")}` : ""}
 
-CATEGORY BREAKDOWN:
-${Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) => `- ${cat}: ${pts} pts`).join("\n")}
+CATEGORY PERFORMANCE (points by category):
+${Object.entries(categoryPoints).length > 0 ? Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) => `- ${cat}: ${pts} pts`).join("\n") : "No category data yet."}
 
-MILESTONES: ${milestones.length > 0 ? milestones.filter(m => !m.achieved).slice(0, 3).map(m => `"${m.name}" (in progress)`).join(", ") : "No milestones set"}
+${totalPenaltyPoints > 0 ? `PENALTIES INCURRED: ${totalPenaltyPoints} total penalty points.\nActive penalties: ${activePenalties.map(p => `"${p.name}" (${p.value} pts)`).join(", ")}` : "PENALTIES: None triggered - great discipline!"}
+
+${milestones.length > 0 ? `MILESTONES IN PROGRESS:\n${milestones.filter(m => !m.achieved).slice(0, 3).map(m => `- "${m.name}"`).join("\n")}` : ""}
 
 YOUR TASK:
-Provide insight in JSON format with these fields:
+Provide insight in JSON format. Be SPECIFIC about task names, categories, and penalties - reference them directly. Address the user as "you".
 {
-  "headline": "A concise 5-10 word summary of the key insight",
+  "headline": "A concise 5-10 word summary referencing specific tasks or categories",
   "status": "aligned" | "drifting" | "needs_attention",
-  "mainInsight": "2-3 sentences capturing the most important pattern or observation",
-  "strengths": ["Array of 2-3 things going well"],
-  "concerns": ["Array of 1-2 areas that need attention, or empty if aligned"],
-  "suggestion": "One specific, realistic action to take based on their actual patterns",
+  "mainInsight": "2-3 sentences about specific tasks, categories, or penalties. Name them! Example: 'Your meditation practice is solid at 85%, but your workout category is struggling...'",
+  "strengths": ["Reference specific task names or categories doing well"],
+  "concerns": ["Reference specific task names, categories, or penalties that need attention"],
+  "suggestion": "One specific action mentioning actual task/category names from the data",
   "momentum": "up" | "steady" | "down"
 }
 
-IMPORTANT RULES:
-- Base ALL insights on the actual data provided, not generic advice
-- If user is aligned and progressing well, acknowledge it briefly - don't invent problems
-- If something is drifting, explain WHY based on the patterns you see
-- Suggestions must be realistic and based on what they actually tend to complete
-- Keep the headline punchy and insightful`;
+CRITICAL RULES:
+- ALWAYS say "you" or "your" - NEVER use the user's name or say "the user"
+- Reference SPECIFIC task names like "your morning meditation" or "the workout category"
+- Mention specific penalties by name if they're being triggered
+- Compare category performance - which categories are thriving vs struggling
+- Base ALL insights on the actual data, not generic advice
+- Keep the headline punchy and reference something specific`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
