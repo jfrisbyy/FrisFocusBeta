@@ -225,6 +225,9 @@ export const penaltyItemSchema = z.object({
   timesThreshold: z.number().int().min(1).optional(),
   period: z.enum(["week", "month"]).optional(),
   boostPenaltyPoints: z.number().int().min(1).optional(),
+  rewardEnabled: z.boolean().default(false),
+  rewardType: z.enum(["daily", "weekly"]).optional(),
+  rewardPoints: z.number().int().min(1).optional(),
   currentCount: z.number().int().min(0).default(0),
   triggered: z.boolean().default(false),
 });

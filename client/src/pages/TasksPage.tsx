@@ -174,6 +174,11 @@ export default function TasksPage() {
   const [penaltyBoostThreshold, setPenaltyBoostThreshold] = useState("3");
   const [penaltyBoostPeriod, setPenaltyBoostPeriod] = useState<"week" | "month">("week");
   const [penaltyBoostPoints, setPenaltyBoostPoints] = useState("10");
+  
+  // Penalty reward state (earn points for NOT logging the penalty)
+  const [penaltyRewardEnabled, setPenaltyRewardEnabled] = useState(false);
+  const [penaltyRewardType, setPenaltyRewardType] = useState<"daily" | "weekly">("daily");
+  const [penaltyRewardPoints, setPenaltyRewardPoints] = useState("5");
 
   const [categories, setCategories] = useState<Category[]>(() => useMockData ? sampleCategories : []);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -1309,6 +1314,9 @@ export default function TasksPage() {
     setPenaltyBoostThreshold("3");
     setPenaltyBoostPeriod("week");
     setPenaltyBoostPoints("10");
+    setPenaltyRewardEnabled(false);
+    setPenaltyRewardType("daily");
+    setPenaltyRewardPoints("5");
   };
 
   const handleOpenCreatePenalty = () => {
@@ -1325,6 +1333,9 @@ export default function TasksPage() {
     setPenaltyBoostThreshold(penalty.timesThreshold?.toString() || "3");
     setPenaltyBoostPeriod(penalty.period || "week");
     setPenaltyBoostPoints(penalty.boostPenaltyPoints?.toString() || "10");
+    setPenaltyRewardEnabled(penalty.rewardEnabled || false);
+    setPenaltyRewardType(penalty.rewardType || "daily");
+    setPenaltyRewardPoints((penalty.rewardPoints || 5).toString());
     setPenaltyDialogOpen(true);
   };
 
@@ -1334,6 +1345,7 @@ export default function TasksPage() {
     const finalValue = value > 0 ? -value : value;
     const threshold = parseInt(penaltyBoostThreshold, 10) || 3;
     const boostPoints = parseInt(penaltyBoostPoints, 10) || 10;
+    const rewardPts = parseInt(penaltyRewardPoints, 10) || 5;
 
     if (editingPenalty) {
       if (activeSeason) {
@@ -1348,6 +1360,9 @@ export default function TasksPage() {
                 timesThreshold: penaltyBoostEnabled ? threshold : undefined,
                 period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
                 boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+                rewardEnabled: penaltyRewardEnabled,
+                rewardType: penaltyRewardEnabled ? penaltyRewardType : undefined,
+                rewardPoints: penaltyRewardEnabled ? rewardPts : undefined,
               }
             : p
         ));
@@ -1373,6 +1388,9 @@ export default function TasksPage() {
           timesThreshold: penaltyBoostEnabled ? threshold : undefined,
           period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
           boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+          rewardEnabled: penaltyRewardEnabled,
+          rewardType: penaltyRewardEnabled ? penaltyRewardType : undefined,
+          rewardPoints: penaltyRewardEnabled ? rewardPts : undefined,
           currentCount: 0,
           triggered: false,
         };
@@ -1939,6 +1957,53 @@ export default function TasksPage() {
                       If this penalty is logged {penaltyBoostThreshold}+ times per {penaltyBoostPeriod}, you lose an extra {penaltyBoostPoints} points
                     </p>
                   </div>
+                </div>
+              )}
+              
+              {/* Reward for NOT logging the penalty */}
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <Label htmlFor="reward-enabled" className="text-sm font-medium">Avoidance Reward</Label>
+                  <p className="text-xs text-muted-foreground">Earn points for NOT logging this penalty</p>
+                </div>
+                <Switch
+                  id="reward-enabled"
+                  checked={penaltyRewardEnabled}
+                  onCheckedChange={setPenaltyRewardEnabled}
+                  data-testid="switch-penalty-reward"
+                />
+              </div>
+              
+              {penaltyRewardEnabled && (
+                <div className="space-y-4 pl-4 border-l-2 border-green-500/30">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reward-type">Reward Period</Label>
+                      <Select value={penaltyRewardType} onValueChange={(v) => setPenaltyRewardType(v as "daily" | "weekly")}>
+                        <SelectTrigger data-testid="select-penalty-reward-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reward-points">Reward Points</Label>
+                      <Input
+                        id="reward-points"
+                        type="number"
+                        value={penaltyRewardPoints}
+                        onChange={(e) => setPenaltyRewardPoints(e.target.value)}
+                        min={1}
+                        data-testid="input-penalty-reward-points"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Earn +{penaltyRewardPoints} points {penaltyRewardType === "daily" ? "each day" : "each week"} you don't log this penalty
+                  </p>
                 </div>
               )}
             </div>
