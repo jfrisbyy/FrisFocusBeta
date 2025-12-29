@@ -25,6 +25,7 @@ import DashboardSettingsDialog from "@/components/DashboardSettingsDialog";
 import CirclesOverviewCard from "@/components/CirclesOverviewCard";
 import JournalCard from "@/components/JournalCard";
 import FeedCard from "@/components/FeedCard";
+import InsightEngineCard from "@/components/InsightEngineCard";
 import type { TaskAlert, UnifiedBooster, Milestone, BadgeWithLevels, DashboardPreferences, DashboardCardKey } from "@shared/schema";
 import { defaultDashboardPreferences, dashboardCardKeys } from "@shared/schema";
 import {
@@ -2021,6 +2022,13 @@ export default function Dashboard() {
                 <FeedCard 
                   useMockData={useMockData} 
                   onViewAll={() => navigate("/community")}
+                />
+              );
+            case "insightEngine":
+              return (
+                <InsightEngineCard 
+                  useMockData={useMockData}
+                  tone={dashboardPrefs.insightEngineTone || "direct"}
                 />
               );
             default:

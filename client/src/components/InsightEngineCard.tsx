@@ -1,0 +1,324 @@
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Brain, 
+  RefreshCw, 
+  TrendingUp, 
+  TrendingDown, 
+  Minus,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp
+} from "lucide-react";
+
+interface InsightResponse {
+  headline: string;
+  status: "aligned" | "drifting" | "needs_attention";
+  mainInsight: string;
+  strengths: string[];
+  concerns: string[];
+  suggestion: string;
+  momentum: "up" | "steady" | "down";
+  period: string;
+  periodLabel: string;
+  startDate: string;
+  endDate: string;
+  daysAnalyzed: number;
+  totalPoints: number;
+  avgDailyPoints: number;
+  generatedAt: string;
+}
+
+type Period = "thisWeek" | "lastWeek" | "thisMonth" | "season";
+type Tone = "direct" | "analytical" | "gentle" | "challenging";
+
+interface InsightEngineCardProps {
+  tone?: Tone;
+  useMockData?: boolean;
+}
+
+const mockInsight: InsightResponse = {
+  headline: "Strong momentum, minor gaps in morning routine",
+  status: "aligned",
+  mainInsight: "You've been consistent with your core habits this week, completing 85% of your must-do tasks. Your evening routine is particularly strong, but morning tasks are showing some inconsistency.",
+  strengths: [
+    "Evening routine completion at 92%",
+    "Workout consistency improved from last week",
+    "No penalty points accumulated"
+  ],
+  concerns: [
+    "Morning meditation missed 3 days this week"
+  ],
+  suggestion: "Try linking your morning meditation to your existing coffee routine - it's a habit you never miss.",
+  momentum: "up",
+  period: "thisWeek",
+  periodLabel: "this week",
+  startDate: "2024-01-15",
+  endDate: "2024-01-21",
+  daysAnalyzed: 5,
+  totalPoints: 245,
+  avgDailyPoints: 49,
+  generatedAt: new Date().toISOString(),
+};
+
+export default function InsightEngineCard({ tone = "direct", useMockData = false }: InsightEngineCardProps) {
+  const [selectedPeriod, setSelectedPeriod] = useState<Period>("thisWeek");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [insight, setInsight] = useState<InsightResponse | null>(useMockData ? mockInsight : null);
+
+  const generateInsightMutation = useMutation({
+    mutationFn: async ({ period, tone }: { period: Period; tone: Tone }) => {
+      const response = await apiRequest("POST", "/api/ai/insight-engine", { period, tone });
+      return response.json();
+    },
+    onSuccess: (data: InsightResponse) => {
+      setInsight(data);
+    },
+  });
+
+  const handleGenerate = () => {
+    if (useMockData) {
+      setInsight({ ...mockInsight, period: selectedPeriod });
+      return;
+    }
+    generateInsightMutation.mutate({ period: selectedPeriod, tone });
+  };
+
+  const handlePeriodChange = (period: Period) => {
+    setSelectedPeriod(period);
+    if (insight) {
+      if (useMockData) {
+        setInsight({ ...mockInsight, period });
+      } else {
+        generateInsightMutation.mutate({ period, tone });
+      }
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "aligned":
+        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case "drifting":
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case "needs_attention":
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "aligned":
+        return <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/30">Aligned</Badge>;
+      case "drifting":
+        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30">Drifting</Badge>;
+      case "needs_attention":
+        return <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/30">Needs Attention</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const getMomentumIcon = (momentum: string) => {
+    switch (momentum) {
+      case "up":
+        return <TrendingUp className="h-4 w-4 text-green-500" />;
+      case "down":
+        return <TrendingDown className="h-4 w-4 text-red-500" />;
+      default:
+        return <Minus className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const periodLabels: Record<Period, string> = {
+    thisWeek: "This Week",
+    lastWeek: "Last Week",
+    thisMonth: "This Month",
+    season: "Season",
+  };
+
+  const isLoading = generateInsightMutation.isPending;
+  const hasError = generateInsightMutation.isError;
+  const errorMessage = generateInsightMutation.error?.message || "Failed to generate insight";
+
+  return (
+    <Card data-testid="card-insight-engine">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base font-semibold">Insight Engine</CardTitle>
+          </div>
+          <Select value={selectedPeriod} onValueChange={(v) => handlePeriodChange(v as Period)}>
+            <SelectTrigger className="w-[130px] h-8" data-testid="select-insight-period">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="thisWeek">This Week</SelectItem>
+              <SelectItem value="lastWeek">Last Week</SelectItem>
+              <SelectItem value="thisMonth">This Month</SelectItem>
+              <SelectItem value="season">Season</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {hasError ? (
+          <div className="flex flex-col items-center justify-center py-4 space-y-2 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <p className="text-sm text-destructive font-medium">Something went wrong</p>
+            <p className="text-xs text-muted-foreground">{errorMessage}</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleGenerate}
+              data-testid="button-retry-insight"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        ) : !insight ? (
+          <div className="flex flex-col items-center justify-center py-6 space-y-3">
+            <Brain className="h-12 w-12 text-muted-foreground/30" />
+            <p className="text-sm text-muted-foreground text-center">
+              Get personalized insights based on your behavior patterns
+            </p>
+            <Button 
+              onClick={handleGenerate} 
+              disabled={isLoading}
+              data-testid="button-generate-insight"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-4 w-4 mr-2" />
+                  Generate Insight
+                </>
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {getStatusIcon(insight.status)}
+                  <h3 className="font-medium text-sm leading-tight">{insight.headline}</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {getStatusBadge(insight.status)}
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    {getMomentumIcon(insight.momentum)}
+                    <span>{insight.momentum === "up" ? "Trending up" : insight.momentum === "down" ? "Trending down" : "Steady"}</span>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleGenerate}
+                disabled={isLoading}
+                data-testid="button-refresh-insight"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+
+            <p className="text-sm text-muted-foreground">{insight.mainInsight}</p>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-between"
+              onClick={() => setIsExpanded(!isExpanded)}
+              data-testid="button-expand-insight"
+            >
+              <span className="text-xs">{isExpanded ? "Show less" : "Show details"}</span>
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+
+            {isExpanded && (
+              <div className="space-y-4 pt-2 border-t">
+                {insight.strengths.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      Strengths
+                    </h4>
+                    <ul className="space-y-1">
+                      {insight.strengths.map((strength, i) => (
+                        <li key={i} className="text-sm text-muted-foreground pl-4">
+                          {strength}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {insight.concerns.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                      Areas to Watch
+                    </h4>
+                    <ul className="space-y-1">
+                      {insight.concerns.map((concern, i) => (
+                        <li key={i} className="text-sm text-muted-foreground pl-4">
+                          {concern}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="bg-primary/5 rounded-md p-3">
+                  <h4 className="text-xs font-medium mb-1 flex items-center gap-1">
+                    <Lightbulb className="h-3 w-3 text-primary" />
+                    Suggestion
+                  </h4>
+                  <p className="text-sm">{insight.suggestion}</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t">
+                  <div>
+                    <div className="text-lg font-semibold">{insight.daysAnalyzed}</div>
+                    <div className="text-xs text-muted-foreground">Days</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold">{insight.totalPoints}</div>
+                    <div className="text-xs text-muted-foreground">Points</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold">{insight.avgDailyPoints}</div>
+                    <div className="text-xs text-muted-foreground">Avg/Day</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

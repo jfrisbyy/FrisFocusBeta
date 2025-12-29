@@ -88,6 +88,7 @@ const cardLabels: Record<DashboardCardKey, { label: string; description: string 
   circlesOverview: { label: "Circles Overview", description: "Show circles scores and leaderboard" },
   journal: { label: "Quick Journal", description: "Show quick journaling card" },
   feed: { label: "Community Feed", description: "Show recent community posts" },
+  insightEngine: { label: "Insight Engine", description: "AI-powered behavior analysis and coaching" },
 };
 
 const cardKeysArray = Object.keys(cardLabels) as DashboardCardKey[];
@@ -161,8 +162,15 @@ export default function DashboardSettingsDialog({
   const [savedMessages, setSavedMessages] = useState<string[]>(welcomeSettings.savedCustomMessages);
   const [newMessageInput, setNewMessageInput] = useState("");
   const [selectedIndex, setSelectedIndex] = useState<number>(welcomeSettings.selectedMessageIndex);
+  const getValidCardOrder = (order: string[] | undefined): DashboardCardKey[] => {
+    const existingKeys = new Set(cardKeysArray);
+    const validOrder = (order || []).filter(key => existingKeys.has(key as DashboardCardKey)) as DashboardCardKey[];
+    const missingKeys = cardKeysArray.filter(key => !validOrder.includes(key));
+    return [...validOrder, ...missingKeys];
+  };
+
   const [cardOrder, setCardOrder] = useState<DashboardCardKey[]>(
-    (preferences.cardOrder?.length > 0 ? preferences.cardOrder : [...dashboardCardKeys]) as DashboardCardKey[]
+    getValidCardOrder(preferences.cardOrder)
   );
 
   useEffect(() => {
@@ -173,7 +181,7 @@ export default function DashboardSettingsDialog({
       setSavedMessages(welcomeSettings.savedCustomMessages);
       setSelectedIndex(welcomeSettings.selectedMessageIndex);
       setNewMessageInput("");
-      setCardOrder((preferences.cardOrder?.length > 0 ? preferences.cardOrder : [...dashboardCardKeys]) as DashboardCardKey[]);
+      setCardOrder(getValidCardOrder(preferences.cardOrder));
     }
   }, [open, welcomeSettings, preferences.cardOrder]);
 

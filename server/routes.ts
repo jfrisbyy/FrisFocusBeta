@@ -131,7 +131,7 @@ import {
   insertDailyStepsSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
-import { and, or, desc, inArray, gte, sql } from "drizzle-orm";
+import { and, or, desc, inArray, gte, lte, sql } from "drizzle-orm";
 import { lt } from "drizzle-orm";
 import { getGitHubUser, listRepositories, createRepository, getRepository, listCommits } from "./github";
 
@@ -9837,6 +9837,233 @@ Always recalculate totals when items change. Round all numbers to whole integers
     } catch (error: any) {
       console.error("Error adjusting food analysis:", error);
       res.status(500).json({ error: error.message || "Failed to adjust food analysis" });
+    }
+  });
+
+  // ==================== INSIGHT ENGINE API ====================
+  
+  app.post("/api/ai/insight-engine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { period, tone } = req.body;
+      
+      // Validate period
+      const validPeriods = ["thisWeek", "lastWeek", "thisMonth", "season"];
+      if (!period || !validPeriods.includes(period)) {
+        return res.status(400).json({ error: "Valid period is required: thisWeek, lastWeek, thisMonth, or season" });
+      }
+      
+      // Validate tone
+      const validTones = ["direct", "analytical", "gentle", "challenging"];
+      const selectedTone = validTones.includes(tone) ? tone : "direct";
+      
+      // Calculate date ranges based on period
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date = now;
+      let periodLabel: string;
+      
+      if (period === "thisWeek") {
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() + mondayOffset);
+        startDate.setHours(0, 0, 0, 0);
+        periodLabel = "this week";
+      } else if (period === "lastWeek") {
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        endDate = new Date(now);
+        endDate.setDate(now.getDate() + mondayOffset - 1);
+        endDate.setHours(23, 59, 59, 999);
+        startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 6);
+        startDate.setHours(0, 0, 0, 0);
+        periodLabel = "last week";
+      } else if (period === "thisMonth") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        periodLabel = "this month";
+      } else {
+        // season - get data from active season start date
+        startDate = new Date(now);
+        startDate.setMonth(startDate.getMonth() - 3);
+        periodLabel = "your current season";
+      }
+      
+      const formatDate = (d: Date) => d.toISOString().split('T')[0];
+      const startDateStr = formatDate(startDate);
+      const endDateStr = formatDate(endDate);
+      
+      // Fetch user data for the specified period
+      const [
+        user,
+        tasks,
+        penalties,
+        dailyLogs,
+        activeSeason,
+        settings,
+        milestones,
+      ] = await Promise.all([
+        storage.getUser(userId),
+        db.select().from(userTasks).where(eq(userTasks.userId, userId)),
+        db.select().from(userPenalties).where(eq(userPenalties.userId, userId)),
+        db.select().from(userDailyLogs).where(
+          and(
+            eq(userDailyLogs.userId, userId),
+            gte(userDailyLogs.date, startDateStr),
+            lte(userDailyLogs.date, endDateStr)
+          )
+        ).orderBy(desc(userDailyLogs.date)),
+        db.select().from(seasons).where(and(eq(seasons.userId, userId), eq(seasons.isActive, true))).limit(1),
+        db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId)).limit(1),
+        storage.getMilestones(userId),
+      ]);
+      
+      const userName = user?.firstName || user?.displayName || "there";
+      const activeSeasonData = activeSeason[0];
+      const userSettings = settings[0];
+      
+      // Calculate statistics
+      const totalDays = dailyLogs.length;
+      const taskCompletions: Record<string, number> = {};
+      const categoryPoints: Record<string, number> = {};
+      let totalPoints = 0;
+      let totalPenaltyPoints = 0;
+      
+      // Build task lookup map
+      const taskMap = new Map(tasks.map(t => [t.id, t]));
+      
+      dailyLogs.forEach(log => {
+        const taskIds = Array.isArray(log.completedTaskIds) ? log.completedTaskIds : [];
+        taskIds.forEach(taskId => {
+          taskCompletions[taskId] = (taskCompletions[taskId] || 0) + 1;
+          const task = taskMap.get(taskId);
+          if (task) {
+            const pts = task.value || 0;
+            totalPoints += pts;
+            const category = task.category || "uncategorized";
+            categoryPoints[category] = (categoryPoints[category] || 0) + pts;
+          }
+        });
+        totalPoints += (log.taskPoints || 0);
+        totalPenaltyPoints += Math.abs(log.penaltyPoints || 0);
+      });
+      
+      // Identify patterns
+      const taskStats = tasks.map(task => {
+        const completionCount = taskCompletions[task.id] || 0;
+        const completionRate = totalDays > 0 ? (completionCount / totalDays * 100).toFixed(1) : "0";
+        return {
+          name: task.name,
+          category: task.category || "uncategorized",
+          priority: task.priority || "couldDo",
+          value: task.value,
+          completionCount,
+          completionRate: parseFloat(completionRate),
+        };
+      }).sort((a, b) => b.completionRate - a.completionRate);
+      
+      const strongTasks = taskStats.filter(t => t.completionRate >= 70);
+      const weakTasks = taskStats.filter(t => t.completionRate < 30 && t.completionCount > 0);
+      const missedTasks = taskStats.filter(t => t.completionCount === 0);
+      const mustDoMissed = missedTasks.filter(t => t.priority === "mustDo");
+      
+      // Calculate daily consistency
+      const dailyPointsArr = dailyLogs.map(l => (l.taskPoints || 0) + (l.todoPoints || 0));
+      const avgDailyPoints = dailyPointsArr.length > 0 
+        ? (dailyPointsArr.reduce((a, b) => a + b, 0) / dailyPointsArr.length).toFixed(1) 
+        : "0";
+      
+      // Tone-specific instructions
+      const toneInstructions: Record<string, string> = {
+        direct: "Be concise and straightforward. Give clear, actionable feedback without excessive encouragement or softening. Focus on what matters most.",
+        analytical: "Provide detailed analysis with specific numbers and patterns. Break down the data and explain correlations. Be methodical and thorough.",
+        gentle: "Be supportive and encouraging. Acknowledge effort and progress. Frame challenges positively and offer gentle suggestions for improvement.",
+        challenging: "Be motivational and push for growth. Call out areas of complacency. Challenge the user to step up and reach their full potential.",
+      };
+      
+      // Build the insight prompt
+      const insightPrompt = `You are an AI life coach analyzing a user's behavior patterns from ${periodLabel}. Your role is to provide personalized, actionable insights based on their actual data.
+
+ANALYSIS PERIOD: ${startDateStr} to ${endDateStr} (${totalDays} days logged)
+
+TONE: ${selectedTone.toUpperCase()}
+${toneInstructions[selectedTone]}
+
+USER CONTEXT:
+- Name: ${userName}
+- Daily goal: ${userSettings?.dailyGoal || 50} pts
+- Weekly goal: ${userSettings?.weeklyGoal || 350} pts
+${activeSeasonData ? `- Active season: "${activeSeasonData.name}"` : "- No active season"}
+
+PERIOD STATISTICS:
+- Total points earned: ${totalPoints} pts
+- Total penalty points: ${totalPenaltyPoints} pts  
+- Average daily points: ${avgDailyPoints} pts
+- Days logged: ${totalDays}
+
+TASK PERFORMANCE:
+Strong habits (70%+ completion): ${strongTasks.length > 0 ? strongTasks.slice(0, 5).map(t => `"${t.name}" (${t.completionRate}%)`).join(", ") : "None yet"}
+
+Struggling areas (<30% completion): ${weakTasks.length > 0 ? weakTasks.slice(0, 5).map(t => `"${t.name}" (${t.completionRate}%)`).join(", ") : "None"}
+
+${mustDoMissed.length > 0 ? `ALERT - Must-Do tasks not completed: ${mustDoMissed.map(t => `"${t.name}"`).join(", ")}` : ""}
+
+CATEGORY BREAKDOWN:
+${Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) => `- ${cat}: ${pts} pts`).join("\n")}
+
+MILESTONES: ${milestones.length > 0 ? milestones.filter(m => !m.achieved).slice(0, 3).map(m => `"${m.name}" (in progress)`).join(", ") : "No milestones set"}
+
+YOUR TASK:
+Provide insight in JSON format with these fields:
+{
+  "headline": "A concise 5-10 word summary of the key insight",
+  "status": "aligned" | "drifting" | "needs_attention",
+  "mainInsight": "2-3 sentences capturing the most important pattern or observation",
+  "strengths": ["Array of 2-3 things going well"],
+  "concerns": ["Array of 1-2 areas that need attention, or empty if aligned"],
+  "suggestion": "One specific, realistic action to take based on their actual patterns",
+  "momentum": "up" | "steady" | "down"
+}
+
+IMPORTANT RULES:
+- Base ALL insights on the actual data provided, not generic advice
+- If user is aligned and progressing well, acknowledge it briefly - don't invent problems
+- If something is drifting, explain WHY based on the patterns you see
+- Suggestions must be realistic and based on what they actually tend to complete
+- Keep the headline punchy and insightful`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: insightPrompt }
+        ],
+        max_tokens: 800,
+        response_format: { type: "json_object" }
+      });
+      
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "No response from AI" });
+      }
+      
+      const insight = JSON.parse(content);
+      
+      // Add metadata to response
+      res.json({
+        ...insight,
+        period,
+        periodLabel,
+        startDate: startDateStr,
+        endDate: endDateStr,
+        daysAnalyzed: totalDays,
+        totalPoints,
+        avgDailyPoints: parseFloat(avgDailyPoints),
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("Error generating insight:", error);
+      res.status(500).json({ error: error.message || "Failed to generate insight" });
     }
   });
 

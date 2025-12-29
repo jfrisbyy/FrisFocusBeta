@@ -1945,6 +1945,7 @@ export const dashboardCardKeys = [
   "circlesOverview",
   "journal",
   "feed",
+  "insightEngine",
 ] as const;
 export type DashboardCardKey = typeof dashboardCardKeys[number];
 
@@ -1963,6 +1964,7 @@ export const dashboardPreferencesSchema = z.object({
   circlesOverview: z.boolean().default(true),
   journal: z.boolean().default(true),
   feed: z.boolean().default(true),
+  insightEngine: z.boolean().default(true),
   selectedCircles: z.array(z.string()).default([]),
   cardOrder: z.array(z.string()).default([]),
   theme: z.enum(["light", "dark"]).default("light"),
@@ -1970,6 +1972,7 @@ export const dashboardPreferencesSchema = z.object({
   siteTheme: z.enum(["default", "midnight", "sepia", "forest", "ocean", "rosegold", "hotpink", "peach", "sunrise", "aurora", "citrus", "orchid"]).default("default"),
   defaultStepGoal: z.number().int().min(100).max(100000).default(10000),
   hasSeenOnboarding: z.boolean().default(false),
+  insightEngineTone: z.enum(["direct", "analytical", "gentle", "challenging"]).default("direct"),
 });
 export type DashboardPreferences = z.infer<typeof dashboardPreferencesSchema>;
 
@@ -1988,6 +1991,7 @@ export const defaultDashboardPreferences: DashboardPreferences = {
   circlesOverview: true,
   journal: true,
   feed: true,
+  insightEngine: true,
   selectedCircles: [],
   cardOrder: [...dashboardCardKeys],
   theme: "light",
@@ -1995,6 +1999,7 @@ export const defaultDashboardPreferences: DashboardPreferences = {
   siteTheme: "default",
   defaultStepGoal: 10000,
   hasSeenOnboarding: false,
+  insightEngineTone: "direct",
 };
 
 // Dashboard preferences table - stores user dashboard card visibility settings
