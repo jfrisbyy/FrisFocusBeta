@@ -2036,23 +2036,61 @@ export default function Dashboard() {
           }
         };
 
-        const getCardSize = (key: DashboardCardKey) => {
+        const getCardSpan = (key: DashboardCardKey) => {
           switch (key) {
             case "weeklyTable":
             case "recentWeeks":
-              return "lg:col-span-2";
+              return 2;
             default:
-              return "";
+              return 1;
           }
         };
 
+        const getCardSizeClass = (key: DashboardCardKey) => {
+          return getCardSpan(key) === 2 ? "lg:col-span-2" : "";
+        };
+
+        // Get visible cards only
+        const visibleCards = cardOrder.filter(key => dashboardPrefs[key] && renderCard(key) !== null);
+        
+        // Reorder to optimize grid layout: place 2-col cards at positions 0, 3, 6, 9... 
+        // (start of each row in a 3-col grid) to avoid whitespace gaps
+        const optimizedCards: DashboardCardKey[] = [];
+        const singleColCards = visibleCards.filter(k => getCardSpan(k) === 1);
+        const doubleColCards = visibleCards.filter(k => getCardSpan(k) === 2);
+        
+        let singleIdx = 0;
+        let doubleIdx = 0;
+        let colsUsed = 0;
+        
+        while (singleIdx < singleColCards.length || doubleIdx < doubleColCards.length) {
+          const colsRemaining = 3 - colsUsed;
+          
+          // Try to fit a double-col card at the start of a row
+          if (colsUsed === 0 && doubleIdx < doubleColCards.length) {
+            optimizedCards.push(doubleColCards[doubleIdx++]);
+            colsUsed = 2;
+          } else if (colsRemaining >= 1 && singleIdx < singleColCards.length) {
+            optimizedCards.push(singleColCards[singleIdx++]);
+            colsUsed += 1;
+          } else if (colsRemaining >= 2 && doubleIdx < doubleColCards.length) {
+            optimizedCards.push(doubleColCards[doubleIdx++]);
+            colsUsed += 2;
+          } else {
+            // Move to next row
+            colsUsed = 0;
+          }
+          
+          if (colsUsed >= 3) colsUsed = 0;
+        }
+
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 grid-flow-dense">
-            {cardOrder.map((key) => {
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {optimizedCards.map((key) => {
               const card = renderCard(key);
               if (!card) return null;
               return (
-                <div key={key} className={getCardSize(key)} data-testid={`dashboard-card-${key}`}>
+                <div key={key} className={getCardSizeClass(key)} data-testid={`dashboard-card-${key}`}>
                   {card}
                 </div>
               );
