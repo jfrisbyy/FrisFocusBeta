@@ -9929,30 +9929,44 @@ Always recalculate totals when items change. Round all numbers to whole integers
       const categoryPoints: Record<string, number> = {};
       let totalPoints = 0;
       let totalPenaltyPoints = 0;
+      let daysWithTaskDetails = 0;
       
       // Build task lookup map
       const taskMap = new Map(tasks.map(t => [t.id, t]));
       
       dailyLogs.forEach(log => {
         const taskIds = Array.isArray(log.completedTaskIds) ? log.completedTaskIds : [];
+        
+        // Track if this day has task-level detail
+        if (taskIds.length > 0) {
+          daysWithTaskDetails++;
+        }
+        
         taskIds.forEach(taskId => {
           taskCompletions[taskId] = (taskCompletions[taskId] || 0) + 1;
           const task = taskMap.get(taskId);
           if (task) {
             const pts = task.value || 0;
-            totalPoints += pts;
             const category = task.category || "uncategorized";
             categoryPoints[category] = (categoryPoints[category] || 0) + pts;
           }
         });
-        totalPoints += (log.taskPoints || 0);
+        
+        // Always count points from the aggregated values
+        totalPoints += (log.taskPoints || 0) + (log.todoPoints || 0);
         totalPenaltyPoints += Math.abs(log.penaltyPoints || 0);
       });
       
-      // Identify patterns
+      // Calculate data quality metrics
+      const hasDetailedTaskData = daysWithTaskDetails > 0;
+      const taskDataCoverage = totalDays > 0 ? Math.round((daysWithTaskDetails / totalDays) * 100) : 0;
+      
+      // Identify patterns - only use days with task data for completion rates
       const taskStats = tasks.map(task => {
         const completionCount = taskCompletions[task.id] || 0;
-        const completionRate = totalDays > 0 ? (completionCount / totalDays * 100).toFixed(1) : "0";
+        // Use daysWithTaskDetails for rate calculation when available, otherwise totalDays
+        const baseDays = daysWithTaskDetails > 0 ? daysWithTaskDetails : totalDays;
+        const completionRate = baseDays > 0 ? (completionCount / baseDays * 100).toFixed(1) : "0";
         return {
           name: task.name,
           category: task.category || "uncategorized",
@@ -9963,9 +9977,11 @@ Always recalculate totals when items change. Round all numbers to whole integers
         };
       }).sort((a, b) => b.completionRate - a.completionRate);
       
-      const strongTasks = taskStats.filter(t => t.completionRate >= 70);
-      const weakTasks = taskStats.filter(t => t.completionRate < 30 && t.completionCount > 0);
-      const missedTasks = taskStats.filter(t => t.completionCount === 0);
+      // Only include tasks that have been tracked at least once
+      const trackedTasks = taskStats.filter(t => t.completionCount > 0);
+      const strongTasks = trackedTasks.filter(t => t.completionRate >= 70);
+      const weakTasks = trackedTasks.filter(t => t.completionRate < 30);
+      const missedTasks = hasDetailedTaskData ? taskStats.filter(t => t.completionCount === 0) : [];
       const mustDoMissed = missedTasks.filter(t => t.priority === "mustDo");
       
       // Calculate daily consistency
@@ -9996,9 +10012,14 @@ Always recalculate totals when items change. Round all numbers to whole integers
       const activePenalties = totalPenaltyPoints > 0 ? penalties.slice(0, 4) : [];
       
       // Build the insight prompt following grounded, honest coaching principles
+      const dataQualityNote = hasDetailedTaskData 
+        ? `Task-level detail available for ${daysWithTaskDetails} of ${totalDays} days (${taskDataCoverage}% coverage).`
+        : `Note: Task-level completion data is not available. Analysis is based on aggregate points only.`;
+      
       const insightPrompt = `You are a reflective life-coach analyzing behavior patterns from ${periodLabel}. You are NOT a motivational speaker, productivity scoreboard, or task list. Your job is to generate grounded, honest, and specific insights.
 
 ANALYSIS PERIOD: ${startDateStr} to ${endDateStr} (${totalDays} days logged)
+DATA QUALITY: ${dataQualityNote}
 
 TONE: ${selectedTone.toUpperCase()}
 ${toneInstructions[selectedTone]}
@@ -10013,37 +10034,38 @@ PERIOD DATA:
 - Total penalty points incurred: ${totalPenaltyPoints} pts  
 - Average daily points: ${avgDailyPoints} pts
 - Days logged: ${totalDays}
+${hasDetailedTaskData ? `- Days with task-level tracking: ${daysWithTaskDetails}` : ""}
 
-TASKS - STRONG HABITS (70%+ completion):
-${strongTasks.length > 0 ? strongTasks.slice(0, 6).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% completion, ${t.value} pts each`).join("\n") : "Insufficient data to identify strong habits."}
+${hasDetailedTaskData ? `TASKS - STRONG HABITS (70%+ completion among tracked days):
+${strongTasks.length > 0 ? strongTasks.slice(0, 6).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% of ${daysWithTaskDetails} tracked days, ${t.value} pts each`).join("\n") : "No tasks reached 70%+ completion rate."}
 
-TASKS - WEAK AREAS (<30% completion):
-${weakTasks.length > 0 ? weakTasks.slice(0, 5).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% completion`).join("\n") : "No weak areas identified."}
+TASKS - WEAKER AREAS (<30% completion):
+${weakTasks.length > 0 ? weakTasks.slice(0, 5).map(t => `- "${t.name}" [${t.category}] - ${t.completionRate}% of tracked days`).join("\n") : "No weak areas identified among tracked tasks."}
 
-${mustDoMissed.length > 0 ? `MUST-DO TASKS NOT COMPLETED:\n${mustDoMissed.map(t => `- "${t.name}" [${t.category}]`).join("\n")}` : ""}
+${mustDoMissed.length > 0 ? `MUST-DO TASKS NEVER COMPLETED:\n${mustDoMissed.map(t => `- "${t.name}" [${t.category}]`).join("\n")}` : ""}` : "TASK-LEVEL DATA: Not available. Focus your analysis on aggregate points and penalties."}
 
-CATEGORY BREAKDOWN:
-${Object.entries(categoryPoints).length > 0 ? Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) => `- ${cat}: ${pts} pts`).join("\n") : "No category data."}
+${hasDetailedTaskData && Object.entries(categoryPoints).length > 0 ? `CATEGORY BREAKDOWN (from task completions):
+${Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) => `- ${cat}: ${pts} pts`).join("\n")}` : ""}
 
-${totalPenaltyPoints > 0 ? `PENALTIES: ${totalPenaltyPoints} pts total from: ${activePenalties.map(p => `"${p.name}" (${p.value} pts)`).join(", ")}` : "PENALTIES: None incurred."}
+${totalPenaltyPoints > 0 ? `PENALTIES: ${totalPenaltyPoints} pts total incurred.${activePenalties.length > 0 ? `\nKnown penalties: ${activePenalties.map(p => `"${p.name}" (${p.value} pts)`).join(", ")}` : ""}` : "PENALTIES: None incurred."}
 
 ${milestones.length > 0 ? `ACTIVE MILESTONES:\n${milestones.filter(m => !m.achieved).slice(0, 3).map(m => `- "${m.name}"`).join("\n")}` : ""}
 
 ===== CORE RULES (FOLLOW STRICTLY) =====
 
-1. TASKS ARE THE SOURCE OF TRUTH
-- Always reason from actual tasks first. Name specific tasks when describing strengths or concerns.
-- Never use vague language like "most tasks," "generally productive," or "overall consistency."
-- If you cannot ground a claim in task data, explicitly say there is insufficient data.
+1. TASKS ARE THE SOURCE OF TRUTH (when available)
+- When task-level data exists, always reason from actual tasks first. Name specific tasks.
+- When task-level data is NOT available, acknowledge this honestly and focus on what you CAN observe (points, penalties, milestones).
+- Never use vague language like "most tasks" or "generally productive."
 
 2. POINTS ARE SUPPORTING EVIDENCE, NOT CONCLUSIONS
-- Points quantify impact. They do NOT explain behavior on their own.
-- Use points only to support insights that are already grounded in specific tasks.
-- NEVER treat high points as automatic success if milestone-relevant tasks are missing.
+- Points quantify impact but do NOT explain behavior alone.
+- When you have task data: use points to support task-grounded insights.
+- When you only have aggregate points: acknowledge the limitation and focus on trends (daily averages, penalty patterns, goal comparison).
 
-3. CATEGORIES EXPLAIN PATTERNS
-- When discussing a category, explain it through concrete task examples.
-- "Health activity declined" must be followed by what specifically happened.
+3. CATEGORIES EXPLAIN PATTERNS (when tracked)
+- When category data exists, explain it through concrete task examples.
+- When category data is missing, do not speculate about categories.
 
 4. MILESTONES DEFINE MEANING
 - Tie behavior back to active milestones when relevant.
@@ -10052,16 +10074,18 @@ ${milestones.length > 0 ? `ACTIVE MILESTONES:\n${milestones.filter(m => !m.achie
 
 5. CONSISTENCY MATTERS MORE THAN PERFECTION
 - Look for repeated patterns, not one-off misses.
-- Do not shame occasional lapses. Highlight trends (improving, stable, declining).
+- Focus on trends: improving, stable, or declining based on the data available.
+- Do not shame occasional lapses.
 
 6. DO NOT INVENT PROBLEMS
-- If core tasks are completed and milestones are progressing, say so.
+- If the user is logging days and earning points, that is meaningful.
+- Do not claim there are problems just because task-level detail is missing.
 - Silence or affirmation is preferred over unnecessary critique.
-- Never complain for the sake of balance.
 
 7. PREFER HONESTY OVER COMPLETENESS
-- If data is thin, partial, or unclear, explicitly say so.
-- Never guess or fill gaps with generic productivity language.
+- If data is thin or partial, explicitly say so rather than guessing.
+- When task data is missing, say "I can see you logged X days and earned Y points, but I don't have task-level detail to identify specific patterns."
+- Never fill gaps with generic productivity language.
 
 ===== OUTPUT FORMAT =====
 
@@ -10107,8 +10131,11 @@ Respond ONLY with valid JSON:
         startDate: startDateStr,
         endDate: endDateStr,
         daysAnalyzed: totalDays,
+        daysWithTaskData: daysWithTaskDetails,
+        taskDataCoverage,
         totalPoints,
         avgDailyPoints: parseFloat(avgDailyPoints),
+        penaltyPoints: totalPenaltyPoints,
         generatedAt: new Date().toISOString(),
       });
     } catch (error: any) {
