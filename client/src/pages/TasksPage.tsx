@@ -1367,11 +1367,33 @@ export default function TasksPage() {
             : p
         ));
       } else if (!useMockData) {
-        updatePenaltyMutation.mutate({ id: editingPenalty.id, name: penaltyName, value: finalValue });
+        updatePenaltyMutation.mutate({ 
+          id: editingPenalty.id, 
+          name: penaltyName, 
+          value: finalValue,
+          negativeBoostEnabled: penaltyBoostEnabled,
+          timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+          period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+          boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+          rewardEnabled: penaltyRewardEnabled,
+          rewardType: penaltyRewardEnabled ? penaltyRewardType : undefined,
+          rewardPoints: penaltyRewardEnabled ? rewardPts : undefined,
+        });
       } else {
         setPenalties(penalties.map(p =>
           p.id === editingPenalty.id
-            ? { ...p, name: penaltyName, value: finalValue }
+            ? { 
+                ...p, 
+                name: penaltyName, 
+                value: finalValue,
+                negativeBoostEnabled: penaltyBoostEnabled,
+                timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+                period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+                boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+                rewardEnabled: penaltyRewardEnabled,
+                rewardType: penaltyRewardEnabled ? penaltyRewardType : undefined,
+                rewardPoints: penaltyRewardEnabled ? rewardPts : undefined,
+              }
             : p
         ));
       }
@@ -1396,14 +1418,30 @@ export default function TasksPage() {
         };
         setPenalties([...penalties, newPenalty]);
       } else if (!useMockData) {
-        createPenaltyMutation.mutate({ name: penaltyName, value: finalValue });
+        createPenaltyMutation.mutate({ 
+          name: penaltyName, 
+          value: finalValue,
+          negativeBoostEnabled: penaltyBoostEnabled,
+          timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+          period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+          boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+          rewardEnabled: penaltyRewardEnabled,
+          rewardType: penaltyRewardEnabled ? penaltyRewardType : undefined,
+          rewardPoints: penaltyRewardEnabled ? rewardPts : undefined,
+        });
       } else {
         const newPenalty: PenaltyItem = {
           id: `p${Date.now()}`,
           name: penaltyName,
           value: finalValue,
           category: "Penalties",
-          negativeBoostEnabled: false,
+          negativeBoostEnabled: penaltyBoostEnabled,
+          timesThreshold: penaltyBoostEnabled ? threshold : undefined,
+          period: penaltyBoostEnabled ? penaltyBoostPeriod : undefined,
+          boostPenaltyPoints: penaltyBoostEnabled ? boostPoints : undefined,
+          rewardEnabled: penaltyRewardEnabled,
+          rewardType: penaltyRewardEnabled ? penaltyRewardType : undefined,
+          rewardPoints: penaltyRewardEnabled ? rewardPts : undefined,
           currentCount: 0,
           triggered: false,
         };
