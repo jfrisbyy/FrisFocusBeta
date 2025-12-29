@@ -323,7 +323,7 @@ function RoutineForm({ initialData, onSave, onGenerate, isGenerating, isSaving }
 export default function FitnessPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
-  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  const { triggerPageVisit, mainOnboardingComplete, triggerGoalSet } = useOnboarding();
   
   useEffect(() => {
     if (mainOnboardingComplete) {
@@ -1016,10 +1016,13 @@ export default function FitnessPage() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/fitness/nutrition-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/goals"] });
       // If step goal was provided, also update the step goal setting
       if (variables.stepGoal) {
         updateStepGoalMutation.mutate(variables.stepGoal);
       }
+      // Trigger onboarding goal set event
+      triggerGoalSet();
       toast({ title: "Goal updated" });
       setGoalDialogOpen(false);
     },

@@ -308,6 +308,8 @@ export async function registerRoutes(
     mainOnboardingComplete: z.boolean().optional(),
     visitedPages: z.array(onboardingPageSchema).optional(),
     activePageWalkthrough: onboardingPageSchema.nullable().optional(),
+    finalCardShown: z.boolean().optional(),
+    showingFinalCard: z.boolean().optional(),
   }).strict();
 
   app.put('/api/onboarding/progress', isAuthenticated, async (req: any, res) => {

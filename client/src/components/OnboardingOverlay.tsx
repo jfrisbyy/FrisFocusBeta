@@ -6,7 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useOnboarding } from "@/contexts/OnboardingContext";
-import { OnboardingPage, getCardById, getOnboardingContentForAI, SkipCheckKey } from "@/lib/onboardingCards";
+import { OnboardingPage, getCardById, getOnboardingContentForAI, SkipCheckKey, mainOnboardingCards, pageWalkthroughCards } from "@/lib/onboardingCards";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -70,6 +70,8 @@ export function OnboardingOverlay() {
     minimizeForAction,
     completeOnboarding,
     skipCurrentCard,
+    activePageWalkthrough,
+    isFinalCard,
   } = useOnboarding();
 
   // Fetch data needed for skip checks - use same endpoints as rest of app
@@ -87,6 +89,9 @@ export function OnboardingOverlay() {
   });
   const { data: milestones = [] } = useQuery<Milestone[]>({
     queryKey: ["/api/milestones"],
+  });
+  const { data: goals = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/fitness/goals"],
   });
   
   // For todos and day logs, check ALL historical data (not just today)
@@ -112,10 +117,11 @@ export function OnboardingOverlay() {
       hasTodos: allTodos.length > 0,
       hasDaySaved: allDayLogs.length > 0,
       hasMilestones: milestones.length > 0,
+      hasGoalSet: goals.length > 0,
     };
     
     return skipCheckMap[currentCard.skipCheck] ?? false;
-  }, [currentCard, seasons, categories, tasks, penalties, allTodos, allDayLogs, milestones]);
+  }, [currentCard, seasons, categories, tasks, penalties, allTodos, allDayLogs, milestones, goals]);
 
   // Inline chat state
   const [showChat, setShowChat] = useState(false);
@@ -128,9 +134,9 @@ export function OnboardingOverlay() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
-  // Trigger confetti celebration when card 41 (final celebration card) appears
+  // Trigger confetti celebration when final card appears (after all walkthrough cards completed)
   useEffect(() => {
-    if (currentCardId === 41) {
+    if (isFinalCard) {
       const duration = 3000;
       const animationEnd = Date.now() + duration;
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
@@ -161,7 +167,38 @@ export function OnboardingOverlay() {
 
       return () => clearInterval(interval);
     }
-  }, [currentCardId]);
+  }, [isFinalCard]);
+  
+  // Calculate relative card position for display
+  const cardDisplayInfo = useMemo(() => {
+    if (!currentCardId) return { current: 0, total: 0 };
+    
+    if (activePageWalkthrough) {
+      const pageCards = pageWalkthroughCards[activePageWalkthrough];
+      const currentIndex = pageCards.indexOf(currentCardId);
+      if (currentIndex >= 0) {
+        return {
+          current: currentIndex + 1,
+          total: pageCards.length,
+        };
+      }
+    }
+    
+    // For main onboarding, show position in main cards (1-27)
+    const mainIndex = mainOnboardingCards.indexOf(currentCardId);
+    if (mainIndex >= 0) {
+      return {
+        current: mainIndex + 1,
+        total: mainOnboardingCards.length,
+      };
+    }
+    
+    // Fallback for cards not in standard sequences - show just the card number
+    return {
+      current: currentCardId,
+      total: 0, // 0 signals to hide "of X" display
+    };
+  }, [currentCardId, activePageWalkthrough]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ message, history }: { message: string; history: ChatMessage[] }) => {
@@ -216,6 +253,63 @@ export function OnboardingOverlay() {
     setShowChat(true);
   };
 
+  // Render final card when all walkthroughs completed
+  if (isFinalCard) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+        <Card 
+          className="w-full max-w-md border-l-4 border-l-primary shadow-lg bg-primary/5"
+          data-testid="card-onboarding-final"
+        >
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-primary/10">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Journey Complete!</CardTitle>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 -mt-1 -mr-2"
+                onClick={() => completeOnboarding()}
+                data-testid="button-onboarding-final-dismiss"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Congratulations!</p>
+          </CardHeader>
+
+          <CardContent className="space-y-3">
+            <p className="text-sm text-foreground leading-relaxed">
+              You've explored every corner of FrisFocus. From building your first season to understanding recognition, you now have the full picture.
+            </p>
+            <p className="text-sm text-foreground leading-relaxed">
+              This isn't the end — it's the beginning. The tools are yours. The structure is set. Now it's about showing up, one day at a time.
+            </p>
+            <p className="text-sm text-foreground leading-relaxed">
+              Go build something you're proud of.
+            </p>
+          </CardContent>
+
+          <CardFooter className="pt-4 border-t border-border">
+            <Button 
+              className="w-full"
+              onClick={() => {
+                completeOnboarding();
+              }}
+              data-testid="button-onboarding-final-complete"
+            >
+              Let's Go
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+  
   if (!currentCard || isMinimized) {
     return null;
   }
@@ -408,7 +502,11 @@ export function OnboardingOverlay() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Card {currentCardId} of 41
+            {isFinalCard 
+              ? "Congratulations!" 
+              : cardDisplayInfo.total > 0 
+                ? `Card ${cardDisplayInfo.current} of ${cardDisplayInfo.total}`
+                : `Card ${cardDisplayInfo.current}`}
           </p>
         </CardHeader>
 
@@ -535,6 +633,10 @@ export function OnboardingMinimizedIndicator() {
     queryKey: ["/api/milestones"],
     enabled: isMinimized && hasSkipCheck,
   });
+  const { data: goals = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/fitness/goals"],
+    enabled: isMinimized && hasSkipCheck,
+  });
   const { data: allTodos = [] } = useQuery<{ id: string }[]>({
     queryKey: ["/api/habit/all-daily-todos"],
     enabled: isMinimized && hasSkipCheck,
@@ -560,6 +662,7 @@ export function OnboardingMinimizedIndicator() {
       hasTodos: allTodos.length > 0,
       hasDaySaved: allDayLogs.length > 0,
       hasMilestones: milestones.length > 0,
+      hasGoalSet: goals.length > 0,
     };
     
     return skipCheckMap[card.skipCheck] ?? false;

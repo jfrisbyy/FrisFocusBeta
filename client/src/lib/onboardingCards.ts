@@ -379,6 +379,8 @@ export const onboardingCards: OnboardingCard[] = [
     content: [
       "Whether you're maintaining, losing weight, or gaining weight, pick what you're working toward — we'll handle the calculations and help you decide what to do next."
     ],
+    trigger: "goalSet",
+    skipCheck: "hasGoalSet",
   },
   {
     id: 30,

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from "react";
 import { clearAllFrisFocusData } from "@/lib/storage";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -26,6 +26,8 @@ interface OnboardingProgress {
   dismissedByUser: boolean;
   visitedPages: OnboardingPage[];
   activePageWalkthrough: OnboardingPage | null;
+  finalCardShown: boolean;
+  showingFinalCard: boolean;
 }
 
 const defaultProgress: OnboardingProgress = {
@@ -39,6 +41,8 @@ const defaultProgress: OnboardingProgress = {
   dismissedByUser: false,
   visitedPages: [],
   activePageWalkthrough: null,
+  finalCardShown: false,
+  showingFinalCard: false,
 };
 
 interface OnboardingContextType {
@@ -68,10 +72,14 @@ interface OnboardingContextType {
   isCardCompleted: (cardId: number) => boolean;
   triggerPenaltyCreated: () => void;
   triggerDaySaved: () => void;
+  triggerGoalSet: () => void;
   skipCurrentCard: () => void;
   triggerPageVisit: (page: OnboardingPage) => void;
   showPageWalkthrough: (page: OnboardingPage) => void;
   visitedPages: OnboardingPage[];
+  activePageWalkthrough: OnboardingPage | null;
+  isFinalCard: boolean;
+  showFinalCard: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -287,16 +295,37 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         const nextCardId = cardIndex < sequence.length - 1 ? sequence[cardIndex + 1] : null;
         
         if (nextCardId === null && progress.activePageWalkthrough) {
-          setProgress(prev => ({
-            ...prev,
-            completedCardIds: prev.completedCardIds.includes(currentCard.id)
-              ? prev.completedCardIds
-              : [...prev.completedCardIds, currentCard.id],
-            currentCardId: null,
-            waitingForTrigger: null,
-            isMinimized: false,
-            activePageWalkthrough: null,
-          }));
+          const newCompletedIds = progress.completedCardIds.includes(currentCard.id)
+            ? progress.completedCardIds
+            : [...progress.completedCardIds, currentCard.id];
+          
+          // Check if all cards completed to show final card
+          const allCardIds = [...mainOnboardingCards];
+          Object.values(pageWalkthroughCards).forEach(cards => {
+            allCardIds.push(...cards);
+          });
+          const allDone = allCardIds.every(id => newCompletedIds.includes(id));
+          
+          if (allDone && !progress.finalCardShown) {
+            setProgress(prev => ({
+              ...prev,
+              completedCardIds: newCompletedIds,
+              currentCardId: null,
+              waitingForTrigger: null,
+              isMinimized: false,
+              activePageWalkthrough: null,
+              showingFinalCard: true,
+            }));
+          } else {
+            setProgress(prev => ({
+              ...prev,
+              completedCardIds: newCompletedIds,
+              currentCardId: null,
+              waitingForTrigger: null,
+              isMinimized: false,
+              activePageWalkthrough: null,
+            }));
+          }
         } else if (nextCardId === null) {
           setProgress(prev => ({
             ...prev,
@@ -398,6 +427,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       waitingForTrigger: null,
       isMinimized: false,
       activePageWalkthrough: null,
+      showingFinalCard: false,
+      finalCardShown: true,
     }));
     
     refetchUser();
@@ -422,6 +453,52 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const triggerDaySaved = useCallback(() => {
     triggerAction("daySaved");
   }, [triggerAction]);
+
+  const triggerGoalSet = useCallback(() => {
+    triggerAction("goalSet");
+  }, [triggerAction]);
+
+  // Check if all onboarding cards have been completed (to show final card)
+  const allCardsCompleted = useMemo(() => {
+    // All cards from 1-47 should be completed
+    const allCardIds = [...mainOnboardingCards];
+    Object.values(pageWalkthroughCards).forEach(cards => {
+      allCardIds.push(...cards);
+    });
+    return allCardIds.every(id => progress.completedCardIds.includes(id));
+  }, [progress.completedCardIds]);
+
+  // Show final card when all cards completed and hasn't been shown before
+  const showFinalCard = useCallback(() => {
+    if (progress.finalCardShown) return;
+    
+    setProgress(prev => ({
+      ...prev,
+      showingFinalCard: true,
+      isMinimized: false,
+    }));
+  }, [progress.finalCardShown]);
+
+  // Dismiss final card
+  const dismissFinalCard = useCallback(() => {
+    setProgress(prev => ({
+      ...prev,
+      showingFinalCard: false,
+      finalCardShown: true,
+    }));
+  }, []);
+
+  const isFinalCard = progress.showingFinalCard && !progress.finalCardShown;
+  
+  // Automatically trigger final card when all cards are completed
+  useEffect(() => {
+    if (allCardsCompleted && !progress.finalCardShown && !progress.showingFinalCard && hasLoadedFromServer) {
+      setProgress(prev => ({
+        ...prev,
+        showingFinalCard: true,
+      }));
+    }
+  }, [allCardsCompleted, progress.finalCardShown, progress.showingFinalCard, hasLoadedFromServer]);
 
   const skipCurrentCard = useCallback(() => {
     const sequence = getActiveCardSequence();
@@ -457,13 +534,35 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       }
     } else {
       if (progress.activePageWalkthrough) {
-        setProgress(prev => ({
-          ...prev,
-          currentCardId: null,
-          activePageWalkthrough: null,
-          waitingForTrigger: null,
-          isMinimized: false,
-        }));
+        // Check if all cards will be completed after this skip
+        const newCompletedIds = progress.currentCardId !== null && !progress.completedCardIds.includes(progress.currentCardId)
+          ? [...progress.completedCardIds, progress.currentCardId]
+          : progress.completedCardIds;
+        
+        const allCardIds = [...mainOnboardingCards];
+        Object.values(pageWalkthroughCards).forEach(cards => {
+          allCardIds.push(...cards);
+        });
+        const allDone = allCardIds.every(id => newCompletedIds.includes(id));
+        
+        if (allDone && !progress.finalCardShown) {
+          setProgress(prev => ({
+            ...prev,
+            currentCardId: null,
+            activePageWalkthrough: null,
+            waitingForTrigger: null,
+            isMinimized: false,
+            showingFinalCard: true,
+          }));
+        } else {
+          setProgress(prev => ({
+            ...prev,
+            currentCardId: null,
+            activePageWalkthrough: null,
+            waitingForTrigger: null,
+            isMinimized: false,
+          }));
+        }
       } else {
         setProgress(prev => ({
           ...prev,
@@ -475,7 +574,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         }));
       }
     }
-  }, [getActiveCardSequence, progress.currentCardId, progress.activePageWalkthrough]);
+  }, [getActiveCardSequence, progress.currentCardId, progress.activePageWalkthrough, progress.completedCardIds, progress.finalCardShown]);
 
   const startJourney = async () => {
     if (!user?.id) return;
@@ -511,10 +610,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       isCardCompleted,
       triggerPenaltyCreated,
       triggerDaySaved,
+      triggerGoalSet,
       skipCurrentCard,
       triggerPageVisit,
       showPageWalkthrough,
       visitedPages: progress.visitedPages,
+      activePageWalkthrough: progress.activePageWalkthrough,
+      isFinalCard,
+      showFinalCard,
     }}>
       {children}
     </OnboardingContext.Provider>
