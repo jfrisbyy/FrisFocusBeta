@@ -524,7 +524,7 @@ export default function RecognitionPage() {
           <p className="text-muted-foreground text-sm">Track your achievements and community recognition</p>
         </div>
         <Button variant="ghost" size="icon" onClick={() => {
-          if (mainOnboardingComplete && !visitedPages.includes("badges")) {
+          if (mainOnboardingComplete) {
             showPageWalkthrough("badges");
           } else {
             setHelpDialogOpen(true);

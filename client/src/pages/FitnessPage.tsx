@@ -1090,7 +1090,7 @@ export default function FitnessPage() {
           <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
         </div>
         <Button variant="ghost" size="icon" onClick={() => {
-          if (mainOnboardingComplete && !visitedPages.includes("health")) {
+          if (mainOnboardingComplete) {
             showPageWalkthrough("health");
           } else {
             setHelpDialogOpen(true);

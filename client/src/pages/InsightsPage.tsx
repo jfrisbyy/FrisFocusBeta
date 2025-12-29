@@ -425,7 +425,7 @@ export default function InsightsPage() {
               </Button>
             )}
             <Button variant="ghost" size="icon" onClick={() => {
-              if (mainOnboardingComplete && !visitedPages.includes("insights")) {
+              if (mainOnboardingComplete) {
                 showPageWalkthrough("insights");
               } else {
                 setHelpDialogOpen(true);

@@ -662,13 +662,13 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
                   <Button
                     onClick={() => {
                       onOpenChange(false);
-                      showOnboarding();
+                      showOnboarding(true);
                     }}
                     className="w-full"
-                    data-testid="button-help-replay-full-tutorial"
+                    data-testid="button-help-replay-walkthrough"
                   >
                     <PlayCircle className="h-4 w-4 mr-2" />
-                    Replay Full Tutorial
+                    Replay Walkthrough
                   </Button>
                 ) : null}
                 <Button
@@ -818,13 +818,13 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
                 size="sm"
                 onClick={() => {
                   onOpenChange(false);
-                  showOnboarding();
+                  showOnboarding(true);
                 }}
                 className="w-full"
-                data-testid="button-help-replay-full-tutorial"
+                data-testid="button-help-replay-walkthrough"
               >
                 <PlayCircle className="h-4 w-4 mr-2" />
-                Replay Full Tutorial
+                Replay Walkthrough
               </Button>
             ) : null
           )}

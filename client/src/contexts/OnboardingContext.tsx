@@ -59,7 +59,7 @@ interface OnboardingContextType {
   dismissedByUser: boolean;
   waitingForTrigger: OnboardingTrigger | null;
   isMinimized: boolean;
-  showOnboarding: () => void;
+  showOnboarding: (forceReplay?: boolean) => void;
   hideOnboarding: () => void;
   minimizeForAction: () => void;
   goToNextCard: () => void;
@@ -152,12 +152,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     return mainOnboardingCards;
   }, [progress.activePageWalkthrough]);
 
-  const showOnboarding = useCallback(() => {
-    if (progress.mainOnboardingComplete) {
+  const showOnboarding = useCallback((forceReplay: boolean = false) => {
+    if (progress.mainOnboardingComplete && !forceReplay) {
       return;
     }
     
-    if (progress.onboardingComplete || progress.dismissedByUser) {
+    if (forceReplay || progress.onboardingComplete || progress.dismissedByUser) {
       setProgress(prev => ({ 
         ...prev, 
         currentCardId: 1, 

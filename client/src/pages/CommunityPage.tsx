@@ -5921,7 +5921,7 @@ export default function CommunityPage() {
           </div>
         </div>
         <Button variant="ghost" size="icon" onClick={() => {
-          if (mainOnboardingComplete && !visitedPages.includes("community")) {
+          if (mainOnboardingComplete) {
             showPageWalkthrough("community");
           } else {
             setHelpDialogOpen(true);

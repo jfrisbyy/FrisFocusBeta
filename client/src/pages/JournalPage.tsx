@@ -1065,7 +1065,7 @@ export default function JournalPage() {
               New Entry
             </Button>
             <Button variant="ghost" size="icon" onClick={() => {
-              if (mainOnboardingComplete && !visitedPages.includes("journal")) {
+              if (mainOnboardingComplete) {
                 showPageWalkthrough("journal");
               } else {
                 setHelpDialogOpen(true);
