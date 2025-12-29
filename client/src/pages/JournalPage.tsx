@@ -310,6 +310,9 @@ export default function JournalPage() {
     },
   });
 
+  // Get active season for auto-tagging entries
+  const activeSeason = seasons.find(s => s.isActive && !s.isArchived);
+
   // Enhanced entry mutations
   const createEnhancedEntryMutation = useMutation({
     mutationFn: async (data: { 
@@ -320,6 +323,7 @@ export default function JournalPage() {
       title?: string;
       content?: string;
       fieldValues?: Record<string, any>;
+      seasonId?: string;
     }) => {
       const res = await apiRequest("POST", "/api/journal/entries", data);
       return res.json();
@@ -584,6 +588,7 @@ export default function JournalPage() {
           date: dateStr,
           title: formTitle.trim() || undefined,
           fieldValues: formFieldValues,
+          seasonId: activeSeason?.id,
         });
       } else if (user && formFolderId) {
         // Save journal entry WITH folder using enhanced entries API
@@ -593,26 +598,17 @@ export default function JournalPage() {
           date: dateStr,
           title: autoTitle,
           content: formContent.trim(),
+          seasonId: activeSeason?.id,
         });
       } else if (user) {
-        // Save journal entry WITHOUT folder using legacy API
-        try {
-          await createMutation.mutateAsync({
-            date: dateStr,
-            title: autoTitle,
-            content: formContent.trim(),
-          });
-          toast({
-            title: "Entry created",
-            description: "Your journal entry has been added",
-          });
-        } catch (error) {
-          toast({
-            title: "Error",
-            description: "Failed to create journal entry",
-            variant: "destructive",
-          });
-        }
+        // Save journal entry WITHOUT folder using enhanced API (to support seasonId)
+        await createEnhancedEntryMutation.mutateAsync({
+          entryType: "journal",
+          date: dateStr,
+          title: autoTitle,
+          content: formContent.trim(),
+          seasonId: activeSeason?.id,
+        });
       } else {
         const newEntry: JournalEntry = {
           id: `entry-${Date.now()}`,

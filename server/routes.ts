@@ -8703,7 +8703,7 @@ CURRENT CONVERSATION STATE:
   app.post("/api/journal/entries", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { folderId, templateId, entryType, date, title, content, fieldValues, mood, tags } = req.body;
+      const { folderId, templateId, entryType, date, title, content, fieldValues, mood, tags, seasonId } = req.body;
       
       if (!date) {
         return res.status(400).json({ error: "Date is required" });
@@ -8713,6 +8713,7 @@ CURRENT CONVERSATION STATE:
         userId,
         folderId: folderId || null,
         templateId: templateId || null,
+        seasonId: seasonId || null,
         entryType: entryType || "journal",
         date,
         title: title || null,
