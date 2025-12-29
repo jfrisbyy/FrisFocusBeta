@@ -425,11 +425,7 @@ export default function InsightsPage() {
               </Button>
             )}
             <Button variant="ghost" size="icon" onClick={() => {
-              if (mainOnboardingComplete) {
-                showPageWalkthrough("insights");
-              } else {
-                setHelpDialogOpen(true);
-              }
+              showPageWalkthrough("insights");
             }} data-testid="button-insights-help">
               <HelpCircle className="h-5 w-5" />
             </Button>

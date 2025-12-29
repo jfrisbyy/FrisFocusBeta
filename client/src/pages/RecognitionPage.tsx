@@ -524,11 +524,7 @@ export default function RecognitionPage() {
           <p className="text-muted-foreground text-sm">Track your achievements and community recognition</p>
         </div>
         <Button variant="ghost" size="icon" onClick={() => {
-          if (mainOnboardingComplete) {
-            showPageWalkthrough("badges");
-          } else {
-            setHelpDialogOpen(true);
-          }
+          showPageWalkthrough("badges");
         }} data-testid="button-recognition-help">
           <HelpCircle className="h-5 w-5" />
         </Button>

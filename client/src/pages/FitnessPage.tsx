@@ -1090,11 +1090,7 @@ export default function FitnessPage() {
           <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
         </div>
         <Button variant="ghost" size="icon" onClick={() => {
-          if (mainOnboardingComplete) {
-            showPageWalkthrough("health");
-          } else {
-            setHelpDialogOpen(true);
-          }
+          showPageWalkthrough("health");
         }} data-testid="button-health-help">
           <HelpCircle className="h-5 w-5" />
         </Button>

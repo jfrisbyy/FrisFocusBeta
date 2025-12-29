@@ -1065,11 +1065,7 @@ export default function JournalPage() {
               New Entry
             </Button>
             <Button variant="ghost" size="icon" onClick={() => {
-              if (mainOnboardingComplete) {
-                showPageWalkthrough("journal");
-              } else {
-                setHelpDialogOpen(true);
-              }
+              showPageWalkthrough("journal");
             }} data-testid="button-journal-help">
               <HelpCircle className="h-5 w-5" />
             </Button>

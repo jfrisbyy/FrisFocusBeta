@@ -56,11 +56,11 @@ export const onboardingCards: OnboardingCard[] = [
     title: "Getting Started",
     content: [
       "There's a lot here, and you don't need to learn it all at once.",
-      "You can flip through the remaining cards, or start exploring right away and learn as you go. Helpful guidance will appear as you move around the app, and you can always come back to these cards anytime from the question mark under the settings gear."
+      "Click start exploring for a guided walkthrough."
     ],
     showButtons: {
       primary: { text: "Start Exploring", action: "explore" },
-      secondary: { text: "Keep Learning", action: "next" }
+      secondary: { text: "Skip for Now", action: "skip" }
     }
   },
   {

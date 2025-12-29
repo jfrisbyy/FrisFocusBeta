@@ -5921,11 +5921,7 @@ export default function CommunityPage() {
           </div>
         </div>
         <Button variant="ghost" size="icon" onClick={() => {
-          if (mainOnboardingComplete) {
-            showPageWalkthrough("community");
-          } else {
-            setHelpDialogOpen(true);
-          }
+          showPageWalkthrough("community");
         }} data-testid="button-community-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
