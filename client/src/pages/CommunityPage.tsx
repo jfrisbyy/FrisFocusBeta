@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useDemo } from "@/contexts/DemoContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1127,6 +1128,14 @@ export default function CommunityPage() {
   const { isDemo } = useDemo();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  
+  useEffect(() => {
+    if (mainOnboardingComplete) {
+      triggerPageVisit("community");
+    }
+  }, [mainOnboardingComplete, triggerPageVisit]);
+  
   const [email, setEmail] = useState("");
   const [showEmailInvite, setShowEmailInvite] = useState(false);
   const [pendingInviteEmail, setPendingInviteEmail] = useState("");
@@ -5915,7 +5924,7 @@ export default function CommunityPage() {
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>
-      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[6]} />
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[6]} currentPage="community" />
 
       <Tabs value={communityTab} onValueChange={(v) => {
         setCommunityTab(v as "friends" | "circles" | "feed");

@@ -1907,6 +1907,7 @@ export default function Dashboard() {
         open={helpDialogOpen} 
         onOpenChange={handleHelpDialogClose}
         simplified={true}
+        currentPage="dashboard"
       />
 
       {(() => {

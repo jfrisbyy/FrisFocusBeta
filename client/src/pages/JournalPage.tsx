@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,9 @@ import {
   FileText,
   PanelLeftClose,
   PanelLeft,
+  HelpCircle,
 } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -146,7 +149,16 @@ export default function JournalPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
   const { user } = useAuth();
+  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  
+  useEffect(() => {
+    if (mainOnboardingComplete) {
+      triggerPageVisit("journal");
+    }
+  }, [mainOnboardingComplete, triggerPageVisit]);
+  
   const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
@@ -1047,11 +1059,17 @@ export default function JournalPage() {
             <h2 className="text-2xl font-semibold tracking-tight">Journal</h2>
             <p className="text-muted-foreground text-sm">Record your thoughts and reflections</p>
           </div>
-          <Button onClick={handleOpenCreate} data-testid="button-new-entry">
-            <Plus className="h-4 w-4 mr-2" />
-            New Entry
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleOpenCreate} data-testid="button-new-entry">
+              <Plus className="h-4 w-4 mr-2" />
+              New Entry
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-journal-help">
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
+        <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} currentPage="journal" />
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Card>

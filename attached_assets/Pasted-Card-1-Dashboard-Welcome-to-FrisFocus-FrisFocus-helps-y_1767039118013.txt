@@ -1,0 +1,307 @@
+Card 1 - Dashboard 
+
+Welcome to FrisFocus
+FrisFocus helps you organize your life around what actually matters — and follow through with structure, accountability, and visibility.
+This isn’t about doing more.
+It’s about doing what matters, consistently.
+You can start solo, or with others.
+You can keep things simple, or build something competitive.
+You can adjust anytime.
+There’s no “perfect” setup — just one that fits you right now.
+
+Card 2 - Dashboard page
+Getting Started 
+There’s a lot here, and you don’t need to learn it all at once.
+You can flip through the remaining cards, or start exploring right away and learn as you go. Helpful guidance will appear as you move around the app, and you can always come back to these cards anytime from the question mark under the settings gear.
+(user presented with two options, start exploring which opens up card 3, or keep learning, which advances to the next slide in the series of 10) 
+
+Card 3 - Dashboard page
+Start Exploring 
+You’re ready to start exploring.
+ We’ll begin on the Tasks page, where the structure behind everything else lives.
+This setup is designed to be quick. Most people finish in about five minutes, and nothing needs to be perfect — you can always adjust things later.
+
+
+
+Cad 4 - Tasks page 
+This is where your structure lives.
+ Tasks hold the habits, routines, and commitments that support the direction you’re working toward.
+Let’s start by creating a season — a defined phase of focus that gives everything context.
+
+Card 5 - Tasks page
+Life doesn’t stay static,  your goals, responsibilities, and energy change over time.
+FrisFocus is built to move with you.
+A Season represents a phase of your life, you define what matters right now — without locking yourself into a single path. 
+For example, your priorities and the habits that build you up as a student will look much different than the priorities that you would need after you graduate. Both matter! 
+You can create a season at any time from the banner at the top of this page.
+Let’s start one now — give it a name and use the description to capture what this phase of your life looks like or what you’re focusing on.
+
+Card 6 - Tasks page (after Season is created)
+Nice work — you’ve created your first season.
+When your priorities or circumstances shift, you can always create a new one.
+Don’t worry — past seasons are saved so you can look back, reflect, and see how you’ve grown over time.
+
+
+Card 7 - Tasks page 
+Now let’s add some tasks.
+ Tasks represent actions you repeat regularly to support your current season — things like workouts, study sessions, journaling, recovery habits, or daily routines.
+They form the foundation of consistency. Think about the person you want to be six months from now, and ask yourself: What actions would I need to take consistently to get there?
+Those actions belong here.
+
+
+
+Card 8 - Tasks page
+There’s no fixed number of tasks.
+ Create as many as make sense for you. Along with bigger habits, don’t overlook the small, repeatable actions that keep your days running smoothly — things you might not normally think to track.
+Consistency is often built on the basics.. 
+
+Card 9 - Tasks page 
+Tasks are organized using categories.
+ Categories help you group responsibilities based on different areas of your life. They’re fully customizable — common examples include health, career, spiritual, or social — but you can tailor them however you’d like.
+Go ahead and create your first category by clicking the + icon in the category card.
+
+
+Card 10 - Tasks page (after 2 categories are created) 
+Tasks also have priority levels.
+ This helps the system understand what matters most right now.
+Must Do
+ Core actions that directly support your goals. You’ll be alerted if these aren’t logged after three days.
+Should Do
+ Helpful actions that strengthen progress. You’ll be alerted if you go ten days without logging them.
+Could Do
+ Supportive actions that add balance but won’t derail progress if missed. These are often things you enjoy or personal side projects.
+
+
+
+Card 11 - Tasks page 
+Finally, let’s talk about scoring.
+ You’ll set a personal daily point goal and weekly point goal. Each task is assigned points that roll up toward these goals as you complete them.
+This is a private system designed to help you stay intentional and aware day to day.
+The default is 50 points per day and 350 points per week, but you’re encouraged to adjust the scale as you get more comfortable and tailor it to what feels realistic for you.
+
+
+Card 12 - Tasks page 
+When assigning points to a task, think in context of your overall goal.
+ If your daily target is 50 points, a single task probably shouldn’t be worth 30 — that can throw off the balance of your system.
+Score tasks based on both priority and difficulty. Tasks that directly support your main focus — especially ones you know are harder for you to stay consistent with — should be worth more. Tasks that matter but come more easily can be scored lower.
+ 
+
+Card 13 - Tasks page 
+Tasks can also include boosters and penalties to reinforce consistency.
+ Boosters reward patterns you want to build — for example, earning extra points when you complete a task multiple times within a set period.
+Penalties work the opposite way, helping you notice when something important is being avoided or skipped. Both are optional tools meant to support awareness and follow-through, not perfection.
+
+Card 14 - Tasks page 
+
+Now that you’re familiar with tasks, let’s create your first one.
+Click the green New Task button on this page to get started. You can fill everything out manually or have the system guide you through it step by step.
+
+Card 15 - Tasks page (after task is created)
+Nice work.
+Figuring out the right tasks can take some thought — that’s normal. If you’re feeling unsure or stuck, you can use the Generate with AI button for help identifying what’s worth focusing on based on your goals.! 
+
+Card 16 - Tasks page 
+Have any habits or distractions you want to reduce?
+ Penalties are a way to bring awareness and accountability to things you’re working on changing. You can lose points when a habit shows up — and earn points for time spent without it.
+Take a moment to think of one habit or distraction, then click Create a Penalty under the tasks section to get started.
+
+
+
+
+Card 16 - Tasks page 
+Nice progress so far.
+Let’s move to the Daily page using the top banner, right next to Tasks.
+
+Card 17 - Daily page 
+Now that you’ve created your task library, each day, you’ll come here to log the tasks you completed and track how you’re actually spending your time.
+Card 18 - Daily page
+You can assign a schedule to each day. Create different schedule templates — like workdays, rest days, travel days, or weekends — and apply them as needed. This helps your tasks match the reality of your day instead of forcing one routine onto every day.
+
+Card 18 - Daily page 
+To-do list items are flexible and optional.
+ Some people use them to organize which tasks they plan to complete that day, while others use them for one-off items that don’t belong in their regular routine — things like a dentist appointment or grocery shopping.
+You can assign points to to-do items if you’d like, or even attach penalties if something important is skipped. Just be mindful not to double-count points — if a to-do item is already tracked as a task, scoring both can inflate your totals.
+If something doesn’t get finished, you can also import incomplete items from yesterday into today, so nothing gets lost.
+Go ahead and create one to-do item for today — whatever makes sense for you.
+
+
+Card 19 - Daily page (after to do list item is added)
+This page is where you log as you go.
+As you complete tasks or to-do items throughout the day, you can check them off here at any time.
+When you’re ready — whether that’s immediately or later — click Save Day to record your progress and lock in your points. You can always come back and update things as needed.
+
+Card 20 - Daily page 
+You can also add a journal note from here.
+ Anything you write will appear directly in your journal — whether it’s how you’re feeling, a reflection on the day, or a quick check-in.
+Go ahead and write a short note, check off a task or to-do if you’ve completed one, and click Save Day when you’re ready.
+
+Card 21 - Daily page
+You’ve got the foundation down.
+Now let’s head back to the Dashboard — this is where everything you’ve set up starts to come together.
+
+
+
+Card 22 - Dashboard
+The dashboard is your high-level view.
+It brings everything together so you can quickly see how you’re doing — including progress toward your weekly point goal, a breakdown of each day, your current streak, and alerts for tasks that still need attention.
+Card 23 - Dashboard
+Plan ahead from here.
+ The dashboard lets you add due dates, weekly to-do items, and milestones to organize what you’re working toward.
+Due dates are for fixed obligations with real deadlines — things like rent, credit card payments, or important submissions. They help make sure nothing critical slips through the cracks.
+Weekly to-do items are for things that need to get done at some point during the week, but don’t need to be tied to a specific day yet.
+Milestones represent the major outcomes and goals you want to achieve during this season. These are the bigger accomplishments you’re working toward over time.
+Think of one meaningful milestone for this season and add it here. When you complete it, you can reward yourself with points that reflect the effort it took.
+
+
+Card 24 - Dashboard (after milestone is created)
+This dashboard is meant to adapt to you.
+Use the settings gear at the top of the page to customize how it looks and works. You can adjust colors, update your welcome message, choose which cards appear, and even change their order — so your dashboard reflects what matters most to you.
+Card 25 - Dashboard 
+You’ve got the foundation in place.
+ From here, you can explore FrisFocus naturally. As you move to different pages, short walkthroughs will appear when needed to help you understand each feature in context.
+Use the system at your own pace — the more you engage with it, the more value it provides over time.
+
+
+
+
+HEALTH 
+Card 1 - Health page 
+This is your all inclusive Health hub! Whether you are trying to lose weight, gain weight, or just maintain, our comprehensive system is designed to figure out the best plan for you. FrisFocus meets you where you are and grows with you as your fitness goals evolve.   
+Card 2 - Health page 
+Start by choosing your goal.
+Whether you’re maintaining, losing weight, or gaining weight, pick what you’re working toward — we’ll handle the calculations and help you decide what to do next. 
+(prompt user to go through goal setting system, and when it is completed, move on)
+
+Card 3 - Health page 
+Now that your goal is set, it’s time to track nutrition.
+Log meals manually, enter macros, describe your meal, or snap a photo to estimate calories — keep everything organized in one place to easily keep track of your progress. 
+
+Card 4 - Health page 
+Next, log your training and track progress.
+Create workout routines aligned to your goals and log gym sessions, practices, games, or runs - then track weight over time to see if you’re staying on pace.
+Card 5 - Health page 
+Now let’s connect the dots.
+ Your caloric delta is the balance between what you eat and how much you move. FrisFocus uses it to show whether you’re trending toward your goal — without forcing daily perfection.
+You can log activity burn manually, or let the system estimate it by briefly describing your workout, practice, or session.
+
+
+
+
+
+
+
+ Community Page
+Card 1 
+FrisFocus works solo — but becomes more powerful with others.
+The community page is your hub for checking in on friends and their progress, and holding each other accountable ! 
+
+Card 2 - Community page
+Friends: Shared Progress, Personal Support
+FrisFocus lets you add friends to share progress, stay connected, and support each other along the way — without distracting from your personal system.
+Friends don’t change your goals.
+They make consistency easier.
+
+Card 3 - Community page
+Sharing Progress
+When you add friends, you can choose to share what you would like, including task completions, streaks and milestones, progress updates, fitness data, but your structure stays personal — visibility is optional and intentional. Not all friends need the same level of visibility. 
+
+Card 4 - Community Page
+Circles are shared spaces where progress is visible and accountability is mutual,transforming goals into shared commitments.
+Instead of everyone working alone, members follow a common task list and build consistency together. Perfect for teams, friends, or families who want accountability to feel collaborative — not forced.
+Card 5 - Community Page 
+Within a Circle, you can create Awards and Badges to recognize progress and contribution.
+ These can reflect:
+
+
+Awards and Badges help turn shared effort into something tangible — without losing the focus on growth, and you can tie real life rewards to them if it makes sense for your circle! 
+Card 6 - Community Page 
+Go 1v1 with a friend, or compete Circle vs Circle, where groups follow the same task structure and progress is tracked collectively. It’s friendly pressure, designed to push everyone forward.
+
+Card 7 - Community Page 
+Feed: Shared Progress, Not Noise
+The Feed is a simple space to share progress, reflections, and wins with the FrisFocus community.
+ It’s not about likes or performance — it’s about visibility, encouragement, and momentum.
+Posts can be quick or thoughtful — whatever fits the moment.
+
+
+
+INSIGHTS PAGE
+
+Card 1 - Insights is your personal assistant, grounded in your data and your goals.
+It looks across your tasks, habits, streaks, and seasons to help you understand what’s working, what’s getting in the way, and where small changes can make the biggest difference.
+Think of it as a reflective partner that helps you spot patterns, stay aligned over time, and make clearer decisions — without guessing or pressure.
+
+Card 2 - Insights Page 
+
+
+Customize Your Insights Assistant
+Your Insights assistant isn’t one-size-fits-all — you can shape how it works for you.
+By clicking the setting gear, you can give it instructions about:
+how you like feedback delivered
+
+
+what you want it to prioritize (discipline, balance, flexibility, performance)
+
+
+how strict or supportive you want it to be
+
+
+personal context that helps it understand you better
+
+
+The more you guide it, the better it reflects your values, goals, and preferences.
+
+
+
+
+
+Card 39- Journal page
+
+Journal: Reflection That Connects the Dots
+Card 1 
+The Journal is a space to capture thoughts, reflections, and check-ins as you move through your days.
+ It’s designed to help you slow down, make sense of your progress, and notice patterns that aren’t always visible in the moment.
+Entries can be quick notes, honest reflections, lessons learned, moments worth remembering, whatever you need it to be!
+Your journal stays personal — but it works alongside your tasks, seasons, and insights to give your growth context. 
+Card 2 
+Organize reflection in a way that works for you.
+ Create folders to group related entries, and build custom trackers to log specific things over time — using templates you control.
+Trackers can be used for things like mood, energy, habits, symptoms, training notes, spiritual check-ins, creative progress, or anything else you want to notice consistently.
+
+
+
+Recognition 
+
+Card 1
+Recognition highlights the effort behind your progress.
+ This page brings together focus points, personal badges, and global stamps to highlight outcomes, consistency, and milestones across your journey.
+It’s designed to show what your effort led to, not just how busy you were.
+
+Card 2 
+Focus points represent achieved outcomes.
+ Unlike daily or weekly points — which reflect effort, activity, and follow-through — focus points are earned for results that matter across a longer horizon.
+They’re awarded for things like reaching a milestone, staying consistent over time, winning a competition, completing a defined challenge, or supporting others in your circles.
+Focus points exist on a shared scale for everyone. Their purpose isn’t to drive day-to-day behavior, but to reflect what your effort ultimately led to — and to give meaningful context to progress over time
+
+Card 3 
+Badges are personal milestones you create for yourself.
+They’re tied to your season, your tasks, and your definition of consistency — not a global standard.
+For example, you might create a badge for logging workouts 30 times, with levels that unlock as you continue (20 logs, 40 logs, and beyond). You can design these manually or let AI help generate badge ideas based on your task list.
+Badges are meant to make showing up visible — in a way that’s motivating, flexible, and uniquely yours.
+Card 4 
+Community stamps are platform-wide achievements.
+Stamps are earned through fixed criteria that apply to everyone and are visible across the FrisFocus community.
+Stamps recognize major milestones — like completing hundreds of tasks, winning circle competitions, or reaching significant goals. Because the criteria are the same for all users, stamps carry shared meaning wherever they appear.
+
+
+
+
+
+
+
+
+FINAL CARD (only show once every single one of all of these cards have been completed)
+You’re all set.
+ You’ve seen how the system works — now the value comes from showing up and using it.
+FrisFocus doesn’t replace effort or decisions. It reflects them. The more consistently you log, reflect, and adjust, the clearer and more rewarding the system becomes over time.
+Take it at your own pace, shape it around your life, and keep showing up. We’ll be here to help you make sense of it as you go.

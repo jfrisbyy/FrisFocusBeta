@@ -1571,7 +1571,7 @@ export default function TasksPage() {
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>
-      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[2, 3]} />
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[2, 3]} currentPage="tasks" />
 
       {!isDemo && (
         <div className={`bg-gradient-to-r ${getBannerColorClasses(activeSeason?.bannerColor).gradient} border ${getBannerColorClasses(activeSeason?.bannerColor).border} rounded-lg p-4`}>

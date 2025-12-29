@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { useDemo } from "@/contexts/DemoContext";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences, WorkoutRoutine, RoutineExercise } from "@shared/schema";
@@ -322,6 +323,14 @@ function RoutineForm({ initialData, onSave, onGenerate, isGenerating, isSaving }
 export default function FitnessPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
+  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  
+  useEffect(() => {
+    if (mainOnboardingComplete) {
+      triggerPageVisit("health");
+    }
+  }, [mainOnboardingComplete, triggerPageVisit]);
+  
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [sportsSubTab, setSportsSubTab] = useState<SportsSubTab>("runs");
   const [gymSubTab, setGymSubTab] = useState<GymSubTab>("strength");
@@ -1081,7 +1090,7 @@ export default function FitnessPage() {
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>
-      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[5]} />
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[5]} currentPage="health" />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ActiveTab)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5 h-auto">

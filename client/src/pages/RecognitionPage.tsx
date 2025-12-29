@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,9 @@ import {
   CheckCircle,
   Crown,
   RotateCw,
+  HelpCircle,
 } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
@@ -222,7 +225,16 @@ const sampleBadges: BadgeDefinition[] = [
 export default function RecognitionPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
+  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  
+  useEffect(() => {
+    if (mainOnboardingComplete) {
+      triggerPageVisit("badges");
+    }
+  }, [mainOnboardingComplete, triggerPageVisit]);
+  
   const [badges, setBadges] = useState<BadgeDefinition[]>([]);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBadge, setEditingBadge] = useState<BadgeDefinition | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -511,7 +523,11 @@ export default function RecognitionPage() {
           <h2 className="text-2xl font-semibold tracking-tight">Recognition</h2>
           <p className="text-muted-foreground text-sm">Track your achievements and community recognition</p>
         </div>
+        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-recognition-help">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
       </div>
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} currentPage="badges" />
 
       <Tabs defaultValue="focus-points" className="space-y-4">
         <TabsList>

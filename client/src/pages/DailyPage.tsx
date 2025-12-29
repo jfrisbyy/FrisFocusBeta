@@ -788,7 +788,7 @@ export default function DailyPage() {
             Go to the Tasks page to add tasks and penalties to track.
           </p>
         </div>
-        <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} />
+        <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} currentPage="daily" />
       </div>
     );
   }
@@ -807,7 +807,7 @@ export default function DailyPage() {
         </div>
         <DatePicker date={date} onDateChange={setDate} />
       </div>
-      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} />
+      <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} filterCards={[3]} currentPage="daily" />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">

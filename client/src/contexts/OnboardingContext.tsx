@@ -5,9 +5,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { 
   onboardingCards, 
-  keepLearningCards, 
-  exploringCards, 
+  mainOnboardingCards,
+  pageWalkthroughCards,
   getCardById,
+  getPageWalkthroughCards,
   OnboardingCard,
   OnboardingTrigger,
   OnboardingPage,
@@ -19,9 +20,12 @@ interface OnboardingProgress {
   completedCardIds: number[];
   exploringMode: boolean;
   onboardingComplete: boolean;
+  mainOnboardingComplete: boolean;
   waitingForTrigger: OnboardingTrigger | null;
   isMinimized: boolean;
   dismissedByUser: boolean;
+  visitedPages: OnboardingPage[];
+  activePageWalkthrough: OnboardingPage | null;
 }
 
 const defaultProgress: OnboardingProgress = {
@@ -29,9 +33,12 @@ const defaultProgress: OnboardingProgress = {
   completedCardIds: [],
   exploringMode: true,
   onboardingComplete: false,
+  mainOnboardingComplete: false,
   waitingForTrigger: null,
   isMinimized: false,
   dismissedByUser: false,
+  visitedPages: [],
+  activePageWalkthrough: null,
 };
 
 interface OnboardingContextType {
@@ -44,6 +51,7 @@ interface OnboardingContextType {
   completedCardIds: number[];
   exploringMode: boolean;
   onboardingComplete: boolean;
+  mainOnboardingComplete: boolean;
   dismissedByUser: boolean;
   waitingForTrigger: OnboardingTrigger | null;
   isMinimized: boolean;
@@ -61,6 +69,9 @@ interface OnboardingContextType {
   triggerPenaltyCreated: () => void;
   triggerDaySaved: () => void;
   skipCurrentCard: () => void;
+  triggerPageVisit: (page: OnboardingPage) => void;
+  showPageWalkthrough: (page: OnboardingPage) => void;
+  visitedPages: OnboardingPage[];
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -76,13 +87,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load onboarding progress from API
   const { data: serverData } = useQuery<{ progress: OnboardingProgress | null; rewardGranted: boolean }>({
     queryKey: ["/api/onboarding/progress"],
     enabled: isAuthenticated,
   });
 
-  // Initialize progress from server data when it loads
   useEffect(() => {
     if (serverData && !hasLoadedFromServer) {
       const serverProgress = serverData.progress;
@@ -94,16 +103,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }
   }, [serverData, hasLoadedFromServer]);
 
-  // Save progress to API when it changes (debounced)
   useEffect(() => {
     if (!isAuthenticated || !hasLoadedFromServer) return;
     
-    // Clear any pending save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
     
-    // Debounce save to avoid too many API calls
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         await apiRequest("PUT", "/api/onboarding/progress", {
@@ -121,24 +127,28 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, [progress, isAuthenticated, hasLoadedFromServer]);
 
-  // shouldShowTutorial = user is authenticated, has profile, but hasn't completed/skipped tutorial
   const shouldShowTutorial = isAuthenticated && hasStartedJourney && !progress.onboardingComplete;
 
-  // Auto-start tutorial cards when user has profile but hasn't completed tutorial
-  // Don't auto-start if user has manually dismissed the tutorial
   useEffect(() => {
-    if (shouldShowTutorial && progress.currentCardId === null && !progress.dismissedByUser) {
+    if (shouldShowTutorial && progress.currentCardId === null && !progress.dismissedByUser && !progress.mainOnboardingComplete) {
       setProgress(prev => ({ ...prev, currentCardId: 1 }));
     }
-  }, [shouldShowTutorial, progress.currentCardId, progress.dismissedByUser]);
+  }, [shouldShowTutorial, progress.currentCardId, progress.dismissedByUser, progress.mainOnboardingComplete]);
 
   const currentCard = progress.currentCardId ? getCardById(progress.currentCardId) ?? null : null;
 
   const getActiveCardSequence = useCallback((): number[] => {
-    return progress.exploringMode ? exploringCards : keepLearningCards;
-  }, [progress.exploringMode]);
+    if (progress.activePageWalkthrough) {
+      return pageWalkthroughCards[progress.activePageWalkthrough];
+    }
+    return mainOnboardingCards;
+  }, [progress.activePageWalkthrough]);
 
   const showOnboarding = useCallback(() => {
+    if (progress.mainOnboardingComplete) {
+      return;
+    }
+    
     if (progress.onboardingComplete || progress.dismissedByUser) {
       setProgress(prev => ({ 
         ...prev, 
@@ -149,16 +159,38 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         waitingForTrigger: null,
         exploringMode: true,
         isMinimized: false,
+        activePageWalkthrough: null,
       }));
     } else if (progress.isMinimized) {
       setProgress(prev => ({ ...prev, isMinimized: false }));
     } else if (progress.currentCardId === null) {
       setProgress(prev => ({ ...prev, currentCardId: 1, isMinimized: false, dismissedByUser: false }));
     }
-  }, [progress.onboardingComplete, progress.currentCardId, progress.isMinimized, progress.dismissedByUser]);
+  }, [progress.onboardingComplete, progress.currentCardId, progress.isMinimized, progress.dismissedByUser, progress.mainOnboardingComplete]);
+
+  const showPageWalkthrough = useCallback((page: OnboardingPage) => {
+    const pageCards = pageWalkthroughCards[page];
+    if (pageCards.length === 0) return;
+    
+    setProgress(prev => ({
+      ...prev,
+      currentCardId: pageCards[0],
+      activePageWalkthrough: page,
+      isMinimized: false,
+      dismissedByUser: false,
+      waitingForTrigger: null,
+    }));
+  }, []);
 
   const hideOnboarding = useCallback(() => {
-    setProgress(prev => ({ ...prev, currentCardId: null, isMinimized: false, waitingForTrigger: null, dismissedByUser: true }));
+    setProgress(prev => ({ 
+      ...prev, 
+      currentCardId: null, 
+      isMinimized: false, 
+      waitingForTrigger: null, 
+      dismissedByUser: true,
+      activePageWalkthrough: null,
+    }));
   }, []);
 
   const minimizeForAction = useCallback(() => {
@@ -190,7 +222,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       const nextCard = getCardById(nextCardId);
       
       if (nextCard?.trigger && nextCard.trigger !== "immediate" && nextCard.trigger !== "manual") {
-        // Show the card so user can see instructions, and set waiting for trigger
         setProgress(prev => ({
           ...prev,
           currentCardId: nextCardId,
@@ -204,14 +235,24 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         }));
       }
     } else {
-      setProgress(prev => ({
-        ...prev,
-        currentCardId: null,
-        onboardingComplete: true,
-        waitingForTrigger: null,
-      }));
+      if (progress.activePageWalkthrough) {
+        setProgress(prev => ({
+          ...prev,
+          currentCardId: null,
+          activePageWalkthrough: null,
+          waitingForTrigger: null,
+        }));
+      } else {
+        setProgress(prev => ({
+          ...prev,
+          currentCardId: null,
+          onboardingComplete: true,
+          mainOnboardingComplete: true,
+          waitingForTrigger: null,
+        }));
+      }
     }
-  }, [getActiveCardSequence, progress.currentCardId]);
+  }, [getActiveCardSequence, progress.currentCardId, progress.activePageWalkthrough]);
 
   const goToCard = useCallback((cardId: number) => {
     const card = getCardById(cardId);
@@ -232,7 +273,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const triggerAction = useCallback((trigger: OnboardingTrigger) => {
     const sequence = getActiveCardSequence();
     
-    // Check if current card has this trigger - if so, advance to next card
     const currentCard = progress.currentCardId ? getCardById(progress.currentCardId) : null;
     console.log('[Onboarding] triggerAction called:', {
       trigger,
@@ -246,20 +286,44 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (cardIndex >= 0) {
         const nextCardId = cardIndex < sequence.length - 1 ? sequence[cardIndex + 1] : null;
         
-        setProgress(prev => ({
-          ...prev,
-          completedCardIds: prev.completedCardIds.includes(currentCard.id)
-            ? prev.completedCardIds
-            : [...prev.completedCardIds, currentCard.id],
-          currentCardId: nextCardId,
-          waitingForTrigger: null,
-          isMinimized: false,
-        }));
+        if (nextCardId === null && progress.activePageWalkthrough) {
+          setProgress(prev => ({
+            ...prev,
+            completedCardIds: prev.completedCardIds.includes(currentCard.id)
+              ? prev.completedCardIds
+              : [...prev.completedCardIds, currentCard.id],
+            currentCardId: null,
+            waitingForTrigger: null,
+            isMinimized: false,
+            activePageWalkthrough: null,
+          }));
+        } else if (nextCardId === null) {
+          setProgress(prev => ({
+            ...prev,
+            completedCardIds: prev.completedCardIds.includes(currentCard.id)
+              ? prev.completedCardIds
+              : [...prev.completedCardIds, currentCard.id],
+            currentCardId: null,
+            waitingForTrigger: null,
+            isMinimized: false,
+            onboardingComplete: true,
+            mainOnboardingComplete: true,
+          }));
+        } else {
+          setProgress(prev => ({
+            ...prev,
+            completedCardIds: prev.completedCardIds.includes(currentCard.id)
+              ? prev.completedCardIds
+              : [...prev.completedCardIds, currentCard.id],
+            currentCardId: nextCardId,
+            waitingForTrigger: null,
+            isMinimized: false,
+          }));
+        }
         return;
       }
     }
     
-    // Fallback: check waitingForTrigger (for cards that were minimized)
     if (progress.waitingForTrigger === trigger) {
       const waitingCard = sequence
         .map(id => getCardById(id))
@@ -282,35 +346,46 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [progress.currentCardId, progress.waitingForTrigger, progress.completedCardIds, getActiveCardSequence]);
+  }, [progress.currentCardId, progress.waitingForTrigger, progress.completedCardIds, progress.activePageWalkthrough, getActiveCardSequence]);
+
+  const triggerPageVisit = useCallback((page: OnboardingPage) => {
+    if (!progress.mainOnboardingComplete) return;
+    
+    if (progress.visitedPages.includes(page)) return;
+    
+    const pageCards = pageWalkthroughCards[page];
+    if (pageCards.length === 0) return;
+    
+    setProgress(prev => ({
+      ...prev,
+      visitedPages: [...prev.visitedPages, page],
+      currentCardId: pageCards[0],
+      activePageWalkthrough: page,
+      isMinimized: false,
+      dismissedByUser: false,
+    }));
+  }, [progress.mainOnboardingComplete, progress.visitedPages]);
 
   const completeOnboarding = useCallback(async () => {
-    // Award 50 FP on FIRST onboarding completion (not on replay)
-    // Use server-side rewardGranted flag that survives tutorial replays
     if (!rewardGranted) {
       try {
         const response = await apiRequest("POST", "/api/fp/award-onetime", {
           eventType: "completed_onboarding_tutorial",
         });
         
-        // Mark reward as granted on success (200) or already claimed (409)
         if (response.ok || response.status === 409) {
           setRewardGranted(true);
-          // Persist to server
           await apiRequest("PUT", "/api/onboarding/progress", {
             rewardGranted: true,
           });
         }
         
         if (response.ok) {
-          // Invalidate FP-related queries to show the new points
           queryClient.invalidateQueries({ queryKey: ["/api/fp"] });
           queryClient.invalidateQueries({ queryKey: ["/api/fp/history"] });
-          // Refresh user to get updated state
           refetchUser();
         }
       } catch (error) {
-        // Network or other errors - don't mark as granted so user can retry
         console.error("Failed to award onboarding FP:", error);
       }
     }
@@ -319,11 +394,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       ...prev,
       currentCardId: null,
       onboardingComplete: true,
+      mainOnboardingComplete: true,
       waitingForTrigger: null,
       isMinimized: false,
+      activePageWalkthrough: null,
     }));
     
-    // Refresh user to sync onboarding state
     refetchUser();
   }, [rewardGranted, refetchUser]);
 
@@ -332,9 +408,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getCardsForCurrentPage = useCallback((page: OnboardingPage): OnboardingCard[] => {
-    const sequence = getActiveCardSequence();
-    return onboardingCards.filter(c => c.page === page && sequence.includes(c.id));
-  }, [getActiveCardSequence]);
+    return getPageWalkthroughCards(page);
+  }, []);
 
   const isCardCompleted = useCallback((cardId: number): boolean => {
     return progress.completedCardIds.includes(cardId);
@@ -348,13 +423,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     triggerAction("daySaved");
   }, [triggerAction]);
 
-  // Skip current card (used when user already has completed the action during replay)
-  // This properly clears waitingForTrigger and marks current card as completed before advancing
   const skipCurrentCard = useCallback(() => {
     const sequence = getActiveCardSequence();
     const currentIndex = sequence.indexOf(progress.currentCardId ?? 0);
     
-    // Mark current card as completed
     if (progress.currentCardId !== null) {
       setProgress(prev => ({
         ...prev,
@@ -364,7 +436,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       }));
     }
 
-    // Advance to next card
     if (currentIndex >= 0 && currentIndex < sequence.length - 1) {
       const nextCardId = sequence[currentIndex + 1];
       const nextCard = getCardById(nextCardId);
@@ -385,15 +456,26 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         }));
       }
     } else {
-      setProgress(prev => ({
-        ...prev,
-        currentCardId: null,
-        onboardingComplete: true,
-        waitingForTrigger: null,
-        isMinimized: false,
-      }));
+      if (progress.activePageWalkthrough) {
+        setProgress(prev => ({
+          ...prev,
+          currentCardId: null,
+          activePageWalkthrough: null,
+          waitingForTrigger: null,
+          isMinimized: false,
+        }));
+      } else {
+        setProgress(prev => ({
+          ...prev,
+          currentCardId: null,
+          onboardingComplete: true,
+          mainOnboardingComplete: true,
+          waitingForTrigger: null,
+          isMinimized: false,
+        }));
+      }
     }
-  }, [getActiveCardSequence, progress.currentCardId]);
+  }, [getActiveCardSequence, progress.currentCardId, progress.activePageWalkthrough]);
 
   const startJourney = async () => {
     if (!user?.id) return;
@@ -412,6 +494,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       completedCardIds: progress.completedCardIds,
       exploringMode: progress.exploringMode,
       onboardingComplete: progress.onboardingComplete,
+      mainOnboardingComplete: progress.mainOnboardingComplete,
       dismissedByUser: progress.dismissedByUser,
       waitingForTrigger: progress.waitingForTrigger,
       isMinimized: progress.isMinimized,
@@ -429,6 +512,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       triggerPenaltyCreated,
       triggerDaySaved,
       skipCurrentCard,
+      triggerPageVisit,
+      showPageWalkthrough,
+      visitedPages: progress.visitedPages,
     }}>
       {children}
     </OnboardingContext.Provider>

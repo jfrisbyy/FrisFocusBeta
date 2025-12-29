@@ -296,6 +296,7 @@ export async function registerRoutes(
   });
 
   // Update onboarding progress
+  const onboardingPageSchema = z.enum(["dashboard", "tasks", "daily", "health", "community", "insights", "journal", "badges"]);
   const onboardingProgressSchema = z.object({
     currentCardId: z.number().nullable(),
     completedCardIds: z.array(z.number()),
@@ -304,6 +305,9 @@ export async function registerRoutes(
     dismissedByUser: z.boolean(),
     waitingForTrigger: z.string().nullable(),
     isMinimized: z.boolean(),
+    mainOnboardingComplete: z.boolean().optional(),
+    visitedPages: z.array(onboardingPageSchema).optional(),
+    activePageWalkthrough: onboardingPageSchema.nullable().optional(),
   }).strict();
 
   app.put('/api/onboarding/progress', isAuthenticated, async (req: any, res) => {

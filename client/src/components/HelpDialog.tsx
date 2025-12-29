@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles, Rocket, PlayCircle, MessageCircle, Send, Loader2, ArrowLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, HelpCircle, Target, CheckSquare, Zap, Dumbbell, Users, Palette, TrendingUp, Sparkles, Rocket, PlayCircle, MessageCircle, Send, Loader2, ArrowLeft, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { getOnboardingContentForAI } from "@/lib/onboardingCards";
+import { getOnboardingContentForAI, pageWalkthroughCards, OnboardingPage } from "@/lib/onboardingCards";
 import { nanoid } from "nanoid";
 import {
   Dialog,
@@ -378,10 +378,13 @@ interface HelpDialogProps {
   startCard?: HelpCardId;
   showReplayTutorial?: boolean;
   simplified?: boolean;
+  currentPage?: OnboardingPage;
 }
 
-export function HelpDialog({ open, onOpenChange, filterCards, startCard, showReplayTutorial = true, simplified = false }: HelpDialogProps) {
-  const { showOnboarding, onboardingComplete, completedCardIds, hasStartedJourney } = useOnboarding();
+export function HelpDialog({ open, onOpenChange, filterCards, startCard, showReplayTutorial = true, simplified = false, currentPage }: HelpDialogProps) {
+  const { showOnboarding, showPageWalkthrough, onboardingComplete, mainOnboardingComplete, completedCardIds, hasStartedJourney } = useOnboarding();
+  
+  const hasPageWalkthrough = currentPage ? pageWalkthroughCards[currentPage]?.length > 0 : false;
   const displayCards = filterCards 
     ? helpCards.filter(card => filterCards.includes(card.id))
     : helpCards;
@@ -445,7 +448,18 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
 
   const handleReplayTutorial = () => {
     onOpenChange(false);
-    showOnboarding();
+    if (mainOnboardingComplete && hasPageWalkthrough && currentPage) {
+      showPageWalkthrough(currentPage);
+    } else {
+      showOnboarding();
+    }
+  };
+  
+  const handlePageHelp = () => {
+    if (currentPage && hasPageWalkthrough) {
+      onOpenChange(false);
+      showPageWalkthrough(currentPage);
+    }
   };
 
   const handleAskAI = () => {
@@ -626,14 +640,25 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
               </div>
 
               <div className="flex flex-col gap-2 pt-4 border-t border-border flex-shrink-0">
-                <Button
-                  onClick={handleReplayTutorial}
-                  className="w-full"
-                  data-testid="button-help-simplified-replay"
-                >
-                  <PlayCircle className="h-4 w-4 mr-2" />
-                  Begin Getting Started Walkthrough
-                </Button>
+                {mainOnboardingComplete && hasPageWalkthrough ? (
+                  <Button
+                    onClick={handlePageHelp}
+                    className="w-full"
+                    data-testid="button-help-simplified-page-help"
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    View Page Guide
+                  </Button>
+                ) : !mainOnboardingComplete ? (
+                  <Button
+                    onClick={handleReplayTutorial}
+                    className="w-full"
+                    data-testid="button-help-simplified-replay"
+                  >
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    Begin Getting Started Walkthrough
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   onClick={handleAskAI}
@@ -753,16 +778,29 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
           </div>
 
           {showReplayTutorial && (hasStartedJourney || onboardingComplete || completedCardIds.length > 0) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReplayTutorial}
-              className="w-full"
-              data-testid="button-help-replay-tutorial"
-            >
-              <PlayCircle className="h-4 w-4 mr-2" />
-              Begin Getting Started Walkthrough
-            </Button>
+            mainOnboardingComplete && hasPageWalkthrough ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePageHelp}
+                className="w-full"
+                data-testid="button-help-page-guide"
+              >
+                <BookOpen className="h-4 w-4 mr-2" />
+                View Page Guide
+              </Button>
+            ) : !mainOnboardingComplete ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReplayTutorial}
+                className="w-full"
+                data-testid="button-help-replay-tutorial"
+              >
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Begin Getting Started Walkthrough
+              </Button>
+            ) : null
           )}
         </div>
       </DialogContent>

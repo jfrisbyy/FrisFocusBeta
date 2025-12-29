@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight, Pencil, HelpCircle } from "lucide-react";
+import { HelpDialog } from "@/components/HelpDialog";
 import { Input } from "@/components/ui/input";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useDemo } from "@/contexts/DemoContext";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useToast } from "@/hooks/use-toast";
 import type { AIMessage, AIConversation } from "@shared/schema";
 import { format } from "date-fns";
@@ -30,8 +32,17 @@ const sampleMessages: AIMessage[] = [
 export default function InsightsPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
+  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  
+  useEffect(() => {
+    if (mainOnboardingComplete) {
+      triggerPageVisit("insights");
+    }
+  }, [mainOnboardingComplete, triggerPageVisit]);
+  
   const [messages, setMessages] = useState<AIMessage[]>(isDemo ? sampleMessages : []);
   const [input, setInput] = useState("");
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [instructionsInput, setInstructionsInput] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -402,17 +413,23 @@ export default function InsightsPage() {
             <Sparkles className="h-5 w-5 text-muted-foreground" />
             <h1 className="text-lg font-semibold">AI Insights</h1>
           </div>
-          {!isDemo && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSettingsOpen(true)}
-              data-testid="button-ai-settings"
-            >
-              <Settings className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            {!isDemo && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSettingsOpen(true)}
+                data-testid="button-ai-settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-insights-help">
+              <HelpCircle className="h-5 w-5" />
             </Button>
-          )}
+          </div>
         </div>
+        <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} currentPage="insights" />
 
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogContent className="max-w-lg">
