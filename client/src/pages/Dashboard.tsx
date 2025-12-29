@@ -2046,51 +2046,56 @@ export default function Dashboard() {
           }
         };
 
-        const getCardSizeClass = (key: DashboardCardKey) => {
-          return getCardSpan(key) === 2 ? "lg:col-span-2" : "";
+        // Dense layout planner: assigns explicit grid positions while preserving user order
+        // Cards are placed in their preferred order but fill gaps when possible
+        const planDenseLayout = (cards: DashboardCardKey[]) => {
+          const COLS = 3;
+          const grid: boolean[][] = []; // grid[row][col] = occupied
+          
+          const findSlot = (span: number): { row: number; col: number } => {
+            for (let row = 0; ; row++) {
+              if (!grid[row]) grid[row] = [false, false, false];
+              for (let col = 0; col <= COLS - span; col++) {
+                let fits = true;
+                for (let s = 0; s < span; s++) {
+                  if (grid[row][col + s]) { fits = false; break; }
+                }
+                if (fits) return { row, col };
+              }
+            }
+          };
+          
+          const markOccupied = (row: number, col: number, span: number) => {
+            if (!grid[row]) grid[row] = [false, false, false];
+            for (let s = 0; s < span; s++) {
+              grid[row][col + s] = true;
+            }
+          };
+          
+          return cards.map(key => {
+            const span = getCardSpan(key);
+            const { row, col } = findSlot(span);
+            markOccupied(row, col, span);
+            return { key, row: row + 1, col: col + 1, span };
+          });
         };
 
-        // Get visible cards only
-        const visibleCards = cardOrder.filter(key => dashboardPrefs[key] && renderCard(key) !== null);
-        
-        // Reorder to optimize grid layout: place 2-col cards at positions 0, 3, 6, 9... 
-        // (start of each row in a 3-col grid) to avoid whitespace gaps
-        const optimizedCards: DashboardCardKey[] = [];
-        const singleColCards = visibleCards.filter(k => getCardSpan(k) === 1);
-        const doubleColCards = visibleCards.filter(k => getCardSpan(k) === 2);
-        
-        let singleIdx = 0;
-        let doubleIdx = 0;
-        let colsUsed = 0;
-        
-        while (singleIdx < singleColCards.length || doubleIdx < doubleColCards.length) {
-          const colsRemaining = 3 - colsUsed;
-          
-          // Try to fit a double-col card at the start of a row
-          if (colsUsed === 0 && doubleIdx < doubleColCards.length) {
-            optimizedCards.push(doubleColCards[doubleIdx++]);
-            colsUsed = 2;
-          } else if (colsRemaining >= 1 && singleIdx < singleColCards.length) {
-            optimizedCards.push(singleColCards[singleIdx++]);
-            colsUsed += 1;
-          } else if (colsRemaining >= 2 && doubleIdx < doubleColCards.length) {
-            optimizedCards.push(doubleColCards[doubleIdx++]);
-            colsUsed += 2;
-          } else {
-            // Move to next row
-            colsUsed = 0;
-          }
-          
-          if (colsUsed >= 3) colsUsed = 0;
-        }
+        // Get visible cards in user's preferred order
+        const visibleCards = cardOrder.filter(key => dashboardPrefs[key]);
+        const layout = planDenseLayout(visibleCards);
 
         return (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {optimizedCards.map((key) => {
+            {layout.map(({ key, row, col, span }) => {
               const card = renderCard(key);
               if (!card) return null;
               return (
-                <div key={key} className={getCardSizeClass(key)} data-testid={`dashboard-card-${key}`}>
+                <div 
+                  key={key} 
+                  className={span === 2 ? "lg:col-span-2" : ""}
+                  style={{ gridRow: row, gridColumn: `${col} / span ${span}` }}
+                  data-testid={`dashboard-card-${key}`}
+                >
                   {card}
                 </div>
               );
