@@ -240,14 +240,15 @@ export default function DailyPage() {
     },
   });
 
-  // Mutation for creating enhanced journal entry (with folder support)
+  // Mutation for creating enhanced journal entry (with folder and season support)
   const createEnhancedJournalEntryMutation = useMutation({
-    mutationFn: async (data: { date: string; title: string; content: string; folderId?: string }) => {
+    mutationFn: async (data: { date: string; title: string; content: string; folderId?: string; seasonId?: string }) => {
       const response = await apiRequest("POST", "/api/journal/entries", {
         date: data.date,
         title: data.title,
         content: data.content,
         folderId: data.folderId || null,
+        seasonId: data.seasonId || null,
         entryType: "journal",
       });
       return response.json();
@@ -675,22 +676,14 @@ export default function DailyPage() {
       const journalDate = format(now, "yyyy-MM-dd");
       
       try {
-        // Use enhanced API with folder support if a folder is selected
-        if (selectedJournalFolderId) {
-          await createEnhancedJournalEntryMutation.mutateAsync({
-            date: journalDate,
-            title: timeTitle,
-            content: notes.trim(),
-            folderId: selectedJournalFolderId,
-          });
-        } else {
-          // Save via API for authenticated users (legacy endpoint)
-          await createJournalEntryMutation.mutateAsync({
-            date: journalDate,
-            title: timeTitle,
-            content: notes.trim(),
-          });
-        }
+        // Always use enhanced API with season support
+        await createEnhancedJournalEntryMutation.mutateAsync({
+          date: journalDate,
+          title: timeTitle,
+          content: notes.trim(),
+          folderId: selectedJournalFolderId || undefined,
+          seasonId: activeSeason?.id,
+        });
       } catch (error) {
         // Fallback to localStorage if API fails
         const newJournalEntry: StoredJournalEntry = {
