@@ -149,7 +149,7 @@ export default function JournalPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
   const { user } = useAuth();
-  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  const { triggerPageVisit, mainOnboardingComplete, showPageWalkthrough, visitedPages } = useOnboarding();
   
   useEffect(() => {
     if (mainOnboardingComplete) {
@@ -1064,7 +1064,13 @@ export default function JournalPage() {
               <Plus className="h-4 w-4 mr-2" />
               New Entry
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-journal-help">
+            <Button variant="ghost" size="icon" onClick={() => {
+              if (mainOnboardingComplete && !visitedPages.includes("journal")) {
+                showPageWalkthrough("journal");
+              } else {
+                setHelpDialogOpen(true);
+              }
+            }} data-testid="button-journal-help">
               <HelpCircle className="h-5 w-5" />
             </Button>
           </div>

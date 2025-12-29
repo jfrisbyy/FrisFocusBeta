@@ -1128,7 +1128,7 @@ export default function CommunityPage() {
   const { isDemo } = useDemo();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  const { triggerPageVisit, mainOnboardingComplete, showPageWalkthrough, visitedPages } = useOnboarding();
   
   useEffect(() => {
     if (mainOnboardingComplete) {
@@ -5920,7 +5920,13 @@ export default function CommunityPage() {
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-community-help">
+        <Button variant="ghost" size="icon" onClick={() => {
+          if (mainOnboardingComplete && !visitedPages.includes("community")) {
+            showPageWalkthrough("community");
+          } else {
+            setHelpDialogOpen(true);
+          }
+        }} data-testid="button-community-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>

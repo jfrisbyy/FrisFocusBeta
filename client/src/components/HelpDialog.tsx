@@ -658,6 +658,18 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
                     <PlayCircle className="h-4 w-4 mr-2" />
                     Begin Getting Started Walkthrough
                   </Button>
+                ) : mainOnboardingComplete && currentPage === "dashboard" ? (
+                  <Button
+                    onClick={() => {
+                      onOpenChange(false);
+                      showOnboarding();
+                    }}
+                    className="w-full"
+                    data-testid="button-help-replay-full-tutorial"
+                  >
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    Replay Full Tutorial
+                  </Button>
                 ) : null}
                 <Button
                   variant="outline"
@@ -799,6 +811,20 @@ export function HelpDialog({ open, onOpenChange, filterCards, startCard, showRep
               >
                 <PlayCircle className="h-4 w-4 mr-2" />
                 Begin Getting Started Walkthrough
+              </Button>
+            ) : mainOnboardingComplete && currentPage === "dashboard" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOpenChange(false);
+                  showOnboarding();
+                }}
+                className="w-full"
+                data-testid="button-help-replay-full-tutorial"
+              >
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Replay Full Tutorial
               </Button>
             ) : null
           )}

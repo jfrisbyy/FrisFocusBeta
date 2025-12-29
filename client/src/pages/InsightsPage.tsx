@@ -32,7 +32,7 @@ const sampleMessages: AIMessage[] = [
 export default function InsightsPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
-  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  const { triggerPageVisit, mainOnboardingComplete, showPageWalkthrough, visitedPages } = useOnboarding();
   
   useEffect(() => {
     if (mainOnboardingComplete) {
@@ -424,7 +424,13 @@ export default function InsightsPage() {
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-insights-help">
+            <Button variant="ghost" size="icon" onClick={() => {
+              if (mainOnboardingComplete && !visitedPages.includes("insights")) {
+                showPageWalkthrough("insights");
+              } else {
+                setHelpDialogOpen(true);
+              }
+            }} data-testid="button-insights-help">
               <HelpCircle className="h-5 w-5" />
             </Button>
           </div>

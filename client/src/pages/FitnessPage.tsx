@@ -323,7 +323,7 @@ function RoutineForm({ initialData, onSave, onGenerate, isGenerating, isSaving }
 export default function FitnessPage() {
   const { isDemo } = useDemo();
   const { toast } = useToast();
-  const { triggerPageVisit, mainOnboardingComplete, triggerGoalSet } = useOnboarding();
+  const { triggerPageVisit, mainOnboardingComplete, triggerGoalSet, showPageWalkthrough, visitedPages } = useOnboarding();
   
   useEffect(() => {
     if (mainOnboardingComplete) {
@@ -1089,7 +1089,13 @@ export default function FitnessPage() {
           <h1 className="text-2xl font-bold">Health</h1>
           <p className="text-muted-foreground text-sm">Track nutrition, workouts, and body composition</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-health-help">
+        <Button variant="ghost" size="icon" onClick={() => {
+          if (mainOnboardingComplete && !visitedPages.includes("health")) {
+            showPageWalkthrough("health");
+          } else {
+            setHelpDialogOpen(true);
+          }
+        }} data-testid="button-health-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>

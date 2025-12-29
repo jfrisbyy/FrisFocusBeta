@@ -225,7 +225,7 @@ const sampleBadges: BadgeDefinition[] = [
 export default function RecognitionPage() {
   const { toast } = useToast();
   const { isDemo } = useDemo();
-  const { triggerPageVisit, mainOnboardingComplete } = useOnboarding();
+  const { triggerPageVisit, mainOnboardingComplete, showPageWalkthrough, visitedPages } = useOnboarding();
   
   useEffect(() => {
     if (mainOnboardingComplete) {
@@ -523,7 +523,13 @@ export default function RecognitionPage() {
           <h2 className="text-2xl font-semibold tracking-tight">Recognition</h2>
           <p className="text-muted-foreground text-sm">Track your achievements and community recognition</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setHelpDialogOpen(true)} data-testid="button-recognition-help">
+        <Button variant="ghost" size="icon" onClick={() => {
+          if (mainOnboardingComplete && !visitedPages.includes("badges")) {
+            showPageWalkthrough("badges");
+          } else {
+            setHelpDialogOpen(true);
+          }
+        }} data-testid="button-recognition-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
       </div>
