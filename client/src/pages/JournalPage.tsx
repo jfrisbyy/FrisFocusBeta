@@ -184,6 +184,12 @@ export default function JournalPage() {
   // Filter by tracker template
   const [filterTemplateId, setFilterTemplateId] = useState<string | null>(null);
   
+  // Season filter state
+  const [filterSeasonId, setFilterSeasonId] = useState<string | null>(null);
+  
+  // Edit entry folder state
+  const [editFormFolderId, setEditFormFolderId] = useState<string | null>(null);
+  
   // View entry popup state
   const [viewingEntry, setViewingEntry] = useState<JournalEntry | null>(null);
 
@@ -208,6 +214,18 @@ export default function JournalPage() {
   // Fetch legacy journal entries from API
   const { data: apiEntries } = useQuery<UserJournalEntry[]>({
     queryKey: ["/api/habit/journal"],
+    enabled: !!user && !isDemo,
+  });
+
+  // Fetch seasons for filtering
+  interface Season {
+    id: string;
+    name: string;
+    isActive: boolean;
+    isArchived: boolean;
+  }
+  const { data: seasons = [] } = useQuery<Season[]>({
+    queryKey: ["/api/seasons"],
     enabled: !!user && !isDemo,
   });
 
@@ -325,6 +343,19 @@ export default function JournalPage() {
     },
   });
 
+  // Update enhanced entry mutation (supports folder move)
+  const updateEnhancedEntryMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; title?: string; content?: string; folderId?: string | null }) => {
+      const res = await apiRequest("PUT", `/api/journal/entries/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/journal/entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/habit/journal"] });
+      toast({ title: "Entry updated" });
+    },
+  });
+
   // Legacy entry mutations
   const createMutation = useMutation({
     mutationFn: async (data: { date: string; title: string; content: string }) => {
@@ -412,8 +443,8 @@ export default function JournalPage() {
       return [];
     }
     
-    // When filtering by folder or template, use enhanced entries only
-    if (selectedFolderId || filterTemplateId) {
+    // When filtering by folder, template, or season, use enhanced entries only
+    if (selectedFolderId || filterTemplateId || filterSeasonId) {
       let filtered = enhancedEntries;
       
       // Filter by folder if selected
@@ -424,6 +455,11 @@ export default function JournalPage() {
       // Filter by template if selected
       if (filterTemplateId) {
         filtered = filtered.filter(e => e.templateId === filterTemplateId);
+      }
+      
+      // Filter by season if selected
+      if (filterSeasonId) {
+        filtered = filtered.filter(e => (e as any).seasonId === filterSeasonId);
       }
       
       return filtered.map((e) => ({
@@ -464,7 +500,7 @@ export default function JournalPage() {
     }
     
     return combined;
-  }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId, templates]);
+  }, [isDemo, user, apiEntries, enhancedEntries, selectedFolderId, filterTemplateId, filterSeasonId, templates]);
   
   // For display, combine displayEntries with local entries for non-logged-in users
   const allEntries = useMemo(() => {
@@ -517,13 +553,17 @@ export default function JournalPage() {
     setEditingEntry(entry);
     setFormTitle(entry.title);
     setFormContent(entry.content);
+    // Find enhanced entry to get current folder
+    const enhancedEntry = enhancedEntries.find(e => e.id === entry.id);
+    setEditFormFolderId(enhancedEntry?.folderId || null);
   };
 
   const handleSave = async () => {
-    if (newEntryType === "journal" && (!formTitle.trim() || !formContent.trim())) {
+    // Only require content for journal entries (title is optional - will auto-generate)
+    if (newEntryType === "journal" && !editingEntry && !formContent.trim()) {
       toast({
-        title: "Missing fields",
-        description: "Please enter both a title and content",
+        title: "Missing content",
+        description: "Please enter some content for your entry",
         variant: "destructive",
       });
       return;
@@ -532,6 +572,9 @@ export default function JournalPage() {
     if (isCreating) {
       const now = new Date();
       const dateStr = format(now, "yyyy-MM-dd");
+      
+      // Auto-generate title if not provided (like daily page entries)
+      const autoTitle = formTitle.trim() || format(now, "MMM d, yyyy 'at' h:mm a");
       
       if (user && newEntryType === "tracker" && selectedTemplateId) {
         await createEnhancedEntryMutation.mutateAsync({
@@ -548,7 +591,7 @@ export default function JournalPage() {
           folderId: formFolderId,
           entryType: "journal",
           date: dateStr,
-          title: formTitle.trim(),
+          title: autoTitle,
           content: formContent.trim(),
         });
       } else if (user) {
@@ -556,7 +599,7 @@ export default function JournalPage() {
         try {
           await createMutation.mutateAsync({
             date: dateStr,
-            title: formTitle.trim(),
+            title: autoTitle,
             content: formContent.trim(),
           });
           toast({
@@ -574,7 +617,7 @@ export default function JournalPage() {
         const newEntry: JournalEntry = {
           id: `entry-${Date.now()}`,
           date: dateStr,
-          title: formTitle.trim(),
+          title: autoTitle,
           content: formContent.trim(),
           createdAt: now.toISOString(),
         };
@@ -588,11 +631,25 @@ export default function JournalPage() {
     } else if (editingEntry) {
       if (user) {
         try {
-          await updateMutation.mutateAsync({
-            id: editingEntry.id,
-            title: formTitle.trim(),
-            content: formContent.trim(),
-          });
+          // Check if this is an enhanced entry (can move folders)
+          const isEnhancedEntry = enhancedEntries.some(e => e.id === editingEntry.id);
+          
+          if (isEnhancedEntry) {
+            // Use enhanced mutation which supports folder changes
+            await updateEnhancedEntryMutation.mutateAsync({
+              id: editingEntry.id,
+              title: formTitle.trim() || undefined,
+              content: formContent.trim() || undefined,
+              folderId: editFormFolderId,
+            });
+          } else {
+            // Use legacy mutation for legacy entries
+            await updateMutation.mutateAsync({
+              id: editingEntry.id,
+              title: formTitle.trim(),
+              content: formContent.trim(),
+            });
+          }
           toast({
             title: "Entry updated",
             description: `Entry "${formTitle}" has been updated`,
@@ -616,6 +673,7 @@ export default function JournalPage() {
         });
       }
       setEditingEntry(null);
+      setEditFormFolderId(null);
     }
 
     resetEntryForm();
@@ -833,11 +891,12 @@ export default function JournalPage() {
               
               <div className="space-y-1">
                 <Button
-                  variant={selectedFolderId === null && filterTemplateId === null ? "secondary" : "ghost"}
+                  variant={selectedFolderId === null && filterTemplateId === null && filterSeasonId === null ? "secondary" : "ghost"}
                   className="w-full justify-start gap-2"
                   onClick={() => {
                     setSelectedFolderId(null);
                     setFilterTemplateId(null);
+                    setFilterSeasonId(null);
                   }}
                   data-testid="button-folder-all"
                 >
@@ -853,6 +912,7 @@ export default function JournalPage() {
                       onClick={() => {
                         setSelectedFolderId(folder.id);
                         setFilterTemplateId(null);
+                        setFilterSeasonId(null);
                       }}
                       data-testid={`button-folder-${folder.id}`}
                     >
@@ -942,6 +1002,44 @@ export default function JournalPage() {
                   )}
                 </div>
               </div>
+              
+              {/* Season Filter */}
+              {user && seasons.length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium mb-2">Filter by Season</h3>
+                  <div className="space-y-1">
+                    {seasons.filter(s => !s.isArchived).map((season) => (
+                      <Button
+                        key={season.id}
+                        variant={filterSeasonId === season.id ? "secondary" : "ghost"}
+                        className="w-full justify-start gap-2 text-sm"
+                        onClick={() => {
+                          setFilterSeasonId(filterSeasonId === season.id ? null : season.id);
+                          setSelectedFolderId(null);
+                          setFilterTemplateId(null);
+                        }}
+                        data-testid={`button-season-${season.id}`}
+                      >
+                        <Calendar className="h-4 w-4" />
+                        <span className="truncate">{season.name}</span>
+                        {season.isActive && (
+                          <Badge variant="outline" className="ml-auto text-xs">Active</Badge>
+                        )}
+                      </Button>
+                    ))}
+                    {filterSeasonId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-muted-foreground"
+                        onClick={() => setFilterSeasonId(null)}
+                      >
+                        Clear season filter
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1218,13 +1316,39 @@ export default function JournalPage() {
 
             {(newEntryType === "journal" || editingEntry) && (
               <>
+                {/* Folder selector for editing entries */}
+                {editingEntry && user && (
+                  <div className="space-y-2">
+                    <Label>Folder</Label>
+                    <Select
+                      value={editFormFolderId || "none"}
+                      onValueChange={(v) => setEditFormFolderId(v === "none" ? null : v)}
+                    >
+                      <SelectTrigger data-testid="select-edit-folder">
+                        <SelectValue placeholder="No folder" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No folder</SelectItem>
+                        {folders.map((folder) => (
+                          <SelectItem key={folder.id} value={folder.id}>
+                            <div className="flex items-center gap-2">
+                              <Folder className="h-4 w-4" style={{ color: folder.color || undefined }} />
+                              {folder.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
                 <div className="space-y-2">
-                  <Label htmlFor="entry-title">Title</Label>
+                  <Label htmlFor="entry-title">Title (optional)</Label>
                   <Input
                     id="entry-title"
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="Entry title..."
+                    placeholder="Auto-generated if empty..."
                     data-testid="input-entry-title"
                   />
                 </div>

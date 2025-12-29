@@ -877,6 +877,10 @@ export const seasonPenalties = pgTable("season_penalties", {
   timesThreshold: integer("times_threshold"),
   period: varchar("period"),
   boostPenaltyPoints: integer("boost_penalty_points"),
+  // Reward for NOT logging this penalty
+  rewardEnabled: boolean("reward_enabled").default(false),
+  rewardType: varchar("reward_type"), // "daily" or "weekly"
+  rewardPoints: integer("reward_points").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -919,6 +923,9 @@ export const seasonWithDataSchema = z.object({
     timesThreshold: z.number().nullable(),
     period: z.string().nullable(),
     boostPenaltyPoints: z.number().nullable(),
+    rewardEnabled: z.boolean().nullable(),
+    rewardType: z.string().nullable(),
+    rewardPoints: z.number().nullable(),
   })),
 });
 export type SeasonWithData = z.infer<typeof seasonWithDataSchema>;
@@ -1517,6 +1524,7 @@ export const journalEntries = pgTable("journal_entries", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   folderId: varchar("folder_id").references(() => journalFolders.id, { onDelete: "set null" }),
   templateId: varchar("template_id").references(() => journalTemplates.id, { onDelete: "set null" }),
+  seasonId: varchar("season_id").references(() => seasons.id, { onDelete: "set null" }), // Season when entry was created
   entryType: varchar("entry_type").notNull().default("journal"), // "journal" or "tracker"
   date: varchar("date").notNull(), // YYYY-MM-DD format
   title: varchar("title"),

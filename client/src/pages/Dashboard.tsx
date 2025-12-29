@@ -1976,6 +1976,14 @@ export default function Dashboard() {
                   maxItems={4}
                   isExpanded={weeklyTodosExpanded}
                   onExpandToggle={() => setWeeklyTodosExpanded(!weeklyTodosExpanded)}
+                  weekOffset={weeklyTodoWeekOffset}
+                  onWeekOffsetChange={setWeeklyTodoWeekOffset}
+                  weekLabel={(() => {
+                    const todoWeekDate = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weeklyTodoWeekOffset * 7);
+                    const weekStartStr = format(todoWeekDate, "MMM d");
+                    const weekEndStr = format(addDays(todoWeekDate, 6), "MMM d");
+                    return weeklyTodoWeekOffset === 0 ? `This Week` : `${weekStartStr} - ${weekEndStr}`;
+                  })()}
                 />
               );
             case "dueDates":

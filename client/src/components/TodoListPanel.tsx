@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift, Settings, StickyNote, Pencil, AlertTriangle, Download } from "lucide-react";
+import { Plus, Trash2, Gift, Settings, StickyNote, Pencil, AlertTriangle, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,9 @@ interface TodoListPanelProps {
   isExpanded?: boolean;
   onExpandToggle?: () => void;
   noCard?: boolean;
+  weekOffset?: number;
+  onWeekOffsetChange?: (offset: number) => void;
+  weekLabel?: string;
 }
 
 export default function TodoListPanel({
@@ -61,6 +64,9 @@ export default function TodoListPanel({
   isExpanded = true,
   onExpandToggle,
   noCard = false,
+  weekOffset,
+  onWeekOffsetChange,
+  weekLabel,
 }: TodoListPanelProps) {
   const { triggerAction } = useOnboarding();
   const [newTitle, setNewTitle] = useState("");
@@ -206,7 +212,37 @@ export default function TodoListPanel({
             )}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">{prompt}</p>
+        {onWeekOffsetChange && weekOffset !== undefined ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground flex-1">{prompt}</p>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onWeekOffsetChange(weekOffset - 1)}
+                data-testid="button-todo-prev-week"
+                className="h-7 w-7"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs font-medium min-w-[70px] text-center">
+                {weekLabel || "This Week"}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onWeekOffsetChange(weekOffset + 1)}
+                disabled={weekOffset >= 0}
+                data-testid="button-todo-next-week"
+                className="h-7 w-7"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{prompt}</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {!readOnly && (
