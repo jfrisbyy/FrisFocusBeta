@@ -496,20 +496,6 @@ export default function ScheduleCard({ date, isDemo = false }: ScheduleCardProps
             {isToday ? "Today's Schedule" : "Day Schedule"}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Select
-              value={assignedTemplate?.id || "none"}
-              onValueChange={(v) => assignTemplateMutation.mutate(v === "none" ? null : v)}
-            >
-              <SelectTrigger className="w-[160px]" data-testid="select-schedule-template">
-                <SelectValue placeholder="Select template" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No schedule</SelectItem>
-                {templates.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Dialog open={isEditorOpen} onOpenChange={(open) => {
               setIsEditorOpen(open);
               if (!open) setEditingTemplate(undefined);
