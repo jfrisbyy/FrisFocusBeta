@@ -2047,7 +2047,7 @@ export default function Dashboard() {
         };
 
         return (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 grid-flow-dense">
             {cardOrder.map((key) => {
               const card = renderCard(key);
               if (!card) return null;
