@@ -577,8 +577,8 @@ export default function JournalPage() {
       const now = new Date();
       const dateStr = format(now, "yyyy-MM-dd");
       
-      // Auto-generate title if not provided (like daily page entries)
-      const autoTitle = formTitle.trim() || format(now, "MMM d, yyyy 'at' h:mm a");
+      // Auto-generate title if not provided (like daily page entries: "3:45 PM Note")
+      const autoTitle = formTitle.trim() || format(now, "h:mm a") + " Note";
       
       if (user && newEntryType === "tracker" && selectedTemplateId) {
         await createEnhancedEntryMutation.mutateAsync({
