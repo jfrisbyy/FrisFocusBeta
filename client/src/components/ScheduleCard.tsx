@@ -564,16 +564,16 @@ export default function ScheduleCard({ date, isDemo = false }: ScheduleCardProps
           </div>
         )}
 
-        {templates.length > 0 && !assignedTemplate && (
+        {templates.length > 0 && (
           <div className="mt-4 pt-3 border-t">
             <p className="text-xs text-muted-foreground mb-2">Available Templates:</p>
             <div className="flex flex-wrap gap-2">
               {templates.map((t) => (
                 <Badge
                   key={t.id}
-                  variant="outline"
-                  className="cursor-pointer hover-elevate"
-                  onClick={() => assignTemplateMutation.mutate(t.id)}
+                  variant={assignedTemplate?.id === t.id ? "default" : "outline"}
+                  className={`cursor-pointer ${assignedTemplate?.id === t.id ? "" : "hover-elevate"}`}
+                  onClick={() => assignTemplateMutation.mutate(assignedTemplate?.id === t.id ? null : t.id)}
                   data-testid={`badge-template-${t.id}`}
                 >
                   {t.name}
