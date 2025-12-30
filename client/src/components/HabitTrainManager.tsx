@@ -233,8 +233,11 @@ export default function HabitTrainManager({ tasks, seasonId, disabled }: HabitTr
 
   const getTotalPoints = (train: HabitTrainWithSteps) => {
     const taskPoints = train.steps
-      .filter((s) => s.stepType === "task" && s.task)
-      .reduce((sum, s) => sum + (s.task?.value || 0), 0);
+      .filter((s) => s.stepType === "task")
+      .reduce((sum, s) => {
+        const taskData = s.task || (s.taskId ? tasks.find(t => t.id === s.taskId) : null);
+        return sum + (taskData?.value || 0);
+      }, 0);
     return taskPoints + (train.bonusPoints || 0);
   };
 
@@ -317,25 +320,32 @@ export default function HabitTrainManager({ tasks, seasonId, disabled }: HabitTr
                         <p className="text-xs text-muted-foreground mt-2">{train.description}</p>
                       )}
                       <div className="space-y-1 mt-2">
-                        {train.steps.map((step, idx) => (
-                          <div key={step.id} className="flex items-center gap-2 pl-4 text-sm">
-                            <span className="text-muted-foreground text-xs w-4">{idx + 1}.</span>
-                            {step.stepType === "task" && step.task ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <span>{step.task.name}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {step.task.category}
-                                </Badge>
-                                <span className="text-xs font-mono text-chart-1">+{step.task.value}</span>
-                              </div>
-                            ) : step.stepType === "note" ? (
-                              <div className="flex items-center gap-2 flex-1 text-muted-foreground italic">
-                                <FileText className="h-3 w-3" />
-                                <span className="text-xs">{step.noteText}</span>
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
+                        {train.steps.map((step, idx) => {
+                          const taskData = step.task || (step.stepType === "task" && step.taskId ? tasks.find(t => t.id === step.taskId) : null);
+                          return (
+                            <div key={step.id} className="flex items-center gap-2 pl-4 text-sm">
+                              <span className="text-muted-foreground text-xs w-4">{idx + 1}.</span>
+                              {step.stepType === "task" && taskData ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span>{taskData.name}</span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {taskData.category}
+                                  </Badge>
+                                  <span className="text-xs font-mono text-chart-1">+{taskData.value}</span>
+                                </div>
+                              ) : step.stepType === "task" && step.taskId ? (
+                                <div className="flex items-center gap-2 flex-1 text-muted-foreground">
+                                  <span className="text-xs italic">Task not found</span>
+                                </div>
+                              ) : step.stepType === "note" ? (
+                                <div className="flex items-center gap-2 flex-1 text-muted-foreground italic">
+                                  <FileText className="h-3 w-3" />
+                                  <span className="text-xs">{step.noteText}</span>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t">
                         <Button
