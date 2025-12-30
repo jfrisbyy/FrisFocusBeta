@@ -13,6 +13,9 @@ import {
   journalEntries,
   userJournalSettings,
   seasons,
+  habitTrains,
+  habitTrainSteps,
+  userTasks,
   type User,
   type UpsertUser,
   type Notification,
@@ -44,6 +47,12 @@ import {
   type InsertUserJournalSettings,
   type Season,
   type InsertSeason,
+  type HabitTrain,
+  type InsertHabitTrain,
+  type HabitTrainStep,
+  type InsertHabitTrainStep,
+  type HabitTrainWithSteps,
+  type CreateHabitTrainRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -126,6 +135,13 @@ export interface IStorage {
   createSeason(data: InsertSeason): Promise<Season>;
   updateSeason(id: string, userId: string, data: Partial<InsertSeason>): Promise<Season | undefined>;
   deleteSeason(id: string, userId: string): Promise<boolean>;
+
+  // Habit Trains
+  getHabitTrains(userId: string): Promise<HabitTrainWithSteps[]>;
+  getHabitTrain(id: string, userId: string): Promise<HabitTrainWithSteps | undefined>;
+  createHabitTrain(userId: string, data: CreateHabitTrainRequest): Promise<HabitTrainWithSteps>;
+  updateHabitTrain(id: string, userId: string, data: CreateHabitTrainRequest): Promise<HabitTrainWithSteps | undefined>;
+  deleteHabitTrain(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -884,6 +900,182 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(seasons)
       .where(and(eq(seasons.id, id), eq(seasons.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // ==================== HABIT TRAINS ====================
+
+  async getHabitTrains(userId: string): Promise<HabitTrainWithSteps[]> {
+    const trains = await db
+      .select()
+      .from(habitTrains)
+      .where(eq(habitTrains.userId, userId))
+      .orderBy(desc(habitTrains.createdAt));
+
+    const result: HabitTrainWithSteps[] = [];
+    for (const train of trains) {
+      const steps = await db
+        .select({
+          id: habitTrainSteps.id,
+          trainId: habitTrainSteps.trainId,
+          orderIndex: habitTrainSteps.orderIndex,
+          stepType: habitTrainSteps.stepType,
+          taskId: habitTrainSteps.taskId,
+          noteText: habitTrainSteps.noteText,
+          taskName: userTasks.name,
+          taskValue: userTasks.value,
+          taskCategory: userTasks.category,
+        })
+        .from(habitTrainSteps)
+        .leftJoin(userTasks, eq(habitTrainSteps.taskId, userTasks.id))
+        .where(eq(habitTrainSteps.trainId, train.id))
+        .orderBy(habitTrainSteps.orderIndex);
+
+      result.push({
+        id: train.id,
+        userId: train.userId,
+        name: train.name,
+        description: train.description,
+        bonusPoints: train.bonusPoints,
+        seasonId: train.seasonId,
+        createdAt: train.createdAt?.toISOString() ?? null,
+        updatedAt: train.updatedAt?.toISOString() ?? null,
+        steps: steps.map(s => ({
+          id: s.id,
+          trainId: s.trainId,
+          orderIndex: s.orderIndex,
+          stepType: s.stepType as "task" | "note",
+          taskId: s.taskId,
+          noteText: s.noteText,
+          task: s.taskId && s.taskName ? {
+            id: s.taskId,
+            name: s.taskName,
+            value: s.taskValue ?? 0,
+            category: s.taskCategory ?? "",
+          } : null,
+        })),
+      });
+    }
+    return result;
+  }
+
+  async getHabitTrain(id: string, userId: string): Promise<HabitTrainWithSteps | undefined> {
+    const [train] = await db
+      .select()
+      .from(habitTrains)
+      .where(and(eq(habitTrains.id, id), eq(habitTrains.userId, userId)));
+    
+    if (!train) return undefined;
+
+    const steps = await db
+      .select({
+        id: habitTrainSteps.id,
+        trainId: habitTrainSteps.trainId,
+        orderIndex: habitTrainSteps.orderIndex,
+        stepType: habitTrainSteps.stepType,
+        taskId: habitTrainSteps.taskId,
+        noteText: habitTrainSteps.noteText,
+        taskName: userTasks.name,
+        taskValue: userTasks.value,
+        taskCategory: userTasks.category,
+      })
+      .from(habitTrainSteps)
+      .leftJoin(userTasks, eq(habitTrainSteps.taskId, userTasks.id))
+      .where(eq(habitTrainSteps.trainId, train.id))
+      .orderBy(habitTrainSteps.orderIndex);
+
+    return {
+      id: train.id,
+      userId: train.userId,
+      name: train.name,
+      description: train.description,
+      bonusPoints: train.bonusPoints,
+      seasonId: train.seasonId,
+      createdAt: train.createdAt?.toISOString() ?? null,
+      updatedAt: train.updatedAt?.toISOString() ?? null,
+      steps: steps.map(s => ({
+        id: s.id,
+        trainId: s.trainId,
+        orderIndex: s.orderIndex,
+        stepType: s.stepType as "task" | "note",
+        taskId: s.taskId,
+        noteText: s.noteText,
+        task: s.taskId && s.taskName ? {
+          id: s.taskId,
+          name: s.taskName,
+          value: s.taskValue ?? 0,
+          category: s.taskCategory ?? "",
+        } : null,
+      })),
+    };
+  }
+
+  async createHabitTrain(userId: string, data: CreateHabitTrainRequest): Promise<HabitTrainWithSteps> {
+    const [train] = await db.insert(habitTrains).values({
+      userId,
+      name: data.name,
+      description: data.description,
+      bonusPoints: data.bonusPoints ?? 0,
+      seasonId: data.seasonId,
+    }).returning();
+
+    // Insert steps with order index
+    const stepsToInsert = data.steps.map((step, index) => ({
+      trainId: train.id,
+      orderIndex: index,
+      stepType: step.stepType,
+      taskId: step.stepType === "task" ? step.taskId : null,
+      noteText: step.stepType === "note" ? step.noteText : null,
+    }));
+
+    if (stepsToInsert.length > 0) {
+      await db.insert(habitTrainSteps).values(stepsToInsert);
+    }
+
+    return this.getHabitTrain(train.id, userId) as Promise<HabitTrainWithSteps>;
+  }
+
+  async updateHabitTrain(id: string, userId: string, data: CreateHabitTrainRequest): Promise<HabitTrainWithSteps | undefined> {
+    // Verify ownership
+    const [existing] = await db
+      .select()
+      .from(habitTrains)
+      .where(and(eq(habitTrains.id, id), eq(habitTrains.userId, userId)));
+    
+    if (!existing) return undefined;
+
+    // Update the train
+    await db.update(habitTrains).set({
+      name: data.name,
+      description: data.description,
+      bonusPoints: data.bonusPoints ?? 0,
+      seasonId: data.seasonId,
+      updatedAt: new Date(),
+    }).where(eq(habitTrains.id, id));
+
+    // Delete existing steps and re-insert
+    await db.delete(habitTrainSteps).where(eq(habitTrainSteps.trainId, id));
+
+    const stepsToInsert = data.steps.map((step, index) => ({
+      trainId: id,
+      orderIndex: index,
+      stepType: step.stepType,
+      taskId: step.stepType === "task" ? step.taskId : null,
+      noteText: step.stepType === "note" ? step.noteText : null,
+    }));
+
+    if (stepsToInsert.length > 0) {
+      await db.insert(habitTrainSteps).values(stepsToInsert);
+    }
+
+    return this.getHabitTrain(id, userId);
+  }
+
+  async deleteHabitTrain(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(habitTrains)
+      .where(and(eq(habitTrains.id, id), eq(habitTrains.userId, userId)))
       .returning();
     return result.length > 0;
   }
