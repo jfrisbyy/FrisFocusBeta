@@ -2376,7 +2376,7 @@ export const habitTrainSteps = pgTable("habit_train_steps", {
   trainId: varchar("train_id").notNull().references(() => habitTrains.id, { onDelete: "cascade" }),
   orderIndex: integer("order_index").notNull(),
   stepType: varchar("step_type").notNull().default("task"), // "task" or "note"
-  taskId: varchar("task_id").references(() => userTasks.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id"), // No FK constraint - tasks can come from season JSON or user_tasks table
   noteText: varchar("note_text"),
   createdAt: timestamp("created_at").defaultNow(),
 });
