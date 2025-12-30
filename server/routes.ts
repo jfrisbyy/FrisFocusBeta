@@ -129,6 +129,7 @@ import {
   insertUserDueDateSchema,
   dailySteps,
   insertDailyStepsSchema,
+  createHabitTrainRequestSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray, gte, lte, sql } from "drizzle-orm";
@@ -10145,6 +10146,83 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
     } catch (error: any) {
       console.error("Error generating insight:", error);
       res.status(500).json({ error: error.message || "Failed to generate insight" });
+    }
+  });
+
+  // ==================== HABIT TRAINS ====================
+
+  app.get("/api/habit-trains", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const trains = await storage.getHabitTrains(userId);
+      res.json(trains);
+    } catch (error: any) {
+      console.error("Error fetching habit trains:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch habit trains" });
+    }
+  });
+
+  app.get("/api/habit-trains/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { id } = req.params;
+      const train = await storage.getHabitTrain(id, userId);
+      if (!train) {
+        return res.status(404).json({ error: "Habit train not found" });
+      }
+      res.json(train);
+    } catch (error: any) {
+      console.error("Error fetching habit train:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch habit train" });
+    }
+  });
+
+  app.post("/api/habit-trains", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const parsed = createHabitTrainRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request body", details: parsed.error.errors });
+      }
+      const train = await storage.createHabitTrain(userId, parsed.data);
+      res.status(201).json(train);
+    } catch (error: any) {
+      console.error("Error creating habit train:", error);
+      res.status(500).json({ error: error.message || "Failed to create habit train" });
+    }
+  });
+
+  app.put("/api/habit-trains/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { id } = req.params;
+      const parsed = createHabitTrainRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request body", details: parsed.error.errors });
+      }
+      const train = await storage.updateHabitTrain(id, userId, parsed.data);
+      if (!train) {
+        return res.status(404).json({ error: "Habit train not found" });
+      }
+      res.json(train);
+    } catch (error: any) {
+      console.error("Error updating habit train:", error);
+      res.status(500).json({ error: error.message || "Failed to update habit train" });
+    }
+  });
+
+  app.delete("/api/habit-trains/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { id } = req.params;
+      const deleted = await storage.deleteHabitTrain(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Habit train not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting habit train:", error);
+      res.status(500).json({ error: error.message || "Failed to delete habit train" });
     }
   });
 
