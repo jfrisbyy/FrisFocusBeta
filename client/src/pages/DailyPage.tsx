@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDemo } from "@/contexts/DemoContext";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Train, ChevronDown, ChevronUp, FileText, Sparkles, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HelpDialog } from "@/components/HelpDialog";
 import { useOnboarding } from "@/contexts/OnboardingContext";
@@ -34,7 +34,7 @@ import {
   type StoredTodoItem,
   type StoredTaskTier,
 } from "@/lib/storage";
-import type { JournalFolder } from "@shared/schema";
+import type { JournalFolder, HabitTrainWithSteps } from "@shared/schema";
 
 interface DisplayTask {
   id: string;
@@ -190,6 +190,34 @@ export default function DailyPage() {
     queryKey: ["/api/journal/folders"],
     enabled: !isDemo && !!user,
   });
+
+  // Fetch habit trains for train display and completion sync
+  const { data: habitTrains = [] } = useQuery<HabitTrainWithSteps[]>({
+    queryKey: ["/api/habit-trains"],
+    enabled: !isDemo && !!user,
+  });
+
+  // State for expanded habit trains
+  const [expandedTrains, setExpandedTrains] = useState<Set<string>>(new Set());
+
+  const toggleTrainExpanded = (trainId: string) => {
+    setExpandedTrains(prev => {
+      const next = new Set(prev);
+      if (next.has(trainId)) {
+        next.delete(trainId);
+      } else {
+        next.add(trainId);
+      }
+      return next;
+    });
+  };
+
+  // Calculate train completion status
+  const getTrainCompletionStatus = (train: HabitTrainWithSteps) => {
+    const taskSteps = train.steps.filter(s => s.stepType === "task" && s.taskId);
+    const completedCount = taskSteps.filter(s => completedIds.has(s.taskId!)).length;
+    return { total: taskSteps.length, completed: completedCount };
+  };
   
   // Check if API queries have completed their initial fetch
   // Also wait for historical season data if needed
@@ -828,6 +856,121 @@ export default function DailyPage() {
             importLabel="Import from yesterday"
             data-testid="panel-daily-todos"
           />
+
+          {/* Habit Trains Section */}
+          {!isDemo && habitTrains.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Train className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-medium">Habit Trains</h3>
+                </div>
+                <div className="space-y-3">
+                  {habitTrains.map((train) => {
+                    const isExpanded = expandedTrains.has(train.id);
+                    const { total, completed } = getTrainCompletionStatus(train);
+                    const isComplete = total > 0 && completed === total;
+                    const taskPoints = train.steps
+                      .filter(s => s.stepType === "task" && s.taskId && completedIds.has(s.taskId))
+                      .reduce((sum, s) => {
+                        const task = allTasks.find(t => t.id === s.taskId);
+                        return sum + (task?.value || 0);
+                      }, 0);
+                    const totalPossiblePoints = train.steps
+                      .filter(s => s.stepType === "task" && s.task)
+                      .reduce((sum, s) => sum + (s.task?.value || 0), 0) + (train.bonusPoints || 0);
+
+                    return (
+                      <div 
+                        key={train.id} 
+                        className={cn(
+                          "border rounded-lg transition-colors",
+                          isComplete && "border-chart-1/50 bg-chart-1/5"
+                        )}
+                        data-testid={`daily-train-${train.id}`}
+                      >
+                        <button
+                          onClick={() => toggleTrainExpanded(train.id)}
+                          className="w-full flex items-center justify-between gap-2 p-3 hover-elevate rounded-lg text-left"
+                          data-testid={`button-toggle-daily-train-${train.id}`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isComplete ? (
+                              <Check className="h-4 w-4 text-chart-1 flex-shrink-0" />
+                            ) : (
+                              <Train className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            )}
+                            <span className={cn("font-medium truncate", isComplete && "text-chart-1")}>{train.name}</span>
+                            <Badge variant={isComplete ? "default" : "secondary"} className="text-xs">
+                              {completed}/{total}
+                            </Badge>
+                            {(train.bonusPoints ?? 0) > 0 && (
+                              <Badge 
+                                variant="outline" 
+                                className={cn("text-xs", isComplete ? "text-chart-1 border-chart-1/50" : "")}
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                +{train.bonusPoints}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-sm font-mono",
+                              taskPoints > 0 ? "text-chart-1" : "text-muted-foreground"
+                            )}>
+                              {taskPoints}/{totalPossiblePoints} pts
+                            </span>
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-3 pb-3 border-t">
+                            {train.description && (
+                              <p className="text-xs text-muted-foreground mt-2 mb-3">{train.description}</p>
+                            )}
+                            <div className="space-y-1">
+                              {train.steps.map((step, idx) => (
+                                <div key={step.id}>
+                                  {step.stepType === "note" ? (
+                                    <div className="flex items-center gap-2 py-2 pl-2 text-muted-foreground italic">
+                                      <FileText className="h-3 w-3 flex-shrink-0" />
+                                      <span className="text-xs">{step.noteText}</span>
+                                    </div>
+                                  ) : step.taskId && step.task ? (
+                                    <TaskCheckbox
+                                      id={step.taskId}
+                                      name={step.task.name}
+                                      value={step.task.value}
+                                      checked={completedIds.has(step.taskId)}
+                                      onChange={(checked) => handleTaskToggle(step.taskId!, checked)}
+                                      note={taskNotes?.[step.taskId]}
+                                      onNoteChange={(note) => handleTaskNoteChange(step.taskId!, note)}
+                                    />
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                            {isComplete && (train.bonusPoints ?? 0) > 0 && (
+                              <div className="mt-3 pt-2 border-t flex items-center gap-2 text-chart-1">
+                                <Sparkles className="h-4 w-4" />
+                                <span className="text-sm font-medium">Train complete! +{train.bonusPoints} bonus points</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           {/* Horizontal Category Tabs */}
           <Card>
