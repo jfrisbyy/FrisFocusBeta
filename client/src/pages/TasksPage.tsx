@@ -47,6 +47,7 @@ import {
 import { Target, Pencil, Check, X, Plus, Trash2, AlertTriangle, TrendingDown, Tag, Calendar, CalendarDays, Archive, Download, Loader2, Sparkles, Maximize2, Minimize2, HelpCircle, ChevronDown, Settings, RefreshCw, Clock, ListPlus } from "lucide-react";
 import TaskForm, { TaskWithBooster } from "@/components/TaskForm";
 import { HelpDialog } from "@/components/HelpDialog";
+import HabitTrainManager from "@/components/HabitTrainManager";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { BoosterRule } from "@/components/BoosterRuleConfig";
@@ -1847,6 +1848,14 @@ export default function TasksPage() {
         seasonContext={activeSeason?.name}
         onCategoryCreate={handleCategoryCreate}
       />
+
+      {!isDemo && (
+        <HabitTrainManager
+          tasks={tasks.map(t => ({ id: t.id, name: t.name, value: t.value, category: t.category }))}
+          seasonId={activeSeason?.id}
+          disabled={isActiveSeasonArchived}
+        />
+      )}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
