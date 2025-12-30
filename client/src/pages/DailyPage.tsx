@@ -901,8 +901,11 @@ export default function DailyPage() {
                         return sum + (task?.value || 0);
                       }, 0);
                     const totalPossiblePoints = train.steps
-                      .filter(s => s.stepType === "task" && s.task)
-                      .reduce((sum, s) => sum + (s.task?.value || 0), 0) + (train.bonusPoints || 0);
+                      .filter(s => s.stepType === "task" && s.taskId)
+                      .reduce((sum, s) => {
+                        const task = s.task || allTasks.find(t => t.id === s.taskId);
+                        return sum + (task?.value || 0);
+                      }, 0) + (train.bonusPoints || 0);
 
                     return (
                       <div 
@@ -959,26 +962,33 @@ export default function DailyPage() {
                               <p className="text-xs text-muted-foreground mt-2 mb-3">{train.description}</p>
                             )}
                             <div className="space-y-1">
-                              {train.steps.map((step, idx) => (
-                                <div key={step.id}>
-                                  {step.stepType === "note" ? (
-                                    <div className="flex items-center gap-2 py-2 pl-2 text-muted-foreground italic">
-                                      <FileText className="h-3 w-3 flex-shrink-0" />
-                                      <span className="text-xs">{step.noteText}</span>
-                                    </div>
-                                  ) : step.taskId && step.task ? (
-                                    <TaskCheckbox
-                                      id={step.taskId}
-                                      name={step.task.name}
-                                      value={step.task.value}
-                                      checked={completedIds.has(step.taskId)}
-                                      onChange={(checked) => handleTaskToggle(step.taskId!, checked)}
-                                      note={taskNotes?.[step.taskId]}
-                                      onNoteChange={(note) => handleTaskNoteChange(step.taskId!, note)}
-                                    />
-                                  ) : null}
-                                </div>
-                              ))}
+                              {train.steps.map((step, idx) => {
+                                const taskData = step.task || (step.taskId ? allTasks.find(t => t.id === step.taskId) : null);
+                                return (
+                                  <div key={step.id}>
+                                    {step.stepType === "note" ? (
+                                      <div className="flex items-center gap-2 py-2 pl-2 text-muted-foreground italic">
+                                        <FileText className="h-3 w-3 flex-shrink-0" />
+                                        <span className="text-xs">{step.noteText}</span>
+                                      </div>
+                                    ) : step.taskId && taskData ? (
+                                      <TaskCheckbox
+                                        id={step.taskId}
+                                        name={taskData.name}
+                                        value={taskData.value}
+                                        checked={completedIds.has(step.taskId)}
+                                        onChange={(checked) => handleTaskToggle(step.taskId!, checked)}
+                                        note={taskNotes?.[step.taskId]}
+                                        onNoteChange={(note) => handleTaskNoteChange(step.taskId!, note)}
+                                      />
+                                    ) : step.taskId ? (
+                                      <div className="flex items-center gap-2 py-2 pl-2 text-muted-foreground italic text-xs">
+                                        Task not found
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
                             </div>
                             {isComplete && (train.bonusPoints ?? 0) > 0 && (
                               <div className="mt-3 pt-2 border-t flex items-center gap-2 text-chart-1">
