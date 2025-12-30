@@ -1020,12 +1020,12 @@ export class DatabaseStorage implements IStorage {
       seasonId: data.seasonId,
     }).returning();
 
-    // Insert steps with order index
+    // Insert steps with order index (ensure empty strings become null for FK constraint)
     const stepsToInsert = data.steps.map((step, index) => ({
       trainId: train.id,
       orderIndex: index,
       stepType: step.stepType,
-      taskId: step.stepType === "task" ? step.taskId : null,
+      taskId: step.stepType === "task" && step.taskId ? step.taskId : null,
       noteText: step.stepType === "note" ? step.noteText : null,
     }));
 
@@ -1061,7 +1061,7 @@ export class DatabaseStorage implements IStorage {
       trainId: id,
       orderIndex: index,
       stepType: step.stepType,
-      taskId: step.stepType === "task" ? step.taskId : null,
+      taskId: step.stepType === "task" && step.taskId ? step.taskId : null,
       noteText: step.stepType === "note" ? step.noteText : null,
     }));
 
