@@ -2347,3 +2347,85 @@ export const aiTaskAssistResponseSchema = z.object({
   isComplete: z.boolean(),
 });
 export type AITaskAssistResponse = z.infer<typeof aiTaskAssistResponseSchema>;
+
+// ==================== HABIT TRAINS ====================
+
+// Habit trains - sequenced task routines with optional bonus points
+export const habitTrains = pgTable("habit_trains", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: varchar("description"),
+  bonusPoints: integer("bonus_points").default(0),
+  seasonId: varchar("season_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHabitTrainSchema = createInsertSchema(habitTrains).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertHabitTrain = z.infer<typeof insertHabitTrainSchema>;
+export type HabitTrain = typeof habitTrains.$inferSelect;
+
+// Habit train step type enum
+export const habitTrainStepTypeSchema = z.enum(["task", "note"]);
+export type HabitTrainStepType = z.infer<typeof habitTrainStepTypeSchema>;
+
+// Habit train steps - ordered items in a train (tasks or notes)
+export const habitTrainSteps = pgTable("habit_train_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trainId: varchar("train_id").notNull().references(() => habitTrains.id, { onDelete: "cascade" }),
+  orderIndex: integer("order_index").notNull(),
+  stepType: varchar("step_type").notNull().default("task"), // "task" or "note"
+  taskId: varchar("task_id").references(() => userTasks.id, { onDelete: "cascade" }),
+  noteText: varchar("note_text"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHabitTrainStepSchema = createInsertSchema(habitTrainSteps).omit({ id: true, createdAt: true });
+export type InsertHabitTrainStep = z.infer<typeof insertHabitTrainStepSchema>;
+export type HabitTrainStep = typeof habitTrainSteps.$inferSelect;
+
+// Habit train step schema for frontend use (with embedded task data)
+export const habitTrainStepWithTaskSchema = z.object({
+  id: z.string(),
+  trainId: z.string(),
+  orderIndex: z.number().int(),
+  stepType: habitTrainStepTypeSchema,
+  taskId: z.string().nullable(),
+  noteText: z.string().nullable(),
+  task: z.object({
+    id: z.string(),
+    name: z.string(),
+    value: z.number().int(),
+    category: z.string(),
+  }).nullable().optional(),
+});
+export type HabitTrainStepWithTask = z.infer<typeof habitTrainStepWithTaskSchema>;
+
+// Full habit train with steps (for frontend display)
+export const habitTrainWithStepsSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  bonusPoints: z.number().int().nullable(),
+  seasonId: z.string().nullable(),
+  steps: z.array(habitTrainStepWithTaskSchema),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+});
+export type HabitTrainWithSteps = z.infer<typeof habitTrainWithStepsSchema>;
+
+// Create/update habit train request schema
+export const createHabitTrainRequestSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  bonusPoints: z.number().int().min(0).optional(),
+  seasonId: z.string().optional(),
+  steps: z.array(z.object({
+    stepType: habitTrainStepTypeSchema,
+    taskId: z.string().optional(),
+    noteText: z.string().optional(),
+  })),
+});
+export type CreateHabitTrainRequest = z.infer<typeof createHabitTrainRequestSchema>;
