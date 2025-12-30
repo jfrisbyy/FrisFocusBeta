@@ -483,6 +483,23 @@ export default function DailyPage() {
     }, {} as Record<string, DisplayTask[]>);
   }, [categories, allTasks]);
 
+  // Helper to calculate comprehensive task points including train bonuses
+  const calculateTotalPositivePoints = useCallback((idsToCheck: Set<string>) => {
+    // Task points + tier bonuses
+    const basePoints = allTasks
+      .filter(t => idsToCheck.has(t.id) && t.value > 0)
+      .reduce((sum, t) => sum + t.value + (taskTiers[t.id] ? (t.tiers?.find(tier => tier.id === taskTiers[t.id])?.bonusPoints || 0) : 0), 0);
+    
+    // Train bonuses for fully completed trains
+    const trainBonuses = habitTrains.reduce((sum, train) => {
+      const taskSteps = train.steps.filter(s => s.stepType === "task" && s.taskId);
+      const allTasksComplete = taskSteps.length > 0 && taskSteps.every(s => idsToCheck.has(s.taskId!));
+      return sum + (allTasksComplete ? (train.bonusPoints || 0) : 0);
+    }, 0);
+    
+    return basePoints + trainBonuses;
+  }, [allTasks, taskTiers, habitTrains]);
+
   const handleTaskToggle = (taskId: string, checked: boolean) => {
     // Update local state immediately for visual feedback
     const newCompletedIds = new Set(completedIds);
@@ -508,10 +525,8 @@ export default function DailyPage() {
         if (!idsToSave) return;
         
         try {
-          // Calculate points with the pending completed set
-          const newPositivePoints = allTasks
-            .filter(t => idsToSave.has(t.id) && t.value > 0)
-            .reduce((sum, t) => sum + t.value + (taskTiers[t.id] ? (t.tiers?.find(tier => tier.id === taskTiers[t.id])?.bonusPoints || 0) : 0), 0);
+          // Calculate points with the pending completed set (including train bonuses)
+          const newPositivePoints = calculateTotalPositivePoints(idsToSave);
           const newNegativePoints = allTasks
             .filter(t => idsToSave.has(t.id) && t.value < 0)
             .reduce((sum, t) => sum + t.value, 0);
@@ -590,9 +605,18 @@ export default function DailyPage() {
     return tier?.bonusPoints || 0;
   };
 
+  // Calculate train bonus points for fully completed trains
+  const trainBonusPoints = useMemo(() => {
+    return habitTrains.reduce((sum, train) => {
+      const taskSteps = train.steps.filter(s => s.stepType === "task" && s.taskId);
+      const allTasksComplete = taskSteps.length > 0 && taskSteps.every(s => completedIds.has(s.taskId!));
+      return sum + (allTasksComplete ? (train.bonusPoints || 0) : 0);
+    }, 0);
+  }, [habitTrains, completedIds]);
+
   const positivePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value > 0)
-    .reduce((sum, t) => sum + t.value + getTierBonus(t), 0);
+    .reduce((sum, t) => sum + t.value + getTierBonus(t), 0) + trainBonusPoints;
 
   const negativePoints = allTasks
     .filter(t => completedIds.has(t.id) && t.value < 0)
