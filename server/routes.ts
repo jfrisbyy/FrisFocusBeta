@@ -10153,7 +10153,7 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
 
   app.get("/api/habit-trains", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const trains = await storage.getHabitTrains(userId);
       res.json(trains);
     } catch (error: any) {
@@ -10164,7 +10164,7 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
 
   app.get("/api/habit-trains/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const { id } = req.params;
       const train = await storage.getHabitTrain(id, userId);
       if (!train) {
@@ -10179,7 +10179,7 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
 
   app.post("/api/habit-trains", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const parsed = createHabitTrainRequestSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid request body", details: parsed.error.errors });
@@ -10194,7 +10194,7 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
 
   app.put("/api/habit-trains/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const { id } = req.params;
       const parsed = createHabitTrainRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -10213,7 +10213,7 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
 
   app.delete("/api/habit-trains/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user.claims.sub;
       const { id } = req.params;
       const deleted = await storage.deleteHabitTrain(id, userId);
       if (!deleted) {
