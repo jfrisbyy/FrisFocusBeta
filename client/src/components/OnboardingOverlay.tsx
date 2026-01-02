@@ -256,7 +256,7 @@ export function OnboardingOverlay() {
   // Render final card when all walkthroughs completed
   if (isFinalCard) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/40">
         <Card 
           className="w-full max-w-md border-l-4 border-l-primary shadow-lg bg-primary/5"
           data-testid="card-onboarding-final"
@@ -359,7 +359,7 @@ export function OnboardingOverlay() {
   // Render inline chat view
   if (showChat) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/40">
         <Card 
           className={cn(
             "w-full max-w-md border-l-4 shadow-lg flex flex-col",
@@ -474,7 +474,7 @@ export function OnboardingOverlay() {
 
   // Render normal onboarding card
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/40">
       <Card 
         className={cn(
           "w-full max-w-md border-l-4 shadow-lg",
