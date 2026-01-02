@@ -256,9 +256,9 @@ export function OnboardingOverlay() {
   // Render final card when all walkthroughs completed
   if (isFinalCard) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/40">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
         <Card 
-          className="w-full max-w-md border-l-4 border-l-primary shadow-lg bg-primary/5"
+          className="w-full max-w-md border-l-4 border-l-primary shadow-xl bg-card"
           data-testid="card-onboarding-final"
         >
           <CardHeader className="pb-2">
@@ -359,11 +359,11 @@ export function OnboardingOverlay() {
   // Render inline chat view
   if (showChat) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/40">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
         <Card 
           className={cn(
-            "w-full max-w-md border-l-4 shadow-lg flex flex-col",
-            "border-l-amber-500 bg-amber-500/5"
+            "w-full max-w-md border-l-4 shadow-xl flex flex-col bg-card",
+            "border-l-amber-500"
           )}
           style={{ maxHeight: "80vh" }}
           data-testid="card-onboarding-chat"
@@ -474,12 +474,11 @@ export function OnboardingOverlay() {
 
   // Render normal onboarding card
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
       <Card 
         className={cn(
-          "w-full max-w-md border-l-4 shadow-lg",
-          borderColor,
-          bgColor
+          "w-full max-w-md border-l-4 shadow-xl bg-card",
+          borderColor
         )}
         data-testid="card-onboarding"
       >
