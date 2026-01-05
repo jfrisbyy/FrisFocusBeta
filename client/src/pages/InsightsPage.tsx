@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useDemo } from "@/contexts/DemoContext";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
 import type { AIMessage, AIConversation } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -531,7 +532,13 @@ export default function InsightsPage() {
                           : "bg-muted"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                      {msg.role === "assistant" ? (
+                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                      )}
                     </div>
                   </div>
                 ))}

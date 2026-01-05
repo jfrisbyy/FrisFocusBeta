@@ -12,6 +12,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { nanoid } from "nanoid";
 import confetti from "canvas-confetti";
+import ReactMarkdown from "react-markdown";
 import type { Season, Category, Task, Milestone } from "@shared/schema";
 
 interface ChatMessage {
@@ -430,7 +431,13 @@ export function OnboardingOverlay() {
                             : "bg-muted"
                         )}
                       >
-                        {msg.content}
+                        {msg.role === "assistant" ? (
+                          <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          msg.content
+                        )}
                       </div>
                     </div>
                   ))}
