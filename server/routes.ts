@@ -131,6 +131,8 @@ import {
   dailySteps,
   insertDailyStepsSchema,
   createHabitTrainRequestSchema,
+  userTaskCompletions,
+  insertUserTaskCompletionSchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray, gte, lte, sql } from "drizzle-orm";
@@ -167,6 +169,47 @@ function isConsecutiveDay(date1: string, date2: string): boolean {
   const diffTime = Math.abs(d2.getTime() - d1.getTime());
   const diffDays = diffTime / (1000 * 60 * 60 * 24);
   return diffDays === 1;
+}
+
+// Helper to record task completions for all-time analytics
+async function recordTaskCompletions(
+  userId: string, 
+  date: string, 
+  taskIds: string[], 
+  seasonId: string | null,
+  taskLookup: Map<string, { name: string; category: string; value: number }>
+) {
+  if (!taskIds || taskIds.length === 0) return;
+  
+  try {
+    // Delete existing completions for this user/date to avoid duplicates
+    await db.delete(userTaskCompletions).where(
+      and(
+        eq(userTaskCompletions.userId, userId),
+        eq(userTaskCompletions.date, date)
+      )
+    );
+    
+    // Insert new completions
+    const completions = taskIds.map(taskId => {
+      const task = taskLookup.get(taskId);
+      return {
+        userId,
+        taskId,
+        taskName: task?.name || "Unknown Task",
+        taskCategory: task?.category || "uncategorized",
+        taskValue: task?.value || 0,
+        seasonId: seasonId || null,
+        date,
+      };
+    }).filter(c => c.taskName !== "Unknown Task"); // Only record known tasks
+    
+    if (completions.length > 0) {
+      await db.insert(userTaskCompletions).values(completions);
+    }
+  } catch (error) {
+    console.error("Error recording task completions:", error);
+  }
 }
 
 function isValidRedirectUri(redirectUri: string): boolean {
@@ -8178,6 +8221,19 @@ CURRENT CONVERSATION STATE:
       const date = req.params.date;
       const { completedTaskIds, notes, todoPoints, penaltyPoints, taskPoints, seasonId, taskNotes, taskTiers } = req.body;
 
+      // Build task lookup for recording completions to all-time history
+      const taskLookup = new Map<string, { name: string; category: string; value: number }>();
+      const [allUserTasks, allSeasonTasks] = await Promise.all([
+        db.select().from(userTasks).where(eq(userTasks.userId, userId)),
+        seasonId ? db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, seasonId)) : Promise.resolve([])
+      ]);
+      for (const t of allUserTasks) {
+        taskLookup.set(t.id, { name: t.name, category: t.category || "uncategorized", value: t.value || 0 });
+      }
+      for (const t of allSeasonTasks) {
+        taskLookup.set(t.id, { name: t.name, category: t.category || "uncategorized", value: t.value || 0 });
+      }
+
       // Check if log exists for this date
       const [existing] = await db.select().from(userDailyLogs)
         .where(and(eq(userDailyLogs.userId, userId), eq(userDailyLogs.date, date)));
@@ -8242,6 +8298,9 @@ CURRENT CONVERSATION STATE:
         } catch (fpError) {
           console.error("Error awarding FP for hit_daily_goal:", fpError);
         }
+        
+        // Record task completions to all-time history
+        await recordTaskCompletions(userId, date, completedTaskIds || [], seasonId || null, taskLookup);
         
         res.json(log);
       } else {
@@ -8308,11 +8367,106 @@ CURRENT CONVERSATION STATE:
           console.error("Error awarding FP for log_day/hit_daily_goal:", fpError);
         }
         
+        // Record task completions to all-time history
+        await recordTaskCompletions(userId, date, completedTaskIds || [], seasonId || null, taskLookup);
+        
         res.json(log);
       }
     } catch (error) {
       console.error("Error updating daily log:", error);
       res.status(400).json({ error: "Failed to update daily log" });
+    }
+  });
+
+  // ==================== ALL-TIME TASK ANALYTICS API ====================
+  
+  // Get all-time task completion analytics for a user
+  app.get("/api/analytics/task-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all task completions for this user
+      const completions = await db.select().from(userTaskCompletions)
+        .where(eq(userTaskCompletions.userId, userId));
+      
+      // Get all current tasks for reference
+      const [currentUserTasks, activeSeason] = await Promise.all([
+        db.select().from(userTasks).where(eq(userTasks.userId, userId)),
+        db.select().from(seasons).where(and(eq(seasons.userId, userId), eq(seasons.isActive, true))).limit(1)
+      ]);
+      
+      let currentSeasonTasks: any[] = [];
+      if (activeSeason[0]) {
+        currentSeasonTasks = await db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, activeSeason[0].id));
+      }
+      
+      // Aggregate completions by task
+      const taskStats: Record<string, {
+        taskId: string;
+        taskName: string;
+        category: string;
+        totalCompletions: number;
+        totalPoints: number;
+        firstCompleted: string;
+        lastCompleted: string;
+        completionsByMonth: Record<string, number>;
+      }> = {};
+      
+      for (const c of completions) {
+        if (!taskStats[c.taskId]) {
+          taskStats[c.taskId] = {
+            taskId: c.taskId,
+            taskName: c.taskName,
+            category: c.taskCategory,
+            totalCompletions: 0,
+            totalPoints: 0,
+            firstCompleted: c.date,
+            lastCompleted: c.date,
+            completionsByMonth: {},
+          };
+        }
+        const stat = taskStats[c.taskId];
+        stat.totalCompletions++;
+        stat.totalPoints += c.taskValue;
+        if (c.date < stat.firstCompleted) stat.firstCompleted = c.date;
+        if (c.date > stat.lastCompleted) stat.lastCompleted = c.date;
+        
+        // Track by month
+        const month = c.date.substring(0, 7); // YYYY-MM
+        stat.completionsByMonth[month] = (stat.completionsByMonth[month] || 0) + 1;
+      }
+      
+      // Sort by total completions descending
+      const sortedStats = Object.values(taskStats).sort((a, b) => b.totalCompletions - a.totalCompletions);
+      
+      // Calculate category totals
+      const categoryStats: Record<string, { category: string; totalCompletions: number; totalPoints: number }> = {};
+      for (const stat of sortedStats) {
+        if (!categoryStats[stat.category]) {
+          categoryStats[stat.category] = { category: stat.category, totalCompletions: 0, totalPoints: 0 };
+        }
+        categoryStats[stat.category].totalCompletions += stat.totalCompletions;
+        categoryStats[stat.category].totalPoints += stat.totalPoints;
+      }
+      
+      // Get unique dates for total days tracked
+      const uniqueDates = new Set(completions.map(c => c.date));
+      
+      res.json({
+        taskStats: sortedStats,
+        categoryStats: Object.values(categoryStats).sort((a, b) => b.totalCompletions - a.totalCompletions),
+        summary: {
+          totalCompletions: completions.length,
+          totalPoints: completions.reduce((sum, c) => sum + c.taskValue, 0),
+          uniqueTasksCompleted: sortedStats.length,
+          daysTracked: uniqueDates.size,
+          firstTrackedDate: completions.length > 0 ? [...uniqueDates].sort()[0] : null,
+          lastTrackedDate: completions.length > 0 ? [...uniqueDates].sort().pop() : null,
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching task history analytics:", error);
+      res.status(500).json({ error: "Failed to fetch task history analytics" });
     }
   });
 
