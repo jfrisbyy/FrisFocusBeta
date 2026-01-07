@@ -10550,5 +10550,106 @@ CRITICAL: You MUST reference task names from the ALL TRACKED TASKS list above. D
     }
   });
 
+  // ==================== ADMIN: BACKFILL TASK COMPLETIONS ====================
+  // One-time migration endpoint to populate userTaskCompletions from historical daily logs
+  app.post("/api/admin/backfill-task-completions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all daily logs for this user
+      const allLogs = await db.select().from(userDailyLogs)
+        .where(eq(userDailyLogs.userId, userId))
+        .orderBy(userDailyLogs.date);
+      
+      if (allLogs.length === 0) {
+        return res.json({ message: "No daily logs found to backfill", processed: 0 });
+      }
+      
+      // Get all season IDs from the logs
+      const seasonIds = [...new Set(allLogs.map(log => log.seasonId).filter(Boolean))];
+      
+      // Build comprehensive task lookup including all sources
+      const taskLookup = new Map<string, { name: string; category: string; value: number }>();
+      
+      // Get all user tasks
+      const allUserTasks = await db.select().from(userTasks).where(eq(userTasks.userId, userId));
+      for (const t of allUserTasks) {
+        taskLookup.set(t.id, { name: t.name, category: t.category || "uncategorized", value: t.value || 0 });
+      }
+      
+      // Get all season tasks from all referenced seasons
+      if (seasonIds.length > 0) {
+        const allSeasonTasks = await db.select().from(seasonTasks)
+          .where(inArray(seasonTasks.seasonId, seasonIds as string[]));
+        for (const t of allSeasonTasks) {
+          taskLookup.set(t.id, { name: t.name, category: t.category || "uncategorized", value: t.value || 0 });
+        }
+        
+        // Get all habit trains from all referenced seasons
+        const allHabitTrains = await db.select().from(habitTrains)
+          .where(inArray(habitTrains.seasonId, seasonIds as string[]));
+        for (const train of allHabitTrains) {
+          const trainTasks = (train.tasks as any[]) || [];
+          for (const step of trainTasks) {
+            if (step.taskId) {
+              taskLookup.set(step.taskId, { 
+                name: step.name || "Habit Train Step", 
+                category: train.name || "habit-train", 
+                value: step.points || 0 
+              });
+            }
+          }
+        }
+      }
+      
+      let processedCount = 0;
+      let insertedCount = 0;
+      
+      // Process each daily log
+      for (const log of allLogs) {
+        const taskIds = (log.completedTaskIds as string[]) || [];
+        if (taskIds.length === 0) continue;
+        
+        // Delete existing completions for this user/date
+        await db.delete(userTaskCompletions).where(
+          and(
+            eq(userTaskCompletions.userId, userId),
+            eq(userTaskCompletions.date, log.date)
+          )
+        );
+        
+        // Build completions with fallback for archived tasks
+        const completions = taskIds.map(taskId => {
+          const task = taskLookup.get(taskId);
+          return {
+            userId,
+            taskId,
+            taskName: task?.name || "Archived Task",
+            taskCategory: task?.category || "archived",
+            taskValue: task?.value || 0,
+            seasonId: log.seasonId || null,
+            date: log.date,
+          };
+        });
+        
+        if (completions.length > 0) {
+          await db.insert(userTaskCompletions).values(completions);
+          insertedCount += completions.length;
+        }
+        processedCount++;
+      }
+      
+      res.json({ 
+        message: "Backfill completed successfully",
+        logsProcessed: processedCount,
+        completionsInserted: insertedCount,
+        totalTasksInLookup: taskLookup.size
+      });
+    } catch (error: any) {
+      console.error("Error backfilling task completions:", error);
+      res.status(500).json({ error: error.message || "Failed to backfill task completions" });
+    }
+  });
+
   return httpServer;
 }

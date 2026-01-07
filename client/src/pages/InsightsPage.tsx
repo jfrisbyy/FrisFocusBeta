@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight, Pencil, HelpCircle } from "lucide-react";
+import { Send, Bot, User, Sparkles, Settings, Loader2, Plus, MessageSquare, Trash2, ChevronLeft, ChevronRight, Pencil, HelpCircle, Database } from "lucide-react";
 import { HelpDialog } from "@/components/HelpDialog";
 import { Input } from "@/components/ui/input";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -158,6 +158,22 @@ export default function InsightsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save", description: "Could not save your AI instructions.", variant: "destructive" });
+    },
+  });
+
+  const backfillMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/backfill-task-completions", {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "History synced", 
+        description: `Processed ${data.logsProcessed} days, synced ${data.completionsInserted} task completions.` 
+      });
+    },
+    onError: () => {
+      toast({ title: "Sync failed", description: "Could not sync task history.", variant: "destructive" });
     },
   });
 
@@ -449,6 +465,28 @@ export default function InsightsPage() {
               className="min-h-[150px]"
               data-testid="input-ai-instructions"
             />
+            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Sync Task History</p>
+                <p className="text-xs text-muted-foreground">Import all your past task completions for better AI insights</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => backfillMutation.mutate()}
+                disabled={backfillMutation.isPending}
+                data-testid="button-sync-history"
+              >
+                {backfillMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-1" />
+                    Sync
+                  </>
+                )}
+              </Button>
+            </div>
             <DialogFooter>
               <Button
                 variant="outline"
