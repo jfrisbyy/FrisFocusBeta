@@ -1691,7 +1691,19 @@ export default function JournalPage() {
           </DialogHeader>
           <div className="py-4">
             {viewingEntry?.content && (
-              <RichTextViewer content={viewingEntry.content} className="text-sm" />
+              <RichTextViewer 
+                content={viewingEntry.content} 
+                className="text-sm" 
+                onCheckboxChange={(newHtml) => {
+                  if (viewingEntry) {
+                    updateEnhancedEntryMutation.mutate({
+                      id: viewingEntry.id,
+                      content: newHtml,
+                    });
+                    setViewingEntry({ ...viewingEntry, content: newHtml });
+                  }
+                }}
+              />
             )}
           </div>
           <DialogFooter className="gap-2">

@@ -368,18 +368,85 @@ export function RichTextEditor({
   );
 }
 
-export function RichTextViewer({ content, className }: { content: string; className?: string }) {
+interface RichTextViewerProps {
+  content: string;
+  className?: string;
+  onCheckboxChange?: (newHtml: string) => void;
+}
+
+export function RichTextViewer({ content, className, onCheckboxChange }: RichTextViewerProps) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Underline,
+      TextStyle,
+      Color,
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
+      Highlight.configure({
+        multicolor: true,
+      }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+    ],
+    content,
+    editable: false,
+    onUpdate: ({ editor }) => {
+      if (onCheckboxChange) {
+        onCheckboxChange(editor.getHTML());
+      }
+    },
+    editorProps: {
+      attributes: {
+        class: cn(
+          "prose prose-sm dark:prose-invert max-w-none focus:outline-none"
+        ),
+      },
+      handleClick: (view, pos, event) => {
+        const target = event.target as HTMLElement;
+        if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
+          const checkbox = target as HTMLInputElement;
+          const li = checkbox.closest('li');
+          if (li) {
+            const isChecked = li.getAttribute('data-checked') === 'true';
+            li.setAttribute('data-checked', isChecked ? 'false' : 'true');
+            checkbox.checked = !isChecked;
+            
+            if (onCheckboxChange) {
+              setTimeout(() => {
+                onCheckboxChange(view.dom.innerHTML);
+              }, 0);
+            }
+          }
+          return true;
+        }
+        return false;
+      },
+    },
+  });
+
+  if (!editor) {
+    return null;
+  }
+
   return (
     <div 
       className={cn(
-        "prose prose-sm dark:prose-invert max-w-none",
         "[&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:pl-0",
         "[&_ul[data-type='taskList']_li]:flex [&_ul[data-type='taskList']_li]:gap-2 [&_ul[data-type='taskList']_li]:items-start",
         "[&_ul[data-type='taskList']_li_label]:flex [&_ul[data-type='taskList']_li_label]:items-center",
-        "[&_ul[data-type='taskList']_li_input]:mt-0.5",
+        "[&_ul[data-type='taskList']_li_input]:mt-0.5 [&_ul[data-type='taskList']_li_input]:cursor-pointer",
         className
       )}
-      dangerouslySetInnerHTML={{ __html: content }}
-    />
+    >
+      <EditorContent editor={editor} />
+    </div>
   );
 }
