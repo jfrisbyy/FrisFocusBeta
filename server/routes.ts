@@ -2065,6 +2065,7 @@ Guidelines:
         cardioData,
         runsData,
         bodyCompData,
+        allTimeCompletionsInsights,
       ] = await Promise.all([
         storage.getUser(userId),
         storage.getMilestones(userId),
@@ -2084,7 +2085,32 @@ Guidelines:
         db.select().from(cardioRuns).where(eq(cardioRuns.userId, userId)).orderBy(desc(cardioRuns.date)).limit(10),
         db.select().from(basketballRuns).where(eq(basketballRuns.userId, userId)).orderBy(desc(basketballRuns.date)).limit(10),
         db.select().from(bodyComposition).where(eq(bodyComposition.userId, userId)).orderBy(desc(bodyComposition.date)).limit(5),
+        db.select().from(userTaskCompletions).where(eq(userTaskCompletions.userId, userId)),
       ]);
+      
+      // Aggregate all-time task statistics for insights
+      const allTimeStatsInsights: Record<string, { 
+        taskName: string; 
+        category: string; 
+        totalCompletions: number; 
+        totalPoints: number;
+      }> = {};
+      for (const c of allTimeCompletionsInsights) {
+        if (!allTimeStatsInsights[c.taskId]) {
+          allTimeStatsInsights[c.taskId] = {
+            taskName: c.taskName,
+            category: c.taskCategory,
+            totalCompletions: 0,
+            totalPoints: 0,
+          };
+        }
+        const stat = allTimeStatsInsights[c.taskId];
+        stat.totalCompletions++;
+        stat.totalPoints += c.taskValue;
+      }
+      const sortedAllTimeInsights = Object.values(allTimeStatsInsights).sort((a, b) => b.totalCompletions - a.totalCompletions);
+      const allTimeDaysInsights = new Set(allTimeCompletionsInsights.map(c => c.date)).size;
+      const allTimePointsInsights = allTimeCompletionsInsights.reduce((sum, c) => sum + c.taskValue, 0);
 
       // Build personalized context for the AI
       const userName = user?.firstName || user?.displayName || "there";
@@ -2238,6 +2264,11 @@ Guidelines:
         ? `Body composition (${bodyCompData.length} entries): ${bodyCompData.slice(0, 3).map(b => `${b.date}: ${b.weight ? `${b.weight} lbs` : ''}${b.bodyFat ? `, ${b.bodyFat}% BF` : ''}`).join('; ')}`
         : "No body composition data logged.";
 
+      // Build all-time task history summary
+      const allTimeTaskSummary = sortedAllTimeInsights.length > 0
+        ? `ALL-TIME TASK HISTORY (${allTimeDaysInsights} days, ${allTimePointsInsights} pts total):\nMost completed: ${sortedAllTimeInsights.slice(0, 10).map(s => `"${s.taskName}" [${s.category}]: ${s.totalCompletions}x, ${s.totalPoints} pts`).join('; ')}`
+        : "No all-time task completion history yet.";
+
       // Get user's custom AI instructions
       const customInstructions = userSettings?.aiInstructions || "";
       const customInstructionsSection = customInstructions 
@@ -2268,6 +2299,8 @@ CIRCLES: ${circleSummary}
 SEASON: ${seasonSummary}
 
 GOALS: ${goalsSummary}
+
+${allTimeTaskSummary}
 
 FITNESS DATA:
 - ${nutritionSummary}
@@ -8222,16 +8255,31 @@ CURRENT CONVERSATION STATE:
       const { completedTaskIds, notes, todoPoints, penaltyPoints, taskPoints, seasonId, taskNotes, taskTiers } = req.body;
 
       // Build task lookup for recording completions to all-time history
+      // Include user tasks, season tasks, and habit train tasks
       const taskLookup = new Map<string, { name: string; category: string; value: number }>();
-      const [allUserTasks, allSeasonTasks] = await Promise.all([
+      const [allUserTasks, allSeasonTasks, allHabitTrains] = await Promise.all([
         db.select().from(userTasks).where(eq(userTasks.userId, userId)),
-        seasonId ? db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, seasonId)) : Promise.resolve([])
+        seasonId ? db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, seasonId)) : Promise.resolve([]),
+        seasonId ? db.select().from(habitTrains).where(eq(habitTrains.seasonId, seasonId)) : Promise.resolve([])
       ]);
       for (const t of allUserTasks) {
         taskLookup.set(t.id, { name: t.name, category: t.category || "uncategorized", value: t.value || 0 });
       }
       for (const t of allSeasonTasks) {
         taskLookup.set(t.id, { name: t.name, category: t.category || "uncategorized", value: t.value || 0 });
+      }
+      // Add habit train steps as tasks (they have their own IDs within the tasks array)
+      for (const train of allHabitTrains) {
+        const trainTasks = (train.tasks as any[]) || [];
+        for (const step of trainTasks) {
+          if (step.taskId) {
+            taskLookup.set(step.taskId, { 
+              name: step.name || "Habit Train Step", 
+              category: train.name || "habit-train", 
+              value: step.points || 0 
+            });
+          }
+        }
       }
 
       // Check if log exists for this date
@@ -10151,6 +10199,7 @@ Always recalculate totals when items change. Round all numbers to whole integers
         activeSeason,
         settings,
         milestones,
+        allTimeCompletions,
       ] = await Promise.all([
         storage.getUser(userId),
         db.select().from(userTasks).where(eq(userTasks.userId, userId)),
@@ -10165,7 +10214,38 @@ Always recalculate totals when items change. Round all numbers to whole integers
         db.select().from(seasons).where(and(eq(seasons.userId, userId), eq(seasons.isActive, true))).limit(1),
         db.select().from(userHabitSettings).where(eq(userHabitSettings.userId, userId)).limit(1),
         storage.getMilestones(userId),
+        db.select().from(userTaskCompletions).where(eq(userTaskCompletions.userId, userId)),
       ]);
+      
+      // Aggregate all-time task statistics
+      const allTimeTaskStats: Record<string, { 
+        taskName: string; 
+        category: string; 
+        totalCompletions: number; 
+        totalPoints: number;
+        firstCompleted: string;
+        lastCompleted: string;
+      }> = {};
+      for (const c of allTimeCompletions) {
+        if (!allTimeTaskStats[c.taskId]) {
+          allTimeTaskStats[c.taskId] = {
+            taskName: c.taskName,
+            category: c.taskCategory,
+            totalCompletions: 0,
+            totalPoints: 0,
+            firstCompleted: c.date,
+            lastCompleted: c.date,
+          };
+        }
+        const stat = allTimeTaskStats[c.taskId];
+        stat.totalCompletions++;
+        stat.totalPoints += c.taskValue;
+        if (c.date < stat.firstCompleted) stat.firstCompleted = c.date;
+        if (c.date > stat.lastCompleted) stat.lastCompleted = c.date;
+      }
+      const sortedAllTimeStats = Object.values(allTimeTaskStats).sort((a, b) => b.totalCompletions - a.totalCompletions);
+      const allTimeDaysTracked = new Set(allTimeCompletions.map(c => c.date)).size;
+      const allTimeTotalPoints = allTimeCompletions.reduce((sum, c) => sum + c.taskValue, 0);
       
       const userName = user?.firstName || user?.displayName || "there";
       const activeSeasonData = activeSeason[0];
@@ -10293,6 +10373,10 @@ ${Object.entries(categoryPoints).sort((a, b) => b[1] - a[1]).map(([cat, pts]) =>
 ${totalPenaltyPoints > 0 ? `PENALTIES: ${totalPenaltyPoints} pts total incurred.${activePenalties.length > 0 ? `\nKnown penalties: ${activePenalties.map(p => `"${p.name}" (${p.value} pts)`).join(", ")}` : ""}` : "PENALTIES: None incurred."}
 
 ${milestones.length > 0 ? `ACTIVE MILESTONES:\n${milestones.filter(m => !m.achieved).slice(0, 3).map(m => `- "${m.name}"`).join("\n")}` : ""}
+
+${sortedAllTimeStats.length > 0 ? `ALL-TIME TASK HISTORY (${allTimeDaysTracked} days tracked, ${allTimeTotalPoints} total pts):
+Most completed tasks:
+${sortedAllTimeStats.slice(0, 8).map(s => `- "${s.taskName}" [${s.category}]: ${s.totalCompletions} completions, ${s.totalPoints} pts, first: ${s.firstCompleted}, last: ${s.lastCompleted}`).join("\n")}` : "ALL-TIME HISTORY: No task completion history recorded yet."}
 
 ===== CORE RULES (FOLLOW STRICTLY) =====
 
