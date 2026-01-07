@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor, RichTextViewer } from "@/components/RichTextEditor";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import {
   Dialog,
@@ -83,6 +84,11 @@ const FOLDER_COLORS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f97316", 
   "#eab308", "#22c55e", "#14b8a6", "#06b6d4", "#3b82f6"
 ];
+
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return doc.body.textContent || "";
+}
 
 function getSampleEntries(): JournalEntry[] {
   const today = new Date();
@@ -1169,7 +1175,7 @@ export default function JournalPage() {
                               </span>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2">
-                              {entry.content}
+                              {stripHtml(entry.content)}
                             </p>
                           </div>
 
@@ -1370,14 +1376,11 @@ export default function JournalPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="entry-content">Content</Label>
-                  <Textarea
-                    id="entry-content"
-                    value={formContent}
-                    onChange={(e) => setFormContent(e.target.value)}
+                  <RichTextEditor
+                    content={formContent}
+                    onChange={setFormContent}
                     placeholder="Write your thoughts..."
-                    rows={5}
-                    className="resize-none"
-                    data-testid="input-entry-content"
+                    minHeight="180px"
                   />
                 </div>
               </>
@@ -1687,7 +1690,9 @@ export default function JournalPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm whitespace-pre-wrap">{viewingEntry?.content}</p>
+            {viewingEntry?.content && (
+              <RichTextViewer content={viewingEntry.content} className="text-sm" />
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button
