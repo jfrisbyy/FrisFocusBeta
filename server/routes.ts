@@ -47,6 +47,7 @@ import {
   seasonTasks,
   seasonCategories,
   seasonPenalties,
+  habitTrains,
   insertSeasonTaskSchema,
   insertSeasonCategorySchema,
   insertSeasonPenaltySchema,
@@ -2056,16 +2057,99 @@ Guidelines:
         ? `User has ${dueDates.length} due dates: ${dueDates.slice(0, 5).map(d => `"${d.title}" due ${d.dueDate} (${d.status})`).join(', ')}${dueDates.length > 5 ? ` and ${dueDates.length - 5} more` : ''}`
         : "No due dates set.";
 
-      const taskSummary = tasks.length > 0 
-        ? `User tracks ${tasks.length} daily tasks: ${tasks.slice(0, 8).map(t => `"${t.name}" (${t.value} pts, ${t.category || 'uncategorized'})`).join(', ')}${tasks.length > 8 ? ` and ${tasks.length - 8} more` : ''}`
+      // Calculate recent progress from daily logs (guard against null values)
+      const recentLogs = dailyLogs.slice(0, 7);
+
+      // Build detailed task context with completion history
+      const allTasks: Array<{
+        id: string;
+        name: string;
+        value: number;
+        category: string;
+        priority: string;
+        description: string | null;
+        hasBooster: boolean;
+        source: string;
+      }> = [];
+      
+      // Add user tasks (uses boostEnabled not boosterRule)
+      for (const t of tasks) {
+        allTasks.push({
+          id: t.id,
+          name: t.name,
+          value: t.value,
+          category: t.category || "uncategorized",
+          priority: t.priority || "shouldDo",
+          description: null,
+          hasBooster: !!t.boostEnabled,
+          source: "user_tasks"
+        });
+      }
+      
+      // Get season tasks if active season exists
+      let seasonTaskList: any[] = [];
+      let habitTrainList: any[] = [];
+      
+      if (activeSeasonData) {
+        const [fetchedSeasonTasks, fetchedHabitTrains] = await Promise.all([
+          db.select().from(seasonTasks).where(eq(seasonTasks.seasonId, activeSeasonData.id)),
+          db.select().from(habitTrains).where(eq(habitTrains.seasonId, activeSeasonData.id))
+        ]);
+        seasonTaskList = fetchedSeasonTasks;
+        habitTrainList = fetchedHabitTrains;
+      }
+      
+      for (const t of seasonTaskList) {
+        allTasks.push({
+          id: t.id,
+          name: t.name,
+          value: t.value || 0,
+          category: t.category || "uncategorized",
+          priority: t.priority || "shouldDo",
+          description: t.description || null,
+          hasBooster: !!(t.boosterRule as any)?.enabled,
+          source: "season"
+        });
+      }
+      
+      // Calculate per-task completion stats from recent logs
+      const taskCompletionStats: Record<string, { completed: number; total: number }> = {};
+      for (const task of allTasks) {
+        taskCompletionStats[task.id] = { completed: 0, total: recentLogs.length };
+      }
+      for (const log of recentLogs) {
+        const completedIds = log.completedTaskIds as string[] || [];
+        for (const taskId of completedIds) {
+          if (taskCompletionStats[taskId]) {
+            taskCompletionStats[taskId].completed++;
+          }
+        }
+      }
+      
+      // Build detailed task summary with completion rates
+      const detailedTaskList = allTasks.slice(0, 20).map(t => {
+        const stats = taskCompletionStats[t.id];
+        const completionRate = stats && stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+        const boosterLabel = t.hasBooster ? " [has booster]" : "";
+        const descLabel = t.description ? ` - ${t.description.slice(0, 50)}` : "";
+        return `• "${t.name}" (${t.value} pts, ${t.category}, ${t.priority})${boosterLabel}: ${completionRate}% completed last 7 days${descLabel}`;
+      }).join('\n');
+      
+      const taskSummary = allTasks.length > 0 
+        ? `User tracks ${allTasks.length} tasks:\n${detailedTaskList}${allTasks.length > 20 ? `\n...and ${allTasks.length - 20} more tasks` : ''}`
         : "No tasks set up yet.";
+      
+      // Build habit train summary
+      const habitTrainSummary = habitTrainList.length > 0
+        ? `User has ${habitTrainList.length} Habit Trains (sequenced task routines):\n${habitTrainList.map(train => {
+            return `• "${train.name}" (${train.isActive ? 'active' : 'inactive'})`;
+          }).join('\n')}`
+        : "No habit trains configured.";
 
       const penaltySummary = penalties.length > 0 
         ? `User has ${penalties.length} penalties to avoid: ${penalties.slice(0, 5).map(p => `"${p.name}" (-${Math.abs(p.value)} pts)`).join(', ')}${penalties.length > 5 ? ` and ${penalties.length - 5} more` : ''}`
         : "No penalties set.";
 
-      // Calculate recent progress from daily logs (guard against null values)
-      const recentLogs = dailyLogs.slice(0, 7);
       const recentProgress = recentLogs.length > 0 
         ? `Recent activity (last ${recentLogs.length} days): ${recentLogs.map(log => {
             const taskIds = log.completedTaskIds;
@@ -2127,6 +2211,8 @@ MILESTONES: ${milestoneSummary}
 DUE DATES: ${dueDateSummary}
 
 DAILY TASKS: ${taskSummary}
+
+HABIT TRAINS: ${habitTrainSummary}
 
 PENALTIES: ${penaltySummary}
 
