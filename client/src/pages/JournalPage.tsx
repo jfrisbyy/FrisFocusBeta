@@ -544,7 +544,7 @@ export default function JournalPage() {
   
   const filteredEntries = allEntries.filter(entry => 
     entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    entry.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    stripHtml(entry.content).toLowerCase().includes(searchQuery.toLowerCase()) ||
     format(parseISO(entry.date), "MMMM d, yyyy").toLowerCase().includes(searchQuery.toLowerCase())
   );
 

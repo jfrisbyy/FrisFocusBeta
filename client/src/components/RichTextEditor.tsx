@@ -7,6 +7,7 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
+import Placeholder from "@tiptap/extension-placeholder";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -87,6 +88,9 @@ export function RichTextEditor({
       }),
       TextAlign.configure({
         types: ["heading", "paragraph"],
+      }),
+      Placeholder.configure({
+        placeholder,
       }),
     ],
     content,
