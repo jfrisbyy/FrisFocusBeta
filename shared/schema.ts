@@ -1431,6 +1431,26 @@ export const insertUserDailyLogSchema = createInsertSchema(userDailyLogs).omit({
 export type InsertUserDailyLog = z.infer<typeof insertUserDailyLogSchema>;
 export type UserDailyLog = typeof userDailyLogs.$inferSelect;
 
+// User task completions - all-time task completion history for analytics
+export const userTaskCompletions = pgTable("user_task_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id").notNull(),
+  taskName: varchar("task_name").notNull(), // Snapshot of task name at completion time
+  taskCategory: varchar("task_category").notNull(), // Snapshot of category at completion time
+  taskValue: integer("task_value").notNull(), // Points value at completion time
+  seasonId: varchar("season_id"), // Season when completed (if applicable)
+  date: varchar("date").notNull(), // YYYY-MM-DD format
+  completedAt: timestamp("completed_at").defaultNow(),
+}, (table) => [
+  index("idx_task_completions_user_date").on(table.userId, table.date),
+  index("idx_task_completions_task").on(table.userId, table.taskId),
+]);
+
+export const insertUserTaskCompletionSchema = createInsertSchema(userTaskCompletions).omit({ id: true, completedAt: true });
+export type InsertUserTaskCompletion = z.infer<typeof insertUserTaskCompletionSchema>;
+export type UserTaskCompletion = typeof userTaskCompletions.$inferSelect;
+
 // User journal entries - personal reflections and notes
 export const userJournalEntries = pgTable("user_journal_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
