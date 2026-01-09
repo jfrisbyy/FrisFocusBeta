@@ -25,7 +25,7 @@ import { useDemo } from "@/contexts/DemoContext";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences, WorkoutRoutine, RoutineExercise } from "@shared/schema";
+import type { NutritionLog, BodyComposition, StrengthWorkout, SkillWorkout, BasketballRun, NutritionSettings, Meal, CardioRun, LivePlaySettings, DailySteps, SportTemplate, LivePlayField, PracticeSettings, PracticeTemplate, PracticeField, DashboardPreferences, WorkoutRoutine, RoutineExercise, CalorieBurnActivity } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Settings, Calendar as CalendarIcon } from "lucide-react";
 import { format, subDays, addDays, startOfWeek, parseISO, isToday, isThisWeek, differenceInDays, eachDayOfInterval } from "date-fns";
@@ -352,6 +352,7 @@ export default function FitnessPage() {
   const [stepsView, setStepsView] = useState<"today" | "weekly">("today");
   const [stepsDialogOpen, setStepsDialogOpen] = useState(false);
   const [deficitDialogOpen, setDeficitDialogOpen] = useState(false);
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false);
   const [stepsWeekOffset, setStepsWeekOffset] = useState(0);
   const [habitsManageOpen, setHabitsManageOpen] = useState(false);
   const [newHabitName, setNewHabitName] = useState("");
@@ -450,6 +451,11 @@ export default function FitnessPage() {
 
   const { data: stepsData = [], isLoading: loadingSteps } = useQuery<DailySteps[]>({
     queryKey: ["/api/fitness/steps"],
+    enabled: !isDemo,
+  });
+
+  const { data: calorieActivitiesData = [], isLoading: loadingCalorieActivities } = useQuery<CalorieBurnActivity[]>({
+    queryKey: ["/api/fitness/calorie-activities"],
     enabled: !isDemo,
   });
 
@@ -1547,6 +1553,10 @@ export default function FitnessPage() {
                 <Plus className="h-4 w-4 mr-2" />
                 Log Nutrition
               </Button>
+              <Button onClick={() => setActivityDialogOpen(true)} variant="outline" data-testid="button-add-activity">
+                <Activity className="h-4 w-4 mr-2" />
+                Log Activity
+              </Button>
               <Button onClick={() => setDeficitDialogOpen(true)} variant="outline" data-testid="button-add-deficit">
                 <TrendingDown className="h-4 w-4 mr-2" />
                 Update Calorie Delta
@@ -1777,6 +1787,36 @@ export default function FitnessPage() {
                                 <span>{meal.calories} cal</span>
                                 <span>{meal.protein}g protein</span>
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {/* Activities Logged - Calorie Burns */}
+                  {(() => {
+                    const dateStr = format(selectedNutritionDate, "yyyy-MM-dd");
+                    const dateActivities = calorieActivitiesData.filter(a => a.date === dateStr);
+                    const totalBurned = dateActivities.reduce((sum, a) => sum + (a.caloriesBurned || 0), 0);
+                    if (dateActivities.length === 0) return null;
+                    return (
+                      <div className="space-y-2 mt-4">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Activities Logged</div>
+                          <Badge variant="secondary" className="text-xs" data-testid="badge-total-burned">
+                            <Flame className="h-3 w-3 mr-1 text-orange-500" />
+                            {totalBurned} cal burned
+                          </Badge>
+                        </div>
+                        <div className="space-y-1">
+                          {dateActivities.map((activity) => (
+                            <div key={activity.id} className="flex items-center justify-between p-2 bg-orange-500/10 rounded-md text-sm" data-testid={`activity-row-${activity.id}`}>
+                              <div className="flex items-center gap-2">
+                                <Activity className="h-4 w-4 text-orange-500" />
+                                <span className="font-medium">{activity.name}</span>
+                                {activity.duration && <span className="text-muted-foreground text-xs">{activity.duration} min</span>}
+                              </div>
+                              <span className="text-orange-500 font-mono">{activity.caloriesBurned} cal</span>
                             </div>
                           ))}
                         </div>
@@ -3670,6 +3710,13 @@ export default function FitnessPage() {
         nutritionSettings={nutritionSettings}
       />
       
+      <ActivityDialog
+        open={activityDialogOpen}
+        onOpenChange={setActivityDialogOpen}
+        isDemo={isDemo}
+        selectedDate={selectedNutritionDate}
+      />
+      
       <GoalDialog
         open={goalDialogOpen}
         onOpenChange={setGoalDialogOpen}
@@ -4683,6 +4730,246 @@ function DeficitDialog({ open, onOpenChange, isDemo, nutritionSettings }: {
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={updateMutation.isPending} data-testid="button-save-deficit">
             {updateMutation.isPending ? "Saving..." : "Save Deficit"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Activity Dialog - Log individual calorie burn activities
+function ActivityDialog({ open, onOpenChange, isDemo, selectedDate }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isDemo: boolean;
+  selectedDate: Date;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    name: "",
+    caloriesBurned: "",
+    duration: "",
+    activityType: "",
+    intensity: "",
+    notes: "",
+  });
+
+  const activityPresets = [
+    { name: "Walking", calories: 100, duration: 30, type: "cardio" },
+    { name: "Running", calories: 300, duration: 30, type: "cardio" },
+    { name: "Weight Training", calories: 200, duration: 45, type: "strength" },
+    { name: "Basketball", calories: 400, duration: 60, type: "sports" },
+    { name: "Cycling", calories: 250, duration: 30, type: "cardio" },
+    { name: "Swimming", calories: 350, duration: 30, type: "cardio" },
+    { name: "HIIT", calories: 350, duration: 25, type: "cardio" },
+    { name: "Yoga", calories: 100, duration: 45, type: "flexibility" },
+  ];
+
+  const [validationErrors, setValidationErrors] = useState<{ name?: string; caloriesBurned?: string; duration?: string }>({});
+  
+  const resetForm = () => {
+    setFormData({ name: "", caloriesBurned: "", duration: "", activityType: "", intensity: "", notes: "" });
+    setValidationErrors({});
+  };
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; caloriesBurned: number; duration?: number; activityType?: string; intensity?: string; notes?: string; date: string }) => {
+      const res = await apiRequest("POST", "/api/fitness/calorie-activities", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fitness/calorie-activities"] });
+      toast({ title: "Activity logged successfully" });
+      resetForm();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Failed to log activity", 
+        description: error.message || "Please check your input and try again",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (isDemo) {
+      toast({ title: "Demo mode - data not saved" });
+      resetForm();
+      onOpenChange(false);
+      return;
+    }
+    
+    const errors: { name?: string; caloriesBurned?: string; duration?: string } = {};
+    
+    if (!formData.name.trim()) {
+      errors.name = "Activity name is required";
+    }
+    
+    if (!formData.caloriesBurned.trim()) {
+      errors.caloriesBurned = "Calories burned is required";
+    } else {
+      const calories = Number(formData.caloriesBurned);
+      if (isNaN(calories) || !Number.isInteger(calories) || calories <= 0) {
+        errors.caloriesBurned = "Enter a positive whole number";
+      }
+    }
+    
+    if (formData.duration.trim()) {
+      const duration = Number(formData.duration);
+      if (isNaN(duration) || !Number.isInteger(duration) || duration <= 0) {
+        errors.duration = "Enter a positive whole number";
+      }
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    
+    setValidationErrors({});
+    createMutation.mutate({
+      name: formData.name.trim(),
+      caloriesBurned: parseInt(formData.caloriesBurned),
+      duration: formData.duration ? parseInt(formData.duration) : undefined,
+      activityType: formData.activityType || undefined,
+      intensity: formData.intensity || undefined,
+      notes: formData.notes || undefined,
+      date: format(selectedDate, "yyyy-MM-dd"),
+    });
+  };
+
+  const applyPreset = (preset: { name: string; calories: number; duration: number; type: string }) => {
+    setFormData({
+      ...formData,
+      name: preset.name,
+      caloriesBurned: preset.calories.toString(),
+      duration: preset.duration.toString(),
+      activityType: preset.type,
+    });
+    setValidationErrors({});
+  };
+  
+  const handleClose = () => {
+    resetForm();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => { if (!val) handleClose(); else onOpenChange(val); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-orange-500" />
+            Log Activity
+          </DialogTitle>
+          <DialogDescription>
+            Track calories burned from physical activities for {format(selectedDate, "MMM d, yyyy")}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {/* Quick presets */}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Quick Add</Label>
+            <div className="flex flex-wrap gap-2">
+              {activityPresets.map((preset) => (
+                <Button
+                  key={preset.name}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => applyPreset(preset)}
+                  data-testid={`button-preset-${preset.name.toLowerCase().replace(' ', '-')}`}
+                >
+                  {preset.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-2">
+              <Label>Activity Name</Label>
+              <Input
+                placeholder="e.g., Morning Run"
+                value={formData.name}
+                onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setValidationErrors({ ...validationErrors, name: undefined }); }}
+                className={validationErrors.name ? "border-red-500" : ""}
+                data-testid="input-activity-name"
+              />
+              {validationErrors.name && <p className="text-xs text-red-500">{validationErrors.name}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Calories Burned</Label>
+              <Input
+                type="number"
+                placeholder="300"
+                min="1"
+                value={formData.caloriesBurned}
+                onChange={(e) => { setFormData({ ...formData, caloriesBurned: e.target.value }); setValidationErrors({ ...validationErrors, caloriesBurned: undefined }); }}
+                className={validationErrors.caloriesBurned ? "border-red-500" : ""}
+                data-testid="input-activity-calories"
+              />
+              {validationErrors.caloriesBurned && <p className="text-xs text-red-500">{validationErrors.caloriesBurned}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Duration (min)</Label>
+              <Input
+                type="number"
+                placeholder="30"
+                min="1"
+                value={formData.duration}
+                onChange={(e) => { setFormData({ ...formData, duration: e.target.value }); setValidationErrors({ ...validationErrors, duration: undefined }); }}
+                className={validationErrors.duration ? "border-red-500" : ""}
+                data-testid="input-activity-duration"
+              />
+              {validationErrors.duration && <p className="text-xs text-red-500">{validationErrors.duration}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={formData.activityType} onValueChange={(v) => setFormData({ ...formData, activityType: v })}>
+                <SelectTrigger data-testid="select-activity-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cardio">Cardio</SelectItem>
+                  <SelectItem value="strength">Strength</SelectItem>
+                  <SelectItem value="sports">Sports</SelectItem>
+                  <SelectItem value="flexibility">Flexibility</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Intensity</Label>
+              <Select value={formData.intensity} onValueChange={(v) => setFormData({ ...formData, intensity: v })}>
+                <SelectTrigger data-testid="select-activity-intensity">
+                  <SelectValue placeholder="Select intensity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="moderate">Moderate</SelectItem>
+                  <SelectItem value="intense">Intense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Notes (optional)</Label>
+            <Textarea
+              placeholder="Any additional details..."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="resize-none"
+              data-testid="textarea-activity-notes"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-save-activity">
+            {createMutation.isPending ? "Saving..." : "Log Activity"}
           </Button>
         </DialogFooter>
       </DialogContent>
