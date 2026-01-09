@@ -1065,17 +1065,21 @@ IMPORTANT:
         }
       }
       
-      // Check for steps in nutrition log
+      // Check for steps in nutrition log - use ACTUAL logged protein, not stale data
       const todayNutrition = nutritionLogs_.length > 0 ? nutritionLogs_[0] : null;
       
       const TDEE = maintenanceCalories || 2500;
-      const protein = proteinIntake || 150;
+      // Use actual logged protein from today's nutrition, not client-passed value
+      const protein = todayNutrition?.protein ?? 0;
+      const hasLoggedProtein = todayNutrition && typeof todayNutrition.protein === 'number' && todayNutrition.protein > 0;
       
       const systemPrompt = `You are a helpful fitness coach estimating the user's daily caloric deficit for ${normalizedDate}.
 
 USER PROFILE:
 - Maintenance TDEE: ${TDEE} calories
-- Protein intake: ${protein}g (thermic effect ~${Math.round(protein * 4 * 0.25)} calories)
+${hasLoggedProtein 
+  ? `- Protein logged today: ${protein}g (thermic effect ~${Math.round(protein * 4 * 0.25)} calories)`
+  : `- No protein logged yet for today (ask about food intake to estimate thermic effect)`}
 
 KNOWN LOGGED ACTIVITIES FOR THIS DAY:
 ${knownActivities.length > 0 ? knownActivities.map(a => '- ' + a).join('\n') : '- No workouts logged yet'}
