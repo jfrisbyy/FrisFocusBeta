@@ -476,6 +476,25 @@ export const insertNutritionLogSchema = createInsertSchema(nutritionLogs).omit({
 export type InsertNutritionLog = z.infer<typeof insertNutritionLogSchema>;
 export type NutritionLog = typeof nutritionLogs.$inferSelect;
 
+// Calorie burn activities - individual activity logs for calorie delta tracking
+export const calorieBurnActivities = pgTable("calorie_burn_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: text("date").notNull(),
+  name: text("name").notNull(),
+  caloriesBurned: integer("calories_burned").notNull(),
+  duration: integer("duration"),
+  activityType: text("activity_type"),
+  intensity: text("intensity"),
+  notes: text("notes"),
+  source: text("source").default("manual"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCalorieBurnActivitySchema = createInsertSchema(calorieBurnActivities).omit({ id: true, createdAt: true });
+export type InsertCalorieBurnActivity = z.infer<typeof insertCalorieBurnActivitySchema>;
+export type CalorieBurnActivity = typeof calorieBurnActivities.$inferSelect;
+
 // Body composition - with userId for multi-user support
 export const bodyComposition = pgTable("body_composition", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
