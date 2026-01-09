@@ -1155,7 +1155,7 @@ IMPORTANT:
   app.post("/api/fitness/deficit/chat", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { date, history, maintenanceCalories, proteinIntake } = req.body;
+      const { date, history, maintenanceCalories } = req.body;
       
       if (!date) {
         return res.status(400).json({ error: "Date is required" });
@@ -1163,84 +1163,89 @@ IMPORTANT:
       
       const normalizedDate = date.split('T')[0];
       
-      // Fetch all logs for the date
-      const [strengthLogs] = await Promise.all([
+      // Fetch all logs for the date in parallel
+      const [strengthLogs, basketballLogs, cardioLogs, nutritionLogs_, loggedActivities] = await Promise.all([
         db.select().from(strengthWorkouts).where(and(eq(strengthWorkouts.userId, userId), eq(strengthWorkouts.date, normalizedDate))),
-      ]);
-      const [basketballLogs] = await Promise.all([
         db.select().from(basketballRuns).where(and(eq(basketballRuns.userId, userId), eq(basketballRuns.date, normalizedDate))),
-      ]);
-      const [cardioLogs] = await Promise.all([
         db.select().from(cardioRuns).where(and(eq(cardioRuns.userId, userId), eq(cardioRuns.date, normalizedDate))),
-      ]);
-      const [nutritionLogs_] = await Promise.all([
         db.select().from(nutritionLogs).where(and(eq(nutritionLogs.userId, userId), eq(nutritionLogs.date, normalizedDate))),
+        db.select().from(calorieBurnActivities).where(and(eq(calorieBurnActivities.userId, userId), eq(calorieBurnActivities.date, normalizedDate))),
       ]);
       
-      // Build a summary of known activities
-      let knownActivities: string[] = [];
+      // Calculate total logged calories burned from activities
+      const totalLoggedCaloriesBurned = loggedActivities.reduce((sum, a) => sum + (a.caloriesBurned || 0), 0);
+      
+      // Build a summary of logged activities with their calorie burns
+      let activitySummary: string[] = [];
+      for (const activity of loggedActivities) {
+        const durationStr = activity.duration ? `, ${activity.duration} min` : '';
+        activitySummary.push(`${activity.name}: ${activity.caloriesBurned} cal burned${durationStr}`);
+      }
+      
+      // Build a summary of known workout logs (without calorie estimates - user needs to log them separately)
+      let workoutLogs: string[] = [];
       
       if (strengthLogs.length > 0) {
         for (const w of strengthLogs) {
           const exercises = Array.isArray(w.exercises) ? w.exercises as any[] : [];
           const volume = exercises.reduce((sum, ex) => sum + (ex.sets || 0) * (ex.reps || 0) * (ex.weight || 0), 0);
-          knownActivities.push(`Strength workout: ${w.primaryFocus || 'General'} focus, ${w.duration || '?'} minutes, ${exercises.length} exercises, volume ${volume}lbs`);
+          workoutLogs.push(`Strength workout: ${w.primaryFocus || 'General'} focus, ${w.duration || '?'} minutes, ${exercises.length} exercises, volume ${volume}lbs`);
         }
       }
       
       if (basketballLogs.length > 0) {
         for (const b of basketballLogs) {
           const gameType = b.gameType && typeof b.gameType === 'object' ? Object.keys(b.gameType as object).filter(k => (b.gameType as any)[k]).join('/') : 'unknown';
-          knownActivities.push(`Basketball: ${b.gamesPlayed || 0} games (${gameType}), ${b.courtType || 'unknown'} court, ${b.competitionLevel || 'unknown'} level`);
+          workoutLogs.push(`Basketball: ${b.gamesPlayed || 0} games (${gameType}), ${b.courtType || 'unknown'} court, ${b.competitionLevel || 'unknown'} level`);
         }
       }
       
       if (cardioLogs.length > 0) {
         for (const c of cardioLogs) {
-          knownActivities.push(`Cardio run: ${c.distance ? (c.distance/1000).toFixed(1) + 'km' : '?'}, ${c.duration || '?'} minutes, ${c.terrain || 'unknown'} terrain`);
+          workoutLogs.push(`Cardio run: ${c.distance ? (c.distance/1000).toFixed(1) + 'km' : '?'}, ${c.duration || '?'} minutes, ${c.terrain || 'unknown'} terrain`);
         }
       }
       
-      // Check for steps in nutrition log - use ACTUAL logged protein, not stale data
+      // Check for nutrition data
       const todayNutrition = nutritionLogs_.length > 0 ? nutritionLogs_[0] : null;
-      
       const TDEE = maintenanceCalories || 2500;
-      // Use actual logged protein from today's nutrition, not client-passed value
       const protein = todayNutrition?.protein ?? 0;
       const hasLoggedProtein = todayNutrition && typeof todayNutrition.protein === 'number' && todayNutrition.protein > 0;
+      const caloriesConsumed = todayNutrition?.calories ?? 0;
+      const hasLoggedCalories = todayNutrition && typeof todayNutrition.calories === 'number' && todayNutrition.calories > 0;
       
-      const systemPrompt = `You are a helpful fitness coach estimating the user's daily caloric deficit for ${normalizedDate}.
+      const systemPrompt = `You are a helpful fitness coach helping the user understand their daily caloric balance for ${normalizedDate}.
 
 USER PROFILE:
 - Maintenance TDEE: ${TDEE} calories
+${hasLoggedCalories ? `- Calories consumed today: ${caloriesConsumed} cal` : '- No calories logged yet for today'}
 ${hasLoggedProtein 
   ? `- Protein logged today: ${protein}g (thermic effect ~${Math.round(protein * 4 * 0.25)} calories)`
-  : `- No protein logged yet for today (ask about food intake to estimate thermic effect)`}
+  : `- No protein logged yet for today`}
 
-KNOWN LOGGED ACTIVITIES FOR THIS DAY:
-${knownActivities.length > 0 ? knownActivities.map(a => '- ' + a).join('\n') : '- No workouts logged yet'}
+LOGGED CALORIE BURN ACTIVITIES (${loggedActivities.length} activities, ${totalLoggedCaloriesBurned} cal total):
+${activitySummary.length > 0 ? activitySummary.map(a => '- ' + a).join('\n') : '- No activities logged yet'}
+
+WORKOUT LOGS (for reference, user should log calorie burns separately):
+${workoutLogs.length > 0 ? workoutLogs.map(w => '- ' + w).join('\n') : '- No workouts logged'}
 
 YOUR TASK:
-1. First, acknowledge what you already know from their logs
-2. Ask 1-2 specific follow-up questions to refine the estimate (e.g., intensity level, rest times, steps walked, general activity level)
-3. After they respond, provide a final estimate
+1. Show the user their current caloric balance based on what's logged
+2. If they have workout logs but no corresponding calorie burn activities, suggest they log those activities with estimated calories
+3. Calculate net calories: consumed - burned
+4. Provide actionable insights
 
-When you have enough information to give a final estimate, respond with JSON:
+Always respond with JSON:
 {
   "isFinal": true,
-  "estimatedDeficit": <number>,
-  "breakdown": {
-    "exerciseCalories": <number>,
-    "neatBonus": <number>,
-    "proteinTEF": <number>,
-    "explanation": "<brief explanation>"
-  }
+  "summary": {
+    "caloriesConsumed": ${caloriesConsumed},
+    "caloriesBurned": ${totalLoggedCaloriesBurned},
+    "netCalories": ${caloriesConsumed - totalLoggedCaloriesBurned},
+    "proteinTEF": ${hasLoggedProtein ? Math.round(protein * 4 * 0.25) : 0}
+  },
+  "message": "<your helpful message with insights and suggestions>"
 }
-
-While gathering info, respond with:
-{
-  "isFinal": false,
-  "message": "<your message to the user>"
 }`;
 
       const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
