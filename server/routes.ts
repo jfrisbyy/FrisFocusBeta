@@ -133,6 +133,8 @@ import {
   createHabitTrainRequestSchema,
   userTaskCompletions,
   insertUserTaskCompletionSchema,
+  calorieBurnActivities,
+  insertCalorieBurnActivitySchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray, gte, lte, sql } from "drizzle-orm";
@@ -890,6 +892,140 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating nutrition settings:", error);
       res.status(400).json({ error: "Failed to update nutrition settings" });
+    }
+  });
+
+  // ==================== CALORIE BURN ACTIVITIES ====================
+  // Individual activity logs for calorie delta tracking (like meals for calories consumed)
+
+  // Get all calorie burn activities for a date
+  app.get("/api/fitness/calorie-activities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { date } = req.query;
+      
+      let activities;
+      if (date) {
+        const normalizedDate = String(date).split('T')[0];
+        activities = await db.select().from(calorieBurnActivities)
+          .where(and(eq(calorieBurnActivities.userId, userId), eq(calorieBurnActivities.date, normalizedDate)))
+          .orderBy(desc(calorieBurnActivities.createdAt));
+      } else {
+        activities = await db.select().from(calorieBurnActivities)
+          .where(eq(calorieBurnActivities.userId, userId))
+          .orderBy(desc(calorieBurnActivities.createdAt));
+      }
+      
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching calorie activities:", error);
+      res.status(500).json({ error: "Failed to fetch calorie activities" });
+    }
+  });
+
+  // Create a new calorie burn activity
+  app.post("/api/fitness/calorie-activities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, caloriesBurned, duration, activityType, intensity, notes, date } = req.body;
+      
+      if (!name || typeof caloriesBurned !== 'number') {
+        return res.status(400).json({ error: "Name and calories burned are required" });
+      }
+      
+      const normalizedDate = date ? String(date).split('T')[0] : new Date().toISOString().split('T')[0];
+      
+      const [activity] = await db.insert(calorieBurnActivities).values({
+        userId,
+        date: normalizedDate,
+        name,
+        caloriesBurned,
+        duration: duration || null,
+        activityType: activityType || null,
+        intensity: intensity || null,
+        notes: notes || null,
+        source: "manual",
+      }).returning();
+      
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Error creating calorie activity:", error);
+      res.status(400).json({ error: "Failed to create calorie activity" });
+    }
+  });
+
+  // Update a calorie burn activity
+  app.put("/api/fitness/calorie-activities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { name, caloriesBurned, duration, activityType, intensity, notes } = req.body;
+      
+      const [updated] = await db.update(calorieBurnActivities)
+        .set({ name, caloriesBurned, duration, activityType, intensity, notes })
+        .where(and(eq(calorieBurnActivities.id, id), eq(calorieBurnActivities.userId, userId)))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating calorie activity:", error);
+      res.status(400).json({ error: "Failed to update calorie activity" });
+    }
+  });
+
+  // Delete a calorie burn activity
+  app.delete("/api/fitness/calorie-activities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      const [deleted] = await db.delete(calorieBurnActivities)
+        .where(and(eq(calorieBurnActivities.id, id), eq(calorieBurnActivities.userId, userId)))
+        .returning();
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting calorie activity:", error);
+      res.status(400).json({ error: "Failed to delete calorie activity" });
+    }
+  });
+
+  // Get daily summary (consumed vs burned)
+  app.get("/api/fitness/calorie-summary/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const normalizedDate = req.params.date.split('T')[0];
+      
+      // Get nutrition log for consumed calories
+      const [nutritionLog] = await db.select().from(nutritionLogs)
+        .where(and(eq(nutritionLogs.userId, userId), eq(nutritionLogs.date, normalizedDate)));
+      
+      // Get all calorie burn activities for the day
+      const activities = await db.select().from(calorieBurnActivities)
+        .where(and(eq(calorieBurnActivities.userId, userId), eq(calorieBurnActivities.date, normalizedDate)));
+      
+      const caloriesConsumed = nutritionLog?.calories || 0;
+      const caloriesBurned = activities.reduce((sum, a) => sum + (a.caloriesBurned || 0), 0);
+      
+      res.json({
+        date: normalizedDate,
+        caloriesConsumed,
+        caloriesBurned,
+        netCalories: caloriesConsumed - caloriesBurned,
+        activities,
+        activityCount: activities.length,
+      });
+    } catch (error) {
+      console.error("Error fetching calorie summary:", error);
+      res.status(500).json({ error: "Failed to fetch calorie summary" });
     }
   });
 
