@@ -699,6 +699,18 @@ export default function Dashboard() {
     enabled: !useMockData,
   });
 
+  // Fetch weekly avoidance penalties for the viewed week
+  const viewedWeekStart = useMemo(() => {
+    const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const weekStartDate = addDays(baseWeekStart, weekOffset * 7);
+    return format(weekStartDate, "yyyy-MM-dd");
+  }, [weekOffset]);
+  
+  const { data: apiWeeklyPenalties, isFetched: weeklyPenaltiesFetched } = useQuery<any[]>({
+    queryKey: ["/api/habit/weekly-penalties", viewedWeekStart],
+    enabled: !useMockData,
+  });
+
   // Fetch dashboard preferences
   const { data: apiDashboardPrefs } = useQuery<DashboardPreferences>({
     queryKey: ["/api/dashboard/preferences"],
@@ -1391,52 +1403,29 @@ export default function Dashboard() {
         };
       });
 
-    // Calculate task penalty rules (penalties for not completing tasks enough times)
-    // Only calculate penalties for past weeks (weekOffset < 0), not the current week
-    const taskPenalties: UnifiedBooster[] = weekOffset < 0 
-      ? tasks
-        .filter(t => t.penaltyRule?.enabled && t.penaltyRule?.timesThreshold !== undefined && t.penaltyRule?.penaltyPoints)
-        .map(t => {
-          const rule = t.penaltyRule!;
-          // Count completions in the viewed week (past week)
-          const baseWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-          const periodStart = addDays(baseWeekStart, weekOffset * 7);
-          const periodEnd = addDays(periodStart, 7);
-          let completions = 0;
-          
-          Object.entries(dailyLogs).forEach(([dateStr, log]) => {
-            const logDate = new Date(dateStr);
-            if (logDate >= periodStart && logDate < periodEnd && log.completedTaskIds.includes(t.id)) {
-              completions++;
-            }
-          });
-          
-          // Check if penalty is triggered based on condition
-          const isTriggered = rule.condition === "lessThan" 
-            ? completions < rule.timesThreshold
-            : completions > rule.timesThreshold;
-          
-          const conditionText = rule.condition === "lessThan" ? "less than" : "more than";
-          
-          return {
-            id: `task-penalty-${t.id}`,
-            name: t.name,
-            description: `If done ${conditionText} ${rule.timesThreshold}x per week`,
-            points: -rule.penaltyPoints,
-            achieved: isTriggered,
-            progress: completions,
-            required: rule.timesThreshold,
-            period: "week" as const,
-            isNegative: true,
-          };
-        })
-      : []; // No penalties for current week - only calculated after week ends
+    // Use persisted weekly avoidance penalties from API
+    // These are calculated and stored by the server when daily logs are saved
+    const taskPenalties: UnifiedBooster[] = (apiWeeklyPenalties || [])
+      .map((p: any) => {
+        const conditionText = p.condition === "lessThan" ? "less than" : "more than";
+        return {
+          id: `task-penalty-${p.taskId}`,
+          name: p.taskName,
+          description: `If done ${conditionText} ${p.requiredCount}x per week`,
+          points: -p.penaltyPoints,
+          achieved: p.triggered,
+          progress: p.completionCount,
+          required: p.requiredCount,
+          period: "week" as const,
+          isNegative: true,
+        };
+      });
 
     // Task Master and Over Achiever bonuses now award FP instead of weekly points
     // They are handled separately via the /api/fp/check-weekly-bonuses endpoint
     
     setBoosters([...taskBoosters, ...negativeBoosters, ...taskPenalties]);
-  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId, selectedWeekId]);
+  }, [useMockData, apiTasks, apiPenalties, apiDailyLogs, apiSettings, apiCheerlines, apiWeeklyTodos, weeklyTodosFetched, activeSeason, activeSeasonData, apiQueriesReady, weekOffset, user, currentWeekId, selectedWeekId, apiWeeklyPenalties]);
 
   // Load weeklyGoal from active season when one is active
   useEffect(() => {

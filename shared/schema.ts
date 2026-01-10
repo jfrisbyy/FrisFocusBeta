@@ -952,6 +952,26 @@ export const seasonWithDataSchema = z.object({
 });
 export type SeasonWithData = z.infer<typeof seasonWithDataSchema>;
 
+// Weekly avoidance penalties - tracks triggered task penalties per week
+export const weeklyAvoidancePenalties = pgTable("weekly_avoidance_penalties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  weekStart: varchar("week_start").notNull(), // YYYY-MM-DD (Monday)
+  taskId: varchar("task_id").notNull(),
+  taskName: varchar("task_name").notNull(),
+  completionCount: integer("completion_count").notNull().default(0),
+  requiredCount: integer("required_count").notNull(),
+  condition: varchar("condition").notNull(), // "lessThan" or "moreThan"
+  penaltyPoints: integer("penalty_points").notNull(),
+  triggered: boolean("triggered").notNull().default(false),
+  seasonId: varchar("season_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWeeklyAvoidancePenaltySchema = createInsertSchema(weeklyAvoidancePenalties).omit({ id: true, createdAt: true });
+export type InsertWeeklyAvoidancePenalty = z.infer<typeof insertWeeklyAvoidancePenaltySchema>;
+export type WeeklyAvoidancePenalty = typeof weeklyAvoidancePenalties.$inferSelect;
+
 // ==================== COMMUNITY SOCIAL FEATURES ====================
 
 // Community posts - visible to all users or friends only

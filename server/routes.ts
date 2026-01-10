@@ -135,6 +135,8 @@ import {
   insertUserTaskCompletionSchema,
   calorieBurnActivities,
   insertCalorieBurnActivitySchema,
+  weeklyAvoidancePenalties,
+  insertWeeklyAvoidancePenaltySchema,
 } from "@shared/schema";
 import { sendInvitationEmail } from "./email";
 import { and, or, desc, inArray, gte, lte, sql } from "drizzle-orm";
@@ -211,6 +213,101 @@ async function recordTaskCompletions(
     }
   } catch (error) {
     console.error("Error recording task completions:", error);
+  }
+}
+
+// Helper to calculate and persist weekly avoidance penalties
+async function calculateAndPersistAvoidancePenalties(
+  userId: string,
+  weekStartStr: string,
+  seasonId: string | null
+) {
+  try {
+    // Calculate week end
+    const weekStart = new Date(weekStartStr);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekEndStr = weekEnd.toISOString().split('T')[0];
+
+    // Get all tasks with penaltyRule
+    let tasksWithPenalty: any[] = [];
+    
+    if (seasonId) {
+      const allSeasonTasks = await db.select().from(seasonTasks)
+        .where(eq(seasonTasks.seasonId, seasonId));
+      tasksWithPenalty = allSeasonTasks.filter((t: any) => 
+        t.penaltyRule?.enabled && 
+        t.penaltyRule?.timesThreshold !== undefined && 
+        t.penaltyRule?.penaltyPoints
+      );
+    } else {
+      const allUserTasks = await db.select().from(userTasks)
+        .where(eq(userTasks.userId, userId));
+      tasksWithPenalty = allUserTasks.filter((t: any) => 
+        t.penaltyRule?.enabled && 
+        t.penaltyRule?.timesThreshold !== undefined && 
+        t.penaltyRule?.penaltyPoints
+      );
+    }
+
+    if (tasksWithPenalty.length === 0) return;
+
+    // Get all daily logs for the week
+    const weekLogs = await db.select().from(userDailyLogs).where(
+      and(
+        eq(userDailyLogs.userId, userId),
+        gte(userDailyLogs.date, weekStartStr),
+        lte(userDailyLogs.date, weekEndStr)
+      )
+    );
+
+    // Count completions per task
+    const taskCompletionCounts: Record<string, number> = {};
+    for (const log of weekLogs) {
+      const completedIds = (log.completedTaskIds as string[]) || [];
+      for (const taskId of completedIds) {
+        taskCompletionCounts[taskId] = (taskCompletionCounts[taskId] || 0) + 1;
+      }
+    }
+
+    // Delete existing penalties for this week to avoid duplicates
+    await db.delete(weeklyAvoidancePenalties).where(
+      and(
+        eq(weeklyAvoidancePenalties.userId, userId),
+        eq(weeklyAvoidancePenalties.weekStart, weekStartStr)
+      )
+    );
+
+    // Calculate and persist penalties
+    const penaltiesToInsert: any[] = [];
+    for (const task of tasksWithPenalty) {
+      const rule = task.penaltyRule;
+      const completions = taskCompletionCounts[task.id] || 0;
+      
+      // Check if penalty is triggered
+      const isTriggered = rule.condition === "lessThan"
+        ? completions < rule.timesThreshold
+        : completions > rule.timesThreshold;
+
+      penaltiesToInsert.push({
+        userId,
+        weekStart: weekStartStr,
+        taskId: task.id,
+        taskName: task.name,
+        completionCount: completions,
+        requiredCount: rule.timesThreshold,
+        condition: rule.condition,
+        penaltyPoints: rule.penaltyPoints,
+        triggered: isTriggered,
+        seasonId: seasonId || null,
+      });
+    }
+
+    if (penaltiesToInsert.length > 0) {
+      await db.insert(weeklyAvoidancePenalties).values(penaltiesToInsert);
+    }
+  } catch (error) {
+    console.error("Error calculating avoidance penalties:", error);
   }
 }
 
@@ -8495,6 +8592,19 @@ CURRENT CONVERSATION STATE:
         // Record task completions to all-time history
         await recordTaskCompletions(userId, date, completedTaskIds || [], seasonId || null, taskLookup);
         
+        // Calculate avoidance penalties for the current week
+        try {
+          const logDate = new Date(date);
+          const dayOfWeek = logDate.getDay();
+          const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const weekStart = new Date(logDate);
+          weekStart.setDate(logDate.getDate() + mondayOffset);
+          const weekStartStr = weekStart.toISOString().split('T')[0];
+          await calculateAndPersistAvoidancePenalties(userId, weekStartStr, seasonId || null);
+        } catch (penaltyError) {
+          console.error("Error calculating avoidance penalties:", penaltyError);
+        }
+        
         res.json(log);
       } else {
         // Create new log - set checkInBonusAwarded to true since FP is awarded on first save
@@ -8563,11 +8673,87 @@ CURRENT CONVERSATION STATE:
         // Record task completions to all-time history
         await recordTaskCompletions(userId, date, completedTaskIds || [], seasonId || null, taskLookup);
         
+        // Calculate avoidance penalties for the current week
+        try {
+          const penaltyLogDate = new Date(date);
+          const penaltyDayOfWeek = penaltyLogDate.getDay();
+          const penaltyMondayOffset = penaltyDayOfWeek === 0 ? -6 : 1 - penaltyDayOfWeek;
+          const penaltyWeekStart = new Date(penaltyLogDate);
+          penaltyWeekStart.setDate(penaltyLogDate.getDate() + penaltyMondayOffset);
+          const penaltyWeekStartStr = penaltyWeekStart.toISOString().split('T')[0];
+          await calculateAndPersistAvoidancePenalties(userId, penaltyWeekStartStr, seasonId || null);
+        } catch (penaltyError) {
+          console.error("Error calculating avoidance penalties:", penaltyError);
+        }
+        
         res.json(log);
       }
     } catch (error) {
       console.error("Error updating daily log:", error);
       res.status(400).json({ error: "Failed to update daily log" });
+    }
+  });
+
+  // ==================== WEEKLY AVOIDANCE PENALTIES API ====================
+
+  // Get weekly avoidance penalties for a specific week
+  app.get("/api/habit/weekly-penalties/:weekStart", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const weekStart = req.params.weekStart;
+
+      const penalties = await db.select().from(weeklyAvoidancePenalties)
+        .where(and(
+          eq(weeklyAvoidancePenalties.userId, userId),
+          eq(weeklyAvoidancePenalties.weekStart, weekStart)
+        ));
+
+      res.json(penalties);
+    } catch (error) {
+      console.error("Error fetching weekly avoidance penalties:", error);
+      res.status(500).json({ error: "Failed to fetch weekly avoidance penalties" });
+    }
+  });
+
+  // Calculate and persist avoidance penalties for a week (can be called manually or at week-end)
+  app.post("/api/habit/weekly-penalties/calculate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weekStart, seasonId } = req.body;
+
+      if (!weekStart) {
+        return res.status(400).json({ error: "weekStart is required" });
+      }
+
+      await calculateAndPersistAvoidancePenalties(userId, weekStart, seasonId || null);
+
+      // Return the calculated penalties
+      const penalties = await db.select().from(weeklyAvoidancePenalties)
+        .where(and(
+          eq(weeklyAvoidancePenalties.userId, userId),
+          eq(weeklyAvoidancePenalties.weekStart, weekStart)
+        ));
+
+      res.json(penalties);
+    } catch (error) {
+      console.error("Error calculating weekly avoidance penalties:", error);
+      res.status(500).json({ error: "Failed to calculate weekly avoidance penalties" });
+    }
+  });
+
+  // Get all weekly avoidance penalties for a user (for historical view)
+  app.get("/api/habit/weekly-penalties", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+
+      const penalties = await db.select().from(weeklyAvoidancePenalties)
+        .where(eq(weeklyAvoidancePenalties.userId, userId))
+        .orderBy(desc(weeklyAvoidancePenalties.weekStart));
+
+      res.json(penalties);
+    } catch (error) {
+      console.error("Error fetching all weekly avoidance penalties:", error);
+      res.status(500).json({ error: "Failed to fetch weekly avoidance penalties" });
     }
   });
 
