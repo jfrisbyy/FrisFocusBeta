@@ -769,7 +769,7 @@ export default function Dashboard() {
   const dashboardPrefs = localDashboardPrefs;
   
   // Check if API queries have completed their initial fetch
-  const apiQueriesReady = useMockData || (activeSeason ? activeSeasonDataFetched : (tasksFetched && penaltiesFetched && logsFetched && weeklyPenaltiesFetched));
+  const apiQueriesReady = useMockData || (activeSeason ? (activeSeasonDataFetched && weeklyPenaltiesFetched) : (tasksFetched && penaltiesFetched && logsFetched && weeklyPenaltiesFetched));
 
   // Mutation for updating settings (weekly goal) when no season is active
   const updateSettingsMutation = useMutation({
