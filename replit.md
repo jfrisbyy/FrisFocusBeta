@@ -160,3 +160,45 @@ users {
 - Dependency bundling via esbuild reduces syscall overhead
 - Static asset serving with fallback to index.html for SPA routing
 - Source map support via @jridgewell/trace-mapping
+
+## iOS Mobile App (Capacitor)
+
+FrisFocus is configured to be packaged as a native iOS app using Capacitor.
+
+**Configuration**:
+- App ID: `com.frisfocus.app`
+- App Name: `FrisFocus`
+- Web Directory: `dist/public` (Vite build output)
+- Config file: `capacitor.config.ts`
+
+**Building for iOS** (requires macOS with Xcode):
+
+1. Clone the repository to your Mac
+2. Install dependencies: `npm install`
+3. Build web assets: `vite build`
+4. Sync to iOS: `npx cap sync ios`
+5. Open in Xcode: `npx cap open ios`
+6. Build and run from Xcode
+
+**Development Workflow**:
+```bash
+# After making changes to the web app:
+vite build
+npx cap sync ios
+npx cap open ios
+```
+
+**Live Reload** (for development):
+Add this to `capacitor.config.ts` temporarily:
+```typescript
+server: {
+  url: 'http://YOUR_LOCAL_IP:5000',
+  cleartext: true
+}
+```
+Then run `npx cap run ios` on your Mac.
+
+**Notes**:
+- CocoaPods must be installed on macOS: `sudo gem install cocoapods`
+- The `ios/` folder contains the native Xcode project
+- Commit the `ios/` folder to version control
